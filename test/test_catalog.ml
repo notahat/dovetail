@@ -1,28 +1,7 @@
 (** Tests for [Catalog]. *)
 
 open Dovetail
-
-(** Create a fresh temp directory, run [f] with its path, remove it on exit.
-    Uses shell [rm -rf] for cleanup -- adequate for tests. *)
-let with_temp_dir f =
-  let base = Filename.get_temp_dir_name () in
-  let name =
-    Printf.sprintf "dovetail-test-%d-%d" (Unix.getpid ()) (Random.bits ())
-  in
-  let dir = Filename.concat base name in
-  Unix.mkdir dir 0o755;
-  Fun.protect
-    ~finally:(fun () ->
-      let _ = Sys.command (Printf.sprintf "rm -rf %s" (Filename.quote dir)) in
-      ())
-    (fun () -> f dir)
-
-(** Open an environment, run [f environment], close the environment. *)
-let with_environment path f =
-  let environment = Storage.open_environment path in
-  Fun.protect
-    ~finally:(fun () -> Storage.close_environment environment)
-    (fun () -> f environment)
+open Test_helpers
 
 let users_schema : Schema.t =
   {
