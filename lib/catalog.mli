@@ -1,0 +1,30 @@
+(** The catalog: a persistent map from table name to [Schema.t].
+
+    Backed by a single LMDB subDB called [catalog], keyed by the table name as
+    UTF-8 bytes with [Marshal]-encoded schemas as values. The subDB is created
+    lazily on the first {!put}; reads against an environment that has never been
+    written return [None] rather than raising.
+
+    The Marshal coupling to OCaml's runtime representation is accepted for slice
+    1 and revisited in slice 6 alongside composite-key encoding. *)
+
+val get :
+  Storage.environment ->
+  [> `Read ] Storage.transaction ->
+  table_name:string ->
+  Schema.t option
+(** [get environment transaction ~table_name] returns the schema bound to
+    [table_name], or [None] if no such binding exists (including the case where
+    the catalog subDB has not yet been created). Safe to call inside a read-only
+    transaction. *)
+
+val put :
+  Storage.environment ->
+  [ `Read | `Write ] Storage.transaction ->
+  table_name:string ->
+  Schema.t ->
+  unit
+(** [put environment transaction ~table_name schema] writes [schema] under
+    [table_name], creating the catalog subDB if it does not yet exist.
+    Overwrites any existing binding silently. Must be called inside a read-write
+    transaction. *)
