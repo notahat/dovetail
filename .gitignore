@@ -2,3 +2,4 @@ _build/
 _opam/
 *.install
 .merlin
+.claude/settings.local.json

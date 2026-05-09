@@ -49,10 +49,12 @@ underlying tool's vocabulary.
 ## Tooling
 
 - OCaml 5.2 in a local opam switch at the project root.
-- `eval $(opam env)` before `dune` commands, unless invoking via
-  `opam exec`.
-- Build: `dune build`. Tests: `dune test`. Format:
-  `dune build @fmt --auto-promote`.
+- Run dune commands via `opam exec -- dune ...` so the local switch's
+  environment is set up for that one command. Avoid the
+  `eval $(opam env) && dune ...` form: it works, but it interferes with
+  Claude Code's per-command permission allowlist.
+- Build: `opam exec -- dune build`. Tests: `opam exec -- dune test`.
+  Format: `opam exec -- dune build @fmt --auto-promote`.
 - Run the formatter before considering a step done; it has opinions and
   will adjust line breaks and comment wrapping.
 - Test framework: `alcotest`. Parser library: `angstrom` (arrives in
