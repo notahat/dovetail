@@ -2,8 +2,8 @@
 
 open Dovetail
 
-(** Create a fresh temp directory, run [f] with its path, remove it on
-    exit. Uses shell [rm -rf] for cleanup -- adequate for tests. *)
+(** Create a fresh temp directory, run [f] with its path, remove it on exit.
+    Uses shell [rm -rf] for cleanup -- adequate for tests. *)
 let with_temp_dir f =
   let base = Filename.get_temp_dir_name () in
   let name =

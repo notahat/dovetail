@@ -1,7 +1,5 @@
 type env = Lmdb.Env.t
-
 type -'perm txn = 'perm Lmdb.Txn.t constraint 'perm = [< `Read | `Write ]
-
 type map = (string, string, [ `Uni ]) Lmdb.Map.t
 
 let open_env ?(map_size = 1 lsl 30) ?(max_maps = 4096) path =
@@ -22,15 +20,15 @@ let with_write_txn env f =
 
 let open_map env txn ~name =
   match
-    Lmdb.Map.open_existing Nodup ~key:Lmdb.Conv.string
-      ~value:Lmdb.Conv.string ~txn ~name env
+    Lmdb.Map.open_existing Nodup ~key:Lmdb.Conv.string ~value:Lmdb.Conv.string
+      ~txn ~name env
   with
   | map -> Some map
   | exception Lmdb.Not_found -> None
 
 let create_map env txn ~name =
-  Lmdb.Map.create Nodup ~key:Lmdb.Conv.string ~value:Lmdb.Conv.string ~txn
-    ~name env
+  Lmdb.Map.create Nodup ~key:Lmdb.Conv.string ~value:Lmdb.Conv.string ~txn ~name
+    env
 
 let put map txn ~key ~value = Lmdb.Map.set map ~txn key value
 
