@@ -212,6 +212,39 @@ Each slice gets its own follow-on plan document (`02-…`, `03-…`)
 detailing sub-steps, with TDD where appropriate, review and commit at
 sensible boundaries.
 
+## Prior art and references
+
+There is no widely-adopted "this is the RA language" out there. Designing
+our own is the right call: the language is the user-visible surface of
+the algebra we are defining, and owning it lets us draw our own line
+between pure RA and extensions (option types instead of NULLs,
+generalized projection with computed columns, aggregation as an explicit
+extension). The cost of designing it operator-by-operator across slices
+is small.
+
+References worth consulting *as ideas, not as templates*, when each slice
+forces a syntactic decision:
+
+- **Tutorial D** (Date & Darwen, *Third Manifesto*; implementations Rel,
+  Duro). The most serious "RA done properly" effort. Useful for purity
+  questions — when deciding whether something is really RA or an
+  extension, their answers are considered, even when we disagree. Brings
+  a heavy philosophical package; do not adopt wholesale.
+- **PRQL** (Pipelined Relational Query Language). A SQL frontend, but
+  has solved many small ergonomic papercuts in pipeline syntax (`join`
+  shape, `group ... aggregate` shape, column-list conventions). Worth
+  reading the spec before finalizing each operator's surface. Its
+  underlying semantics are SQL's (bags, NULLs, 3VL) — not what we want.
+- **Kusto / KQL** (Microsoft). Pleasant `where` predicate sublanguage
+  worth comparing against when slice 2 makes us pin ours down.
+- **Malloy** (Google). Pipeline-flavored modeling language compiling to
+  SQL. Mostly out of scope; occasional ergonomic ideas.
+- **Datalog**. A different paradigm (Horn clauses, declarative recursion).
+  Not what we are building, but a useful contrast when reasoning about
+  what RA cannot express cleanly.
+- **Academic notation** (σ, π, ⋈, ⟕, γ). Our reference for what each
+  operator means. Not our surface syntax.
+
 ## Deferred decisions
 
 To revisit when slices force them:
