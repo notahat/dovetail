@@ -1,2 +1,3 @@
 (library
- (name dovetail))
+ (name dovetail)
+ (libraries lmdb unix))
