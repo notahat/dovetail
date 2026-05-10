@@ -132,6 +132,71 @@ let test_cross_product_translates_to_physical_cross_product () =
        })
     physical
 
+let users_id_equals_orders_user_id : Predicate.t =
+  Compare
+    {
+      left = Column { qualifier = Some "users"; name = "id" };
+      op = Equal;
+      right = Column { qualifier = Some "orders"; name = "user_id" };
+    }
+
+let test_restrict_over_cross_product_translates_to_nested_loop_join () =
+  let logical =
+    Logical.Restrict
+      {
+        input =
+          Logical.CrossProduct
+            {
+              left = Logical.Scan { table = "users" };
+              right = Logical.Scan { table = "orders" };
+            };
+        predicate = users_id_equals_orders_user_id;
+      }
+  in
+  let physical = Translate.translate logical in
+  Alcotest.(check physical_testable)
+    "Restrict(CrossProduct(...), pred) -> NestedLoopJoin(..., pred)"
+    (Physical.NestedLoopJoin
+       {
+         left = Physical.FullScan { table = "users" };
+         right = Physical.FullScan { table = "orders" };
+         predicate = users_id_equals_orders_user_id;
+       })
+    physical
+
+let test_standalone_restrict_does_not_trigger_join_rewrite () =
+  let logical =
+    Logical.Restrict
+      { input = Logical.Scan { table = "users" }; predicate = id_equals_three }
+  in
+  let physical = Translate.translate logical in
+  Alcotest.(check physical_testable)
+    "Restrict over a non-CrossProduct input still becomes Filter"
+    (Physical.Filter
+       {
+         input = Physical.FullScan { table = "users" };
+         predicate = id_equals_three;
+       })
+    physical
+
+let test_standalone_cross_product_does_not_trigger_join_rewrite () =
+  let logical =
+    Logical.CrossProduct
+      {
+        left = Logical.Scan { table = "users" };
+        right = Logical.Scan { table = "orders" };
+      }
+  in
+  let physical = Translate.translate logical in
+  Alcotest.(check physical_testable)
+    "CrossProduct without an enclosing Restrict stays as CrossProduct"
+    (Physical.CrossProduct
+       {
+         left = Physical.FullScan { table = "users" };
+         right = Physical.FullScan { table = "orders" };
+       })
+    physical
+
 let () =
   Alcotest.run "translate"
     [
@@ -164,5 +229,18 @@ let () =
           Alcotest.test_case
             "translates Logical.CrossProduct to Physical.CrossProduct" `Quick
             test_cross_product_translates_to_physical_cross_product;
+        ] );
+      ( "nested loop join rewrite",
+        [
+          Alcotest.test_case
+            "Restrict over CrossProduct collapses to a NestedLoopJoin" `Quick
+            test_restrict_over_cross_product_translates_to_nested_loop_join;
+          Alcotest.test_case
+            "standalone Restrict over a base scan still becomes Filter" `Quick
+            test_standalone_restrict_does_not_trigger_join_rewrite;
+          Alcotest.test_case
+            "standalone CrossProduct without an enclosing Restrict stays as \
+             CrossProduct"
+            `Quick test_standalone_cross_product_does_not_trigger_join_rewrite;
         ] );
     ]

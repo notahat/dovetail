@@ -6,12 +6,16 @@
     scans, join algorithm choice, and operator-tree restructuring have a home
     when later slices need them.
 
-    No optimisation happens here in slice 1: the function is a structural
-    rewrite. An optimiser, when it lands, will sit between {!Lower} and
-    {!Translate} (or replace {!Translate} entirely; that decision is deferred).
-*)
+    Slice 1-4 was a pure structural rewrite -- one logical constructor per
+    physical constructor. Slice 5 introduces the first proper rewrite rule:
+    [Restrict (CrossProduct (L, R), pred)] collapses into a single
+    {!Physical.NestedLoopJoin}. The translation is still trivial in aggregate,
+    but the door to a real optimiser is now open: future rewrite rules
+    (predicate pushdown, equi-join detection) will sit alongside this one. *)
 
 val translate : Logical.t -> Physical.t
 (** [translate plan] rewrites [plan] into an equivalent physical plan. Slice 1
     maps [Scan] to [FullScan]; slice 2 adds [Restrict] -> [Filter]; slice 3 adds
-    [Project] -> [Project]. *)
+    [Project] -> [Project]; slice 4 adds [CrossProduct] -> [CrossProduct]; slice
+    5 adds the first non-structural rewrite,
+    [Restrict (CrossProduct (L, R), pred)] -> [NestedLoopJoin (L, R, pred)]. *)
