@@ -22,7 +22,7 @@ The storage stack sits below it, used by `Eval` and the catalog.
 
       "users"
          │
-         │  Parser   (angstrom; slice 1 step 8)
+         │  Parser   (angstrom)
          ▼
        Ast.t        — surface AST; mirrors syntax
          │
@@ -60,7 +60,7 @@ slice it goes away.
 
 | Layer       | Type                                     | Role                                                                                           |
 | ----------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `Parser`    | `string -> (Ast.t, error) result`        | Surface syntax → AST. Slice 1 only handles bare identifiers.                                   |
+| `Parser`    | `string -> (Ast.t, error) result`        | Surface syntax → AST, built on `angstrom`. Slice 1 only handles bare identifiers.              |
 | `Ast`       | `t = Relation_name of string \| ...`     | What the user typed, structured. No semantics yet.                                             |
 | `Lower`     | `Ast.t -> Logical.t`                     | Replace each syntactic node with the algebraic operator it denotes.                            |
 | `Logical`   | `t = Scan of {...} \| ...`               | Algebra: *what* the query computes, with no execution detail.                                  |
@@ -93,7 +93,7 @@ OCaml 5.2 in a local opam switch at the repo root.
 opam exec -- dune build              # compile
 opam exec -- dune test               # run all alcotest suites
 opam exec -- dune build @fmt --auto-promote   # format
-opam exec -- dune exec dovetail      # run the binary (slice 1 step 9 onward)
+opam exec -- dune exec dovetail      # run the REPL (default env: ./dovetail-data)
 ```
 
 See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling

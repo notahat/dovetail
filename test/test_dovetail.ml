@@ -11,20 +11,6 @@ open Test_helpers
     directory under [_build/default/test/]. *)
 let binary_path = "../bin/main.exe"
 
-let contains_substring haystack needle =
-  let needle_length = String.length needle in
-  let haystack_length = String.length haystack in
-  if needle_length = 0 then true
-  else if needle_length > haystack_length then false
-  else
-    let limit = haystack_length - needle_length in
-    let rec scan position =
-      if position > limit then false
-      else if String.sub haystack position needle_length = needle then true
-      else scan (position + 1)
-    in
-    scan 0
-
 (** Run [binary_path] with [environment_path] as its argument, sending
     [stdin_text] as standard input. Returns the captured stdout as a string.
     Stderr is discarded; the binary doesn't write to it on success and we don't

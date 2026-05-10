@@ -4,43 +4,6 @@
 open Dovetail
 open Test_helpers
 
-let expected_rows : Schema.tuple list =
-  [
-    [|
-      Value.Int64 1L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
-    |];
-    [|
-      Value.Int64 2L;
-      Value.String "Bob";
-      Value.String "bob@example.com";
-      Value.Bool false;
-    |];
-    [|
-      Value.Int64 3L;
-      Value.String "Carol";
-      Value.String "carol@example.com";
-      Value.Bool true;
-    |];
-    [|
-      Value.Int64 4L;
-      Value.String "Dave";
-      Value.String "dave@example.com";
-      Value.Bool true;
-    |];
-    [|
-      Value.Int64 5L;
-      Value.String "Eve";
-      Value.String "eve@example.com";
-      Value.Bool false;
-    |];
-  ]
-
-let tuple_list_testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuples>")) ( = )
-
 let test_full_scan_yields_fixture_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -55,7 +18,7 @@ let test_full_scan_yields_fixture_rows () =
         (String.concat "," relation.schema.primary_key);
       let rows = List.of_seq relation.tuples in
       Alcotest.(check tuple_list_testable)
-        "five rows in primary-key order" expected_rows rows)
+        "five rows in primary-key order" expected_users_rows rows)
 
 let test_full_scan_raises_for_missing_table () =
   with_temp_dir @@ fun dir ->

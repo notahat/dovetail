@@ -26,22 +26,6 @@ let run_with_input lines =
   Format.pp_print_flush formatter ();
   Buffer.contents captured
 
-(** Substring search; returns [true] when [haystack] contains [needle] anywhere.
-    Avoids pulling in [Str] for one-off checks. *)
-let contains_substring haystack needle =
-  let needle_length = String.length needle in
-  let haystack_length = String.length haystack in
-  if needle_length = 0 then true
-  else if needle_length > haystack_length then false
-  else
-    let limit = haystack_length - needle_length in
-    let rec scan position =
-      if position > limit then false
-      else if String.sub haystack position needle_length = needle then true
-      else scan (position + 1)
-    in
-    scan 0
-
 let check_contains label output expected =
   if not (contains_substring output expected) then
     Alcotest.failf "%s: expected output to contain %S\n--- output ---\n%s" label

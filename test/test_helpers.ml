@@ -40,3 +40,62 @@ let with_environment path f =
   Fun.protect
     ~finally:(fun () -> Storage.close_environment environment)
     (fun () -> f environment)
+
+(** The five [users] fixture rows as [Schema.tuple]s, in primary-key order.
+    Mirrors [Fixture.users_rows] but lives here so tests can compare pipeline
+    output against a single shared expectation. *)
+let expected_users_rows : Schema.tuple list =
+  [
+    [|
+      Value.Int64 1L;
+      Value.String "Alice";
+      Value.String "alice@example.com";
+      Value.Bool true;
+    |];
+    [|
+      Value.Int64 2L;
+      Value.String "Bob";
+      Value.String "bob@example.com";
+      Value.Bool false;
+    |];
+    [|
+      Value.Int64 3L;
+      Value.String "Carol";
+      Value.String "carol@example.com";
+      Value.Bool true;
+    |];
+    [|
+      Value.Int64 4L;
+      Value.String "Dave";
+      Value.String "dave@example.com";
+      Value.Bool true;
+    |];
+    [|
+      Value.Int64 5L;
+      Value.String "Eve";
+      Value.String "eve@example.com";
+      Value.Bool false;
+    |];
+  ]
+
+(** Alcotest testable for a list of [Schema.tuple]s. Polymorphic-equality based;
+    the printer is a placeholder because tuples don't have a natural one-line
+    rendering and the diff machinery isn't worth the weight here. *)
+let tuple_list_testable : Schema.tuple list Alcotest.testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuples>")) ( = )
+
+(** [contains_substring haystack needle] is [true] if [needle] appears anywhere
+    in [haystack]. Avoids pulling in [Str] for one-off checks. *)
+let contains_substring haystack needle =
+  let needle_length = String.length needle in
+  let haystack_length = String.length haystack in
+  if needle_length = 0 then true
+  else if needle_length > haystack_length then false
+  else
+    let limit = haystack_length - needle_length in
+    let rec scan position =
+      if position > limit then false
+      else if String.sub haystack position needle_length = needle then true
+      else scan (position + 1)
+    in
+    scan 0

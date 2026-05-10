@@ -271,13 +271,20 @@ verifies stdout contains the five rows when given `users\n` as input.
 
 End state: the demo from the top of this document works.
 
-## Open questions to resolve as we go
+## Open questions, resolved
 
-- Pretty-print format for `Relation.t`. Box-drawing? ASCII pipes? Plain
-  TSV? Decide in step 5 when we first need it; can be ugly.
-- Error type shape (`Result.t` of what? a polymorphic variant of error
-  cases?). Decide in step 8 when the parser produces the first user-
-  visible errors; until then, exceptions are fine.
-- Whether `Storage.cursor_seq` should `protect` against cursor leaks if
-  the consumer drops the `Seq.t` early. Probably yes; design when we
-  hit it in step 5.
+- **Pretty-print format for `Relation.t`.** Resolved in step 5: aligned
+  ASCII pipe-table, header + separator + rows, numeric columns
+  right-aligned. `Relation.print` takes an optional formatter so tests
+  can capture output without going through stdout.
+- **Error type shape for `Parser.parse`.** Resolved in step 8 with the
+  smallest commitment: `type error = string`, forwarding angstrom's
+  message unchanged. The `.mli` flags this as a slice-1 placeholder so
+  callers already speak in terms of `Parser.error`; structured errors
+  can land later without breaking the signature shape.
+- **Cursor-leak protection in `Storage.iter_seq`.** Sidestepped: the
+  step-2 implementation materialises the cursor's pairs into a list
+  eagerly and wraps it as a `Seq.t`, so there is no live cursor for a
+  dropped consumer to leak. The `.mli` flags this as a deliberate
+  slice-1 simplification to revisit when a slice needs to scan enough
+  rows that materialisation is the wrong choice.
