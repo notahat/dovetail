@@ -16,3 +16,10 @@ type t =
       (** [Filter { input; predicate }] yields the rows from [input] for which
           [predicate] holds. Schema and multiplicity tag are passed through from
           [input] -- filtering preserves whether the input is a set or a bag. *)
+  | Project of { input : t; columns : Projection.t }
+      (** [Project { input; columns }] yields the rows from [input] narrowed to
+          the named [columns], in the order given. The output schema's
+          [primary_key] is always empty -- derived relations don't carry PK
+          information at this point in the project. The multiplicity tag
+          downgrades to [`Bag] because dropping columns can introduce duplicates
+          that weren't present in the input. *)

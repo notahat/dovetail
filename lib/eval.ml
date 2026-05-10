@@ -52,3 +52,7 @@ let rec eval environment transaction plan =
       let { Relation.schema; tuples } = eval environment transaction input in
       let evaluator = Predicate.resolve schema predicate in
       { schema; tuples = Seq.filter evaluator tuples }
+  | Project { input; columns } ->
+      let { Relation.schema; tuples } = eval environment transaction input in
+      let projected_schema, project_tuple = Projection.resolve schema columns in
+      { schema = projected_schema; tuples = Seq.map project_tuple tuples }
