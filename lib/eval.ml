@@ -45,6 +45,10 @@ let evaluate_full_scan environment transaction table =
   in
   ({ schema; tuples } : [ `Bag ] Relation.t)
 
-let eval environment transaction plan =
+let rec eval environment transaction plan =
   match (plan : Physical.t) with
   | FullScan { table } -> evaluate_full_scan environment transaction table
+  | Filter { input; predicate } ->
+      let { Relation.schema; tuples } = eval environment transaction input in
+      let evaluator = Predicate.resolve schema predicate in
+      { schema; tuples = Seq.filter evaluator tuples }

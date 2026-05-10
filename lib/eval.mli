@@ -5,8 +5,8 @@
     single function that wires its inputs into a [Seq.t] and threads the
     transaction through.
 
-    Slice 1 ships only the {!Physical.FullScan} case; further operators are
-    added as later slices introduce them. *)
+    Slice 1 introduced {!Physical.FullScan}; slice 2 adds {!Physical.Filter}.
+    Further operators are added as later slices introduce them. *)
 
 val eval :
   Storage.environment ->
