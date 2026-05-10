@@ -1,5 +1,5 @@
 type op = Equal | NotEqual
-type term = Column of string | Literal of Value.t
+type term = Column of Schema.column_reference | Literal of Value.t
 type t = Compare of { left : term; op : op; right : term }
 
 (* The static kind that classifies a runtime value. Used to type-check the
@@ -15,11 +15,13 @@ let kind_name = function
   | Value.Kind.String -> "String"
   | Value.Kind.Bool -> "Bool"
 
-(* Render a [term] for inclusion in error messages. Columns appear as their
-   bare name; literals are tagged as such with their kind so the message
-   makes sense even when the literal's printed form would be ambiguous. *)
+(* Render a [term] for inclusion in error messages. Columns appear in their
+   source form (bare or dotted); literals are tagged as such with their kind
+   so the message makes sense even when the literal's printed form would be
+   ambiguous. *)
 let describe_term = function
-  | Column name -> Printf.sprintf "column %S" name
+  | Column reference ->
+      Printf.sprintf "column %S" (Schema.format_column_reference reference)
   | Literal value ->
       Printf.sprintf "literal %s" (kind_name (kind_of_value value))
 
@@ -31,12 +33,10 @@ let resolve_term schema = function
       let kind = kind_of_value value in
       let read_value (_tuple : Schema.tuple) = value in
       (kind, read_value)
-  | Column column_name -> (
-      match Schema.find_field schema column_name with
-      | None ->
-          failwith
-            (Printf.sprintf "Predicate.resolve: unknown column %S" column_name)
-      | Some (column_position, field) ->
+  | Column reference -> (
+      match Schema.find_field schema reference with
+      | Error message -> failwith ("Predicate.resolve: " ^ message)
+      | Ok (column_position, field) ->
           let read_value (tuple : Schema.tuple) = tuple.(column_position) in
           (field.kind, read_value))
 

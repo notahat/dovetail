@@ -7,17 +7,17 @@
     introspection. Mapping names to tuple positions is an executor concern,
     handled by {!resolve}.
 
-    Slice 2 shipped column-vs-literal [Compare] with equality and inequality.
-    Slice 4 step 2 generalises both sides to {!type-term} so column-vs-column
-    comparisons fit in the same shape. Boolean composition (and/or/not), parens,
-    and ordering operators arrive in later slices. *)
+    Slice 4 step 3 reuses {!Schema.column_reference} for column terms so the
+    qualifier (set when a cross product or join exposes same-named columns from
+    different inputs) is carried end to end. Boolean composition (and/or/not),
+    parens, and ordering operators arrive in later slices. *)
 
 (** Comparison operator. *)
 type op = Equal | NotEqual
 
-(** A single side of a comparison: either a column reference (by name) or a
-    literal value. *)
-type term = Column of string | Literal of Value.t
+(** A single side of a comparison: either a column reference (bare or qualified)
+    or a literal value. *)
+type term = Column of Schema.column_reference | Literal of Value.t
 
 (** A predicate. The single-constructor form leaves room for boolean composition
     without changing call sites that already pattern-match. *)
@@ -29,12 +29,14 @@ val resolve : Schema.t -> t -> Schema.tuple -> bool
 
     Validation, performed once at resolve time:
 
-    - Every {!Column} term must name a column that exists in [schema].
+    - Every {!Column} term must resolve uniquely against [schema] -- a qualified
+      reference must match exactly one field; an unqualified one must match
+      exactly one field by name.
     - The two sides' {!Value.Kind.t}s must agree.
 
     The closure does at most two array indices and a structural comparison per
     call. Each {!Column} term's field-order position is captured at resolve
     time, so no name lookup happens per row.
 
-    Raises [Failure] if a column is unknown to the schema, or if the two sides'
-    kinds disagree. *)
+    Raises [Failure] if a column reference is unknown or ambiguous, or if the
+    two sides' kinds disagree. *)

@@ -49,8 +49,8 @@ let evaluate_users_filter predicate =
 
 (* Helpers to build [Compare] predicates with [term]-shaped sides. Local
    shorthand to keep test bodies short under the slice-4 predicate shape. *)
-let column name = Predicate.Column name
-let literal value = Predicate.Literal value
+let column name : Predicate.term = Column { qualifier = None; name }
+let literal value : Predicate.term = Literal value
 
 let compare_predicate ~left ~op ~right : Predicate.t =
   Compare { left; op; right }
@@ -140,8 +140,15 @@ let test_filter_type_mismatch_raises () =
       ())
 
 (* Build a Project wrapping [input_plan] over the users fixture, evaluate
-   it, and return the resulting tuples. *)
-let evaluate_users_project ~input_plan columns =
+   it, and return the resulting tuples. [column_names] is a list of bare
+   names, wrapped into unqualified {!Schema.column_reference}s -- the test
+   bodies don't need qualifiers here. *)
+let evaluate_users_project ~input_plan column_names =
+  let columns =
+    List.map
+      (fun name : Schema.column_reference -> { qualifier = None; name })
+      column_names
+  in
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
@@ -207,7 +214,14 @@ let test_project_then_filter () =
           {
             input =
               Physical.Project
-                { input = users_full_scan; columns = [ "name"; "active" ] };
+                {
+                  input = users_full_scan;
+                  columns =
+                    [
+                      { qualifier = None; name = "name" };
+                      { qualifier = None; name = "active" };
+                    ];
+                };
             predicate =
               compare_predicate ~left:(column "active") ~op:Equal
                 ~right:(literal (Value.Bool true));

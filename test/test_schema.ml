@@ -6,10 +6,10 @@ let users_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Int64 };
-        { name = "name"; kind = String };
-        { name = "email"; kind = String };
-        { name = "active"; kind = Bool };
+        { name = "id"; kind = Int64; qualifier = Some "users" };
+        { name = "name"; kind = String; qualifier = Some "users" };
+        { name = "email"; kind = String; qualifier = Some "users" };
+        { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
     primary_key = [ "id" ];
   }
@@ -20,9 +20,9 @@ let mid_pk_schema : Schema.t =
   {
     fields =
       [
-        { name = "name"; kind = String };
-        { name = "id"; kind = Int64 };
-        { name = "active"; kind = Bool };
+        { name = "name"; kind = String; qualifier = None };
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "active"; kind = Bool; qualifier = None };
       ];
     primary_key = [ "id" ];
   }
@@ -31,11 +31,26 @@ let composite_pk_schema : Schema.t =
   {
     fields =
       [
-        { name = "tenant"; kind = String };
-        { name = "name"; kind = String };
-        { name = "id"; kind = Int64 };
+        { name = "tenant"; kind = String; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+        { name = "id"; kind = Int64; qualifier = None };
       ];
     primary_key = [ "tenant"; "id" ];
+  }
+
+(* A schema modelling the cross-product of users and orders: same-named [id]
+   columns appear under different qualifiers, exercising the
+   ambiguity-resolution path for unqualified references. *)
+let cross_product_schema : Schema.t =
+  {
+    fields =
+      [
+        { name = "id"; kind = Int64; qualifier = Some "users" };
+        { name = "name"; kind = String; qualifier = Some "users" };
+        { name = "id"; kind = Int64; qualifier = Some "orders" };
+        { name = "user_id"; kind = Int64; qualifier = Some "orders" };
+      ];
+    primary_key = [];
   }
 
 let tuple_testable =
@@ -82,26 +97,70 @@ let test_assembles_composite_primary_key () =
   in
   Alcotest.(check tuple_testable) "composite PK" expected assembled
 
-let field_lookup_testable =
-  Alcotest.(
-    option (pair int (testable (Fmt.of_to_string (fun _ -> "<field>")) ( = ))))
+(* Build a [column_reference], handling both qualified and unqualified
+   forms. *)
+let unqualified name : Schema.column_reference = { qualifier = None; name }
 
-let test_find_field_returns_position_and_field_for_first_field () =
-  Alcotest.(check field_lookup_testable)
-    "id at position 0"
-    (Some (0, ({ name = "id"; kind = Int64 } : Schema.field)))
-    (Schema.find_field users_schema "id")
+let qualified ~qualifier ~name : Schema.column_reference =
+  { qualifier = Some qualifier; name }
 
-let test_find_field_returns_position_and_field_for_later_field () =
-  Alcotest.(check field_lookup_testable)
-    "active at position 3"
-    (Some (3, ({ name = "active"; kind = Bool } : Schema.field)))
-    (Schema.find_field users_schema "active")
+let test_unqualified_lookup_returns_position_and_field () =
+  match Schema.find_field users_schema (unqualified "id") with
+  | Ok (position, field) ->
+      Alcotest.(check int) "id at position 0" 0 position;
+      Alcotest.(check string) "field name" "id" field.name
+  | Error message -> Alcotest.failf "expected Ok, got Error %S" message
 
-let test_find_field_returns_none_for_unknown_name () =
-  Alcotest.(check field_lookup_testable)
-    "no such field" None
-    (Schema.find_field users_schema "missing")
+let test_unqualified_lookup_returns_position_for_later_field () =
+  match Schema.find_field users_schema (unqualified "active") with
+  | Ok (position, field) ->
+      Alcotest.(check int) "active at position 3" 3 position;
+      Alcotest.(check string) "field name" "active" field.name
+  | Error message -> Alcotest.failf "expected Ok, got Error %S" message
+
+let test_qualified_lookup_returns_position_and_field () =
+  match
+    Schema.find_field users_schema (qualified ~qualifier:"users" ~name:"id")
+  with
+  | Ok (position, _field) ->
+      Alcotest.(check int) "users.id at position 0" 0 position
+  | Error message -> Alcotest.failf "expected Ok, got Error %S" message
+
+let test_unqualified_lookup_unknown_returns_error () =
+  match Schema.find_field users_schema (unqualified "missing") with
+  | Ok _ -> Alcotest.fail "expected an error for missing column"
+  | Error message ->
+      Alcotest.(check string)
+        "error names the column" "unknown column \"missing\"" message
+
+let test_qualified_lookup_unknown_returns_error () =
+  match
+    Schema.find_field users_schema (qualified ~qualifier:"orders" ~name:"id")
+  with
+  | Ok _ -> Alcotest.fail "expected an error for orders.id against users"
+  | Error message ->
+      Alcotest.(check string)
+        "error names the qualified column" "unknown column \"orders.id\""
+        message
+
+let test_unqualified_lookup_ambiguous_returns_error_naming_qualifiers () =
+  match Schema.find_field cross_product_schema (unqualified "id") with
+  | Ok _ -> Alcotest.fail "expected an ambiguity error"
+  | Error message ->
+      Alcotest.(check string)
+        "error names both qualifiers"
+        "ambiguous column reference \"id\": matches \"users.id\" and \
+         \"orders.id\""
+        message
+
+let test_qualified_lookup_disambiguates_in_cross_product_schema () =
+  match
+    Schema.find_field cross_product_schema
+      (qualified ~qualifier:"orders" ~name:"id")
+  with
+  | Ok (position, _field) ->
+      Alcotest.(check int) "orders.id at position 2" 2 position
+  | Error message -> Alcotest.failf "expected Ok, got Error %S" message
 
 let () =
   Alcotest.run "schema"
@@ -117,11 +176,26 @@ let () =
         ] );
       ( "find_field",
         [
-          Alcotest.test_case "returns position and field for the first field"
-            `Quick test_find_field_returns_position_and_field_for_first_field;
-          Alcotest.test_case "returns position and field for a later field"
-            `Quick test_find_field_returns_position_and_field_for_later_field;
-          Alcotest.test_case "returns None for an unknown name" `Quick
-            test_find_field_returns_none_for_unknown_name;
+          Alcotest.test_case
+            "unqualified reference returns position and field for the first \
+             field"
+            `Quick test_unqualified_lookup_returns_position_and_field;
+          Alcotest.test_case
+            "unqualified reference returns position and field for a later field"
+            `Quick test_unqualified_lookup_returns_position_for_later_field;
+          Alcotest.test_case "qualified reference returns position and field"
+            `Quick test_qualified_lookup_returns_position_and_field;
+          Alcotest.test_case "unknown unqualified column returns error" `Quick
+            test_unqualified_lookup_unknown_returns_error;
+          Alcotest.test_case
+            "unknown qualified column returns error using dotted name" `Quick
+            test_qualified_lookup_unknown_returns_error;
+          Alcotest.test_case
+            "ambiguous unqualified column names the conflicting qualifiers"
+            `Quick
+            test_unqualified_lookup_ambiguous_returns_error_naming_qualifiers;
+          Alcotest.test_case
+            "qualified reference disambiguates within a cross-product schema"
+            `Quick test_qualified_lookup_disambiguates_in_cross_product_schema;
         ] );
     ]

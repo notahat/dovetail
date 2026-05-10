@@ -28,7 +28,12 @@ let test_pipeline_yields_fixture_rows () =
         "five rows from AST" expected_users_rows rows)
 
 let id_equals_three : Predicate.t =
-  Compare { left = Column "id"; op = Equal; right = Literal (Value.Int64 3L) }
+  Compare
+    {
+      left = Column { qualifier = None; name = "id" };
+      op = Equal;
+      right = Literal (Value.Int64 3L);
+    }
 
 let test_restrict_lowers_to_logical_restrict () =
   let ast =
@@ -60,19 +65,18 @@ let test_restrict_pipeline_yields_filtered_rows () =
         [ List.nth expected_users_rows 2 ]
         rows)
 
+let name_then_email : Projection.t =
+  [ { qualifier = None; name = "name" }; { qualifier = None; name = "email" } ]
+
 let test_project_lowers_to_logical_project () =
   let ast =
-    Ast.Project
-      { input = Ast.Relation_name "users"; columns = [ "name"; "email" ] }
+    Ast.Project { input = Ast.Relation_name "users"; columns = name_then_email }
   in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
     "Ast.Project -> Logical.Project wrapping Scan"
     (Logical.Project
-       {
-         input = Logical.Scan { table = "users" };
-         columns = [ "name"; "email" ];
-       })
+       { input = Logical.Scan { table = "users" }; columns = name_then_email })
     logical
 
 let test_project_pipeline_yields_projected_rows () =
@@ -82,7 +86,7 @@ let test_project_pipeline_yields_projected_rows () =
   Storage.with_read_transaction environment (fun transaction ->
       let ast =
         Ast.Project
-          { input = Ast.Relation_name "users"; columns = [ "name"; "email" ] }
+          { input = Ast.Relation_name "users"; columns = name_then_email }
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in

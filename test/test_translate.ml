@@ -27,7 +27,15 @@ let test_pipeline_yields_fixture_rows () =
         "five rows from logical scan" expected_users_rows rows)
 
 let id_equals_three : Predicate.t =
-  Compare { left = Column "id"; op = Equal; right = Literal (Value.Int64 3L) }
+  Compare
+    {
+      left = Column { qualifier = None; name = "id" };
+      op = Equal;
+      right = Literal (Value.Int64 3L);
+    }
+
+let name_then_email : Projection.t =
+  [ { qualifier = None; name = "name" }; { qualifier = None; name = "email" } ]
 
 let test_restrict_translates_to_filter () =
   let logical =
@@ -67,10 +75,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
 let test_project_translates_to_physical_project () =
   let logical =
     Logical.Project
-      {
-        input = Logical.Scan { table = "users" };
-        columns = [ "name"; "email" ];
-      }
+      { input = Logical.Scan { table = "users" }; columns = name_then_email }
   in
   let physical = Translate.translate logical in
   Alcotest.(check physical_testable)
@@ -78,7 +83,7 @@ let test_project_translates_to_physical_project () =
     (Physical.Project
        {
          input = Physical.FullScan { table = "users" };
-         columns = [ "name"; "email" ];
+         columns = name_then_email;
        })
     physical
 
@@ -91,7 +96,7 @@ let test_project_pipeline_yields_projected_rows () =
         Logical.Project
           {
             input = Logical.Scan { table = "users" };
-            columns = [ "name"; "email" ];
+            columns = name_then_email;
           }
       in
       let physical = Translate.translate logical in

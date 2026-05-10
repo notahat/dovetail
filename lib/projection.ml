@@ -1,31 +1,29 @@
-type t = string list
+type t = Schema.column_reference list
 
-(* Look up [column_name] in [input_schema] and return its (position, field).
-   Raises [Failure] naming the missing column if it is not present. *)
-let resolve_column input_schema column_name =
-  match Schema.find_field input_schema column_name with
-  | Some result -> result
-  | None ->
-      failwith
-        (Printf.sprintf "Projection.resolve: unknown column %S" column_name)
+(* Look up [reference] in [input_schema] and return its (position, field).
+   Raises [Failure] with the [Projection.resolve:] prefix on unknown or
+   ambiguous references. *)
+let resolve_column input_schema reference =
+  match Schema.find_field input_schema reference with
+  | Ok result -> result
+  | Error message -> failwith ("Projection.resolve: " ^ message)
 
-(* Walk [columns] left to right, raising if the same name appears twice. *)
+(* Walk [columns] left to right, raising if the same column reference (in its
+   source form) appears twice. *)
 let check_no_duplicates columns =
   let seen = Hashtbl.create (List.length columns) in
   List.iter
-    (fun column_name ->
-      if Hashtbl.mem seen column_name then
-        failwith
-          (Printf.sprintf "Projection.resolve: duplicate column %S" column_name);
-      Hashtbl.add seen column_name ())
+    (fun reference ->
+      let key = Schema.format_column_reference reference in
+      if Hashtbl.mem seen key then
+        failwith (Printf.sprintf "Projection.resolve: duplicate column %S" key);
+      Hashtbl.add seen key ())
     columns
 
 let resolve input_schema columns =
   check_no_duplicates columns;
   let resolved =
-    List.map
-      (fun column_name -> resolve_column input_schema column_name)
-      columns
+    List.map (fun reference -> resolve_column input_schema reference) columns
   in
   let projected_fields = List.map (fun (_position, field) -> field) resolved in
   let positions = Array.of_list (List.map fst resolved) in

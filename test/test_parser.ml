@@ -62,8 +62,12 @@ let test_rejects_two_identifiers () =
 
 (* Local shorthand to keep test bodies short under the slice-4 predicate
    shape. *)
-let predicate_column name = Predicate.Column name
-let predicate_literal value = Predicate.Literal value
+let predicate_column name : Predicate.term = Column { qualifier = None; name }
+
+let predicate_qualified_column ~qualifier ~name : Predicate.term =
+  Column { qualifier = Some qualifier; name }
+
+let predicate_literal value : Predicate.term = Literal value
 
 let predicate_compare ~left ~op ~right : Predicate.t =
   Compare { left; op; right }
@@ -135,6 +139,26 @@ let test_predicate_column_inequality_column () =
     (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
        ~right:(predicate_column "user_id"))
 
+let test_predicate_qualified_column_against_literal () =
+  parses_predicate "users.id = 3"
+    (predicate_compare
+       ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+       ~op:Equal
+       ~right:(predicate_literal (Value.Int64 3L)))
+
+let test_predicate_qualified_column_against_qualified_column () =
+  parses_predicate "users.id = orders.user_id"
+    (predicate_compare
+       ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+       ~op:Equal
+       ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id"))
+
+let test_predicate_rejects_dot_with_whitespace () =
+  (* The dot in a qualified reference must have no whitespace around it, so
+     the syntax stays disjoint from a future floating-point literal. *)
+  rejects_predicate "users .id = 3";
+  rejects_predicate "users. id = 3"
+
 let test_predicate_rejects_empty_input () = rejects_predicate ""
 let test_predicate_rejects_whitespace_only_input () = rejects_predicate "   "
 let test_predicate_rejects_missing_operator () = rejects_predicate "id 3"
@@ -159,11 +183,20 @@ let test_predicate_rejects_trailing_garbage () =
   rejects_predicate "id = 3 garbage"
 
 let id_equals_three : Predicate.t =
-  Compare { left = Column "id"; op = Equal; right = Literal (Value.Int64 3L) }
+  Compare
+    {
+      left = Column { qualifier = None; name = "id" };
+      op = Equal;
+      right = Literal (Value.Int64 3L);
+    }
 
 let active_equals_true : Predicate.t =
   Compare
-    { left = Column "active"; op = Equal; right = Literal (Value.Bool true) }
+    {
+      left = Column { qualifier = None; name = "active" };
+      op = Equal;
+      right = Literal (Value.Bool true);
+    }
 
 let test_pipeline_parses_single_restrict () =
   parses "users | restrict id = 3"
@@ -232,32 +265,57 @@ let test_pipeline_restrict_yields_filtered_rows () =
 
 let users_relation = Ast.Relation_name "users"
 
+(* Local shorthand for the column-reference shape that {!Projection.t} now
+   carries. *)
+let project_column name : Schema.column_reference = { qualifier = None; name }
+
+let project_qualified_column ~qualifier ~name : Schema.column_reference =
+  { qualifier = Some qualifier; name }
+
 let test_pipeline_parses_single_column_project () =
   parses "users | project name"
-    (Ast.Project { input = users_relation; columns = [ "name" ] })
+    (Ast.Project { input = users_relation; columns = [ project_column "name" ] })
 
 let test_pipeline_parses_multi_column_project () =
   parses "users | project name, email"
-    (Ast.Project { input = users_relation; columns = [ "name"; "email" ] })
+    (Ast.Project
+       {
+         input = users_relation;
+         columns = [ project_column "name"; project_column "email" ];
+       })
 
 let test_pipeline_parses_project_without_spaces_around_comma () =
   parses "users | project name,email"
-    (Ast.Project { input = users_relation; columns = [ "name"; "email" ] })
+    (Ast.Project
+       {
+         input = users_relation;
+         columns = [ project_column "name"; project_column "email" ];
+       })
 
 let test_pipeline_parses_project_with_space_before_comma () =
   parses "users | project name ,email"
-    (Ast.Project { input = users_relation; columns = [ "name"; "email" ] })
+    (Ast.Project
+       {
+         input = users_relation;
+         columns = [ project_column "name"; project_column "email" ];
+       })
 
 let test_pipeline_parses_project_reordering_columns () =
   parses "users | project email, id"
-    (Ast.Project { input = users_relation; columns = [ "email"; "id" ] })
+    (Ast.Project
+       {
+         input = users_relation;
+         columns = [ project_column "email"; project_column "id" ];
+       })
 
 let test_pipeline_parses_chained_project () =
   parses "users | project name | project email"
     (Ast.Project
        {
-         input = Ast.Project { input = users_relation; columns = [ "name" ] };
-         columns = [ "email" ];
+         input =
+           Ast.Project
+             { input = users_relation; columns = [ project_column "name" ] };
+         columns = [ project_column "email" ];
        })
 
 let test_pipeline_parses_restrict_then_project () =
@@ -266,7 +324,19 @@ let test_pipeline_parses_restrict_then_project () =
        {
          input =
            Ast.Restrict { input = users_relation; predicate = id_equals_three };
-         columns = [ "name"; "email" ];
+         columns = [ project_column "name"; project_column "email" ];
+       })
+
+let test_pipeline_parses_project_with_qualified_columns () =
+  parses "users | project users.name, users.email"
+    (Ast.Project
+       {
+         input = users_relation;
+         columns =
+           [
+             project_qualified_column ~qualifier:"users" ~name:"name";
+             project_qualified_column ~qualifier:"users" ~name:"email";
+           ];
        })
 
 let test_pipeline_rejects_project_without_columns () = rejects "users | project"
@@ -362,6 +432,10 @@ let () =
           Alcotest.test_case
             "identifier with a bool-keyword prefix is a column reference" `Quick
             test_predicate_keyword_prefix_is_an_identifier;
+          Alcotest.test_case "qualified column = literal" `Quick
+            test_predicate_qualified_column_against_literal;
+          Alcotest.test_case "qualified column = qualified column" `Quick
+            test_predicate_qualified_column_against_qualified_column;
         ] );
       ( "predicate rejection",
         [
@@ -377,6 +451,9 @@ let () =
             test_predicate_rejects_unrecognised_escape;
           Alcotest.test_case "rejects trailing garbage" `Quick
             test_predicate_rejects_trailing_garbage;
+          Alcotest.test_case
+            "rejects qualified-reference dot with whitespace around it" `Quick
+            test_predicate_rejects_dot_with_whitespace;
         ] );
       ( "pipeline syntax",
         [
@@ -415,6 +492,8 @@ let () =
             test_pipeline_parses_chained_project;
           Alcotest.test_case "parses restrict followed by project" `Quick
             test_pipeline_parses_restrict_then_project;
+          Alcotest.test_case "parses project with qualified columns" `Quick
+            test_pipeline_parses_project_with_qualified_columns;
           Alcotest.test_case "rejects project with no columns" `Quick
             test_pipeline_rejects_project_without_columns;
           Alcotest.test_case "rejects project with a leading comma" `Quick

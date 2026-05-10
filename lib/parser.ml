@@ -82,12 +82,24 @@ let comparison_op =
   | Some '<' -> string "<>" *> return Predicate.NotEqual
   | _ -> fail "expected '=' or '<>'"
 
+(* A column reference: either a bare identifier (unqualified) or two
+   identifiers separated by a dot with no whitespace around it (qualified).
+   The no-whitespace rule on the dot keeps the syntax disjoint from a future
+   floating-point literal grammar. *)
+let column_reference =
+  identifier >>= fun first ->
+  peek_char >>= function
+  | Some '.' ->
+      char '.' *> identifier >>| fun second ->
+      ({ qualifier = Some first; name = second } : Schema.column_reference)
+  | _ -> return ({ qualifier = None; name = first } : Schema.column_reference)
+
 (* A single side of a comparison: a literal or a column reference. The bool
    literals [true] and [false] are spelled with letters that would otherwise
    start an identifier, so when the input starts with a letter we try the
-   bool literal first and fall back to the identifier parser. The bool
+   bool literal first and fall back to the column-reference parser. The bool
    parser uses [keyword], which requires a word break after the literal
-   text, so [trueish] cleanly falls through to the identifier branch. *)
+   text, so [trueish] cleanly falls through to the column-reference branch. *)
 let term =
   peek_char >>= function
   | Some '"' ->
@@ -99,7 +111,7 @@ let term =
   | Some character when is_letter character ->
       bool_literal
       >>| (fun literal_value -> Predicate.Literal literal_value)
-      <|> (identifier >>| fun column_name -> Predicate.Column column_name)
+      <|> (column_reference >>| fun reference -> Predicate.Column reference)
   | _ -> fail "expected a column reference or literal"
 
 (* The predicate grammar: [<term> <op> <term>], where each term is either a
@@ -111,14 +123,14 @@ let predicate =
   whitespace *> comparison_op >>= fun op ->
   whitespace *> term >>| fun right -> Predicate.Compare { left; op; right }
 
-(* The slice-3 projection grammar: one identifier followed by zero or
-   more [, identifier] tails. Whitespace is flexible around the comma.
-   At least one column is required; the [identifier] before [many]
-   ensures that. Leading and trailing commas are rejected because we
-   only consume a comma when followed by another identifier. *)
+(* The slice-3 projection grammar: one column reference followed by zero or
+   more [, column-reference] tails. Whitespace is flexible around the comma.
+   At least one column is required; the [column_reference] before [many]
+   ensures that. Leading and trailing commas are rejected because we only
+   consume a comma when followed by another column reference. *)
 let project_columns =
-  identifier >>= fun first_column ->
-  many (whitespace *> char ',' *> whitespace *> identifier)
+  column_reference >>= fun first_column ->
+  many (whitespace *> char ',' *> whitespace *> column_reference)
   >>| fun more_columns -> first_column :: more_columns
 
 (* A restrict pipeline step: [| restrict <predicate>]. *)

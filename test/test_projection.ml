@@ -4,20 +4,28 @@ open Dovetail
 open Test_helpers
 
 (* The fixture's [users] schema, repeated here so the projection tests are
-   self-contained and don't need to spin up an LMDB environment. *)
+   self-contained and don't need to spin up an LMDB environment. The
+   qualifier is set to [Some "users"], matching what {!Fixture} writes. *)
 let users_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Int64 };
-        { name = "name"; kind = String };
-        { name = "email"; kind = String };
-        { name = "active"; kind = Bool };
+        { name = "id"; kind = Int64; qualifier = Some "users" };
+        { name = "name"; kind = String; qualifier = Some "users" };
+        { name = "email"; kind = String; qualifier = Some "users" };
+        { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
     primary_key = [ "id" ];
   }
 
 let users_rows = expected_users_rows
+
+(* Local shorthand to keep test bodies short under the slice-4 column
+   reference shape. *)
+let column name : Schema.column_reference = { qualifier = None; name }
+
+let qualified_column ~qualifier ~name : Schema.column_reference =
+  { qualifier = Some qualifier; name }
 
 (* Apply [projection] to every fixture row and return the projected rows. *)
 let project_users projection =
@@ -27,7 +35,7 @@ let project_users projection =
   List.map project_tuple users_rows
 
 let test_single_column_projection () =
-  let rows = project_users [ "name" ] in
+  let rows = project_users [ column "name" ] in
   let expected =
     [
       [| Value.String "Alice" |];
@@ -40,7 +48,7 @@ let test_single_column_projection () =
   Alcotest.(check tuple_list_testable) "five single-column rows" expected rows
 
 let test_multi_column_projection_in_schema_order () =
-  let rows = project_users [ "name"; "email" ] in
+  let rows = project_users [ column "name"; column "email" ] in
   let expected =
     [
       [| Value.String "Alice"; Value.String "alice@example.com" |];
@@ -53,7 +61,7 @@ let test_multi_column_projection_in_schema_order () =
   Alcotest.(check tuple_list_testable) "five two-column rows" expected rows
 
 let test_projection_reorders_columns () =
-  let rows = project_users [ "email"; "id" ] in
+  let rows = project_users [ column "email"; column "id" ] in
   let expected =
     [
       [| Value.String "alice@example.com"; Value.Int64 1L |];
@@ -68,7 +76,7 @@ let test_projection_reorders_columns () =
 let test_projection_of_non_leading_column () =
   (* "active" is at field index 3. A miscached position would pull the wrong
      tuple element. *)
-  let rows = project_users [ "active" ] in
+  let rows = project_users [ column "active" ] in
   let expected =
     [
       [| Value.Bool true |];
@@ -80,9 +88,27 @@ let test_projection_of_non_leading_column () =
   in
   Alcotest.(check tuple_list_testable) "rows in active order" expected rows
 
+let test_projection_accepts_qualified_column () =
+  (* The qualified form should resolve to the same column as the bare name
+     when there is no ambiguity. *)
+  let rows =
+    project_users [ qualified_column ~qualifier:"users" ~name:"name" ]
+  in
+  let expected =
+    [
+      [| Value.String "Alice" |];
+      [| Value.String "Bob" |];
+      [| Value.String "Carol" |];
+      [| Value.String "Dave" |];
+      [| Value.String "Eve" |];
+    ]
+  in
+  Alcotest.(check tuple_list_testable)
+    "qualified projection yields the same rows" expected rows
+
 let test_projected_schema_has_requested_fields () =
   let projected_schema, _project_tuple =
-    Projection.resolve users_schema [ "email"; "id" ]
+    Projection.resolve users_schema [ column "email"; column "id" ]
   in
   let field_names =
     List.map (fun (field : Schema.field) -> field.name) projected_schema.fields
@@ -96,9 +122,21 @@ let test_projected_schema_has_requested_fields () =
     "first field kind is String" true
     (field_kinds = [ Value.Kind.String; Value.Kind.Int64 ])
 
+let test_projected_schema_preserves_qualifiers () =
+  let projected_schema, _project_tuple =
+    Projection.resolve users_schema [ column "name" ]
+  in
+  let qualifiers =
+    List.map
+      (fun (field : Schema.field) -> field.qualifier)
+      projected_schema.fields
+  in
+  Alcotest.(check (list (option string)))
+    "qualifier is preserved" [ Some "users" ] qualifiers
+
 let test_projected_schema_has_empty_primary_key () =
   let projected_schema, _project_tuple =
-    Projection.resolve users_schema [ "id"; "name" ]
+    Projection.resolve users_schema [ column "id"; column "name" ]
   in
   Alcotest.(check (list string))
     "primary_key is empty even when projection includes the input PK" []
@@ -107,13 +145,26 @@ let test_projected_schema_has_empty_primary_key () =
 let test_unknown_column_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Projection.resolve: unknown column \"unknown_col\"") (fun () ->
-      let _ = Projection.resolve users_schema [ "name"; "unknown_col" ] in
+      let _ =
+        Projection.resolve users_schema [ column "name"; column "unknown_col" ]
+      in
+      ())
+
+let test_unknown_qualifier_raises () =
+  Alcotest.check_raises "unknown qualified column"
+    (Failure "Projection.resolve: unknown column \"orders.id\"") (fun () ->
+      let _ =
+        Projection.resolve users_schema
+          [ qualified_column ~qualifier:"orders" ~name:"id" ]
+      in
       ())
 
 let test_duplicate_column_raises () =
   Alcotest.check_raises "duplicate column"
     (Failure "Projection.resolve: duplicate column \"name\"") (fun () ->
-      let _ = Projection.resolve users_schema [ "name"; "name" ] in
+      let _ =
+        Projection.resolve users_schema [ column "name"; column "name" ]
+      in
       ())
 
 let () =
@@ -129,8 +180,12 @@ let () =
             test_projection_reorders_columns;
           Alcotest.test_case "projection of non-leading column" `Quick
             test_projection_of_non_leading_column;
+          Alcotest.test_case "qualified column projects the same as bare name"
+            `Quick test_projection_accepts_qualified_column;
           Alcotest.test_case "projected schema has requested fields" `Quick
             test_projected_schema_has_requested_fields;
+          Alcotest.test_case "projected schema preserves qualifiers" `Quick
+            test_projected_schema_preserves_qualifiers;
           Alcotest.test_case "projected schema has empty primary key" `Quick
             test_projected_schema_has_empty_primary_key;
         ] );
@@ -138,6 +193,9 @@ let () =
         [
           Alcotest.test_case "unknown column raises naming the column" `Quick
             test_unknown_column_raises;
+          Alcotest.test_case
+            "qualified reference to a column not in this schema raises" `Quick
+            test_unknown_qualifier_raises;
           Alcotest.test_case "duplicate column raises naming the column" `Quick
             test_duplicate_column_raises;
         ] );

@@ -4,15 +4,16 @@ open Dovetail
 open Test_helpers
 
 (* The fixture's [users] schema, repeated here so the predicate tests are
-   self-contained and don't need to spin up an LMDB environment. *)
+   self-contained and don't need to spin up an LMDB environment. The
+   qualifier is set to [Some "users"], matching what {!Fixture} writes. *)
 let users_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Int64 };
-        { name = "name"; kind = String };
-        { name = "email"; kind = String };
-        { name = "active"; kind = Bool };
+        { name = "id"; kind = Int64; qualifier = Some "users" };
+        { name = "name"; kind = String; qualifier = Some "users" };
+        { name = "email"; kind = String; qualifier = Some "users" };
+        { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
     primary_key = [ "id" ];
   }
@@ -24,10 +25,10 @@ let orders_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Int64 };
-        { name = "user_id"; kind = Int64 };
-        { name = "description"; kind = String };
-        { name = "amount"; kind = Int64 };
+        { name = "id"; kind = Int64; qualifier = Some "orders" };
+        { name = "user_id"; kind = Int64; qualifier = Some "orders" };
+        { name = "description"; kind = String; qualifier = Some "orders" };
+        { name = "amount"; kind = Int64; qualifier = Some "orders" };
       ];
     primary_key = [ "id" ];
   }
@@ -36,8 +37,12 @@ let orders_rows = expected_orders_rows
 
 (* Build a [Compare] predicate with two literal-or-column terms. Local
    shorthand to keep the test bodies short. *)
-let column name = Predicate.Column name
-let literal value = Predicate.Literal value
+let column name : Predicate.term = Column { qualifier = None; name }
+
+let qualified_column ~qualifier ~name : Predicate.term =
+  Column { qualifier = Some qualifier; name }
+
+let literal value : Predicate.term = Literal value
 
 let compare_predicate ~left ~op ~right : Predicate.t =
   Compare { left; op; right }
@@ -141,6 +146,31 @@ let test_column_inequality_on_orders () =
   in
   Alcotest.(check int) "five rows with id <> user_id" 5 (List.length matched)
 
+let test_qualified_column_resolves_identically_to_unqualified () =
+  (* Single-relation queries should keep working when the user qualifies the
+     column reference. Same row count, same result. *)
+  let matched =
+    filter_users
+      (compare_predicate
+         ~left:(qualified_column ~qualifier:"users" ~name:"id")
+         ~op:Equal ~right:(literal (Value.Int64 3L)))
+  in
+  Alcotest.(check tuple_list_testable)
+    "Carol's row from qualified id"
+    [ List.nth users_rows 2 ]
+    matched
+
+let test_unknown_qualifier_raises () =
+  Alcotest.check_raises "unknown qualified column"
+    (Failure "Predicate.resolve: unknown column \"orders.id\"") (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Predicate.resolve users_schema
+          (compare_predicate
+             ~left:(qualified_column ~qualifier:"orders" ~name:"id")
+             ~op:Equal ~right:(literal (Value.Int64 3L)))
+      in
+      ())
+
 let test_unknown_column_on_left_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Predicate.resolve: unknown column \"unknown_col\"") (fun () ->
@@ -211,6 +241,9 @@ let () =
             test_column_equals_column_on_orders_finds_self_referential_rows;
           Alcotest.test_case "column <> column on orders" `Quick
             test_column_inequality_on_orders;
+          Alcotest.test_case
+            "qualified column reference resolves identically to unqualified"
+            `Quick test_qualified_column_resolves_identically_to_unqualified;
         ] );
       ( "errors",
         [
@@ -224,5 +257,8 @@ let () =
           Alcotest.test_case
             "type mismatch column vs column raises naming both sides" `Quick
             test_type_mismatch_column_vs_column_raises;
+          Alcotest.test_case
+            "qualified reference to a column not in this schema raises" `Quick
+            test_unknown_qualifier_raises;
         ] );
     ]

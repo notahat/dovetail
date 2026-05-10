@@ -1,15 +1,73 @@
-type field = { name : string; kind : Value.Kind.t }
+type field = { name : string; kind : Value.Kind.t; qualifier : string option }
 type t = { fields : field list; primary_key : string list }
 type tuple = Value.t array
+type column_reference = { qualifier : string option; name : string }
 
-let find_field schema name =
+(* Render a [column_reference] in dotted form (or bare, when unqualified) for
+   inclusion in error messages. *)
+let format_column_reference = function
+  | { qualifier = Some qualifier; name } -> qualifier ^ "." ^ name
+  | { qualifier = None; name } -> name
+
+(* Render a [field] in dotted form when qualified, bare otherwise. *)
+let format_qualified_field (field : field) =
+  match field.qualifier with
+  | Some qualifier -> qualifier ^ "." ^ field.name
+  | None -> field.name
+
+(* Walk [schema.fields], pairing each field with its zero-based position and
+   keeping the ones whose name matches [name]. *)
+let fields_with_position_matching_name (schema : t) name =
   let rec scan position fields =
     match fields with
-    | [] -> None
-    | (field : field) :: _ when field.name = name -> Some (position, field)
+    | [] -> []
+    | (field : field) :: rest when field.name = name ->
+        (position, field) :: scan (position + 1) rest
     | _ :: rest -> scan (position + 1) rest
   in
   scan 0 schema.fields
+
+let find_field schema reference =
+  match reference with
+  | { qualifier = Some required_qualifier; name } -> (
+      let matching =
+        fields_with_position_matching_name schema name
+        |> List.filter (fun (_position, (field : field)) ->
+            field.qualifier = Some required_qualifier)
+      in
+      match matching with
+      | [ result ] -> Ok result
+      | [] ->
+          Error
+            (Printf.sprintf "unknown column %S"
+               (format_column_reference reference))
+      | _ :: _ :: _ ->
+          (* A qualifier-plus-name combination should be unique within a
+             schema. If a future operator generates duplicates we'd want to
+             know about it; for now treat it as an internal invariant
+             violation. *)
+          Error
+            (Printf.sprintf
+               "internal error: column reference %S matches multiple fields"
+               (format_column_reference reference)))
+  | { qualifier = None; name } -> (
+      let matching = fields_with_position_matching_name schema name in
+      match matching with
+      | [ result ] -> Ok result
+      | [] ->
+          Error
+            (Printf.sprintf "unknown column %S"
+               (format_column_reference reference))
+      | _ :: _ :: _ ->
+          let qualified_names =
+            List.map
+              (fun (_position, field) ->
+                Printf.sprintf "%S" (format_qualified_field field))
+              matching
+          in
+          Error
+            (Printf.sprintf "ambiguous column reference %S: matches %s" name
+               (String.concat " and " qualified_names)))
 
 (* Look up the position of [primary_key_name] in [primary_key_names], so that
    we can pull the right value from the caller's PK-ordered values list. *)
@@ -45,7 +103,7 @@ let assemble_tuple schema ~primary_key_values ~non_primary_key_values =
         non_primary_key_remaining := rest;
         head
   in
-  let resolve_field field =
+  let resolve_field (field : field) =
     match index_in_primary_key schema.primary_key field.name with
     | Some position -> primary_key_array.(position)
     | None -> take_non_primary_key ()

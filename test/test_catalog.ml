@@ -7,10 +7,10 @@ let users_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Int64 };
-        { name = "name"; kind = String };
-        { name = "email"; kind = String };
-        { name = "active"; kind = Bool };
+        { name = "id"; kind = Int64; qualifier = Some "users" };
+        { name = "name"; kind = String; qualifier = Some "users" };
+        { name = "email"; kind = String; qualifier = Some "users" };
+        { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
     primary_key = [ "id" ];
   }
@@ -19,9 +19,9 @@ let orders_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Int64 };
-        { name = "user_id"; kind = Int64 };
-        { name = "total"; kind = Int64 };
+        { name = "id"; kind = Int64; qualifier = Some "orders" };
+        { name = "user_id"; kind = Int64; qualifier = Some "orders" };
+        { name = "total"; kind = Int64; qualifier = Some "orders" };
       ];
     primary_key = [ "id" ];
   }
