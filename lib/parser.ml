@@ -27,6 +27,17 @@ let identifier =
 
 let relation_name = identifier >>| fun name -> Ast.Relation_name name
 
+(* Match a keyword: the literal [name], plus a word break (a non-identifier
+   character or end of input) afterwards. The break is what stops
+   [restrict_user] from sneakily matching the [restrict] keyword. *)
+let keyword name =
+  string name
+  *> ( peek_char >>= function
+       | None -> return ()
+       | Some character when not (is_identifier_continuation character) ->
+           return ()
+       | Some _ -> fail (Printf.sprintf "expected end of keyword %S" name) )
+
 (* A signed int64 literal: optional leading minus, then one or more digits.
    Fails (rather than producing a wrong value) on inputs that overflow
    int64, since [Int64.of_string_opt] handles range checking for us. *)
@@ -37,18 +48,11 @@ let int64_literal =
   | Some number -> return (Value.Int64 number)
   | None -> fail "int64 literal out of range"
 
-(* A bool literal. Requires a non-identifier character (or end of input)
-   to follow, so [trueish] doesn't sneakily match [true]. *)
+(* A bool literal. The [keyword] helper enforces a word break after the
+   literal text, so [trueish] doesn't sneakily match [true]. *)
 let bool_literal =
-  let followed_by_word_break =
-    peek_char >>= function
-    | None -> return ()
-    | Some character when is_identifier_continuation character ->
-        fail "expected end of bool literal"
-    | Some _ -> return ()
-  in
-  string "true" *> followed_by_word_break *> return (Value.Bool true)
-  <|> string "false" *> followed_by_word_break *> return (Value.Bool false)
+  keyword "true" *> return (Value.Bool true)
+  <|> keyword "false" *> return (Value.Bool false)
 
 (* A character inside a string literal: either a recognised escape
    (backslash-quote or double-backslash) or any non-quote,
@@ -97,10 +101,25 @@ let predicate =
   whitespace *> literal >>| fun literal_value ->
   Predicate.Compare { column_name; op; literal = literal_value }
 
-(* The complete slice-1 grammar: optional whitespace, an identifier, optional
-   whitespace, end of input. [end_of_input] is what forces the parser to
-   reject trailing tokens like "users orders". *)
-let query = whitespace *> relation_name <* whitespace <* end_of_input
+(* A single pipeline step. Currently only [restrict] is recognised;
+   future operators will join here as alternatives. The result is a
+   function that wraps its [Ast.t] argument with the step's effect, so
+   the caller can fold a list of steps left-to-right over the base. *)
+let pipeline_step =
+  whitespace *> char '|' *> whitespace *> keyword "restrict" *> whitespace
+  *> predicate
+  >>| fun parsed_predicate input ->
+  Ast.Restrict { input; predicate = parsed_predicate }
+
+(* The slice-2 grammar: a relation reference followed by zero or more
+   pipeline steps, surrounded by optional whitespace. Each step wraps the
+   running AST in a [Restrict], left-associatively. *)
+let query =
+  whitespace *> relation_name >>= fun base ->
+  many pipeline_step >>= fun steps ->
+  whitespace *> end_of_input
+  *> return (List.fold_left (fun current step -> step current) base steps)
+
 let parse input = parse_string ~consume:All query input
 
 (* Standalone predicate entry point: leading/trailing whitespace tolerated,

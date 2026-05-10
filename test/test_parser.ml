@@ -130,6 +130,41 @@ let test_predicate_rejects_keyword_followed_by_identifier_chars () =
 let test_predicate_rejects_trailing_garbage () =
   rejects_predicate "id = 3 garbage"
 
+let id_equals_three : Predicate.t =
+  Compare { column_name = "id"; op = Equal; literal = Value.Int64 3L }
+
+let active_equals_true : Predicate.t =
+  Compare { column_name = "active"; op = Equal; literal = Value.Bool true }
+
+let test_pipeline_parses_single_restrict () =
+  parses "users | restrict id = 3"
+    (Ast.Restrict
+       { input = Ast.Relation_name "users"; predicate = id_equals_three })
+
+let test_pipeline_parses_two_restrict_steps_left_associative () =
+  parses "users | restrict id = 3 | restrict active = true"
+    (Ast.Restrict
+       {
+         input =
+           Ast.Restrict
+             { input = Ast.Relation_name "users"; predicate = id_equals_three };
+         predicate = active_equals_true;
+       })
+
+let test_pipeline_tolerates_extra_whitespace_around_pipe () =
+  parses "users    |    restrict id = 3"
+    (Ast.Restrict
+       { input = Ast.Relation_name "users"; predicate = id_equals_three })
+
+let test_pipeline_rejects_leading_pipe () = rejects "| users"
+let test_pipeline_rejects_trailing_pipe () = rejects "users |"
+
+let test_pipeline_rejects_restrict_without_predicate () =
+  rejects "users | restrict"
+
+let test_pipeline_rejects_restrict_without_input () = rejects "restrict id = 3"
+let test_pipeline_rejects_unknown_keyword () = rejects "users | filter id = 3"
+
 let test_pipeline_yields_fixture_rows () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -146,6 +181,25 @@ let test_pipeline_yields_fixture_rows () =
       let rows = List.of_seq relation.tuples in
       Alcotest.(check tuple_list_testable)
         "five rows from parsed query" expected_users_rows rows)
+
+let test_pipeline_restrict_yields_filtered_rows () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict id = 3" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      Alcotest.(check tuple_list_testable)
+        "Carol's row from parsed restrict"
+        [ List.nth expected_users_rows 2 ]
+        rows)
 
 let () =
   Alcotest.run "parser"
@@ -215,10 +269,32 @@ let () =
           Alcotest.test_case "rejects trailing garbage" `Quick
             test_predicate_rejects_trailing_garbage;
         ] );
-      ( "pipeline",
+      ( "pipeline syntax",
+        [
+          Alcotest.test_case "parses a single restrict step" `Quick
+            test_pipeline_parses_single_restrict;
+          Alcotest.test_case
+            "two restrict steps nest left-associatively in the AST" `Quick
+            test_pipeline_parses_two_restrict_steps_left_associative;
+          Alcotest.test_case "tolerates extra whitespace around the pipe" `Quick
+            test_pipeline_tolerates_extra_whitespace_around_pipe;
+          Alcotest.test_case "rejects leading pipe" `Quick
+            test_pipeline_rejects_leading_pipe;
+          Alcotest.test_case "rejects trailing pipe" `Quick
+            test_pipeline_rejects_trailing_pipe;
+          Alcotest.test_case "rejects restrict without a predicate" `Quick
+            test_pipeline_rejects_restrict_without_predicate;
+          Alcotest.test_case "rejects restrict without an input" `Quick
+            test_pipeline_rejects_restrict_without_input;
+          Alcotest.test_case "rejects an unknown pipeline keyword" `Quick
+            test_pipeline_rejects_unknown_keyword;
+        ] );
+      ( "pipeline integration",
         [
           Alcotest.test_case
             "parsed query, lowered/translated/evaluated, yields fixture rows"
             `Quick test_pipeline_yields_fixture_rows;
+          Alcotest.test_case "parsed restrict pipeline yields filtered rows"
+            `Quick test_pipeline_restrict_yields_filtered_rows;
         ] );
     ]

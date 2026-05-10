@@ -20,7 +20,7 @@ The storage stack sits below it, used by `Eval` and the catalog.
   Query pipeline                                  Storage stack
   ──────────────                                  ─────────────
 
-      "users"
+  "users | restrict id = 3"
          │
          │  Parser   (angstrom)
          ▼
@@ -58,16 +58,17 @@ slice it goes away.
 
 ### Query pipeline
 
-| Layer       | Type                                     | Role                                                                                           |
-| ----------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `Parser`    | `string -> (Ast.t, error) result`        | Surface syntax → AST, built on `angstrom`. Slice 1 only handles bare identifiers.              |
-| `Ast`       | `t = Relation_name of string \| ...`     | What the user typed, structured. No semantics yet.                                             |
-| `Lower`     | `Ast.t -> Logical.t`                     | Replace each syntactic node with the algebraic operator it denotes.                            |
-| `Logical`   | `t = Scan of {...} \| ...`               | Algebra: *what* the query computes, with no execution detail.                                  |
-| `Translate` | `Logical.t -> Physical.t`                | Pick a physical strategy per operator. Future home of optimisation.                            |
-| `Physical`  | `t = FullScan of {...} \| ...`           | Concrete execution plan: cursors, hash joins, etc.                                             |
-| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.    |
-| `Relation`  | `'tag t = { schema; tuples }`            | Schema-tagged stream of tuples. Phantom `'tag` distinguishes set vs bag semantics.             |
+| Layer       | Type                                     | Role                                                                                                                       |
+| ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `Parser`    | `string -> (Ast.t, error) result`        | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict` pipeline steps so far.           |
+| `Ast`       | `t = Relation_name \| Restrict \| ...`   | What the user typed, structured. No semantics yet.                                                                         |
+| `Lower`     | `Ast.t -> Logical.t`                     | Replace each syntactic node with the algebraic operator it denotes.                                                        |
+| `Logical`   | `t = Scan \| Restrict \| ...`            | Algebra: *what* the query computes, with no execution detail. `Restrict` is the σ of relational algebra.                   |
+| `Translate` | `Logical.t -> Physical.t`                | Pick a physical strategy per operator. Future home of optimisation.                                                        |
+| `Physical`  | `t = FullScan \| Filter \| ...`          | Concrete execution plan: cursors, filters, hash joins, etc.                                                                |
+| `Predicate` | `t = Compare {...}`                      | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. `Predicate.resolve` validates and caches lookup. |
+| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |
+| `Relation`  | `'tag t = { schema; tuples }`            | Schema-tagged stream of tuples. Phantom `'tag` distinguishes set vs bag semantics.                                         |
 
 ### Storage stack
 
