@@ -7,5 +7,6 @@
   test_fixture
   test_schema
   test_relation
-  test_eval)
+  test_eval
+  test_translate)
  (libraries alcotest dovetail unix))
