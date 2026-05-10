@@ -18,3 +18,17 @@ type error = string
 val parse : string -> (Ast.t, error) result
 (** [parse input] parses [input] as a complete query. Leading and trailing
     whitespace are accepted; the parser must consume the entire input. *)
+
+val parse_predicate : string -> (Predicate.t, error) result
+(** [parse_predicate input] parses [input] as a single predicate of the form
+    [<column-name> <op> <literal>], with [op] one of [=] or [<>] and [literal]
+    one of:
+
+    - signed int64 ([-1], [0], [42])
+    - double-quoted string; backslash-quote and backslash-backslash are the only
+      recognised escape sequences
+    - [true] / [false]
+
+    The right-hand side must be a literal; identifier-on-the-right ([3 = id]) is
+    rejected. Leading and trailing whitespace are accepted; the parser must
+    consume the entire input. *)
