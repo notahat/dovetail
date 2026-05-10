@@ -60,13 +60,14 @@ slice it goes away.
 
 | Layer       | Type                                     | Role                                                                                                                       |
 | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `Parser`    | `string -> (Ast.t, error) result`        | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict` pipeline steps so far.           |
-| `Ast`       | `t = Relation_name \| Restrict \| ...`   | What the user typed, structured. No semantics yet.                                                                         |
-| `Lower`     | `Ast.t -> Logical.t`                     | Replace each syntactic node with the algebraic operator it denotes.                                                        |
-| `Logical`   | `t = Scan \| Restrict \| ...`            | Algebra: *what* the query computes, with no execution detail. `Restrict` is the σ of relational algebra.                   |
-| `Translate` | `Logical.t -> Physical.t`                | Pick a physical strategy per operator. Future home of optimisation.                                                        |
-| `Physical`  | `t = FullScan \| Filter \| ...`          | Concrete execution plan: cursors, filters, hash joins, etc.                                                                |
-| `Predicate` | `t = Compare {...}`                      | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. `Predicate.resolve` validates and caches lookup. |
+| `Parser`    | `string -> (Ast.t, error) result`              | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict` and `project` pipeline steps so far.       |
+| `Ast`       | `t = Relation_name \| Restrict \| Project \| ...` | What the user typed, structured. No semantics yet.                                                                                |
+| `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes.                                                                  |
+| `Logical`   | `t = Scan \| Restrict \| Project \| ...`       | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π.                                       |
+| `Translate` | `Logical.t -> Physical.t`                      | Pick a physical strategy per operator. Future home of optimisation.                                                                  |
+| `Physical`  | `t = FullScan \| Filter \| Project \| ...`     | Concrete execution plan: cursors, filters, projections, hash joins, etc.                                                             |
+| `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. `Predicate.resolve` validates and caches lookup.           |
+| `Projection`| `t = string list`                              | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
 | `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |
 | `Relation`  | `'tag t = { schema; tuples }`            | Schema-tagged stream of tuples. Phantom `'tag` distinguishes set vs bag semantics.                                         |
 

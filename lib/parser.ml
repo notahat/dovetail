@@ -101,15 +101,33 @@ let predicate =
   whitespace *> literal >>| fun literal_value ->
   Predicate.Compare { column_name; op; literal = literal_value }
 
-(* A single pipeline step. Currently only [restrict] is recognised;
-   future operators will join here as alternatives. The result is a
-   function that wraps its [Ast.t] argument with the step's effect, so
-   the caller can fold a list of steps left-to-right over the base. *)
-let pipeline_step =
-  whitespace *> char '|' *> whitespace *> keyword "restrict" *> whitespace
-  *> predicate
+(* The slice-3 projection grammar: one identifier followed by zero or
+   more [, identifier] tails. Whitespace is flexible around the comma.
+   At least one column is required; the [identifier] before [many]
+   ensures that. Leading and trailing commas are rejected because we
+   only consume a comma when followed by another identifier. *)
+let project_columns =
+  identifier >>= fun first_column ->
+  many (whitespace *> char ',' *> whitespace *> identifier)
+  >>| fun more_columns -> first_column :: more_columns
+
+(* A restrict pipeline step: [| restrict <predicate>]. *)
+let restrict_step =
+  keyword "restrict" *> whitespace *> predicate
   >>| fun parsed_predicate input ->
   Ast.Restrict { input; predicate = parsed_predicate }
+
+(* A project pipeline step: [| project <columns>]. *)
+let project_step =
+  keyword "project" *> whitespace *> project_columns
+  >>| fun parsed_columns input ->
+  Ast.Project { input; columns = parsed_columns }
+
+(* A single pipeline step. Each branch wraps its [Ast.t] argument with
+   the step's effect, so the caller can fold a list of steps
+   left-to-right over the base. *)
+let pipeline_step =
+  whitespace *> char '|' *> whitespace *> (restrict_step <|> project_step)
 
 (* The slice-2 grammar: a relation reference followed by zero or more
    pipeline steps, surrounded by optional whitespace. Each step wraps the

@@ -201,6 +201,82 @@ let test_pipeline_restrict_yields_filtered_rows () =
         [ List.nth expected_users_rows 2 ]
         rows)
 
+let users_relation = Ast.Relation_name "users"
+
+let test_pipeline_parses_single_column_project () =
+  parses "users | project name"
+    (Ast.Project { input = users_relation; columns = [ "name" ] })
+
+let test_pipeline_parses_multi_column_project () =
+  parses "users | project name, email"
+    (Ast.Project { input = users_relation; columns = [ "name"; "email" ] })
+
+let test_pipeline_parses_project_without_spaces_around_comma () =
+  parses "users | project name,email"
+    (Ast.Project { input = users_relation; columns = [ "name"; "email" ] })
+
+let test_pipeline_parses_project_with_space_before_comma () =
+  parses "users | project name ,email"
+    (Ast.Project { input = users_relation; columns = [ "name"; "email" ] })
+
+let test_pipeline_parses_project_reordering_columns () =
+  parses "users | project email, id"
+    (Ast.Project { input = users_relation; columns = [ "email"; "id" ] })
+
+let test_pipeline_parses_chained_project () =
+  parses "users | project name | project email"
+    (Ast.Project
+       {
+         input = Ast.Project { input = users_relation; columns = [ "name" ] };
+         columns = [ "email" ];
+       })
+
+let test_pipeline_parses_restrict_then_project () =
+  parses "users | restrict id = 3 | project name, email"
+    (Ast.Project
+       {
+         input =
+           Ast.Restrict { input = users_relation; predicate = id_equals_three };
+         columns = [ "name"; "email" ];
+       })
+
+let test_pipeline_rejects_project_without_columns () = rejects "users | project"
+
+let test_pipeline_rejects_project_with_leading_comma () =
+  rejects "users | project ,name"
+
+let test_pipeline_rejects_project_with_trailing_comma () =
+  rejects "users | project name,"
+
+let test_pipeline_rejects_project_missing_comma () =
+  rejects "users | project name email"
+
+let test_pipeline_project_yields_projected_rows () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | project name, email" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      let expected =
+        [
+          [| Value.String "Alice"; Value.String "alice@example.com" |];
+          [| Value.String "Bob"; Value.String "bob@example.com" |];
+          [| Value.String "Carol"; Value.String "carol@example.com" |];
+          [| Value.String "Dave"; Value.String "dave@example.com" |];
+          [| Value.String "Eve"; Value.String "eve@example.com" |];
+        ]
+      in
+      Alcotest.(check tuple_list_testable)
+        "five projected rows from parsed project" expected rows)
+
 let () =
   Alcotest.run "parser"
     [
@@ -289,6 +365,32 @@ let () =
           Alcotest.test_case "rejects an unknown pipeline keyword" `Quick
             test_pipeline_rejects_unknown_keyword;
         ] );
+      ( "project syntax",
+        [
+          Alcotest.test_case "parses a single-column project step" `Quick
+            test_pipeline_parses_single_column_project;
+          Alcotest.test_case "parses a multi-column project step" `Quick
+            test_pipeline_parses_multi_column_project;
+          Alcotest.test_case "parses project without spaces around the comma"
+            `Quick test_pipeline_parses_project_without_spaces_around_comma;
+          Alcotest.test_case "parses project with a space before the comma"
+            `Quick test_pipeline_parses_project_with_space_before_comma;
+          Alcotest.test_case "parses project that reorders columns" `Quick
+            test_pipeline_parses_project_reordering_columns;
+          Alcotest.test_case
+            "parses two project steps nesting left-associatively" `Quick
+            test_pipeline_parses_chained_project;
+          Alcotest.test_case "parses restrict followed by project" `Quick
+            test_pipeline_parses_restrict_then_project;
+          Alcotest.test_case "rejects project with no columns" `Quick
+            test_pipeline_rejects_project_without_columns;
+          Alcotest.test_case "rejects project with a leading comma" `Quick
+            test_pipeline_rejects_project_with_leading_comma;
+          Alcotest.test_case "rejects project with a trailing comma" `Quick
+            test_pipeline_rejects_project_with_trailing_comma;
+          Alcotest.test_case "rejects project columns separated by whitespace"
+            `Quick test_pipeline_rejects_project_missing_comma;
+        ] );
       ( "pipeline integration",
         [
           Alcotest.test_case
@@ -296,5 +398,7 @@ let () =
             `Quick test_pipeline_yields_fixture_rows;
           Alcotest.test_case "parsed restrict pipeline yields filtered rows"
             `Quick test_pipeline_restrict_yields_filtered_rows;
+          Alcotest.test_case "parsed project pipeline yields projected rows"
+            `Quick test_pipeline_project_yields_projected_rows;
         ] );
     ]
