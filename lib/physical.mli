@@ -32,3 +32,16 @@ type t =
           duplicate values that the inputs already had. The dedicated [Join]
           operator (with multiple strategies on the roadmap -- hash, merge)
           ships in a later slice. *)
+  | NestedLoopJoin of { left : t; right : t; predicate : Predicate.t }
+      (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
+          tuple pair for which [predicate] holds, executed as a nested loop with
+          the right side materialised once and the predicate fused into the
+          inner loop. Schema construction matches [CrossProduct]: [left]'s
+          fields followed by [right]'s, qualifiers preserved, [primary_key]
+          empty. The multiplicity tag is preserved -- the join cannot introduce
+          duplicates that weren't already implicit in the cross.
+
+          Per-pair work is the same as [Filter (CrossProduct ...)]; the node
+          exists so that {!Translate} has a place to emit when it recognises an
+          inner join, and so future strategies (indexed nested-loop, hash join,
+          merge join) have siblings to slot in next to. *)

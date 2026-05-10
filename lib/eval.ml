@@ -58,6 +58,8 @@ let rec eval environment transaction plan =
       { schema = projected_schema; tuples = Seq.map project_tuple tuples }
   | CrossProduct { left; right } ->
       evaluate_cross_product environment transaction ~left ~right
+  | NestedLoopJoin { left; right; predicate } ->
+      evaluate_nested_loop_join environment transaction ~left ~right ~predicate
 
 (* Nested-loop cross product. The right side is materialised into a list once
    so the outer loop can re-iterate it for every left tuple; streaming the
@@ -80,6 +82,33 @@ and evaluate_cross_product environment transaction ~left ~right =
       (fun left_tuple ->
         List.to_seq right_tuples
         |> Seq.map (fun right_tuple -> Array.append left_tuple right_tuple))
+      left_relation.tuples
+  in
+  ({ schema = combined_schema; tuples = combined_tuples } : [ `Bag ] Relation.t)
+
+(* Nested-loop join. Same shape as [evaluate_cross_product] -- right side
+   materialised once, outer loop over left, inner loop over the materialised
+   right -- with the predicate resolved against the combined schema and
+   evaluated per (left, right) pair. Pairs that don't satisfy the predicate
+   are dropped before the combined tuple is emitted. *)
+and evaluate_nested_loop_join environment transaction ~left ~right ~predicate =
+  let left_relation = eval environment transaction left in
+  let right_relation = eval environment transaction right in
+  let right_tuples = List.of_seq right_relation.tuples in
+  let combined_schema : Schema.t =
+    {
+      fields = left_relation.schema.fields @ right_relation.schema.fields;
+      primary_key = [];
+    }
+  in
+  let evaluate_predicate = Predicate.resolve combined_schema predicate in
+  let combined_tuples =
+    Seq.flat_map
+      (fun left_tuple ->
+        List.to_seq right_tuples
+        |> Seq.filter_map (fun right_tuple ->
+            let combined = Array.append left_tuple right_tuple in
+            if evaluate_predicate combined then Some combined else None))
       left_relation.tuples
   in
   ({ schema = combined_schema; tuples = combined_tuples } : [ `Bag ] Relation.t)
