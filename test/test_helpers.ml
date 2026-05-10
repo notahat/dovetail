@@ -78,6 +78,22 @@ let expected_users_rows : Schema.tuple list =
     |];
   ]
 
+(** The six [orders] fixture rows as [Schema.tuple]s, in primary-key order.
+    Mirrors [Fixture.orders_rows] but lives here so tests can compare pipeline
+    output against a single shared expectation. Dave (user id 4) deliberately
+    has no orders; Alice (id 1) and Carol (id 3) each have two. *)
+let expected_orders_rows : Schema.tuple list =
+  [
+    [| Value.Int64 1L; Value.Int64 1L; Value.String "Coffee"; Value.Int64 5L |];
+    [| Value.Int64 2L; Value.Int64 1L; Value.String "Bagel"; Value.Int64 4L |];
+    [| Value.Int64 3L; Value.Int64 2L; Value.String "Tea"; Value.Int64 3L |];
+    [|
+      Value.Int64 4L; Value.Int64 3L; Value.String "Sandwich"; Value.Int64 8L;
+    |];
+    [| Value.Int64 5L; Value.Int64 3L; Value.String "Cake"; Value.Int64 6L |];
+    [| Value.Int64 6L; Value.Int64 5L; Value.String "Cookie"; Value.Int64 2L |];
+  ]
+
 (** Alcotest testable for a list of [Schema.tuple]s. Polymorphic-equality based;
     the printer is a placeholder because tuples don't have a natural one-line
     rendering and the diff machinery isn't worth the weight here. *)

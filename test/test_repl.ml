@@ -50,7 +50,7 @@ let test_parse_error_continues_loop () =
   check_contains "after parse error" output "Alice"
 
 let test_eval_error_continues_loop () =
-  let output = run_with_input [ "orders"; "users" ] in
+  let output = run_with_input [ "nonexistent_table"; "users" ] in
   check_contains "after eval error" output "error:";
   check_contains "after eval error" output "Alice"
 

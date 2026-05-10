@@ -26,10 +26,10 @@ let test_full_scan_raises_for_missing_table () =
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "missing table"
-        (Failure "Eval: unknown table \"orders\"") (fun () ->
+        (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           let _ =
             Eval.eval environment transaction
-              (Physical.FullScan { table = "orders" })
+              (Physical.FullScan { table = "nonexistent_table" })
           in
           ()))
 
