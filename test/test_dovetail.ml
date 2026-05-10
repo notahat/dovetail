@@ -38,6 +38,27 @@ let test_users_query_prints_fixture_rows () =
           stdout_text)
     [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve" ]
 
+let test_users_join_orders_prints_matched_pairs () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~environment_path
+      ~stdin_text:"users | join orders on users.id = orders.user_id\n"
+  in
+  (* Dave (user 4) has no orders, so he must not appear; the other four
+     buyers must each show up in the output. *)
+  if contains_substring stdout_text "Dave" then
+    Alcotest.failf
+      "expected stdout to omit \"Dave\" (no matching orders)\n\
+       --- stdout ---\n\
+       %s"
+      stdout_text;
+  List.iter
+    (fun name ->
+      if not (contains_substring stdout_text name) then
+        Alcotest.failf "expected stdout to contain %S\n--- stdout ---\n%s" name
+          stdout_text)
+    [ "Alice"; "Bob"; "Carol"; "Eve" ]
+
 let () =
   Alcotest.run "dovetail"
     [
@@ -45,5 +66,8 @@ let () =
         [
           Alcotest.test_case "users query prints fixture rows to stdout" `Slow
             test_users_query_prints_fixture_rows;
+          Alcotest.test_case
+            "users join orders prints only matched (user, order) pairs" `Slow
+            test_users_join_orders_prints_matched_pairs;
         ] );
     ]

@@ -115,6 +115,36 @@ let test_cross_product_lowers_to_logical_cross_product () =
        })
     logical
 
+let users_id_equals_orders_user_id =
+  predicate_compare
+    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    ~op:Equal
+    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
+
+let test_join_lowers_to_restrict_over_cross_product () =
+  let ast =
+    Ast.Join
+      {
+        left = Ast.Relation_name "users";
+        right = Ast.Relation_name "orders";
+        predicate = users_id_equals_orders_user_id;
+      }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Join -> Logical.Restrict wrapping Logical.CrossProduct"
+    (Logical.Restrict
+       {
+         input =
+           Logical.CrossProduct
+             {
+               left = Logical.Scan { table = "users" };
+               right = Logical.Scan { table = "orders" };
+             };
+         predicate = users_id_equals_orders_user_id;
+       })
+    logical
+
 let () =
   Alcotest.run "lower"
     [
@@ -146,5 +176,11 @@ let () =
         [
           Alcotest.test_case "lowers Ast.CrossProduct to Logical.CrossProduct"
             `Quick test_cross_product_lowers_to_logical_cross_product;
+        ] );
+      ( "join",
+        [
+          Alcotest.test_case
+            "lowers Ast.Join to Logical.Restrict over Logical.CrossProduct"
+            `Quick test_join_lowers_to_restrict_over_cross_product;
         ] );
     ]

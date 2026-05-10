@@ -313,8 +313,11 @@ After step 3:
   - `users | join orders on users.id = orders.user_id` — six rows.
   - `users | cross orders | restrict users.id = orders.user_id` —
     same six rows.
-  - `users | join orders on true` — thirty rows (degenerate; smoke
-    test).
+
+  A degenerate `on true` smoke would be nice, but the slice-2
+  predicate grammar is comparison-only, so a bare boolean isn't a
+  legal predicate. Lifting that restriction is a sublanguage
+  extension and out of scope here.
 
 ## Open questions
 

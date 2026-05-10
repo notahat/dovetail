@@ -27,5 +27,14 @@ type t =
           [left | cross right]. The result has one row for every pair drawn from
           [left] and [right]; its schema is [left]'s fields followed by
           [right]'s, with each field carrying the qualifier it had on the way
-          in. Inner join (which adds a matching predicate) ships in a later
-          slice as a separate operator. *)
+          in. *)
+  | Join of { left : t; right : t; predicate : Predicate.t }
+      (** [Join { left; right; predicate }] is the surface form
+          [left | join right on <predicate>]. Sugar for cross product followed
+          by a restriction: [Lower] desugars it to
+          [Logical.Restrict (Logical.CrossProduct { left; right }, predicate)],
+          and {!Translate} folds that shape into a single
+          [Physical.NestedLoopJoin]. The schema rule is the same as
+          [CrossProduct] -- both inputs' fields, each retaining its qualifier --
+          so a [predicate] like [users.id = orders.user_id] resolves
+          unambiguously across the combined schema. *)

@@ -152,12 +152,28 @@ let cross_step =
   keyword "cross" *> whitespace *> identifier >>| fun right_table input ->
   Ast.CrossProduct { left = input; right = Ast.Relation_name right_table }
 
+(* An inner-join pipeline step: [| join <relation> on <predicate>]. The
+   right-hand side is a relation reference, mirroring [cross_step]; nested
+   sub-pipelines on the right are out of scope. The [keyword] helper enforces
+   a word break after both [join] and [on], so identifiers like [joinery]
+   and [oncology] don't sneakily match. *)
+let join_step =
+  keyword "join" *> whitespace *> identifier >>= fun right_table ->
+  whitespace *> keyword "on" *> whitespace *> predicate
+  >>| fun parsed_predicate input ->
+  Ast.Join
+    {
+      left = input;
+      right = Ast.Relation_name right_table;
+      predicate = parsed_predicate;
+    }
+
 (* A single pipeline step. Each branch wraps its [Ast.t] argument with
    the step's effect, so the caller can fold a list of steps
    left-to-right over the base. *)
 let pipeline_step =
   whitespace *> char '|' *> whitespace
-  *> (restrict_step <|> project_step <|> cross_step)
+  *> (restrict_step <|> project_step <|> cross_step <|> join_step)
 
 (* The slice-2 grammar: a relation reference followed by zero or more
    pipeline steps, surrounded by optional whitespace. Each step wraps the

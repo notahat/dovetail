@@ -9,6 +9,11 @@
     arrive as later slices introduce them. *)
 
 val lower : Ast.t -> Logical.t
-(** [lower ast] rewrites [ast] into an equivalent logical plan. Slice 1 maps
-    [Relation_name name] to [Scan { table = name }]; slice 2 adds [Ast.Restrict]
-    -> [Logical.Restrict]; slice 3 adds [Ast.Project] -> [Logical.Project]. *)
+(** [lower ast] rewrites [ast] into an equivalent logical plan. [Relation_name]
+    becomes [Scan]; [Ast.Restrict], [Ast.Project], and [Ast.CrossProduct] map to
+    their like-named [Logical] counterparts.
+    [Ast.Join { left; right; predicate }] desugars to
+    [Logical.Restrict (Logical.CrossProduct { left; right }, predicate)] --
+    [Logical] has no [Join] node; the join is just sugar at this layer, and
+    {!Translate} is responsible for collapsing the
+    [Restrict]-over-[CrossProduct] shape into [Physical.NestedLoopJoin]. *)

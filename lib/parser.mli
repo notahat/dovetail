@@ -1,10 +1,11 @@
 (** Parser for the relational-algebra query language.
 
-    Built on [angstrom]. Slice 1's grammar is one production: a bare identifier
-    parses to {!Ast.Relation_name}. Slice 2 adds [restrict] pipeline steps;
-    slice 3 adds [project] pipeline steps with a comma-separated column list.
-    Whitespace surrounding tokens is tolerated; anything else (extra tokens,
-    malformed identifiers, empty input) is rejected.
+    Built on [angstrom]. The grammar is a base relation reference followed by
+    zero or more pipe-separated steps: [restrict <predicate>],
+    [project <columns>], [cross <relation>], and
+    [join <relation> on <predicate>]. Whitespace surrounding tokens is
+    tolerated; anything else (extra tokens, malformed identifiers, empty input)
+    is rejected.
 
     The error type is currently a string passed straight from angstrom. When a
     later slice produces user-visible errors with location information or

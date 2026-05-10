@@ -5,3 +5,9 @@ let rec lower (ast : Ast.t) : Logical.t =
   | Project { input; columns } -> Project { input = lower input; columns }
   | CrossProduct { left; right } ->
       CrossProduct { left = lower left; right = lower right }
+  | Join { left; right; predicate } ->
+      Restrict
+        {
+          input = CrossProduct { left = lower left; right = lower right };
+          predicate;
+        }

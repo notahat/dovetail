@@ -20,7 +20,7 @@ The storage stack sits below it, used by `Eval` and the catalog.
   Query pipeline                                  Storage stack
   ──────────────                                  ─────────────
 
-  "users | cross orders | restrict users.id = orders.user_id"
+  "users | join orders on users.id = orders.user_id"
          │
          │  Parser   (angstrom)
          ▼
@@ -60,12 +60,12 @@ lands in a later slice it goes away.
 
 | Layer       | Type                                     | Role                                                                                                                       |
 | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `Parser`    | `string -> (Ast.t, error) result`              | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict`, `project`, and `cross` pipeline steps so far. |
-| `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| ...` | What the user typed, structured. No semantics yet.                                                                                |
-| `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes.                                                                  |
+| `Parser`    | `string -> (Ast.t, error) result`              | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict`, `project`, `cross`, and `join ... on` pipeline steps so far. |
+| `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| Join \| ...` | What the user typed, structured. No semantics yet.                                                                                |
+| `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes. `Ast.Join` desugars to `Logical.Restrict (Logical.CrossProduct ..., predicate)`. |
 | `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×.                  |
-| `Translate` | `Logical.t -> Physical.t`                      | Pick a physical strategy per operator. Future home of optimisation.                                                                  |
-| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product, future hash joins, etc.                          |
+| `Translate` | `Logical.t -> Physical.t`                      | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; future home of further optimisation. |
+| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| NestedLoopJoin \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, future hash joins, etc.                  |
 | `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
 | `Projection`| `t = Schema.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
 | `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |

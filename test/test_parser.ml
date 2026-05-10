@@ -394,6 +394,60 @@ let test_pipeline_cross_then_restrict_yields_matched_pairs () =
         "six matched (user, order) pairs from parsed pipeline" 6
         (List.length rows))
 
+let users_id_equals_orders_user_id =
+  predicate_compare
+    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    ~op:Equal
+    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
+
+let test_pipeline_parses_join_on_predicate () =
+  parses "users | join orders on users.id = orders.user_id"
+    (Ast.Join
+       {
+         left = users_relation;
+         right = orders_relation;
+         predicate = users_id_equals_orders_user_id;
+       })
+
+let test_pipeline_rejects_join_without_relation () = rejects "users | join"
+
+let test_pipeline_rejects_join_without_on_keyword () =
+  rejects "users | join orders"
+
+let test_pipeline_rejects_join_without_predicate () =
+  rejects "users | join orders on"
+
+let test_pipeline_join_keyword_prefix_is_a_relation_name () =
+  (* [joinery] starts with "join" but is a single identifier, so [users |
+     joinery] should be rejected as an unknown pipeline keyword rather than
+     parsed as a malformed join step. *)
+  rejects "users | joinery orders on users.id = orders.user_id"
+
+let test_pipeline_join_on_keyword_prefix_is_a_column_name () =
+  (* [oncology] starts with "on" but is a single identifier, so it must not
+     be mistaken for the [on] keyword inside the join step. With no real
+     [on], the rest of the input is unparseable. *)
+  rejects "users | join orders oncology users.id = orders.user_id"
+
+let test_pipeline_join_yields_matched_pairs () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match
+          Parser.parse "users | join orders on users.id = orders.user_id"
+        with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      Alcotest.(check int)
+        "six matched (user, order) pairs from parsed join" 6 (List.length rows))
+
 let test_pipeline_cross_then_ambiguous_restrict_raises () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -578,6 +632,23 @@ let () =
             "identifier with a cross-keyword prefix is a relation name" `Quick
             test_pipeline_keyword_prefix_is_a_relation_name;
         ] );
+      ( "join syntax",
+        [
+          Alcotest.test_case "parses a join step with an on-predicate" `Quick
+            test_pipeline_parses_join_on_predicate;
+          Alcotest.test_case "rejects join without a right-hand relation" `Quick
+            test_pipeline_rejects_join_without_relation;
+          Alcotest.test_case "rejects join without the on keyword" `Quick
+            test_pipeline_rejects_join_without_on_keyword;
+          Alcotest.test_case "rejects join without a predicate after on" `Quick
+            test_pipeline_rejects_join_without_predicate;
+          Alcotest.test_case
+            "identifier with a join-keyword prefix is not the join step" `Quick
+            test_pipeline_join_keyword_prefix_is_a_relation_name;
+          Alcotest.test_case
+            "identifier with an on-keyword prefix is not the on keyword" `Quick
+            test_pipeline_join_on_keyword_prefix_is_a_column_name;
+        ] );
       ( "pipeline integration",
         [
           Alcotest.test_case
@@ -592,6 +663,8 @@ let () =
           Alcotest.test_case
             "parsed cross then restrict yields matched (user, order) pairs"
             `Quick test_pipeline_cross_then_restrict_yields_matched_pairs;
+          Alcotest.test_case "parsed join yields matched (user, order) pairs"
+            `Quick test_pipeline_join_yields_matched_pairs;
           Alcotest.test_case
             "parsed cross then unqualified restrict raises ambiguity" `Quick
             test_pipeline_cross_then_ambiguous_restrict_raises;
