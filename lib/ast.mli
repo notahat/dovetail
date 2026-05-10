@@ -18,3 +18,7 @@ type t =
           [input | restrict <predicate>]. The constructor name follows the
           relational-algebra term (σ); SQL's `SELECT` is intentionally avoided
           because it names a different operation. *)
+  | Project of { input : t; columns : Projection.t }
+      (** [Project { input; columns }] is the surface form
+          [input | project <columns>]. The constructor name follows the
+          relational-algebra term (π). *)

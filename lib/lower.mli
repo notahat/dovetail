@@ -11,4 +11,4 @@
 val lower : Ast.t -> Logical.t
 (** [lower ast] rewrites [ast] into an equivalent logical plan. Slice 1 maps
     [Relation_name name] to [Scan { table = name }]; slice 2 adds [Ast.Restrict]
-    -> [Logical.Restrict]. *)
+    -> [Logical.Restrict]; slice 3 adds [Ast.Project] -> [Logical.Project]. *)

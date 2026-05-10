@@ -60,6 +60,46 @@ let test_restrict_pipeline_yields_filtered_rows () =
         [ List.nth expected_users_rows 2 ]
         rows)
 
+let test_project_lowers_to_logical_project () =
+  let ast =
+    Ast.Project
+      { input = Ast.Relation_name "users"; columns = [ "name"; "email" ] }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Project -> Logical.Project wrapping Scan"
+    (Logical.Project
+       {
+         input = Logical.Scan { table = "users" };
+         columns = [ "name"; "email" ];
+       })
+    logical
+
+let test_project_pipeline_yields_projected_rows () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        Ast.Project
+          { input = Ast.Relation_name "users"; columns = [ "name"; "email" ] }
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      let expected =
+        [
+          [| Value.String "Alice"; Value.String "alice@example.com" |];
+          [| Value.String "Bob"; Value.String "bob@example.com" |];
+          [| Value.String "Carol"; Value.String "carol@example.com" |];
+          [| Value.String "Dave"; Value.String "dave@example.com" |];
+          [| Value.String "Eve"; Value.String "eve@example.com" |];
+        ]
+      in
+      Alcotest.(check tuple_list_testable)
+        "five projected rows from Ast.Project" expected rows)
+
 let () =
   Alcotest.run "lower"
     [
@@ -78,5 +118,13 @@ let () =
           Alcotest.test_case
             "Ast.Restrict, lowered/translated/evaluated, yields filtered rows"
             `Quick test_restrict_pipeline_yields_filtered_rows;
+        ] );
+      ( "project",
+        [
+          Alcotest.test_case "lowers Ast.Project to Logical.Project" `Quick
+            test_project_lowers_to_logical_project;
+          Alcotest.test_case
+            "Ast.Project, lowered/translated/evaluated, yields projected rows"
+            `Quick test_project_pipeline_yields_projected_rows;
         ] );
     ]
