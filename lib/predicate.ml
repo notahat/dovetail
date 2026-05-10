@@ -40,6 +40,26 @@ let resolve_term schema = function
           let read_value (tuple : Schema.tuple) = tuple.(column_position) in
           (field.kind, read_value))
 
+(* Render a [Value.t] as a literal in source-like form: int64s as bare
+   digits, strings double-quoted with no escaping, bools as the keywords
+   [true] and [false]. Used by the predicate pretty-printer; not intended
+   to round-trip through the parser (string escapes aren't handled). *)
+let render_literal = function
+  | Value.Int64 number -> Int64.to_string number
+  | Value.String text -> "\"" ^ text ^ "\""
+  | Value.Bool true -> "true"
+  | Value.Bool false -> "false"
+
+let render_term = function
+  | Column reference -> Schema.format_column_reference reference
+  | Literal value -> render_literal value
+
+let render_op = function Equal -> "=" | NotEqual -> "<>"
+
+let format formatter (Compare { left; op; right }) =
+  Format.fprintf formatter "%s %s %s" (render_term left) (render_op op)
+    (render_term right)
+
 let resolve schema (Compare { left; op; right }) =
   let left_kind, read_left = resolve_term schema left in
   let right_kind, read_right = resolve_term schema right in

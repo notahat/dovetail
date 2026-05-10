@@ -15,14 +15,17 @@ let read_line_from_list lines =
         Some head
 
 (** Run the REPL against a populated environment with [lines] as input,
-    capturing all formatter output as a string. *)
-let run_with_input lines =
+    capturing all formatter output as a string. [show_physical] defaults to
+    [false], matching the binary's default. *)
+let run_with_input ?(show_physical = false) lines =
   let captured = Buffer.create 512 in
   let formatter = Format.formatter_of_buffer captured in
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Repl.run environment ~read_line:(read_line_from_list lines) ~output:formatter;
+  Repl.run ~show_physical environment
+    ~read_line:(read_line_from_list lines)
+    ~output:formatter;
   Format.pp_print_flush formatter ();
   Buffer.contents captured
 
@@ -61,6 +64,36 @@ let test_blank_lines_are_skipped_without_error () =
     (contains_substring output "parse error");
   check_contains "blank lines tolerated" output "Alice"
 
+let test_show_physical_defaults_off_omits_plan () =
+  let output = run_with_input [ "users" ] in
+  Alcotest.(check bool)
+    "no FullScan in default output" false
+    (contains_substring output "FullScan")
+
+let test_show_physical_prints_plan_before_results () =
+  let output =
+    run_with_input ~show_physical:true [ "users | restrict id = 3" ]
+  in
+  check_contains "plan header line" output "Filter(id = 3)";
+  check_contains "plan input line" output "FullScan(users)";
+  (* The plan prints before the result table; assert ordering by checking
+     that "FullScan" appears before "Carol" in the captured output. *)
+  let plan_position =
+    String.index output 'F'
+    (* opening "FullScan" *)
+  in
+  let row_position =
+    let rec search position =
+      if position >= String.length output - 5 then String.length output
+      else if String.sub output position 5 = "Carol" then position
+      else search (position + 1)
+    in
+    search 0
+  in
+  Alcotest.(check bool)
+    "plan precedes the result rows" true
+    (plan_position < row_position)
+
 let () =
   Alcotest.run "repl"
     [
@@ -76,5 +109,10 @@ let () =
             test_eval_error_continues_loop;
           Alcotest.test_case "blank and whitespace-only lines are skipped"
             `Quick test_blank_lines_are_skipped_without_error;
+          Alcotest.test_case "show-physical defaults off and omits the plan"
+            `Quick test_show_physical_defaults_off_omits_plan;
+          Alcotest.test_case
+            "show-physical prints the plan before the result rows" `Quick
+            test_show_physical_prints_plan_before_results;
         ] );
     ]

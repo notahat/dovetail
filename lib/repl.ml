@@ -1,10 +1,14 @@
 let prompt = "> "
 
 (* Run a single parsed query against [environment] and pretty-print the
-   result to [output]. Evaluation failures are caught and reported as a
-   one-line error so the surrounding loop can keep going. *)
-let evaluate_and_print environment ~output logical =
+   result to [output]. When [show_physical] is true, the chosen physical
+   plan is printed before evaluation -- intended as an EXPLAIN-style aid
+   for understanding which operators are firing. Evaluation failures are
+   caught and reported as a one-line error so the surrounding loop can keep
+   going. *)
+let evaluate_and_print environment ~output ~show_physical logical =
   let physical = Translate.translate logical in
+  if show_physical then Physical.format output physical;
   Storage.with_read_transaction environment (fun transaction ->
       match Eval.eval environment transaction physical with
       | relation -> Relation.print ~formatter:output relation
@@ -12,14 +16,14 @@ let evaluate_and_print environment ~output logical =
 
 (* Process one input line: parse, lower, evaluate, print. Parse and eval
    errors land in [output]; nothing is raised. *)
-let process_line environment ~output line =
+let process_line environment ~output ~show_physical line =
   match Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message
   | Ok ast ->
       let logical = Lower.lower ast in
-      evaluate_and_print environment ~output logical
+      evaluate_and_print environment ~output ~show_physical logical
 
-let run environment ~read_line ~output =
+let run ?(show_physical = false) environment ~read_line ~output =
   let rec loop () =
     Format.fprintf output "%s" prompt;
     Format.pp_print_flush output ();
@@ -27,7 +31,7 @@ let run environment ~read_line ~output =
     | None -> ()
     | Some line ->
         if String.length (String.trim line) > 0 then
-          process_line environment ~output line;
+          process_line environment ~output ~show_physical line;
         loop ()
   in
   loop ()

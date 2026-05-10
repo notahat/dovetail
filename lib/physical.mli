@@ -45,3 +45,12 @@ type t =
           exists so that {!Translate} has a place to emit when it recognises an
           inner join, and so future strategies (indexed nested-loop, hash join,
           merge join) have siblings to slot in next to. *)
+
+val format : Format.formatter -> t -> unit
+(** [format formatter plan] writes [plan] to [formatter] as an indented tree,
+    one operator per line, with each operator's inputs indented two spaces
+    further than the operator itself. The leaf operator [FullScan] renders as
+    [FullScan(table)]; operators that carry a parameter render it inside
+    parentheses on the operator's line ([Filter(predicate)], [Project(columns)],
+    [NestedLoopJoin(predicate)]). The output is for EXPLAIN-style debug printing
+    -- the [--show-physical] flag on the binary is the primary consumer. *)

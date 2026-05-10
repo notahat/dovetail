@@ -215,6 +215,58 @@ let test_type_mismatch_column_vs_column_raises () =
       in
       ())
 
+let format_to_string predicate =
+  let buffer = Buffer.create 64 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Predicate.format formatter predicate;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_column_equals_int64_literal () =
+  let rendered =
+    format_to_string
+      (compare_predicate ~left:(column "id") ~op:Equal
+         ~right:(literal (Value.Int64 3L)))
+  in
+  Alcotest.(check string) "id = 3" "id = 3" rendered
+
+let test_format_column_equals_string_literal_quotes_string () =
+  let rendered =
+    format_to_string
+      (compare_predicate ~left:(column "name") ~op:Equal
+         ~right:(literal (Value.String "Alice")))
+  in
+  Alcotest.(check string)
+    "string literal is double-quoted" "name = \"Alice\"" rendered
+
+let test_format_column_equals_bool_literal () =
+  let rendered =
+    format_to_string
+      (compare_predicate ~left:(column "active") ~op:Equal
+         ~right:(literal (Value.Bool true)))
+  in
+  Alcotest.(check string) "bool literal as keyword" "active = true" rendered
+
+let test_format_inequality_uses_angle_brackets () =
+  let rendered =
+    format_to_string
+      (compare_predicate ~left:(column "id") ~op:NotEqual
+         ~right:(literal (Value.Int64 3L)))
+  in
+  Alcotest.(check string) "id <> 3" "id <> 3" rendered
+
+let test_format_qualified_columns_use_dot_form () =
+  let rendered =
+    format_to_string
+      (compare_predicate
+         ~left:(qualified_column ~qualifier:"users" ~name:"id")
+         ~op:Equal
+         ~right:(qualified_column ~qualifier:"orders" ~name:"user_id"))
+  in
+  Alcotest.(check string)
+    "qualified column references render in dotted form"
+    "users.id = orders.user_id" rendered
+
 let () =
   Alcotest.run "predicate"
     [
@@ -260,5 +312,18 @@ let () =
           Alcotest.test_case
             "qualified reference to a column not in this schema raises" `Quick
             test_unknown_qualifier_raises;
+        ] );
+      ( "format",
+        [
+          Alcotest.test_case "column = int64 literal" `Quick
+            test_format_column_equals_int64_literal;
+          Alcotest.test_case "column = string literal quotes the string" `Quick
+            test_format_column_equals_string_literal_quotes_string;
+          Alcotest.test_case "column = bool literal" `Quick
+            test_format_column_equals_bool_literal;
+          Alcotest.test_case "inequality renders with <>" `Quick
+            test_format_inequality_uses_angle_brackets;
+          Alcotest.test_case "qualified columns render in dotted form" `Quick
+            test_format_qualified_columns_use_dot_form;
         ] );
     ]

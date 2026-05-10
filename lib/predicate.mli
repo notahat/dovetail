@@ -23,6 +23,13 @@ type term = Column of Schema.column_reference | Literal of Value.t
     without changing call sites that already pattern-match. *)
 type t = Compare of { left : term; op : op; right : term }
 
+val format : Format.formatter -> t -> unit
+(** [format formatter predicate] writes a single-line, source-like rendering of
+    [predicate] to [formatter]. Column terms render in the dotted form when
+    qualified ([users.id]) and bare otherwise; string literals are double-quoted
+    (no escape handling). The output is meant for EXPLAIN-style debug printing,
+    not for round-tripping back through the parser. *)
+
 val resolve : Schema.t -> t -> Schema.tuple -> bool
 (** [resolve schema predicate] validates [predicate] against [schema] and
     returns a closure that evaluates [predicate] against a single tuple.
