@@ -47,19 +47,11 @@ let evaluate_users_filter predicate =
       let relation = Eval.eval environment transaction plan in
       List.of_seq relation.tuples)
 
-(* Helpers to build [Compare] predicates with [term]-shaped sides. Local
-   shorthand to keep test bodies short under the slice-4 predicate shape. *)
-let column name : Predicate.term = Column { qualifier = None; name }
-let literal value : Predicate.term = Literal value
-
-let compare_predicate ~left ~op ~right : Predicate.t =
-  Compare { left; op; right }
-
 let test_filter_equality_on_int64_yields_one_row () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "id") ~op:Equal
-         ~right:(literal (Value.Int64 3L)))
+      (predicate_compare ~left:(predicate_column "id") ~op:Equal
+         ~right:(predicate_literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "Carol's row"
@@ -69,8 +61,8 @@ let test_filter_equality_on_int64_yields_one_row () =
 let test_filter_equality_on_string_yields_one_row () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "name") ~op:Equal
-         ~right:(literal (Value.String "Alice")))
+      (predicate_compare ~left:(predicate_column "name") ~op:Equal
+         ~right:(predicate_literal (Value.String "Alice")))
   in
   Alcotest.(check tuple_list_testable)
     "Alice's row"
@@ -80,24 +72,26 @@ let test_filter_equality_on_string_yields_one_row () =
 let test_filter_equality_on_bool_yields_active_rows () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "active") ~op:Equal
-         ~right:(literal (Value.Bool true)))
+      (predicate_compare
+         ~left:(predicate_column "active")
+         ~op:Equal
+         ~right:(predicate_literal (Value.Bool true)))
   in
   Alcotest.(check int) "three active rows" 3 (List.length rows)
 
 let test_filter_inequality_yields_complement () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "id") ~op:NotEqual
-         ~right:(literal (Value.Int64 3L)))
+      (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
+         ~right:(predicate_literal (Value.Int64 3L)))
   in
   Alcotest.(check int) "four rows with id <> 3" 4 (List.length rows)
 
 let test_filter_matches_all_rows () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "id") ~op:NotEqual
-         ~right:(literal (Value.Int64 999L)))
+      (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
+         ~right:(predicate_literal (Value.Int64 999L)))
   in
   Alcotest.(check tuple_list_testable)
     "all five fixture rows" expected_users_rows rows
@@ -105,15 +99,16 @@ let test_filter_matches_all_rows () =
 let test_filter_matches_zero_rows () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "id") ~op:Equal
-         ~right:(literal (Value.Int64 999L)))
+      (predicate_compare ~left:(predicate_column "id") ~op:Equal
+         ~right:(predicate_literal (Value.Int64 999L)))
   in
   Alcotest.(check tuple_list_testable) "no rows" [] rows
 
 let test_filter_column_equals_column_yields_no_rows () =
   let rows =
     evaluate_users_filter
-      (compare_predicate ~left:(column "name") ~op:Equal ~right:(column "email"))
+      (predicate_compare ~left:(predicate_column "name") ~op:Equal
+         ~right:(predicate_column "email"))
   in
   Alcotest.(check tuple_list_testable) "no rows where name = email" [] rows
 
@@ -122,8 +117,10 @@ let test_filter_unknown_column_raises () =
     (Failure "Predicate.resolve: unknown column \"unknown_col\"") (fun () ->
       let _ =
         evaluate_users_filter
-          (compare_predicate ~left:(column "unknown_col") ~op:Equal
-             ~right:(literal (Value.Int64 3L)))
+          (predicate_compare
+             ~left:(predicate_column "unknown_col")
+             ~op:Equal
+             ~right:(predicate_literal (Value.Int64 3L)))
       in
       ())
 
@@ -134,8 +131,8 @@ let test_filter_type_mismatch_raises () =
         Int64 is Int64") (fun () ->
       let _ =
         evaluate_users_filter
-          (compare_predicate ~left:(column "name") ~op:Equal
-             ~right:(literal (Value.Int64 1L)))
+          (predicate_compare ~left:(predicate_column "name") ~op:Equal
+             ~right:(predicate_literal (Value.Int64 1L)))
       in
       ())
 
@@ -223,8 +220,10 @@ let test_project_then_filter () =
                     ];
                 };
             predicate =
-              compare_predicate ~left:(column "active") ~op:Equal
-                ~right:(literal (Value.Bool true));
+              predicate_compare
+                ~left:(predicate_column "active")
+                ~op:Equal
+                ~right:(predicate_literal (Value.Bool true));
           }
       in
       let relation = Eval.eval environment transaction plan in
@@ -245,8 +244,10 @@ let test_filter_then_project () =
       {
         input = users_full_scan;
         predicate =
-          compare_predicate ~left:(column "active") ~op:Equal
-            ~right:(literal (Value.Bool true));
+          predicate_compare
+            ~left:(predicate_column "active")
+            ~op:Equal
+            ~right:(predicate_literal (Value.Bool true));
       }
   in
   let rows = evaluate_users_project ~input_plan:filter_active_true [ "name" ] in
@@ -330,12 +331,11 @@ let test_cross_product_then_filter_yields_matched_pairs () =
       {
         input = users_cross_orders_plan;
         predicate =
-          Compare
-            {
-              left = Column { qualifier = Some "users"; name = "id" };
-              op = Equal;
-              right = Column { qualifier = Some "orders"; name = "user_id" };
-            };
+          predicate_compare
+            ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+            ~op:Equal
+            ~right:
+              (predicate_qualified_column ~qualifier:"orders" ~name:"user_id");
       }
   in
   let _schema, rows = evaluate_against_fixture plan in
@@ -372,29 +372,23 @@ let expected_matched_user_order_rows : Schema.tuple list =
    predicate grammar in slice 4 doesn't have a bare boolean predicate, but
    [1 = 1] and [1 <> 1] do the same job and parse fine through the existing
    resolver. *)
-let always_true_predicate : Predicate.t =
-  Compare
-    {
-      left = Literal (Value.Int64 1L);
-      op = Equal;
-      right = Literal (Value.Int64 1L);
-    }
+let always_true_predicate =
+  predicate_compare
+    ~left:(predicate_literal (Value.Int64 1L))
+    ~op:Equal
+    ~right:(predicate_literal (Value.Int64 1L))
 
-let always_false_predicate : Predicate.t =
-  Compare
-    {
-      left = Literal (Value.Int64 1L);
-      op = NotEqual;
-      right = Literal (Value.Int64 1L);
-    }
+let always_false_predicate =
+  predicate_compare
+    ~left:(predicate_literal (Value.Int64 1L))
+    ~op:NotEqual
+    ~right:(predicate_literal (Value.Int64 1L))
 
-let users_join_orders_on_id_predicate : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = Some "users"; name = "id" };
-      op = Equal;
-      right = Column { qualifier = Some "orders"; name = "user_id" };
-    }
+let users_join_orders_on_id_predicate =
+  predicate_compare
+    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    ~op:Equal
+    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let nested_loop_join_plan predicate : Physical.t =
   NestedLoopJoin
@@ -462,12 +456,8 @@ let test_cross_product_with_ambiguous_unqualified_filter_raises () =
       {
         input = users_cross_orders_plan;
         predicate =
-          Compare
-            {
-              left = Column { qualifier = None; name = "id" };
-              op = Equal;
-              right = Literal (Value.Int64 3L);
-            };
+          predicate_compare ~left:(predicate_column "id") ~op:Equal
+            ~right:(predicate_literal (Value.Int64 3L));
       }
   in
   Alcotest.check_raises "ambiguous unqualified column"

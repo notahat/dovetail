@@ -18,27 +18,25 @@ let usage program_name =
 type cli_options = { show_physical : bool; environment_path : string }
 
 let parse_cli argv =
-  let positional_arguments = ref [] in
-  let show_physical = ref false in
-  Array.iteri
-    (fun index argument ->
-      if index = 0 then ()
-      else if argument = show_physical_flag then
-        if !show_physical then (
-          Printf.eprintf "%s\n" (usage argv.(0));
-          exit 2)
-        else show_physical := true
-      else positional_arguments := argument :: !positional_arguments)
-    argv;
-  let environment_path =
-    match List.rev !positional_arguments with
-    | [] -> default_environment_path
-    | [ path ] -> path
-    | _ ->
-        Printf.eprintf "%s\n" (usage argv.(0));
-        exit 2
+  let usage_and_exit () =
+    Printf.eprintf "%s\n" (usage argv.(0));
+    exit 2
   in
-  { show_physical = !show_physical; environment_path }
+  let rec walk ~show_physical ~environment_path = function
+    | [] ->
+        let environment_path =
+          Option.value environment_path ~default:default_environment_path
+        in
+        { show_physical; environment_path }
+    | argument :: rest when argument = show_physical_flag ->
+        if show_physical then usage_and_exit ()
+        else walk ~show_physical:true ~environment_path rest
+    | path :: rest ->
+        if Option.is_some environment_path then usage_and_exit ()
+        else walk ~show_physical ~environment_path:(Some path) rest
+  in
+  let arguments = Array.to_list argv |> List.tl in
+  walk ~show_physical:false ~environment_path:None arguments
 
 (* Adapt [stdin] to [Repl.run]'s [read_line] callback: return [None] on
    EOF rather than raising. *)

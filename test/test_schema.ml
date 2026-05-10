@@ -1,6 +1,7 @@
 (** Tests for [Schema]. *)
 
 open Dovetail
+open Test_helpers
 
 let users_schema : Schema.t =
   {
@@ -97,22 +98,15 @@ let test_assembles_composite_primary_key () =
   in
   Alcotest.(check tuple_testable) "composite PK" expected assembled
 
-(* Build a [column_reference], handling both qualified and unqualified
-   forms. *)
-let unqualified name : Schema.column_reference = { qualifier = None; name }
-
-let qualified ~qualifier ~name : Schema.column_reference =
-  { qualifier = Some qualifier; name }
-
 let test_unqualified_lookup_returns_position_and_field () =
-  match Schema.find_field users_schema (unqualified "id") with
+  match Schema.find_field users_schema (column_reference "id") with
   | Ok (position, field) ->
       Alcotest.(check int) "id at position 0" 0 position;
       Alcotest.(check string) "field name" "id" field.name
   | Error message -> Alcotest.failf "expected Ok, got Error %S" message
 
 let test_unqualified_lookup_returns_position_for_later_field () =
-  match Schema.find_field users_schema (unqualified "active") with
+  match Schema.find_field users_schema (column_reference "active") with
   | Ok (position, field) ->
       Alcotest.(check int) "active at position 3" 3 position;
       Alcotest.(check string) "field name" "active" field.name
@@ -120,14 +114,15 @@ let test_unqualified_lookup_returns_position_for_later_field () =
 
 let test_qualified_lookup_returns_position_and_field () =
   match
-    Schema.find_field users_schema (qualified ~qualifier:"users" ~name:"id")
+    Schema.find_field users_schema
+      (qualified_column_reference ~qualifier:"users" ~name:"id")
   with
   | Ok (position, _field) ->
       Alcotest.(check int) "users.id at position 0" 0 position
   | Error message -> Alcotest.failf "expected Ok, got Error %S" message
 
 let test_unqualified_lookup_unknown_returns_error () =
-  match Schema.find_field users_schema (unqualified "missing") with
+  match Schema.find_field users_schema (column_reference "missing") with
   | Ok _ -> Alcotest.fail "expected an error for missing column"
   | Error message ->
       Alcotest.(check string)
@@ -135,7 +130,8 @@ let test_unqualified_lookup_unknown_returns_error () =
 
 let test_qualified_lookup_unknown_returns_error () =
   match
-    Schema.find_field users_schema (qualified ~qualifier:"orders" ~name:"id")
+    Schema.find_field users_schema
+      (qualified_column_reference ~qualifier:"orders" ~name:"id")
   with
   | Ok _ -> Alcotest.fail "expected an error for orders.id against users"
   | Error message ->
@@ -144,7 +140,7 @@ let test_qualified_lookup_unknown_returns_error () =
         message
 
 let test_unqualified_lookup_ambiguous_returns_error_naming_qualifiers () =
-  match Schema.find_field cross_product_schema (unqualified "id") with
+  match Schema.find_field cross_product_schema (column_reference "id") with
   | Ok _ -> Alcotest.fail "expected an ambiguity error"
   | Error message ->
       Alcotest.(check string)
@@ -156,7 +152,7 @@ let test_unqualified_lookup_ambiguous_returns_error_naming_qualifiers () =
 let test_qualified_lookup_disambiguates_in_cross_product_schema () =
   match
     Schema.find_field cross_product_schema
-      (qualified ~qualifier:"orders" ~name:"id")
+      (qualified_column_reference ~qualifier:"orders" ~name:"id")
   with
   | Ok (position, _field) ->
       Alcotest.(check int) "orders.id at position 2" 2 position

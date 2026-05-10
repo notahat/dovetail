@@ -18,4 +18,10 @@ val translate : Logical.t -> Physical.t
     maps [Scan] to [FullScan]; slice 2 adds [Restrict] -> [Filter]; slice 3 adds
     [Project] -> [Project]; slice 4 adds [CrossProduct] -> [CrossProduct]; slice
     5 adds the first non-structural rewrite,
-    [Restrict (CrossProduct (L, R), pred)] -> [NestedLoopJoin (L, R, pred)]. *)
+    [Restrict (CrossProduct (L, R), pred)] -> [NestedLoopJoin (L, R, pred)].
+
+    The slice-5 rewrite fires on shape alone -- it does not inspect which inputs
+    [pred] references. So [Restrict (CrossProduct (L, R), one_sided_pred)] still
+    becomes a [NestedLoopJoin], even though pushing [one_sided_pred] down onto
+    the relevant input would produce a better plan. Predicate pushdown is a
+    separate, future rewrite. *)

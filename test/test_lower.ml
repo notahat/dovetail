@@ -27,13 +27,9 @@ let test_pipeline_yields_fixture_rows () =
       Alcotest.(check tuple_list_testable)
         "five rows from AST" expected_users_rows rows)
 
-let id_equals_three : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = None; name = "id" };
-      op = Equal;
-      right = Literal (Value.Int64 3L);
-    }
+let id_equals_three =
+  predicate_compare ~left:(predicate_column "id") ~op:Equal
+    ~right:(predicate_literal (Value.Int64 3L))
 
 let test_restrict_lowers_to_logical_restrict () =
   let ast =
@@ -66,7 +62,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
         rows)
 
 let name_then_email : Projection.t =
-  [ { qualifier = None; name = "name" }; { qualifier = None; name = "email" } ]
+  [ column_reference "name"; column_reference "email" ]
 
 let test_project_lowers_to_logical_project () =
   let ast =

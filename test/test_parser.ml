@@ -60,18 +60,6 @@ let test_rejects_two_identifiers () =
      refuse them now so we don't accidentally start accepting them later. *)
   rejects "users orders"
 
-(* Local shorthand to keep test bodies short under the slice-4 predicate
-   shape. *)
-let predicate_column name : Predicate.term = Column { qualifier = None; name }
-
-let predicate_qualified_column ~qualifier ~name : Predicate.term =
-  Column { qualifier = Some qualifier; name }
-
-let predicate_literal value : Predicate.term = Literal value
-
-let predicate_compare ~left ~op ~right : Predicate.t =
-  Compare { left; op; right }
-
 let test_predicate_int64_equality () =
   parses_predicate "id = 3"
     (predicate_compare ~left:(predicate_column "id") ~op:Equal
@@ -182,21 +170,15 @@ let test_predicate_keyword_prefix_is_an_identifier () =
 let test_predicate_rejects_trailing_garbage () =
   rejects_predicate "id = 3 garbage"
 
-let id_equals_three : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = None; name = "id" };
-      op = Equal;
-      right = Literal (Value.Int64 3L);
-    }
+let id_equals_three =
+  predicate_compare ~left:(predicate_column "id") ~op:Equal
+    ~right:(predicate_literal (Value.Int64 3L))
 
-let active_equals_true : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = None; name = "active" };
-      op = Equal;
-      right = Literal (Value.Bool true);
-    }
+let active_equals_true =
+  predicate_compare
+    ~left:(predicate_column "active")
+    ~op:Equal
+    ~right:(predicate_literal (Value.Bool true))
 
 let test_pipeline_parses_single_restrict () =
   parses "users | restrict id = 3"
@@ -265,23 +247,17 @@ let test_pipeline_restrict_yields_filtered_rows () =
 
 let users_relation = Ast.Relation_name "users"
 
-(* Local shorthand for the column-reference shape that {!Projection.t} now
-   carries. *)
-let project_column name : Schema.column_reference = { qualifier = None; name }
-
-let project_qualified_column ~qualifier ~name : Schema.column_reference =
-  { qualifier = Some qualifier; name }
-
 let test_pipeline_parses_single_column_project () =
   parses "users | project name"
-    (Ast.Project { input = users_relation; columns = [ project_column "name" ] })
+    (Ast.Project
+       { input = users_relation; columns = [ column_reference "name" ] })
 
 let test_pipeline_parses_multi_column_project () =
   parses "users | project name, email"
     (Ast.Project
        {
          input = users_relation;
-         columns = [ project_column "name"; project_column "email" ];
+         columns = [ column_reference "name"; column_reference "email" ];
        })
 
 let test_pipeline_parses_project_without_spaces_around_comma () =
@@ -289,7 +265,7 @@ let test_pipeline_parses_project_without_spaces_around_comma () =
     (Ast.Project
        {
          input = users_relation;
-         columns = [ project_column "name"; project_column "email" ];
+         columns = [ column_reference "name"; column_reference "email" ];
        })
 
 let test_pipeline_parses_project_with_space_before_comma () =
@@ -297,7 +273,7 @@ let test_pipeline_parses_project_with_space_before_comma () =
     (Ast.Project
        {
          input = users_relation;
-         columns = [ project_column "name"; project_column "email" ];
+         columns = [ column_reference "name"; column_reference "email" ];
        })
 
 let test_pipeline_parses_project_reordering_columns () =
@@ -305,7 +281,7 @@ let test_pipeline_parses_project_reordering_columns () =
     (Ast.Project
        {
          input = users_relation;
-         columns = [ project_column "email"; project_column "id" ];
+         columns = [ column_reference "email"; column_reference "id" ];
        })
 
 let test_pipeline_parses_chained_project () =
@@ -314,8 +290,8 @@ let test_pipeline_parses_chained_project () =
        {
          input =
            Ast.Project
-             { input = users_relation; columns = [ project_column "name" ] };
-         columns = [ project_column "email" ];
+             { input = users_relation; columns = [ column_reference "name" ] };
+         columns = [ column_reference "email" ];
        })
 
 let test_pipeline_parses_restrict_then_project () =
@@ -324,7 +300,7 @@ let test_pipeline_parses_restrict_then_project () =
        {
          input =
            Ast.Restrict { input = users_relation; predicate = id_equals_three };
-         columns = [ project_column "name"; project_column "email" ];
+         columns = [ column_reference "name"; column_reference "email" ];
        })
 
 let test_pipeline_parses_project_with_qualified_columns () =
@@ -334,8 +310,8 @@ let test_pipeline_parses_project_with_qualified_columns () =
          input = users_relation;
          columns =
            [
-             project_qualified_column ~qualifier:"users" ~name:"name";
-             project_qualified_column ~qualifier:"users" ~name:"email";
+             qualified_column_reference ~qualifier:"users" ~name:"name";
+             qualified_column_reference ~qualifier:"users" ~name:"email";
            ];
        })
 

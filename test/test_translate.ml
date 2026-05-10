@@ -26,16 +26,12 @@ let test_pipeline_yields_fixture_rows () =
       Alcotest.(check tuple_list_testable)
         "five rows from logical scan" expected_users_rows rows)
 
-let id_equals_three : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = None; name = "id" };
-      op = Equal;
-      right = Literal (Value.Int64 3L);
-    }
+let id_equals_three =
+  predicate_compare ~left:(predicate_column "id") ~op:Equal
+    ~right:(predicate_literal (Value.Int64 3L))
 
 let name_then_email : Projection.t =
-  [ { qualifier = None; name = "name" }; { qualifier = None; name = "email" } ]
+  [ column_reference "name"; column_reference "email" ]
 
 let test_restrict_translates_to_filter () =
   let logical =
@@ -132,13 +128,11 @@ let test_cross_product_translates_to_physical_cross_product () =
        })
     physical
 
-let users_id_equals_orders_user_id : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = Some "users"; name = "id" };
-      op = Equal;
-      right = Column { qualifier = Some "orders"; name = "user_id" };
-    }
+let users_id_equals_orders_user_id =
+  predicate_compare
+    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    ~op:Equal
+    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let test_restrict_over_cross_product_translates_to_nested_loop_join () =
   let logical =

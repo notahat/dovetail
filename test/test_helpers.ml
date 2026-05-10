@@ -100,6 +100,28 @@ let expected_orders_rows : Schema.tuple list =
 let tuple_list_testable : Schema.tuple list Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuples>")) ( = )
 
+(** Build a bare (unqualified) [Schema.column_reference]. *)
+let column_reference name : Schema.column_reference = { qualifier = None; name }
+
+(** Build a qualified [Schema.column_reference]. *)
+let qualified_column_reference ~qualifier ~name : Schema.column_reference =
+  { qualifier = Some qualifier; name }
+
+(** A [Predicate.term] referring to a bare (unqualified) column. *)
+let predicate_column name : Predicate.term = Column (column_reference name)
+
+(** A [Predicate.term] referring to a qualified column. *)
+let predicate_qualified_column ~qualifier ~name : Predicate.term =
+  Column (qualified_column_reference ~qualifier ~name)
+
+(** A [Predicate.term] wrapping a literal value. *)
+let predicate_literal value : Predicate.term = Literal value
+
+(** A [Predicate.t] comparing two terms. The keyword arguments mirror the record
+    fields so the call site reads close to the predicate's source form. *)
+let predicate_compare ~left ~op ~right : Predicate.t =
+  Compare { left; op; right }
+
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)
 let contains_substring haystack needle =

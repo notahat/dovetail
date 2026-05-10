@@ -6,6 +6,7 @@
     composes the way readers will expect. *)
 
 open Dovetail
+open Test_helpers
 
 let format_to_string plan =
   let buffer = Buffer.create 128 in
@@ -17,21 +18,15 @@ let format_to_string plan =
 let users_full_scan : Physical.t = FullScan { table = "users" }
 let orders_full_scan : Physical.t = FullScan { table = "orders" }
 
-let id_equals_three : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = None; name = "id" };
-      op = Equal;
-      right = Literal (Value.Int64 3L);
-    }
+let id_equals_three =
+  predicate_compare ~left:(predicate_column "id") ~op:Equal
+    ~right:(predicate_literal (Value.Int64 3L))
 
-let users_id_equals_orders_user_id : Predicate.t =
-  Compare
-    {
-      left = Column { qualifier = Some "users"; name = "id" };
-      op = Equal;
-      right = Column { qualifier = Some "orders"; name = "user_id" };
-    }
+let users_id_equals_orders_user_id =
+  predicate_compare
+    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    ~op:Equal
+    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let test_full_scan_renders_with_table_name () =
   Alcotest.(check string)
@@ -51,11 +46,7 @@ let test_project_renders_columns_in_order () =
     Project
       {
         input = users_full_scan;
-        columns =
-          [
-            { qualifier = None; name = "name" };
-            { qualifier = None; name = "email" };
-          ];
+        columns = [ column_reference "name"; column_reference "email" ];
       }
   in
   Alcotest.(check string)
