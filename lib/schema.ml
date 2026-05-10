@@ -9,11 +9,8 @@ let format_column_reference = function
   | { qualifier = Some qualifier; name } -> qualifier ^ "." ^ name
   | { qualifier = None; name } -> name
 
-(* Render a [field] in dotted form when qualified, bare otherwise. *)
-let format_qualified_field (field : field) =
-  match field.qualifier with
-  | Some qualifier -> qualifier ^ "." ^ field.name
-  | None -> field.name
+let format_field_name (field : field) =
+  format_column_reference { qualifier = field.qualifier; name = field.name }
 
 (* Walk [schema.fields], pairing each field with its zero-based position and
    keeping the ones whose name matches [name]. *)
@@ -62,7 +59,7 @@ let find_field schema reference =
           let qualified_names =
             List.map
               (fun (_position, field) ->
-                Printf.sprintf "%S" (format_qualified_field field))
+                Printf.sprintf "%S" (format_field_name field))
               matching
           in
           Error

@@ -54,18 +54,9 @@ let format_separator widths =
   in
   "|-" ^ String.concat "-|-" dashes ^ "-|"
 
-(* Render a field's header text: qualified [qualifier.name] when the field
-   carries a qualifier, bare [name] otherwise. Cross-product results carry
-   qualifiers so users can disambiguate same-named columns from different
-   inputs at a glance. *)
-let header_for_field (field : Schema.field) =
-  match field.qualifier with
-  | Some qualifier -> qualifier ^ "." ^ field.name
-  | None -> field.name
-
 let print ?(formatter = Format.std_formatter) relation =
   let fields = relation.schema.fields in
-  let headers = Array.of_list (List.map header_for_field fields) in
+  let headers = Array.of_list (List.map Schema.format_field_name fields) in
   let right_aligns =
     Array.of_list
       (List.map

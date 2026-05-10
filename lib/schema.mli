@@ -50,6 +50,13 @@ val format_column_reference : column_reference -> string
 (** Render a [column_reference] in its source form: dotted [qualifier.name] when
     qualified, bare [name] when unqualified. *)
 
+val format_field_name : field -> string
+(** Render a [field]'s display name in source form: dotted [qualifier.name] when
+    the field carries a qualifier, bare [name] otherwise. The canonical helper
+    for any caller that has a [field] in hand and wants the same rendering as
+    {!format_column_reference} -- the relation pretty-printer's column headers,
+    error messages that name a conflicting field, and so on. *)
+
 val assemble_tuple :
   t ->
   primary_key_values:Value.t list ->
