@@ -5,9 +5,10 @@
     operator it denotes. The result is independent of how the user wrote the
     query, so later stages can reason in algebraic terms.
 
-    Slice 1 ships only the [Relation_name] case; further nodes arrive as later
-    slices introduce them. *)
+    Slice 1 introduced [Relation_name]; slice 2 adds [Restrict]. Further nodes
+    arrive as later slices introduce them. *)
 
 val lower : Ast.t -> Logical.t
 (** [lower ast] rewrites [ast] into an equivalent logical plan. Slice 1 maps
-    [Relation_name name] to [Scan { table = name }]. *)
+    [Relation_name name] to [Scan { table = name }]; slice 2 adds [Ast.Restrict]
+    -> [Logical.Restrict]. *)
