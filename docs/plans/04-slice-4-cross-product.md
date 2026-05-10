@@ -1,4 +1,4 @@
-# 05 — Slice 4: Cross product (×)
+# 04 — Slice 4: Cross product (×)
 
 The fourth vertical slice. End-state: typing `users | cross orders` at
 the REPL yields every (user, order) pair, and
@@ -8,8 +8,8 @@ the matched ones.
 This slice ships cross product on its own; inner join (`Join` operator,
 `join...on` surface) lands in slice 5. The two were originally grouped
 in `00-initial-plan.md` but have been split so each slice has one clear
-demo and a focused step list. Slice 3 (projection) is unchanged in its
-ordering — projection lands before this slice.
+demo and a focused step list. Slice 3 (projection) shipped before
+this slice, as the original ordering required.
 
 The other big move in slice 4 is the predicate sublanguage's first real
 extension since slice 2: column-vs-column comparisons and qualified
@@ -68,6 +68,9 @@ it.
 ### IR shapes
 
 ```ocaml
+(* Ast *)
+| CrossProduct of { left : t; right : t }
+
 (* Logical *)
 | CrossProduct of { left : t; right : t }
 
@@ -75,12 +78,13 @@ it.
 | CrossProduct of { left : t; right : t }
 ```
 
-Same constructor name in both layers. Cross product has one execution
-strategy (nested loop), so there's no strategy-naming distinction to
-make. When slice 5 adds `Physical.NestedLoopJoin`, the asymmetry
-between `CrossProduct` and `NestedLoopJoin` will reflect reality —
-join has multiple strategies on the roadmap (hash, merge), cross
-product doesn't.
+Same constructor name in all three layers, mirroring the convention
+slice 3 set with `Project`. Cross product has one execution strategy
+(nested loop), so there's no strategy-naming distinction to make. When
+slice 5 adds `Physical.NestedLoopJoin`, the asymmetry between
+`CrossProduct` and `NestedLoopJoin` will reflect reality — join has
+multiple strategies on the roadmap (hash, merge), cross product
+doesn't.
 
 ### Predicate evolution
 
@@ -133,16 +137,14 @@ product introduces a second relation with overlapping names.
 
 ### Primary keys on intermediate results
 
-Slice 3 (projection) hits this question first: when an operator
-produces a new schema that doesn't include the original PK columns,
-what does `primary_key` become? Cross product faces the same question
-— the result has no inherent PK.
-
-Slice 4 follows whatever convention slice 3 establishes. In the
-absence of one, the working default is `primary_key = []` for the
-cross-product result. PK info is only meaningful for base tables today
-(used by `Scan` to decode keys); intermediate-result PKs aren't
-queried by any operator yet, so empty-list is harmless.
+`primary_key = []` for the cross-product result, following the
+convention slice 3 set with `Projection.resolve`: derived schemas
+don't carry primary-key information at this point in the project. PK
+info is only meaningful for base tables today (used by `Scan` to
+decode keys); intermediate-result PKs aren't queried by any operator
+yet, so empty-list is honest. The right time to revisit is when
+`IndexScan` (slice 6) or the optimiser starts wanting PK info on
+non-base relations.
 
 ### Surface syntax
 
@@ -188,10 +190,12 @@ and the slice-1 storage abstraction stays unchanged.
 
 ### Set/Bag preservation
 
-Cross product preserves the multiplicity tag. Slice 4's `Eval`
-continues returning `` [`Bag] `` because nothing yet produces sets, but
-the principle is recorded so slice 7 (set/bag operators) doesn't trip
-on it.
+Cross product preserves the multiplicity tag, matching the rule slice
+3 recorded for `Filter` (slice 3 separately downgraded `Project` to
+`Bag` because dropping columns can introduce duplicates; cross product
+does not have that property). Slice 4's `Eval` continues returning
+`` [`Bag] `` because nothing yet produces sets — the principle is
+recorded in prose so slice 8 (set/bag operators) doesn't trip on it.
 
 ## Sub-steps
 
@@ -279,34 +283,42 @@ work.
   change.
 - `Predicate.t`'s `Column` term restructures to carry
   `column_reference = { qualifier : string option; name : string }`.
+- `Projection.t` restructures the same way: from `string list` to
+  `column_reference list`. Both column-ref-carrying types make the
+  jump together so the parser, the IR, and the resolver agree on a
+  single shape. Slice 3's plan flagged this refactor as a bullet
+  belonging to slice 4 step 3.
 - `Parser` parses `<id>` as unqualified and `<id>.<id>` as qualified;
-  no whitespace allowed around the dot.
-- `Predicate.resolve` calls into the generalised `Schema.find_field`
-  with the term's qualifier, propagating the disambiguation error
-  with a clear message naming the conflicting qualifiers.
+  no whitespace allowed around the dot. Both `predicate` and
+  `project_columns` reuse the new `column_reference` parser.
+- `Predicate.resolve` and `Projection.resolve` both call into the
+  generalised `Schema.find_field` with the term's qualifier,
+  propagating the disambiguation error with a clear message naming the
+  conflicting qualifiers.
 
 Tests: `test_schema.ml` covers `find_field` resolution rules
 (qualified hit; unqualified unique hit; unqualified ambiguous error;
 unknown-column and unknown-qualifier errors). `test_predicate.ml`,
-`test_parser.ml` get qualified-form cases. The slice-2
-unqualified-resolves-uniquely path keeps working unchanged for
-single-relation queries.
+`test_projection.ml`, `test_parser.ml` get qualified-form cases. The
+slice-2/3 unqualified-resolves-uniquely path keeps working unchanged
+for single-relation queries.
 
-End state: `users | restrict users.id = 3` parses and evaluates
-identically to `users | restrict id = 3`. (Ambiguity tests come in
+End state: `users | restrict users.id = 3` and `users | project
+users.name` parse and evaluate identically to their unqualified
+forms. (Ambiguity tests come in
 step 4 once cross product introduces a real ambiguity case.)
 
 ### 4. Cross product
 
-`Logical.CrossProduct` and `Physical.CrossProduct`, both
-`of { left : t; right : t }`. `Translate` recurses into both sides.
-`Eval` implements nested-loop as sketched in *Eval implementation*
-above, materialising the right side.
+`Ast.CrossProduct`, `Logical.CrossProduct`, and
+`Physical.CrossProduct`, all `of { left : t; right : t }`. `Lower` and
+`Translate` recurse into both sides. `Eval` implements nested-loop as
+sketched in *Eval implementation* above, materialising the right side.
 
-Parser: `cross` joins `restrict` as a pipeline-step alternative,
-`whitespace *> "cross" *> whitespace *> relation_name`. Use the
-`keyword` helper from slice 2 step 6 so a column or relation called
-`crossroads` doesn't accidentally trigger the keyword.
+Parser: `cross` joins `restrict` and `project` as a pipeline-step
+alternative, `whitespace *> "cross" *> whitespace *> relation_name`.
+Use the `keyword` helper so a column or relation called `crossroads`
+doesn't accidentally trigger the keyword.
 
 Tests: `test_translate.ml`, `test_lower.ml`, `test_eval.ml`,
 `test_parser.ml` all grow a cross-product group. The end-to-end
@@ -318,8 +330,9 @@ message (both inputs have an `id` column).
 
 After step 4, run the binary manually to confirm the demos from the
 Goal section. Update `README.md`'s layer diagram example and the
-`Logical`/`Physical` rows in the layers table to mention cross
-product.
+`Ast`/`Logical`/`Physical` rows in the layers table to mention cross
+product (slice 3 already added the `Ast` row alongside `Logical` and
+`Physical`).
 
 End state: the demo from the Goal section works end-to-end via the
 REPL.
