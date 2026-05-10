@@ -114,6 +114,24 @@ let test_project_pipeline_yields_projected_rows () =
       Alcotest.(check tuple_list_testable)
         "five projected rows from logical Project" expected rows)
 
+let test_cross_product_translates_to_physical_cross_product () =
+  let logical =
+    Logical.CrossProduct
+      {
+        left = Logical.Scan { table = "users" };
+        right = Logical.Scan { table = "orders" };
+      }
+  in
+  let physical = Translate.translate logical in
+  Alcotest.(check physical_testable)
+    "Logical.CrossProduct -> Physical.CrossProduct wrapping FullScans"
+    (Physical.CrossProduct
+       {
+         left = Physical.FullScan { table = "users" };
+         right = Physical.FullScan { table = "orders" };
+       })
+    physical
+
 let () =
   Alcotest.run "translate"
     [
@@ -140,5 +158,11 @@ let () =
           Alcotest.test_case
             "logical Project, translated and evaluated, yields projected rows"
             `Quick test_project_pipeline_yields_projected_rows;
+        ] );
+      ( "cross product",
+        [
+          Alcotest.test_case
+            "translates Logical.CrossProduct to Physical.CrossProduct" `Quick
+            test_cross_product_translates_to_physical_cross_product;
         ] );
     ]

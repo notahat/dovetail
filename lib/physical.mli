@@ -23,3 +23,12 @@ type t =
           information at this point in the project. The multiplicity tag
           downgrades to [`Bag] because dropping columns can introduce duplicates
           that weren't present in the input. *)
+  | CrossProduct of { left : t; right : t }
+      (** [CrossProduct { left; right }] yields every (left, right) tuple pair,
+          executed as a nested loop with the right side materialised once. The
+          result schema is [left]'s fields followed by [right]'s, with
+          qualifiers preserved; the [primary_key] is empty. Cross product
+          preserves the multiplicity tag, since pairing two rows can only
+          duplicate values that the inputs already had. The dedicated [Join]
+          operator (with multiple strategies on the roadmap -- hash, merge)
+          ships in a later slice. *)

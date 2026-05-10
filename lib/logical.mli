@@ -26,3 +26,9 @@ type t =
           in the order given. Mirrors π in the relational algebra. The output
           schema's [primary_key] is empty regardless of whether [columns]
           includes the input's PK; see {!Projection.resolve}. *)
+  | CrossProduct of { left : t; right : t }
+      (** [CrossProduct { left; right }] is the cartesian product (×) of the two
+          inputs: every (left, right) tuple pair. The result schema is [left]'s
+          fields followed by [right]'s, with qualifiers preserved. The output
+          [primary_key] is empty: derived relations don't carry PK information
+          at this point in the project. *)

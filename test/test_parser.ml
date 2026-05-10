@@ -350,6 +350,93 @@ let test_pipeline_rejects_project_with_trailing_comma () =
 let test_pipeline_rejects_project_missing_comma () =
   rejects "users | project name email"
 
+let orders_relation = Ast.Relation_name "orders"
+
+let test_pipeline_parses_cross_product () =
+  parses "users | cross orders"
+    (Ast.CrossProduct { left = users_relation; right = orders_relation })
+
+let test_pipeline_parses_cross_product_then_restrict () =
+  parses "users | cross orders | restrict users.id = orders.user_id"
+    (Ast.Restrict
+       {
+         input =
+           Ast.CrossProduct { left = users_relation; right = orders_relation };
+         predicate =
+           Compare
+             {
+               left = Column { qualifier = Some "users"; name = "id" };
+               op = Equal;
+               right = Column { qualifier = Some "orders"; name = "user_id" };
+             };
+       })
+
+let test_pipeline_rejects_cross_without_relation () = rejects "users | cross"
+
+let test_pipeline_keyword_prefix_is_a_relation_name () =
+  (* [crossroads] starts with "cross" but is a single identifier, so it
+     parses as a relation reference rather than a malformed cross step. *)
+  parses "users | cross crossroads"
+    (Ast.CrossProduct
+       { left = users_relation; right = Ast.Relation_name "crossroads" })
+
+let test_pipeline_cross_yields_thirty_rows () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | cross orders" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      Alcotest.(check int)
+        "5 users x 6 orders = 30 rows from parsed cross" 30 (List.length rows))
+
+let test_pipeline_cross_then_restrict_yields_matched_pairs () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match
+          Parser.parse
+            "users | cross orders | restrict users.id = orders.user_id"
+        with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      Alcotest.(check int)
+        "six matched (user, order) pairs from parsed pipeline" 6
+        (List.length rows))
+
+let test_pipeline_cross_then_ambiguous_restrict_raises () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | cross orders | restrict id = 3" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Alcotest.check_raises "ambiguous unqualified column"
+        (Failure
+           "Predicate.resolve: ambiguous column reference \"id\": matches \
+            \"users.id\" and \"orders.id\"") (fun () ->
+          let _ = Eval.eval environment transaction physical in
+          ()))
+
 let test_pipeline_project_yields_projected_rows () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -503,6 +590,18 @@ let () =
           Alcotest.test_case "rejects project columns separated by whitespace"
             `Quick test_pipeline_rejects_project_missing_comma;
         ] );
+      ( "cross syntax",
+        [
+          Alcotest.test_case "parses a cross-product step" `Quick
+            test_pipeline_parses_cross_product;
+          Alcotest.test_case "parses cross product followed by restrict" `Quick
+            test_pipeline_parses_cross_product_then_restrict;
+          Alcotest.test_case "rejects cross without a right-hand relation"
+            `Quick test_pipeline_rejects_cross_without_relation;
+          Alcotest.test_case
+            "identifier with a cross-keyword prefix is a relation name" `Quick
+            test_pipeline_keyword_prefix_is_a_relation_name;
+        ] );
       ( "pipeline integration",
         [
           Alcotest.test_case
@@ -512,5 +611,13 @@ let () =
             `Quick test_pipeline_restrict_yields_filtered_rows;
           Alcotest.test_case "parsed project pipeline yields projected rows"
             `Quick test_pipeline_project_yields_projected_rows;
+          Alcotest.test_case "parsed cross-product pipeline yields all pairs"
+            `Quick test_pipeline_cross_yields_thirty_rows;
+          Alcotest.test_case
+            "parsed cross then restrict yields matched (user, order) pairs"
+            `Quick test_pipeline_cross_then_restrict_yields_matched_pairs;
+          Alcotest.test_case
+            "parsed cross then unqualified restrict raises ambiguity" `Quick
+            test_pipeline_cross_then_ambiguous_restrict_raises;
         ] );
     ]

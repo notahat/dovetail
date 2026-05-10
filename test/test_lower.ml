@@ -104,6 +104,21 @@ let test_project_pipeline_yields_projected_rows () =
       Alcotest.(check tuple_list_testable)
         "five projected rows from Ast.Project" expected rows)
 
+let test_cross_product_lowers_to_logical_cross_product () =
+  let ast =
+    Ast.CrossProduct
+      { left = Ast.Relation_name "users"; right = Ast.Relation_name "orders" }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.CrossProduct -> Logical.CrossProduct wrapping Scans"
+    (Logical.CrossProduct
+       {
+         left = Logical.Scan { table = "users" };
+         right = Logical.Scan { table = "orders" };
+       })
+    logical
+
 let () =
   Alcotest.run "lower"
     [
@@ -130,5 +145,10 @@ let () =
           Alcotest.test_case
             "Ast.Project, lowered/translated/evaluated, yields projected rows"
             `Quick test_project_pipeline_yields_projected_rows;
+        ] );
+      ( "cross product",
+        [
+          Alcotest.test_case "lowers Ast.CrossProduct to Logical.CrossProduct"
+            `Quick test_cross_product_lowers_to_logical_cross_product;
         ] );
     ]

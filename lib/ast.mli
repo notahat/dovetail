@@ -22,3 +22,10 @@ type t =
       (** [Project { input; columns }] is the surface form
           [input | project <columns>]. The constructor name follows the
           relational-algebra term (π). *)
+  | CrossProduct of { left : t; right : t }
+      (** [CrossProduct { left; right }] is the surface form
+          [left | cross right]. The result has one row for every pair drawn from
+          [left] and [right]; its schema is [left]'s fields followed by
+          [right]'s, with each field carrying the qualifier it had on the way
+          in. Inner join (which adds a matching predicate) ships in a later
+          slice as a separate operator. *)

@@ -56,3 +56,30 @@ let rec eval environment transaction plan =
       let { Relation.schema; tuples } = eval environment transaction input in
       let projected_schema, project_tuple = Projection.resolve schema columns in
       { schema = projected_schema; tuples = Seq.map project_tuple tuples }
+  | CrossProduct { left; right } ->
+      evaluate_cross_product environment transaction ~left ~right
+
+(* Nested-loop cross product. The right side is materialised into a list once
+   so the outer loop can re-iterate it for every left tuple; streaming the
+   right would otherwise require either re-evaluating the right sub-plan
+   from scratch each iteration (expensive across operators) or threading
+   cursor reset through the storage layer. With slice-4 fixtures the memory
+   cost of materialisation is negligible. *)
+and evaluate_cross_product environment transaction ~left ~right =
+  let left_relation = eval environment transaction left in
+  let right_relation = eval environment transaction right in
+  let right_tuples = List.of_seq right_relation.tuples in
+  let combined_schema : Schema.t =
+    {
+      fields = left_relation.schema.fields @ right_relation.schema.fields;
+      primary_key = [];
+    }
+  in
+  let combined_tuples =
+    Seq.flat_map
+      (fun left_tuple ->
+        List.to_seq right_tuples
+        |> Seq.map (fun right_tuple -> Array.append left_tuple right_tuple))
+      left_relation.tuples
+  in
+  ({ schema = combined_schema; tuples = combined_tuples } : [ `Bag ] Relation.t)

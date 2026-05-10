@@ -145,11 +145,19 @@ let project_step =
   >>| fun parsed_columns input ->
   Ast.Project { input; columns = parsed_columns }
 
+(* A cross-product pipeline step: [| cross <relation>]. The right-hand side
+   is a relation reference (a base table for now); nesting and
+   sub-pipelines on the right are out of scope for slice 4. *)
+let cross_step =
+  keyword "cross" *> whitespace *> identifier >>| fun right_table input ->
+  Ast.CrossProduct { left = input; right = Ast.Relation_name right_table }
+
 (* A single pipeline step. Each branch wraps its [Ast.t] argument with
    the step's effect, so the caller can fold a list of steps
    left-to-right over the base. *)
 let pipeline_step =
-  whitespace *> char '|' *> whitespace *> (restrict_step <|> project_step)
+  whitespace *> char '|' *> whitespace
+  *> (restrict_step <|> project_step <|> cross_step)
 
 (* The slice-2 grammar: a relation reference followed by zero or more
    pipeline steps, surrounded by optional whitespace. Each step wraps the

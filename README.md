@@ -20,7 +20,7 @@ The storage stack sits below it, used by `Eval` and the catalog.
   Query pipeline                                  Storage stack
   ──────────────                                  ─────────────
 
-  "users | restrict id = 3"
+  "users | cross orders | restrict users.id = orders.user_id"
          │
          │  Parser   (angstrom)
          ▼
@@ -50,9 +50,9 @@ The storage stack sits below it, used by `Eval` and the catalog.
                                                   LMDB
 ```
 
-`Fixture` sits beside `Catalog` and the storage stack, populating a
-hardcoded `users` table on first run. Once DDL/DML lands in a later
-slice it goes away.
+`Fixture` sits beside `Catalog` and the storage stack, populating
+hardcoded `users` and `orders` tables on first run. Once DDL/DML
+lands in a later slice it goes away.
 
 ## Layers
 
@@ -60,14 +60,14 @@ slice it goes away.
 
 | Layer       | Type                                     | Role                                                                                                                       |
 | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `Parser`    | `string -> (Ast.t, error) result`              | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict` and `project` pipeline steps so far.       |
-| `Ast`       | `t = Relation_name \| Restrict \| Project \| ...` | What the user typed, structured. No semantics yet.                                                                                |
+| `Parser`    | `string -> (Ast.t, error) result`              | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict`, `project`, and `cross` pipeline steps so far. |
+| `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| ...` | What the user typed, structured. No semantics yet.                                                                                |
 | `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes.                                                                  |
-| `Logical`   | `t = Scan \| Restrict \| Project \| ...`       | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π.                                       |
+| `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×.                  |
 | `Translate` | `Logical.t -> Physical.t`                      | Pick a physical strategy per operator. Future home of optimisation.                                                                  |
-| `Physical`  | `t = FullScan \| Filter \| Project \| ...`     | Concrete execution plan: cursors, filters, projections, hash joins, etc.                                                             |
-| `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. `Predicate.resolve` validates and caches lookup.           |
-| `Projection`| `t = string list`                              | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
+| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product, future hash joins, etc.                          |
+| `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
+| `Projection`| `t = Schema.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
 | `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |
 | `Relation`  | `'tag t = { schema; tuples }`            | Schema-tagged stream of tuples. Phantom `'tag` distinguishes set vs bag semantics.                                         |
 
