@@ -6,9 +6,10 @@ still settling — refine this file as cases come up.
 
 ## Orientation
 
-- `docs/plans/NN-name.md` is where design lives. `01-initial-plan.md` is
-  the foundational document; slice plans accumulate as `02-...`, `03-...`
-  and so on. Read the relevant slice plan before writing code for it.
+- `docs/plans/NN-name.md` is where design lives. `00-initial-plan.md` is
+  the foundational document; slice plans accumulate as `01-...`, `02-...`
+  and so on, with the file number matching the slice number. Read the
+  relevant slice plan before writing code for it.
 - `lib/` for library code, `bin/` for the executable, `test/` for tests.
 - Every module in `lib/` has both a `.ml` and a `.mli`. The `.mli` is the
   public-API documentation: module-level overview at the top, header

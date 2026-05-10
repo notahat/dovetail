@@ -7,7 +7,7 @@ sit over a Volcano-style executor and a hand-rolled storage layer.
 This is a learning vehicle, not production software. The plan deliberately
 delivers the system as thin vertical slices — each slice adds one
 operator's worth of code at every layer, end to end. See
-[`docs/plans/01-initial-plan.md`](docs/plans/01-initial-plan.md) for the
+[`docs/plans/00-initial-plan.md`](docs/plans/00-initial-plan.md) for the
 foundational design and the slice plans (`02-...`, `03-...`) for the work
 in flight.
 

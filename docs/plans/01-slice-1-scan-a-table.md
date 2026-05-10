@@ -31,7 +31,7 @@ five fixture rows come out and the columns are identifiable.
 ## Slice-1 architectural decisions
 
 These pin choices made during planning. Decisions that apply project-wide
-live in `01-initial-plan.md`; this section captures the slice-1 specifics.
+live in `00-initial-plan.md`; this section captures the slice-1 specifics.
 
 ### Project bootstrap
 

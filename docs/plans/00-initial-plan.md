@@ -188,21 +188,28 @@ firm; later ones are sketches and will evolve.
   pushdown (no optimizer yet).
 - **Slice 3** — Projection (`π`). Schema rewriting. The set/bag type
   machinery makes its first appearance: `π` downgrades to `Bag`.
-- **Slice 4** — Cross product and inner join (nested-loop). First
-  multi-relation query. Predicate sublanguage gets qualified column
-  references.
-- **Slice 5** — Primary-key range scans (`IndexScan` physical operator).
+- **Slice 4** — Cross product (`×`). First multi-relation query.
+  Predicate sublanguage gets column-vs-column comparisons and
+  qualified column references; schemas gain per-field qualifiers so
+  that columns from different inputs can share a name without
+  ambiguity.
+- **Slice 5** — Inner join (nested-loop). Adds `Logical.Join` and
+  `Physical.NestedLoopJoin`. The predicate sublanguage already
+  supports qualified refs from slice 4, so this slice is focused on
+  the join operator itself and its surface syntax (`join X on
+  <pred>`).
+- **Slice 6** — Primary-key range scans (`IndexScan` physical operator).
   First time the physical IR has a real choice; logical→physical picks
   `IndexScan` over `FullScan` when the predicate is a PK range.
-- **Slice 6** — Secondary indexes. Catalog grows. Index maintenance on
+- **Slice 7** — Secondary indexes. Catalog grows. Index maintenance on
   fixture insertion. `IndexScan` on a secondary index.
-- **Slice 7** — `distinct`, `union`, `intersect`, `difference`. Set/bag
+- **Slice 8** — `distinct`, `union`, `intersect`, `difference`. Set/bag
   type machinery does real work.
-- **Slice 8** — Minimal SQL frontend: `SELECT cols FROM table WHERE pred`,
+- **Slice 9** — Minimal SQL frontend: `SELECT cols FROM table WHERE pred`,
   single table, no joins yet. SQL AST, SQL→logical lowering for the
   basic shape. `option`-aware predicate translation for `IS NULL` etc.
-- **Slice 9** — SQL joins (inner only).
-- **Slice 10** — Aggregation operator (`γ`) and SQL `GROUP BY` /
+- **Slice 10** — SQL joins (inner only).
+- **Slice 11** — Aggregation operator (`γ`) and SQL `GROUP BY` /
   `HAVING`.
 - **Beyond** — outer joins, sort/limit, DML (probably SQL-side first),
   DDL (probably SQL-side first), more types, optimizer. Order TBD based
