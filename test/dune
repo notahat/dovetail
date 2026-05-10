@@ -11,6 +11,7 @@
   test_translate
   test_lower
   test_parser
+  test_predicate
   test_repl)
  (libraries alcotest dovetail unix)
  (deps ../bin/main.exe))

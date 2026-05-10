@@ -16,6 +16,14 @@ type tuple = Value.t array
 (** A row's values, in field order. An array (rather than a list) so
     column-position lookups are O(1). *)
 
+val find_field : t -> string -> (int * field) option
+(** [find_field schema name] looks up the field called [name] in [schema] and
+    returns its zero-based field-order position together with the field record,
+    or [None] if [schema] has no such field.
+
+    Used by callers that need to map a column name to a tuple position once and
+    then index into tuples by that position -- e.g. predicate evaluation. *)
+
 val assemble_tuple :
   t ->
   primary_key_values:Value.t list ->

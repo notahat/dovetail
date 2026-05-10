@@ -2,6 +2,15 @@ type field = { name : string; kind : Value.Kind.t }
 type t = { fields : field list; primary_key : string list }
 type tuple = Value.t array
 
+let find_field schema name =
+  let rec scan position fields =
+    match fields with
+    | [] -> None
+    | (field : field) :: _ when field.name = name -> Some (position, field)
+    | _ :: rest -> scan (position + 1) rest
+  in
+  scan 0 schema.fields
+
 (* Look up the position of [primary_key_name] in [primary_key_names], so that
    we can pull the right value from the caller's PK-ordered values list. *)
 let index_in_primary_key primary_key_names primary_key_name =

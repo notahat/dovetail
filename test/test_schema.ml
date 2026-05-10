@@ -82,6 +82,27 @@ let test_assembles_composite_primary_key () =
   in
   Alcotest.(check tuple_testable) "composite PK" expected assembled
 
+let field_lookup_testable =
+  Alcotest.(
+    option (pair int (testable (Fmt.of_to_string (fun _ -> "<field>")) ( = ))))
+
+let test_find_field_returns_position_and_field_for_first_field () =
+  Alcotest.(check field_lookup_testable)
+    "id at position 0"
+    (Some (0, ({ name = "id"; kind = Int64 } : Schema.field)))
+    (Schema.find_field users_schema "id")
+
+let test_find_field_returns_position_and_field_for_later_field () =
+  Alcotest.(check field_lookup_testable)
+    "active at position 3"
+    (Some (3, ({ name = "active"; kind = Bool } : Schema.field)))
+    (Schema.find_field users_schema "active")
+
+let test_find_field_returns_none_for_unknown_name () =
+  Alcotest.(check field_lookup_testable)
+    "no such field" None
+    (Schema.find_field users_schema "missing")
+
 let () =
   Alcotest.run "schema"
     [
@@ -93,5 +114,14 @@ let () =
             `Quick test_assembles_with_pk_in_the_middle;
           Alcotest.test_case "interleaves values for a composite primary key"
             `Quick test_assembles_composite_primary_key;
+        ] );
+      ( "find_field",
+        [
+          Alcotest.test_case "returns position and field for the first field"
+            `Quick test_find_field_returns_position_and_field_for_first_field;
+          Alcotest.test_case "returns position and field for a later field"
+            `Quick test_find_field_returns_position_and_field_for_later_field;
+          Alcotest.test_case "returns None for an unknown name" `Quick
+            test_find_field_returns_none_for_unknown_name;
         ] );
     ]
