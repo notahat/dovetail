@@ -8,5 +8,6 @@
   test_schema
   test_relation
   test_eval
-  test_translate)
+  test_translate
+  test_lower)
  (libraries alcotest dovetail unix))
