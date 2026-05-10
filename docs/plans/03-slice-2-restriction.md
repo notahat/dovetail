@@ -1,35 +1,40 @@
-# 03 — Slice 2: Selection (σ) via the RA language
+# 03 — Slice 2: Restriction (σ) via the RA language
 
-The second vertical slice. End-state: typing `users | select id = 3` at
-the REPL returns the matching row. The predicate sublanguage starts at
-its smallest — a single comparison of one column against one literal,
+The second vertical slice. End-state: typing `users | restrict id = 3`
+at the REPL returns the matching row. The predicate sublanguage starts
+at its smallest — a single comparison of one column against one literal,
 equality and inequality only.
+
+The keyword is `restrict` rather than `select`. The two are synonyms in
+the RA literature (Codd uses *restriction*); using `restrict` here keeps
+the surface clear of SQL's `SELECT`, which will eventually live in
+another front end and is a different operation (projection-and-more).
 
 ## Goal
 
 ```
-> users | select id = 3
+> users | restrict id = 3
 | id | name  | email             | active |
 |----|-------|-------------------|--------|
 |  3 | Carol | carol@example.com | true   |
 
-> users | select active = true
+> users | restrict active = true
 ... three rows: Alice, Carol, Dave ...
 
-> users | select name = "Alice"
+> users | restrict name = "Alice"
 ... one row ...
 
-> users | select id <> 3
+> users | restrict id <> 3
 ... four rows ...
 ```
 
 Error cases reach the REPL and don't crash it:
 
 ```
-> users | select unknown_col = 3
+> users | restrict unknown_col = 3
 error: Predicate.resolve: unknown column "unknown_col"
 
-> users | select name = 1
+> users | restrict name = 1
 error: Predicate.resolve: type mismatch: column "name" is String, literal is Int64
 ```
 
@@ -93,12 +98,12 @@ recursive shape of `Logical` and `Physical` IRs so `Lower` and
 (* Ast *)
 type t =
   | Relation_name of string
-  | Select of { input : t; predicate : Predicate.t }
+  | Restrict of { input : t; predicate : Predicate.t }
 
 (* Logical *)
 type t =
   | Scan of { table : string }
-  | Select of { input : t; predicate : Predicate.t }
+  | Restrict of { input : t; predicate : Predicate.t }
 
 (* Physical *)
 type t =
@@ -106,20 +111,19 @@ type t =
   | Filter of { input : t; predicate : Predicate.t }
 ```
 
-Logical uses `Select` (algebraic σ, matches the surface keyword);
-Physical uses `Filter` (execution-engine convention; same logical/
-physical naming split as `Scan`/`FullScan`). Pipelines parse
-left-associative.
+Ast and Logical use `Restrict` (the algebraic σ); Physical uses
+`Filter` (execution-engine convention; same logical/physical naming
+split as `Scan`/`FullScan`). Pipelines parse left-associative.
 
 ### Keyword reservation
 
 None. Identifier parsing is unchanged from slice 1; the parser
 disambiguates by grammatical position. A column or relation called
-`select` parses fine and produces a semantic error only if the name
+`restrict` parses fine and produces a semantic error only if the name
 doesn't resolve.
 
 *Future improvement:* better error messages around misspelled keywords
-("did you mean `select`?") want either reservation or a recovery-style
+("did you mean `restrict`?") want either reservation or a recovery-style
 parser. Revisit when error-message investment becomes a slice's focus.
 
 ### Set/Bag preservation
@@ -187,25 +191,25 @@ type mismatch raises.
 
 End state: filtering works at the physical layer.
 
-### 3. Logical.Select + Translate
+### 3. Logical.Restrict + Translate
 
-Add `| Select of { input : t; predicate : Predicate.t }` to `Logical.t`.
+Add `| Restrict of { input : t; predicate : Predicate.t }` to `Logical.t`.
 Update `Translate.translate` to map
-`Select { input; predicate } → Filter { input = translate input; predicate }`.
+`Restrict { input; predicate } → Filter { input = translate input; predicate }`.
 
-Tests: `test_translate.ml` adds a Select case — structural unit
-(`Select → Filter`) plus the pipeline integration (build
-`Logical.Select`, translate, evaluate, assert rows).
+Tests: `test_translate.ml` adds a Restrict case — structural unit
+(`Restrict → Filter`) plus the pipeline integration (build
+`Logical.Restrict`, translate, evaluate, assert rows).
 
 End state: filtering works at the logical layer.
 
-### 4. Ast.Select + Lower
+### 4. Ast.Restrict + Lower
 
-Add `| Select of { input : t; predicate : Predicate.t }` to `Ast.t`.
+Add `| Restrict of { input : t; predicate : Predicate.t }` to `Ast.t`.
 Update `Lower.lower` similarly. One-line structural rewrite.
 
 Tests: `test_lower.ml` adds the structural unit and the pipeline
-integration (build `Ast.Select`, lower, translate, evaluate, assert
+integration (build `Ast.Restrict`, lower, translate, evaluate, assert
 rows).
 
 End state: filtering works at the AST layer.
@@ -234,25 +238,26 @@ syntax, mismatched-quotes strings, identifier-on-the-right
 End state: predicates parse standalone from strings. No surrounding
 query syntax yet.
 
-### 6. Parser pipeline + select
+### 6. Parser pipeline + restrict
 
 Grammar additions:
 
 - **Pipeline operator** `|`, left-associative.
-- **`select` keyword** wrapping a predicate: `select <predicate>` is a
-  pipeline step.
+- **`restrict` keyword** wrapping a predicate: `restrict <predicate>`
+  is a pipeline step.
 - **Top-level grammar** updated to allow zero or more pipeline steps
   after the relation reference.
 
 Tests: `test_parser.ml` covers the full surface syntax: `users`,
-`users | select id = 3`, `users | select id = 3 | select active = true`,
-etc. Reject malformed pipelines (leading `|`, `select` without a
-predicate, trailing `|`). End-to-end pipeline integration test: parse,
-lower, translate, evaluate, assert rows.
+`users | restrict id = 3`,
+`users | restrict id = 3 | restrict active = true`, etc. Reject
+malformed pipelines (leading `|`, `restrict` without a predicate,
+trailing `|`). End-to-end pipeline integration test: parse, lower,
+translate, evaluate, assert rows.
 
 After step 6, run the binary manually to confirm the demo from the
 Goal section. Update `README.md` to extend the layer diagram
-description to mention selection — probably just a sentence in the
+description to mention restriction — probably just a sentence in the
 Layers table for `Logical`/`Physical`.
 
 End state: the demo from the Goal section works end-to-end via the

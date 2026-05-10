@@ -6,11 +6,18 @@
     without committing to *how*. {!Translate} lowers logical operators into a
     physical plan that picks an execution strategy.
 
-    Slice 1 ships only [Scan]; further logical operators arrive as later slices
-    introduce them. *)
+    Slice 1 introduced [Scan]; slice 2 adds [Restrict] (the σ of relational
+    algebra; "restrict" rather than "select" to avoid future collision with
+    SQL's SELECT, which will eventually live in another front end). Further
+    logical operators arrive as later slices introduce them. *)
 
 type t =
   | Scan of { table : string }
       (** [Scan { table }] reads every row of [table]. The logical operator
           carries no execution detail; it's the [Translate] layer's job to pick
           between full-scan, index-scan, and so on. *)
+  | Restrict of { input : t; predicate : Predicate.t }
+      (** [Restrict { input; predicate }] keeps the rows of [input] for which
+          [predicate] holds. The constructor name follows the relational-algebra
+          term for σ; the executor convention (Filter) takes over once
+          {!Translate} has run. *)

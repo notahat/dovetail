@@ -125,7 +125,7 @@ two algebraic IRs.
   HAVING-ORDER-BY` shape) and we want each parser to faithfully preserve
   source structure for error messages and round-tripping.
 - **Two algebraic IRs from day one** — even with no optimizer in v1.
-  Logical IR holds pure algebra (`Scan`, `Select`, `Project`, `Join`).
+  Logical IR holds pure algebra (`Scan`, `Restrict`, `Project`, `Join`).
   Physical IR holds execution choices (`FullScan`, `IndexScan`,
   `NestedLoopJoin`, `HashJoin`, `Sort`, `Limit`). The v1 logical→physical
   translation is mechanical and trivial — its purpose is to make the
@@ -143,7 +143,7 @@ two algebraic IRs.
 - Sketch of intended surface across the operator set:
 
   ```
-  users | select age > 21 | project name, email
+  users | restrict age > 21 | project name, email
   users | join orders on users.id = orders.user_id
   users | join orders using user_id
   users | project name, age + 1 as next_age
@@ -183,7 +183,7 @@ firm; later ones are sketches and will evolve.
   catalog read, table cursor, `Relation.t`, logical and physical IRs (one
   node each), trivial translation, RA parser (one production), REPL.
 
-- **Slice 2** — Selection (`σ`). Predicate sublanguage at its smallest:
+- **Slice 2** — Restriction (`σ`). Predicate sublanguage at its smallest:
   comparisons against literals on the row's columns. No predicate
   pushdown (no optimizer yet).
 - **Slice 3** — Projection (`π`). Schema rewriting. The set/bag type
