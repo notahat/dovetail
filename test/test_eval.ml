@@ -47,11 +47,19 @@ let evaluate_users_filter predicate =
       let relation = Eval.eval environment transaction plan in
       List.of_seq relation.tuples)
 
+(* Helpers to build [Compare] predicates with [term]-shaped sides. Local
+   shorthand to keep test bodies short under the slice-4 predicate shape. *)
+let column name = Predicate.Column name
+let literal value = Predicate.Literal value
+
+let compare_predicate ~left ~op ~right : Predicate.t =
+  Compare { left; op; right }
+
 let test_filter_equality_on_int64_yields_one_row () =
   let rows =
     evaluate_users_filter
-      (Predicate.Compare
-         { column_name = "id"; op = Equal; literal = Value.Int64 3L })
+      (compare_predicate ~left:(column "id") ~op:Equal
+         ~right:(literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "Carol's row"
@@ -61,8 +69,8 @@ let test_filter_equality_on_int64_yields_one_row () =
 let test_filter_equality_on_string_yields_one_row () =
   let rows =
     evaluate_users_filter
-      (Predicate.Compare
-         { column_name = "name"; op = Equal; literal = Value.String "Alice" })
+      (compare_predicate ~left:(column "name") ~op:Equal
+         ~right:(literal (Value.String "Alice")))
   in
   Alcotest.(check tuple_list_testable)
     "Alice's row"
@@ -72,24 +80,24 @@ let test_filter_equality_on_string_yields_one_row () =
 let test_filter_equality_on_bool_yields_active_rows () =
   let rows =
     evaluate_users_filter
-      (Predicate.Compare
-         { column_name = "active"; op = Equal; literal = Value.Bool true })
+      (compare_predicate ~left:(column "active") ~op:Equal
+         ~right:(literal (Value.Bool true)))
   in
   Alcotest.(check int) "three active rows" 3 (List.length rows)
 
 let test_filter_inequality_yields_complement () =
   let rows =
     evaluate_users_filter
-      (Predicate.Compare
-         { column_name = "id"; op = NotEqual; literal = Value.Int64 3L })
+      (compare_predicate ~left:(column "id") ~op:NotEqual
+         ~right:(literal (Value.Int64 3L)))
   in
   Alcotest.(check int) "four rows with id <> 3" 4 (List.length rows)
 
 let test_filter_matches_all_rows () =
   let rows =
     evaluate_users_filter
-      (Predicate.Compare
-         { column_name = "id"; op = NotEqual; literal = Value.Int64 999L })
+      (compare_predicate ~left:(column "id") ~op:NotEqual
+         ~right:(literal (Value.Int64 999L)))
   in
   Alcotest.(check tuple_list_testable)
     "all five fixture rows" expected_users_rows rows
@@ -97,22 +105,25 @@ let test_filter_matches_all_rows () =
 let test_filter_matches_zero_rows () =
   let rows =
     evaluate_users_filter
-      (Predicate.Compare
-         { column_name = "id"; op = Equal; literal = Value.Int64 999L })
+      (compare_predicate ~left:(column "id") ~op:Equal
+         ~right:(literal (Value.Int64 999L)))
   in
   Alcotest.(check tuple_list_testable) "no rows" [] rows
+
+let test_filter_column_equals_column_yields_no_rows () =
+  let rows =
+    evaluate_users_filter
+      (compare_predicate ~left:(column "name") ~op:Equal ~right:(column "email"))
+  in
+  Alcotest.(check tuple_list_testable) "no rows where name = email" [] rows
 
 let test_filter_unknown_column_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Predicate.resolve: unknown column \"unknown_col\"") (fun () ->
       let _ =
         evaluate_users_filter
-          (Predicate.Compare
-             {
-               column_name = "unknown_col";
-               op = Equal;
-               literal = Value.Int64 3L;
-             })
+          (compare_predicate ~left:(column "unknown_col") ~op:Equal
+             ~right:(literal (Value.Int64 3L)))
       in
       ())
 
@@ -120,11 +131,11 @@ let test_filter_type_mismatch_raises () =
   Alcotest.check_raises "type mismatch"
     (Failure
        "Predicate.resolve: type mismatch: column \"name\" is String, literal \
-        is Int64") (fun () ->
+        Int64 is Int64") (fun () ->
       let _ =
         evaluate_users_filter
-          (Predicate.Compare
-             { column_name = "name"; op = Equal; literal = Value.Int64 1L })
+          (compare_predicate ~left:(column "name") ~op:Equal
+             ~right:(literal (Value.Int64 1L)))
       in
       ())
 
@@ -198,12 +209,8 @@ let test_project_then_filter () =
               Physical.Project
                 { input = users_full_scan; columns = [ "name"; "active" ] };
             predicate =
-              Predicate.Compare
-                {
-                  column_name = "active";
-                  op = Equal;
-                  literal = Value.Bool true;
-                };
+              compare_predicate ~left:(column "active") ~op:Equal
+                ~right:(literal (Value.Bool true));
           }
       in
       let relation = Eval.eval environment transaction plan in
@@ -224,8 +231,8 @@ let test_filter_then_project () =
       {
         input = users_full_scan;
         predicate =
-          Predicate.Compare
-            { column_name = "active"; op = Equal; literal = Value.Bool true };
+          compare_predicate ~left:(column "active") ~op:Equal
+            ~right:(literal (Value.Bool true));
       }
   in
   let rows = evaluate_users_project ~input_plan:filter_active_true [ "name" ] in
@@ -278,6 +285,8 @@ let () =
             `Quick test_filter_matches_all_rows;
           Alcotest.test_case "predicate that matches no row yields empty" `Quick
             test_filter_matches_zero_rows;
+          Alcotest.test_case "column = column with no matches yields no rows"
+            `Quick test_filter_column_equals_column_yields_no_rows;
           Alcotest.test_case
             "unknown column raises before any tuples are pulled" `Quick
             test_filter_unknown_column_raises;

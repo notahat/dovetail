@@ -27,7 +27,7 @@ let test_pipeline_yields_fixture_rows () =
         "five rows from logical scan" expected_users_rows rows)
 
 let id_equals_three : Predicate.t =
-  Compare { column_name = "id"; op = Equal; literal = Value.Int64 3L }
+  Compare { left = Column "id"; op = Equal; right = Literal (Value.Int64 3L) }
 
 let test_restrict_translates_to_filter () =
   let logical =

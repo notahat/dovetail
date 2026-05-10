@@ -73,16 +73,6 @@ let string_literal =
   List.iter (Buffer.add_char buffer) characters;
   Value.String (Buffer.contents buffer)
 
-(* Dispatch to the right literal parser by lookahead, rather than relying
-   on [<|>] to backtrack between alternatives that may have committed. *)
-let literal =
-  peek_char >>= function
-  | Some '"' -> string_literal
-  | Some 't' | Some 'f' -> bool_literal
-  | Some '-' -> int64_literal
-  | Some character when is_digit character -> int64_literal
-  | _ -> fail "expected a literal"
-
 (* The two slice-2 comparison operators. Dispatched by lookahead so the
    choice between [=] and [<>] is unambiguous and doesn't depend on
    [<|>] backtracking behaviour. *)
@@ -92,14 +82,34 @@ let comparison_op =
   | Some '<' -> string "<>" *> return Predicate.NotEqual
   | _ -> fail "expected '=' or '<>'"
 
-(* The slice-2 predicate grammar: [<column-name> <op> <literal>]. The
-   right-hand side is a literal, never an identifier; that's the
-   strictness the slice plan calls for. *)
+(* A single side of a comparison: a literal or a column reference. The bool
+   literals [true] and [false] are spelled with letters that would otherwise
+   start an identifier, so when the input starts with a letter we try the
+   bool literal first and fall back to the identifier parser. The bool
+   parser uses [keyword], which requires a word break after the literal
+   text, so [trueish] cleanly falls through to the identifier branch. *)
+let term =
+  peek_char >>= function
+  | Some '"' ->
+      string_literal >>| fun literal_value -> Predicate.Literal literal_value
+  | Some '-' ->
+      int64_literal >>| fun literal_value -> Predicate.Literal literal_value
+  | Some character when is_digit character ->
+      int64_literal >>| fun literal_value -> Predicate.Literal literal_value
+  | Some character when is_letter character ->
+      bool_literal
+      >>| (fun literal_value -> Predicate.Literal literal_value)
+      <|> (identifier >>| fun column_name -> Predicate.Column column_name)
+  | _ -> fail "expected a column reference or literal"
+
+(* The predicate grammar: [<term> <op> <term>], where each term is either a
+   column reference or a literal. Slice 2 only allowed a literal on the
+   right; slice 4 step 2 lifts that restriction so column-vs-column
+   comparisons (used to match across cross-product inputs) parse. *)
 let predicate =
-  identifier >>= fun column_name ->
+  term >>= fun left ->
   whitespace *> comparison_op >>= fun op ->
-  whitespace *> literal >>| fun literal_value ->
-  Predicate.Compare { column_name; op; literal = literal_value }
+  whitespace *> term >>| fun right -> Predicate.Compare { left; op; right }
 
 (* The slice-3 projection grammar: one identifier followed by zero or
    more [, identifier] tails. Whitespace is flexible around the comma.

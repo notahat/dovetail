@@ -28,7 +28,7 @@ let test_pipeline_yields_fixture_rows () =
         "five rows from AST" expected_users_rows rows)
 
 let id_equals_three : Predicate.t =
-  Compare { column_name = "id"; op = Equal; literal = Value.Int64 3L }
+  Compare { left = Column "id"; op = Equal; right = Literal (Value.Int64 3L) }
 
 let test_restrict_lowers_to_logical_restrict () =
   let ast =

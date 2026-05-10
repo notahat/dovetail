@@ -60,61 +60,83 @@ let test_rejects_two_identifiers () =
      refuse them now so we don't accidentally start accepting them later. *)
   rejects "users orders"
 
+(* Local shorthand to keep test bodies short under the slice-4 predicate
+   shape. *)
+let predicate_column name = Predicate.Column name
+let predicate_literal value = Predicate.Literal value
+
+let predicate_compare ~left ~op ~right : Predicate.t =
+  Compare { left; op; right }
+
 let test_predicate_int64_equality () =
   parses_predicate "id = 3"
-    (Predicate.Compare
-       { column_name = "id"; op = Equal; literal = Value.Int64 3L })
+    (predicate_compare ~left:(predicate_column "id") ~op:Equal
+       ~right:(predicate_literal (Value.Int64 3L)))
 
 let test_predicate_negative_int64 () =
   parses_predicate "id = -1"
-    (Predicate.Compare
-       { column_name = "id"; op = Equal; literal = Value.Int64 (-1L) })
+    (predicate_compare ~left:(predicate_column "id") ~op:Equal
+       ~right:(predicate_literal (Value.Int64 (-1L))))
 
 let test_predicate_string_equality () =
   parses_predicate "name = \"Alice\""
-    (Predicate.Compare
-       { column_name = "name"; op = Equal; literal = Value.String "Alice" })
+    (predicate_compare ~left:(predicate_column "name") ~op:Equal
+       ~right:(predicate_literal (Value.String "Alice")))
 
 let test_predicate_string_with_escaped_quotes () =
   parses_predicate "name = \"with \\\"quotes\\\"\""
-    (Predicate.Compare
-       {
-         column_name = "name";
-         op = Equal;
-         literal = Value.String "with \"quotes\"";
-       })
+    (predicate_compare ~left:(predicate_column "name") ~op:Equal
+       ~right:(predicate_literal (Value.String "with \"quotes\"")))
 
 let test_predicate_string_with_escaped_backslash () =
   parses_predicate "name = \"a\\\\b\""
-    (Predicate.Compare
-       { column_name = "name"; op = Equal; literal = Value.String "a\\b" })
+    (predicate_compare ~left:(predicate_column "name") ~op:Equal
+       ~right:(predicate_literal (Value.String "a\\b")))
 
 let test_predicate_bool_true () =
   parses_predicate "active = true"
-    (Predicate.Compare
-       { column_name = "active"; op = Equal; literal = Value.Bool true })
+    (predicate_compare
+       ~left:(predicate_column "active")
+       ~op:Equal
+       ~right:(predicate_literal (Value.Bool true)))
 
 let test_predicate_bool_false () =
   parses_predicate "active = false"
-    (Predicate.Compare
-       { column_name = "active"; op = Equal; literal = Value.Bool false })
+    (predicate_compare
+       ~left:(predicate_column "active")
+       ~op:Equal
+       ~right:(predicate_literal (Value.Bool false)))
 
 let test_predicate_inequality () =
   parses_predicate "id <> 3"
-    (Predicate.Compare
-       { column_name = "id"; op = NotEqual; literal = Value.Int64 3L })
+    (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
+       ~right:(predicate_literal (Value.Int64 3L)))
 
 let test_predicate_tolerates_extra_whitespace () =
   parses_predicate "  id   =   3  "
-    (Predicate.Compare
-       { column_name = "id"; op = Equal; literal = Value.Int64 3L })
+    (predicate_compare ~left:(predicate_column "id") ~op:Equal
+       ~right:(predicate_literal (Value.Int64 3L)))
+
+let test_predicate_literal_on_the_left () =
+  (* Slice 4 step 2 lifts the slice-2 restriction that the right side must
+     be a literal -- either side can now be a column or a literal. *)
+  parses_predicate "3 = id"
+    (predicate_compare
+       ~left:(predicate_literal (Value.Int64 3L))
+       ~op:Equal ~right:(predicate_column "id"))
+
+let test_predicate_column_equals_column () =
+  parses_predicate "name = email"
+    (predicate_compare ~left:(predicate_column "name") ~op:Equal
+       ~right:(predicate_column "email"))
+
+let test_predicate_column_inequality_column () =
+  parses_predicate "id <> user_id"
+    (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
+       ~right:(predicate_column "user_id"))
 
 let test_predicate_rejects_empty_input () = rejects_predicate ""
 let test_predicate_rejects_whitespace_only_input () = rejects_predicate "   "
-
-let test_predicate_rejects_identifier_on_the_right () =
-  rejects_predicate "3 = id"
-
 let test_predicate_rejects_missing_operator () = rejects_predicate "id 3"
 
 let test_predicate_rejects_unterminated_string () =
@@ -123,18 +145,25 @@ let test_predicate_rejects_unterminated_string () =
 let test_predicate_rejects_unrecognised_escape () =
   rejects_predicate "name = \"\\n\""
 
-let test_predicate_rejects_keyword_followed_by_identifier_chars () =
-  (* [trueish] should not be parsed as bool [true] with [ish] left over. *)
-  rejects_predicate "active = trueish"
+let test_predicate_keyword_prefix_is_an_identifier () =
+  (* [trueish] is not the bool literal [true] with [ish] left over -- it is
+     a single identifier, and so parses as a column reference on the
+     right-hand side of the comparison. *)
+  parses_predicate "active = trueish"
+    (predicate_compare
+       ~left:(predicate_column "active")
+       ~op:Equal
+       ~right:(predicate_column "trueish"))
 
 let test_predicate_rejects_trailing_garbage () =
   rejects_predicate "id = 3 garbage"
 
 let id_equals_three : Predicate.t =
-  Compare { column_name = "id"; op = Equal; literal = Value.Int64 3L }
+  Compare { left = Column "id"; op = Equal; right = Literal (Value.Int64 3L) }
 
 let active_equals_true : Predicate.t =
-  Compare { column_name = "active"; op = Equal; literal = Value.Bool true }
+  Compare
+    { left = Column "active"; op = Equal; right = Literal (Value.Bool true) }
 
 let test_pipeline_parses_single_restrict () =
   parses "users | restrict id = 3"
@@ -324,6 +353,15 @@ let () =
             test_predicate_inequality;
           Alcotest.test_case "tolerates extra whitespace around tokens" `Quick
             test_predicate_tolerates_extra_whitespace;
+          Alcotest.test_case "literal on the left and column on the right"
+            `Quick test_predicate_literal_on_the_left;
+          Alcotest.test_case "column = column" `Quick
+            test_predicate_column_equals_column;
+          Alcotest.test_case "column <> column" `Quick
+            test_predicate_column_inequality_column;
+          Alcotest.test_case
+            "identifier with a bool-keyword prefix is a column reference" `Quick
+            test_predicate_keyword_prefix_is_an_identifier;
         ] );
       ( "predicate rejection",
         [
@@ -331,17 +369,12 @@ let () =
             test_predicate_rejects_empty_input;
           Alcotest.test_case "rejects whitespace-only input" `Quick
             test_predicate_rejects_whitespace_only_input;
-          Alcotest.test_case "rejects identifier on the right" `Quick
-            test_predicate_rejects_identifier_on_the_right;
           Alcotest.test_case "rejects predicate missing an operator" `Quick
             test_predicate_rejects_missing_operator;
           Alcotest.test_case "rejects unterminated string literal" `Quick
             test_predicate_rejects_unterminated_string;
           Alcotest.test_case "rejects unrecognised escape sequence" `Quick
             test_predicate_rejects_unrecognised_escape;
-          Alcotest.test_case
-            "rejects bool keyword followed by identifier characters" `Quick
-            test_predicate_rejects_keyword_followed_by_identifier_chars;
           Alcotest.test_case "rejects trailing garbage" `Quick
             test_predicate_rejects_trailing_garbage;
         ] );
