@@ -1,0 +1,5 @@
+#!/bin/sh
+# Convenience wrapper: build (as needed) and run the dovetail REPL via the
+# local opam switch. Forwards any arguments to the binary, so a custom
+# LMDB data directory can be passed: `./dovetail /tmp/dovetail-play`.
+exec opam exec -- dune exec dovetail -- "$@"

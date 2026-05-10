@@ -94,8 +94,12 @@ OCaml 5.2 in a local opam switch at the repo root.
 opam exec -- dune build              # compile
 opam exec -- dune test               # run all alcotest suites
 opam exec -- dune build @fmt --auto-promote   # format
-opam exec -- dune exec dovetail      # run the REPL (default env: ./dovetail-data)
+./dovetail                           # run the REPL (default env: ./dovetail-data)
+./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
 ```
+
+`./dovetail` is a small wrapper around `opam exec -- dune exec dovetail`
+so the REPL can be launched with a single command.
 
 See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling
 conventions.
