@@ -21,3 +21,8 @@ type t =
           [predicate] holds. The constructor name follows the relational-algebra
           term for σ; the executor convention (Filter) takes over once
           {!Translate} has run. *)
+  | Project of { input : t; columns : Projection.t }
+      (** [Project { input; columns }] narrows [input] to the named [columns],
+          in the order given. Mirrors π in the relational algebra. The output
+          schema's [primary_key] is empty regardless of whether [columns]
+          includes the input's PK; see {!Projection.resolve}. *)

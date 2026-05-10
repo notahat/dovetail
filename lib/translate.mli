@@ -13,4 +13,5 @@
 
 val translate : Logical.t -> Physical.t
 (** [translate plan] rewrites [plan] into an equivalent physical plan. Slice 1
-    maps [Scan] to [FullScan]; slice 2 adds [Restrict] -> [Filter]. *)
+    maps [Scan] to [FullScan]; slice 2 adds [Restrict] -> [Filter]; slice 3 adds
+    [Project] -> [Project]. *)

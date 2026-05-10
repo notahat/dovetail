@@ -64,6 +64,51 @@ let test_restrict_pipeline_yields_filtered_rows () =
         [ List.nth expected_users_rows 2 ]
         rows)
 
+let test_project_translates_to_physical_project () =
+  let logical =
+    Logical.Project
+      {
+        input = Logical.Scan { table = "users" };
+        columns = [ "name"; "email" ];
+      }
+  in
+  let physical = Translate.translate logical in
+  Alcotest.(check physical_testable)
+    "Project -> Project wrapping FullScan"
+    (Physical.Project
+       {
+         input = Physical.FullScan { table = "users" };
+         columns = [ "name"; "email" ];
+       })
+    physical
+
+let test_project_pipeline_yields_projected_rows () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let logical =
+        Logical.Project
+          {
+            input = Logical.Scan { table = "users" };
+            columns = [ "name"; "email" ];
+          }
+      in
+      let physical = Translate.translate logical in
+      let relation = Eval.eval environment transaction physical in
+      let rows = List.of_seq relation.tuples in
+      let expected =
+        [
+          [| Value.String "Alice"; Value.String "alice@example.com" |];
+          [| Value.String "Bob"; Value.String "bob@example.com" |];
+          [| Value.String "Carol"; Value.String "carol@example.com" |];
+          [| Value.String "Dave"; Value.String "dave@example.com" |];
+          [| Value.String "Eve"; Value.String "eve@example.com" |];
+        ]
+      in
+      Alcotest.(check tuple_list_testable)
+        "five projected rows from logical Project" expected rows)
+
 let () =
   Alcotest.run "translate"
     [
@@ -82,5 +127,13 @@ let () =
           Alcotest.test_case
             "logical Restrict, translated and evaluated, yields filtered rows"
             `Quick test_restrict_pipeline_yields_filtered_rows;
+        ] );
+      ( "project",
+        [
+          Alcotest.test_case "lowers Logical.Project to Physical.Project" `Quick
+            test_project_translates_to_physical_project;
+          Alcotest.test_case
+            "logical Project, translated and evaluated, yields projected rows"
+            `Quick test_project_pipeline_yields_projected_rows;
         ] );
     ]
