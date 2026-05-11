@@ -71,7 +71,7 @@ let test_populate_writes_five_users_rows () =
         | Some map -> map
         | None -> Alcotest.fail "expected table:users subDB"
       in
-      let pairs = Storage.iter_seq users_map transaction |> List.of_seq in
+      let pairs = Storage.with_iter_seq users_map transaction List.of_seq in
       Alcotest.(check int) "five rows" 5 (List.length pairs))
 
 let test_populate_writes_six_orders_rows () =
@@ -86,7 +86,7 @@ let test_populate_writes_six_orders_rows () =
         | Some map -> map
         | None -> Alcotest.fail "expected table:orders subDB"
       in
-      let pairs = Storage.iter_seq orders_map transaction |> List.of_seq in
+      let pairs = Storage.with_iter_seq orders_map transaction List.of_seq in
       Alcotest.(check int) "six rows" 6 (List.length pairs))
 
 let test_populate_is_idempotent () =
@@ -99,7 +99,9 @@ let test_populate_is_idempotent () =
         Option.get
           (Storage.open_map environment transaction ~name:users_table_subdb_name)
       in
-      let users_pairs = Storage.iter_seq users_map transaction |> List.of_seq in
+      let users_pairs =
+        Storage.with_iter_seq users_map transaction List.of_seq
+      in
       Alcotest.(check int) "still five users rows" 5 (List.length users_pairs);
       let orders_map =
         Option.get
@@ -107,7 +109,7 @@ let test_populate_is_idempotent () =
              ~name:orders_table_subdb_name)
       in
       let orders_pairs =
-        Storage.iter_seq orders_map transaction |> List.of_seq
+        Storage.with_iter_seq orders_map transaction List.of_seq
       in
       Alcotest.(check int) "still six orders rows" 6 (List.length orders_pairs))
 
@@ -120,7 +122,7 @@ let test_users_raw_bytes_decode_to_expected_tuples () =
         Option.get
           (Storage.open_map environment transaction ~name:users_table_subdb_name)
       in
-      let pairs = Storage.iter_seq users_map transaction |> List.of_seq in
+      let pairs = Storage.with_iter_seq users_map transaction List.of_seq in
       let decoded =
         List.map
           (fun (key_bytes, value_bytes) ->
@@ -143,7 +145,7 @@ let test_orders_raw_bytes_decode_to_expected_tuples () =
           (Storage.open_map environment transaction
              ~name:orders_table_subdb_name)
       in
-      let pairs = Storage.iter_seq orders_map transaction |> List.of_seq in
+      let pairs = Storage.with_iter_seq orders_map transaction List.of_seq in
       let decoded =
         List.map
           (fun (key_bytes, value_bytes) ->

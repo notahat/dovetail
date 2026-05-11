@@ -14,7 +14,7 @@ let evaluate_and_print environment ~output ~show_physical logical =
   if show_physical then Physical.format output physical;
   try
     Storage.with_read_transaction environment (fun transaction ->
-        Eval.eval_cps environment transaction physical (fun relation ->
+        Eval.eval environment transaction physical (fun relation ->
             Relation.print ~formatter:output relation))
   with Failure message -> Format.fprintf output "error: %s@." message
 

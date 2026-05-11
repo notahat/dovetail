@@ -62,14 +62,6 @@ val get : map -> [> `Read ] transaction -> key:string -> string option
 (** [get map transaction ~key] returns [Some v] if [key] is bound, else [None].
 *)
 
-val iter_seq : map -> [> `Read ] transaction -> (string * string) Seq.t
-(** [iter_seq map transaction] returns every key-value pair in the map, in key
-    order. Currently materialised eagerly into a list and wrapped as a [Seq.t]
-    -- the [lmdb] package's streaming dispenser doesn't compose cleanly with our
-    scope-bound read transactions, and slice 1's fixture is too small for it to
-    matter. Revisit when a slice needs to scan enough rows that materialisation
-    is the wrong choice. *)
-
 val with_iter_seq :
   map -> [> `Read ] transaction -> ((string * string) Seq.t -> 'a) -> 'a
 (** [with_iter_seq map transaction continue] opens a cursor over [map] and

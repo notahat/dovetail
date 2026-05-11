@@ -221,7 +221,7 @@ let test_pipeline_yields_fixture_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "five rows from parsed query" expected_users_rows rows))
@@ -238,7 +238,7 @@ let test_pipeline_restrict_yields_filtered_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "Carol's row from parsed restrict"
@@ -368,7 +368,7 @@ let test_pipeline_cross_yields_thirty_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check int)
             "5 users x 6 orders = 30 rows from parsed cross" 30
@@ -389,7 +389,7 @@ let test_pipeline_cross_then_restrict_yields_matched_pairs () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check int)
             "six matched (user, order) pairs from parsed pipeline" 6
@@ -444,7 +444,7 @@ let test_pipeline_join_yields_matched_pairs () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check int)
             "six matched (user, order) pairs from parsed join" 6
@@ -466,7 +466,7 @@ let test_pipeline_cross_then_ambiguous_restrict_raises () =
         (Failure
            "Predicate.resolve: ambiguous column reference \"id\": matches \
             \"users.id\" and \"orders.id\"") (fun () ->
-          Eval.eval_cps environment transaction physical (fun _relation -> ())))
+          Eval.eval environment transaction physical (fun _relation -> ())))
 
 let test_pipeline_project_yields_projected_rows () =
   with_temp_dir @@ fun directory ->
@@ -480,7 +480,7 @@ let test_pipeline_project_yields_projected_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =
             [

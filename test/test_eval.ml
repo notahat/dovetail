@@ -9,7 +9,7 @@ let test_full_scan_yields_fixture_rows () =
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
-      Eval.eval_cps environment transaction
+      Eval.eval environment transaction
         (Physical.FullScan { table = "users" })
         (fun relation ->
           Alcotest.(check string)
@@ -26,7 +26,7 @@ let test_full_scan_raises_for_missing_table () =
   Storage.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "missing table"
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
-          Eval.eval_cps environment transaction
+          Eval.eval environment transaction
             (Physical.FullScan { table = "nonexistent_table" })
             (fun _relation -> ())))
 
@@ -41,7 +41,7 @@ let evaluate_users_filter predicate =
         Physical.Filter
           { input = Physical.FullScan { table = "users" }; predicate }
       in
-      Eval.eval_cps environment transaction plan (fun relation ->
+      Eval.eval environment transaction plan (fun relation ->
           List.of_seq relation.tuples))
 
 let test_filter_equality_on_int64_yields_one_row () =
@@ -148,7 +148,7 @@ let evaluate_users_project ~input_plan column_names =
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
       let plan = Physical.Project { input = input_plan; columns } in
-      Eval.eval_cps environment transaction plan (fun relation ->
+      Eval.eval environment transaction plan (fun relation ->
           List.of_seq relation.tuples))
 
 let users_full_scan = Physical.FullScan { table = "users" }
@@ -223,7 +223,7 @@ let test_project_then_filter () =
                 ~right:(predicate_literal (Value.Bool true));
           }
       in
-      Eval.eval_cps environment transaction plan (fun relation ->
+      Eval.eval environment transaction plan (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =
             [
@@ -286,7 +286,7 @@ let evaluate_against_fixture plan =
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
-      Eval.eval_cps environment transaction plan (fun relation ->
+      Eval.eval environment transaction plan (fun relation ->
           (relation.schema, List.of_seq relation.tuples)))
 
 let test_cross_product_yields_thirty_rows () =

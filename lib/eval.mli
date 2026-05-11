@@ -1,40 +1,32 @@
-(** Volcano-style executor for the physical IR.
+(** Streaming, continuation-passing executor for the physical IR.
 
-    [eval] takes a {!Physical.t} tree and produces a {!Relation.t} whose
-    [tuples] sequence yields rows lazily. Each operator is implemented by a
-    single function that wires its inputs into a [Seq.t] and threads the
-    transaction through.
+    [eval] takes a {!Physical.t} tree and a consumer continuation. It invokes
+    the continuation with a {!Relation.t} whose [tuples] sequence pulls rows
+    lazily from whatever cursors the plan opens. The continuation runs inside
+    those cursor scopes; once it returns, the cursors are torn down and the
+    relation is no longer usable.
 
-    Slice 1 introduced {!Physical.FullScan}; slice 2 adds {!Physical.Filter}.
-    Further operators are added as later slices introduce them. *)
+    Operators implement their part of the pipeline by nesting continuations:
+    each operator opens its inputs through [eval], composes a transformed
+    relation in the innermost callback, and hands the result to its own
+    [continue]. Linear pipelines (FullScan / Filter / Project) stream end-to-end
+    at O(1) memory per cursor; joins still materialise their right input because
+    the outer loop re-iterates it. *)
 
 val eval :
   Storage.environment ->
   [> `Read ] Storage.transaction ->
   Physical.t ->
-  [ `Bag ] Relation.t
-(** [eval environment transaction plan] executes [plan] against the database
-    open in [environment], using [transaction] for all reads. The returned
-    relation's [tuples] sequence must be consumed before [transaction]'s
-    callback returns.
-
-    Raises [Failure] if [plan] references a table the catalog has no schema for,
-    or if a feature is required that slice 1 does not yet implement (e.g. a
-    non-[int64] or composite primary key). *)
-
-val eval_cps :
-  Storage.environment ->
-  [> `Read ] Storage.transaction ->
-  Physical.t ->
   ([ `Bag ] Relation.t -> 'a) ->
   'a
-(** Exploratory CPS-shaped counterpart to {!eval}. Runs [plan] and invokes the
-    continuation with the resulting relation; the continuation runs inside
-    whatever cursor and resource scopes the plan opens, so the relation's
-    [tuples] sequence may be streamed directly from a live cursor rather than
-    eagerly materialised.
+(** [eval environment transaction plan continue] runs [plan] against the
+    database open in [environment], using [transaction] for all reads, and
+    invokes [continue] with the resulting relation. The relation's [tuples]
+    sequence must be consumed inside [continue]; using it after [continue]
+    returns is undefined behaviour.
 
-    During the conversion to a streaming executor, this entry point delegates
-    operator-by-operator to {!eval}; the parity tests guarantee identical
-    behaviour. Once every operator is converted, {!eval} is removed and this
-    becomes the only entry point. *)
+    Raises [Failure] if [plan] references a table the catalog has no schema for,
+    if a column reference cannot be resolved, or on any other plan-shape or
+    schema mismatch surfaced by the operators. Errors are raised eagerly where
+    possible (e.g. predicate resolution runs before any tuples are pulled), so
+    most failure modes surface before [continue] is called. *)

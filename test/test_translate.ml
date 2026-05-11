@@ -21,7 +21,7 @@ let test_pipeline_yields_fixture_rows () =
   Storage.with_read_transaction environment (fun transaction ->
       let logical = Logical.Scan { table = "users" } in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "five rows from logical scan" expected_users_rows rows))
@@ -61,7 +61,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
           }
       in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "Carol's row from logical Restrict"
@@ -96,7 +96,7 @@ let test_project_pipeline_yields_projected_rows () =
           }
       in
       let physical = Translate.translate logical in
-      Eval.eval_cps environment transaction physical (fun relation ->
+      Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =
             [

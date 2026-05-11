@@ -26,24 +26,6 @@ let test_round_trip () =
         "missing key" None
         (Storage.get map transaction ~key:"nope"))
 
-let test_iter_seq_in_key_order () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let map = Storage.create_map environment transaction ~name:"test" in
-      List.iter
-        (fun (k, v) -> Storage.put map transaction ~key:k ~value:v)
-        [ ("c", "3"); ("a", "1"); ("b", "2") ]);
-  Storage.with_read_transaction environment (fun transaction ->
-      let map =
-        Option.get (Storage.open_map environment transaction ~name:"test")
-      in
-      let pairs = Storage.iter_seq map transaction |> List.of_seq in
-      Alcotest.(check (list (pair string string)))
-        "pairs in ascending key order"
-        [ ("a", "1"); ("b", "2"); ("c", "3") ]
-        pairs)
-
 let test_open_map_returns_none_when_missing () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -153,8 +135,6 @@ let () =
       ( "round-trip",
         [
           Alcotest.test_case "put then get" `Quick test_round_trip;
-          Alcotest.test_case "iter_seq yields pairs in key order" `Quick
-            test_iter_seq_in_key_order;
           Alcotest.test_case "open_map returns None when map missing" `Quick
             test_open_map_returns_none_when_missing;
         ] );

@@ -38,25 +38,11 @@ let get map transaction ~key =
   | v -> Some v
   | exception Lmdb.Not_found -> None
 
-let iter_seq map transaction =
-  (* Cursor.go takes a perm-restricted txn matching its perm argument;
-     contravariance lets a [`Read | `Write] transaction be used as [`Read]. *)
-  let transaction = (transaction :> [ `Read ] Lmdb.Txn.t) in
-  Lmdb.Cursor.go Lmdb.Ro ~txn:transaction map (fun cursor ->
-      let rec collect acc =
-        match Lmdb.Cursor.next cursor with
-        | pair -> collect (pair :: acc)
-        | exception Lmdb.Not_found -> List.rev acc
-      in
-      match Lmdb.Cursor.first cursor with
-      | pair -> List.to_seq (collect [ pair ])
-      | exception Lmdb.Not_found -> Seq.empty)
-
-(* Streaming counterpart to [iter_seq]: opens a cursor for the duration of
-   [continue] and exposes a one-shot sequence that pulls each pair lazily.
-   The [exhausted] flag closes the seq once it has either run to its end or
-   been re-entered after exhaustion -- the lmdb package doesn't expose a
-   cursor reset, so re-iteration is not supported. *)
+(* Open a cursor for the duration of [continue] and expose a one-shot
+   sequence that pulls each pair lazily. The [exhausted] flag closes the
+   seq once it has either run to its end or been re-entered after
+   exhaustion -- the lmdb package doesn't expose a cursor reset, so
+   re-iteration is not supported. *)
 let with_iter_seq map transaction continue =
   let transaction = (transaction :> [ `Read ] Lmdb.Txn.t) in
   Lmdb.Cursor.go Lmdb.Ro ~txn:transaction map (fun cursor ->
