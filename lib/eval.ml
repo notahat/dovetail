@@ -138,4 +138,30 @@ let rec eval_cps environment transaction plan continue =
               schema = projected_schema;
               tuples = Seq.map project_tuple input_relation.tuples;
             })
+  | CrossProduct { left; right } ->
+      (* Nested CPS: open the left scope first, then the right scope inside
+         it, then call [continue] at the deepest point. The right side is
+         still materialised via [List.of_seq] because the outer loop over
+         left tuples re-iterates it -- a one-shot streaming seq can't be
+         replayed, and streaming both sides would require a different join
+         algorithm (hash, merge). *)
+      eval_cps environment transaction left (fun left_relation ->
+          eval_cps environment transaction right (fun right_relation ->
+              let right_tuples = List.of_seq right_relation.tuples in
+              let combined_schema : Schema.t =
+                {
+                  fields =
+                    left_relation.schema.fields @ right_relation.schema.fields;
+                  primary_key = [];
+                }
+              in
+              let combined_tuples =
+                Seq.flat_map
+                  (fun left_tuple ->
+                    List.to_seq right_tuples
+                    |> Seq.map (fun right_tuple ->
+                        Array.append left_tuple right_tuple))
+                  left_relation.tuples
+              in
+              continue { schema = combined_schema; tuples = combined_tuples }))
   | _ -> continue (eval environment transaction plan)
