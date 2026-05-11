@@ -110,10 +110,10 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate =
   in
   ({ schema = combined_schema; tuples = combined_tuples } : [ `Bag ] Relation.t)
 
-(* CPS-shaped executor under construction: each operator's streaming branch
-   lands here one step at a time. Branches that have not yet been converted
-   fall through to [eval] and pass the eagerly-built relation to [continue].
-*)
+(* CPS-shaped executor. Every operator is in continuation-passing form so
+   the consumer's [continue] runs inside whatever cursor and resource
+   scopes the plan opens, letting tuples stream directly from live
+   cursors rather than being eagerly materialised. *)
 let rec eval_cps environment transaction plan continue =
   match (plan : Physical.t) with
   | FullScan { table } ->
@@ -164,4 +164,32 @@ let rec eval_cps environment transaction plan continue =
                   left_relation.tuples
               in
               continue { schema = combined_schema; tuples = combined_tuples }))
-  | _ -> continue (eval environment transaction plan)
+  | NestedLoopJoin { left; right; predicate } ->
+      (* Same shape as [CrossProduct] -- nested CPS, right side materialised
+         -- with the predicate resolved against the combined schema and
+         evaluated per (left, right) pair before the combined tuple is
+         emitted. *)
+      eval_cps environment transaction left (fun left_relation ->
+          eval_cps environment transaction right (fun right_relation ->
+              let right_tuples = List.of_seq right_relation.tuples in
+              let combined_schema : Schema.t =
+                {
+                  fields =
+                    left_relation.schema.fields @ right_relation.schema.fields;
+                  primary_key = [];
+                }
+              in
+              let evaluate_predicate =
+                Predicate.resolve combined_schema predicate
+              in
+              let combined_tuples =
+                Seq.flat_map
+                  (fun left_tuple ->
+                    List.to_seq right_tuples
+                    |> Seq.filter_map (fun right_tuple ->
+                        let combined = Array.append left_tuple right_tuple in
+                        if evaluate_predicate combined then Some combined
+                        else None))
+                  left_relation.tuples
+              in
+              continue { schema = combined_schema; tuples = combined_tuples }))
