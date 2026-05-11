@@ -114,8 +114,18 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate =
    lands here one step at a time. Branches that have not yet been converted
    fall through to [eval] and pass the eagerly-built relation to [continue].
 *)
-let eval_cps environment transaction plan continue =
+let rec eval_cps environment transaction plan continue =
   match (plan : Physical.t) with
   | FullScan { table } ->
       evaluate_full_scan_streaming environment transaction table continue
+  | Filter { input; predicate } ->
+      eval_cps environment transaction input (fun input_relation ->
+          let evaluate_predicate =
+            Predicate.resolve input_relation.schema predicate
+          in
+          continue
+            {
+              schema = input_relation.schema;
+              tuples = Seq.filter evaluate_predicate input_relation.tuples;
+            })
   | _ -> continue (eval environment transaction plan)
