@@ -1,6 +1,9 @@
 let table_subdb_name table = "table:" ^ table
 
-let evaluate_full_scan environment transaction table =
+(* Look up the schema and storage handle for a table referenced in a plan.
+   Shared between the eager and streaming [FullScan] evaluators so they
+   produce identical errors when the catalog or storage is missing. *)
+let lookup_table_resources environment transaction table =
   let schema =
     match Catalog.get environment transaction ~table_name:table with
     | Some schema -> schema
@@ -16,11 +19,28 @@ let evaluate_full_scan environment transaction table =
           (Printf.sprintf
              "Eval: catalog has schema for %S but no storage subDB exists" table)
   in
+  (schema, table_map)
+
+let evaluate_full_scan environment transaction table =
+  let schema, table_map =
+    lookup_table_resources environment transaction table
+  in
   let tuples =
     Storage.iter_seq table_map transaction
     |> Seq.map (Row_codec.decode_row schema)
   in
   ({ schema; tuples } : [ `Bag ] Relation.t)
+
+(* Streaming counterpart to [evaluate_full_scan]: opens the cursor for the
+   duration of [continue] and hands it a relation whose tuples are pulled
+   lazily from the live cursor. *)
+let evaluate_full_scan_streaming environment transaction table continue =
+  let schema, table_map =
+    lookup_table_resources environment transaction table
+  in
+  Storage.with_iter_seq table_map transaction (fun pairs ->
+      let tuples = Seq.map (Row_codec.decode_row schema) pairs in
+      continue ({ schema; tuples } : [ `Bag ] Relation.t))
 
 let rec eval environment transaction plan =
   match (plan : Physical.t) with
@@ -90,8 +110,12 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate =
   in
   ({ schema = combined_schema; tuples = combined_tuples } : [ `Bag ] Relation.t)
 
-(* Thin CPS shim over [eval] during the streaming conversion. Each operator
-   is migrated to a streaming branch one step at a time; until then,
-   [eval_cps] hands the eagerly-built relation straight to [continue]. *)
+(* CPS-shaped executor under construction: each operator's streaming branch
+   lands here one step at a time. Branches that have not yet been converted
+   fall through to [eval] and pass the eagerly-built relation to [continue].
+*)
 let eval_cps environment transaction plan continue =
-  continue (eval environment transaction plan)
+  match (plan : Physical.t) with
+  | FullScan { table } ->
+      evaluate_full_scan_streaming environment transaction table continue
+  | _ -> continue (eval environment transaction plan)
