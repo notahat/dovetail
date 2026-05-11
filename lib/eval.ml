@@ -128,4 +128,14 @@ let rec eval_cps environment transaction plan continue =
               schema = input_relation.schema;
               tuples = Seq.filter evaluate_predicate input_relation.tuples;
             })
+  | Project { input; columns } ->
+      eval_cps environment transaction input (fun input_relation ->
+          let projected_schema, project_tuple =
+            Projection.resolve input_relation.schema columns
+          in
+          continue
+            {
+              schema = projected_schema;
+              tuples = Seq.map project_tuple input_relation.tuples;
+            })
   | _ -> continue (eval environment transaction plan)
