@@ -51,3 +51,32 @@ let iter_seq map transaction =
       match Lmdb.Cursor.first cursor with
       | pair -> List.to_seq (collect [ pair ])
       | exception Lmdb.Not_found -> Seq.empty)
+
+(* Streaming counterpart to [iter_seq]: opens a cursor for the duration of
+   [continue] and exposes a one-shot sequence that pulls each pair lazily.
+   The [exhausted] flag closes the seq once it has either run to its end or
+   been re-entered after exhaustion -- the lmdb package doesn't expose a
+   cursor reset, so re-iteration is not supported. *)
+let with_iter_seq map transaction continue =
+  let transaction = (transaction :> [ `Read ] Lmdb.Txn.t) in
+  Lmdb.Cursor.go Lmdb.Ro ~txn:transaction map (fun cursor ->
+      let exhausted = ref false in
+      let started = ref false in
+      let next_pair () =
+        if !exhausted then None
+        else
+          let step =
+            if !started then
+              match Lmdb.Cursor.next cursor with
+              | pair -> Some pair
+              | exception Lmdb.Not_found -> None
+            else (
+              started := true;
+              match Lmdb.Cursor.first cursor with
+              | pair -> Some pair
+              | exception Lmdb.Not_found -> None)
+          in
+          (match step with None -> exhausted := true | Some _ -> ());
+          step
+      in
+      continue (Seq.of_dispenser next_pair))

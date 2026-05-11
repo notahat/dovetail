@@ -69,3 +69,15 @@ val iter_seq : map -> [> `Read ] transaction -> (string * string) Seq.t
     scope-bound read transactions, and slice 1's fixture is too small for it to
     matter. Revisit when a slice needs to scan enough rows that materialisation
     is the wrong choice. *)
+
+val with_iter_seq :
+  map -> [> `Read ] transaction -> ((string * string) Seq.t -> 'a) -> 'a
+(** [with_iter_seq map transaction continue] opens a cursor over [map] and
+    invokes [continue] with a one-shot sequence that pulls key-value pairs in
+    key order directly from the live cursor.
+
+    The sequence is only valid inside [continue]; using it after [continue]
+    returns is undefined behaviour. The sequence is one-shot: once exhausted,
+    re-iterating yields nothing. Partial consumption (returning from [continue]
+    without draining the sequence) is safe -- the cursor and any remaining state
+    are torn down when [continue] returns. *)
