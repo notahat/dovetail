@@ -3,16 +3,20 @@ let prompt = "> "
 (* Run a single parsed query against [environment] and pretty-print the
    result to [output]. When [show_physical] is true, the chosen physical
    plan is printed before evaluation -- intended as an EXPLAIN-style aid
-   for understanding which operators are firing. Evaluation failures are
-   caught and reported as a one-line error so the surrounding loop can keep
-   going. *)
+   for understanding which operators are firing. Evaluation and printing
+   failures are caught and reported as a one-line error so the surrounding
+   loop can keep going. With the CPS executor, printing runs inside the
+   evaluator's continuation -- and therefore inside any live cursor scopes
+   -- so [try]/[with] necessarily catches errors from both evaluation and
+   printing. *)
 let evaluate_and_print environment ~output ~show_physical logical =
   let physical = Translate.translate logical in
   if show_physical then Physical.format output physical;
-  Storage.with_read_transaction environment (fun transaction ->
-      match Eval.eval environment transaction physical with
-      | relation -> Relation.print ~formatter:output relation
-      | exception Failure message -> Format.fprintf output "error: %s@." message)
+  try
+    Storage.with_read_transaction environment (fun transaction ->
+        Eval.eval_cps environment transaction physical (fun relation ->
+            Relation.print ~formatter:output relation))
+  with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Process one input line: parse, lower, evaluate, print. Parse and eval
    errors land in [output]; nothing is raised. *)

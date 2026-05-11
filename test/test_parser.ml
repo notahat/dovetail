@@ -221,10 +221,10 @@ let test_pipeline_yields_fixture_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "five rows from parsed query" expected_users_rows rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "five rows from parsed query" expected_users_rows rows))
 
 let test_pipeline_restrict_yields_filtered_rows () =
   with_temp_dir @@ fun directory ->
@@ -238,12 +238,12 @@ let test_pipeline_restrict_yields_filtered_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "Carol's row from parsed restrict"
-        [ List.nth expected_users_rows 2 ]
-        rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Carol's row from parsed restrict"
+            [ List.nth expected_users_rows 2 ]
+            rows))
 
 let users_relation = Ast.Relation_name "users"
 
@@ -368,10 +368,11 @@ let test_pipeline_cross_yields_thirty_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check int)
-        "5 users x 6 orders = 30 rows from parsed cross" 30 (List.length rows))
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check int)
+            "5 users x 6 orders = 30 rows from parsed cross" 30
+            (List.length rows)))
 
 let test_pipeline_cross_then_restrict_yields_matched_pairs () =
   with_temp_dir @@ fun directory ->
@@ -388,11 +389,11 @@ let test_pipeline_cross_then_restrict_yields_matched_pairs () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check int)
-        "six matched (user, order) pairs from parsed pipeline" 6
-        (List.length rows))
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check int)
+            "six matched (user, order) pairs from parsed pipeline" 6
+            (List.length rows)))
 
 let users_id_equals_orders_user_id =
   predicate_compare
@@ -443,10 +444,11 @@ let test_pipeline_join_yields_matched_pairs () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check int)
-        "six matched (user, order) pairs from parsed join" 6 (List.length rows))
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check int)
+            "six matched (user, order) pairs from parsed join" 6
+            (List.length rows)))
 
 let test_pipeline_cross_then_ambiguous_restrict_raises () =
   with_temp_dir @@ fun directory ->
@@ -464,8 +466,7 @@ let test_pipeline_cross_then_ambiguous_restrict_raises () =
         (Failure
            "Predicate.resolve: ambiguous column reference \"id\": matches \
             \"users.id\" and \"orders.id\"") (fun () ->
-          let _ = Eval.eval environment transaction physical in
-          ()))
+          Eval.eval_cps environment transaction physical (fun _relation -> ())))
 
 let test_pipeline_project_yields_projected_rows () =
   with_temp_dir @@ fun directory ->
@@ -479,19 +480,19 @@ let test_pipeline_project_yields_projected_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      let expected =
-        [
-          [| Value.String "Alice"; Value.String "alice@example.com" |];
-          [| Value.String "Bob"; Value.String "bob@example.com" |];
-          [| Value.String "Carol"; Value.String "carol@example.com" |];
-          [| Value.String "Dave"; Value.String "dave@example.com" |];
-          [| Value.String "Eve"; Value.String "eve@example.com" |];
-        ]
-      in
-      Alcotest.(check tuple_list_testable)
-        "five projected rows from parsed project" expected rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          let expected =
+            [
+              [| Value.String "Alice"; Value.String "alice@example.com" |];
+              [| Value.String "Bob"; Value.String "bob@example.com" |];
+              [| Value.String "Carol"; Value.String "carol@example.com" |];
+              [| Value.String "Dave"; Value.String "dave@example.com" |];
+              [| Value.String "Eve"; Value.String "eve@example.com" |];
+            ]
+          in
+          Alcotest.(check tuple_list_testable)
+            "five projected rows from parsed project" expected rows))
 
 let () =
   Alcotest.run "parser"

@@ -21,10 +21,10 @@ let test_pipeline_yields_fixture_rows () =
   Storage.with_read_transaction environment (fun transaction ->
       let logical = Logical.Scan { table = "users" } in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "five rows from logical scan" expected_users_rows rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "five rows from logical scan" expected_users_rows rows))
 
 let id_equals_three =
   predicate_compare ~left:(predicate_column "id") ~op:Equal
@@ -61,12 +61,12 @@ let test_restrict_pipeline_yields_filtered_rows () =
           }
       in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "Carol's row from logical Restrict"
-        [ List.nth expected_users_rows 2 ]
-        rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Carol's row from logical Restrict"
+            [ List.nth expected_users_rows 2 ]
+            rows))
 
 let test_project_translates_to_physical_project () =
   let logical =
@@ -96,19 +96,19 @@ let test_project_pipeline_yields_projected_rows () =
           }
       in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      let expected =
-        [
-          [| Value.String "Alice"; Value.String "alice@example.com" |];
-          [| Value.String "Bob"; Value.String "bob@example.com" |];
-          [| Value.String "Carol"; Value.String "carol@example.com" |];
-          [| Value.String "Dave"; Value.String "dave@example.com" |];
-          [| Value.String "Eve"; Value.String "eve@example.com" |];
-        ]
-      in
-      Alcotest.(check tuple_list_testable)
-        "five projected rows from logical Project" expected rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          let expected =
+            [
+              [| Value.String "Alice"; Value.String "alice@example.com" |];
+              [| Value.String "Bob"; Value.String "bob@example.com" |];
+              [| Value.String "Carol"; Value.String "carol@example.com" |];
+              [| Value.String "Dave"; Value.String "dave@example.com" |];
+              [| Value.String "Eve"; Value.String "eve@example.com" |];
+            ]
+          in
+          Alcotest.(check tuple_list_testable)
+            "five projected rows from logical Project" expected rows))
 
 let test_cross_product_translates_to_physical_cross_product () =
   let logical =

@@ -22,10 +22,10 @@ let test_pipeline_yields_fixture_rows () =
       let ast = Ast.Relation_name "users" in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "five rows from AST" expected_users_rows rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "five rows from AST" expected_users_rows rows))
 
 let id_equals_three =
   predicate_compare ~left:(predicate_column "id") ~op:Equal
@@ -54,12 +54,12 @@ let test_restrict_pipeline_yields_filtered_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "Carol's row from Ast.Restrict"
-        [ List.nth expected_users_rows 2 ]
-        rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Carol's row from Ast.Restrict"
+            [ List.nth expected_users_rows 2 ]
+            rows))
 
 let name_then_email : Projection.t =
   [ column_reference "name"; column_reference "email" ]
@@ -86,19 +86,19 @@ let test_project_pipeline_yields_projected_rows () =
       in
       let logical = Lower.lower ast in
       let physical = Translate.translate logical in
-      let relation = Eval.eval environment transaction physical in
-      let rows = List.of_seq relation.tuples in
-      let expected =
-        [
-          [| Value.String "Alice"; Value.String "alice@example.com" |];
-          [| Value.String "Bob"; Value.String "bob@example.com" |];
-          [| Value.String "Carol"; Value.String "carol@example.com" |];
-          [| Value.String "Dave"; Value.String "dave@example.com" |];
-          [| Value.String "Eve"; Value.String "eve@example.com" |];
-        ]
-      in
-      Alcotest.(check tuple_list_testable)
-        "five projected rows from Ast.Project" expected rows)
+      Eval.eval_cps environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          let expected =
+            [
+              [| Value.String "Alice"; Value.String "alice@example.com" |];
+              [| Value.String "Bob"; Value.String "bob@example.com" |];
+              [| Value.String "Carol"; Value.String "carol@example.com" |];
+              [| Value.String "Dave"; Value.String "dave@example.com" |];
+              [| Value.String "Eve"; Value.String "eve@example.com" |];
+            ]
+          in
+          Alcotest.(check tuple_list_testable)
+            "five projected rows from Ast.Project" expected rows))
 
 let test_cross_product_lowers_to_logical_cross_product () =
   let ast =

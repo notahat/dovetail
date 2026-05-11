@@ -9,16 +9,15 @@ let test_full_scan_yields_fixture_rows () =
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
-      let relation =
-        Eval.eval environment transaction
-          (Physical.FullScan { table = "users" })
-      in
-      Alcotest.(check string)
-        "schema primary key" "id"
-        (String.concat "," relation.schema.primary_key);
-      let rows = List.of_seq relation.tuples in
-      Alcotest.(check tuple_list_testable)
-        "five rows in primary-key order" expected_users_rows rows)
+      Eval.eval_cps environment transaction
+        (Physical.FullScan { table = "users" })
+        (fun relation ->
+          Alcotest.(check string)
+            "schema primary key" "id"
+            (String.concat "," relation.schema.primary_key);
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "five rows in primary-key order" expected_users_rows rows))
 
 let test_full_scan_raises_for_missing_table () =
   with_temp_dir @@ fun dir ->
@@ -27,11 +26,9 @@ let test_full_scan_raises_for_missing_table () =
   Storage.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "missing table"
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
-          let _ =
-            Eval.eval environment transaction
-              (Physical.FullScan { table = "nonexistent_table" })
-          in
-          ()))
+          Eval.eval_cps environment transaction
+            (Physical.FullScan { table = "nonexistent_table" })
+            (fun _relation -> ())))
 
 (* Build a Filter wrapping a FullScan over the users fixture, evaluate it,
    and return the resulting tuples. *)
@@ -44,8 +41,8 @@ let evaluate_users_filter predicate =
         Physical.Filter
           { input = Physical.FullScan { table = "users" }; predicate }
       in
-      let relation = Eval.eval environment transaction plan in
-      List.of_seq relation.tuples)
+      Eval.eval_cps environment transaction plan (fun relation ->
+          List.of_seq relation.tuples))
 
 let test_filter_equality_on_int64_yields_one_row () =
   let rows =
@@ -151,8 +148,8 @@ let evaluate_users_project ~input_plan column_names =
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
       let plan = Physical.Project { input = input_plan; columns } in
-      let relation = Eval.eval environment transaction plan in
-      List.of_seq relation.tuples)
+      Eval.eval_cps environment transaction plan (fun relation ->
+          List.of_seq relation.tuples))
 
 let users_full_scan = Physical.FullScan { table = "users" }
 
@@ -226,17 +223,17 @@ let test_project_then_filter () =
                 ~right:(predicate_literal (Value.Bool true));
           }
       in
-      let relation = Eval.eval environment transaction plan in
-      let rows = List.of_seq relation.tuples in
-      let expected =
-        [
-          [| Value.String "Alice"; Value.Bool true |];
-          [| Value.String "Carol"; Value.Bool true |];
-          [| Value.String "Dave"; Value.Bool true |];
-        ]
-      in
-      Alcotest.(check tuple_list_testable)
-        "three active projected rows" expected rows)
+      Eval.eval_cps environment transaction plan (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          let expected =
+            [
+              [| Value.String "Alice"; Value.Bool true |];
+              [| Value.String "Carol"; Value.Bool true |];
+              [| Value.String "Dave"; Value.Bool true |];
+            ]
+          in
+          Alcotest.(check tuple_list_testable)
+            "three active projected rows" expected rows))
 
 let test_filter_then_project () =
   let filter_active_true =
@@ -289,8 +286,8 @@ let evaluate_against_fixture plan =
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
   Storage.with_read_transaction environment (fun transaction ->
-      let relation = Eval.eval environment transaction plan in
-      (relation.schema, List.of_seq relation.tuples))
+      Eval.eval_cps environment transaction plan (fun relation ->
+          (relation.schema, List.of_seq relation.tuples)))
 
 let test_cross_product_yields_thirty_rows () =
   let _schema, rows = evaluate_against_fixture users_cross_orders_plan in
@@ -467,77 +464,6 @@ let test_cross_product_with_ambiguous_unqualified_filter_raises () =
       let _ = evaluate_against_fixture plan in
       ())
 
-(* Parity check between [Eval.eval] and [Eval.eval_cps]. While the conversion
-   to a streaming CPS executor is in progress, the two entry points must
-   agree on every plan shape: identical primary key, qualified field names,
-   and tuples in identical order. This test stays in the suite through the
-   conversion as the regression net, and is removed once every caller has
-   switched to [eval_cps]. *)
-let qualified_field_names (schema : Schema.t) =
-  List.map
-    (fun (field : Schema.field) ->
-      match field.qualifier with
-      | Some qualifier -> qualifier ^ "." ^ field.name
-      | None -> field.name)
-    schema.fields
-
-let assert_eval_matches_eval_cps plan =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
-      let eager = Eval.eval environment transaction plan in
-      let eager_rows = List.of_seq eager.tuples in
-      let cps_rows =
-        Eval.eval_cps environment transaction plan (fun streaming ->
-            List.of_seq streaming.tuples)
-      in
-      let cps_schema =
-        Eval.eval_cps environment transaction plan (fun streaming ->
-            streaming.schema)
-      in
-      Alcotest.(check (list string))
-        "qualified field names match"
-        (qualified_field_names eager.schema)
-        (qualified_field_names cps_schema);
-      Alcotest.(check (list string))
-        "primary key matches" eager.schema.primary_key cps_schema.primary_key;
-      Alcotest.(check tuple_list_testable)
-        "tuples match in order" eager_rows cps_rows)
-
-let parity_plans : (string * Physical.t) list =
-  [
-    ("FullScan(users)", FullScan { table = "users" });
-    ( "Filter(FullScan(users), id = 3)",
-      Filter
-        {
-          input = FullScan { table = "users" };
-          predicate =
-            predicate_compare ~left:(predicate_column "id") ~op:Equal
-              ~right:(predicate_literal (Value.Int64 3L));
-        } );
-    ( "Project(FullScan(users), [name; email])",
-      Project
-        {
-          input = FullScan { table = "users" };
-          columns =
-            [
-              { qualifier = None; name = "name" };
-              { qualifier = None; name = "email" };
-            ];
-        } );
-    ("CrossProduct(users, orders)", users_cross_orders_plan);
-    ( "NestedLoopJoin(users, orders, users.id = orders.user_id)",
-      nested_loop_join_plan users_join_orders_on_id_predicate );
-  ]
-
-let parity_test_cases =
-  List.map
-    (fun (label, plan) ->
-      Alcotest.test_case label `Quick (fun () ->
-          assert_eval_matches_eval_cps plan))
-    parity_plans
-
 let () =
   Alcotest.run "eval"
     [
@@ -624,5 +550,4 @@ let () =
              preserved"
             `Quick test_nested_loop_join_schema_preserves_qualifiers;
         ] );
-      ("eval / eval_cps parity", parity_test_cases);
     ]
