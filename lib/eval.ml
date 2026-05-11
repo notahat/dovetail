@@ -89,3 +89,9 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate =
       left_relation.tuples
   in
   ({ schema = combined_schema; tuples = combined_tuples } : [ `Bag ] Relation.t)
+
+(* Thin CPS shim over [eval] during the streaming conversion. Each operator
+   is migrated to a streaming branch one step at a time; until then,
+   [eval_cps] hands the eagerly-built relation straight to [continue]. *)
+let eval_cps environment transaction plan continue =
+  continue (eval environment transaction plan)

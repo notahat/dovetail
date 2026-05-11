@@ -467,6 +467,77 @@ let test_cross_product_with_ambiguous_unqualified_filter_raises () =
       let _ = evaluate_against_fixture plan in
       ())
 
+(* Parity check between [Eval.eval] and [Eval.eval_cps]. While the conversion
+   to a streaming CPS executor is in progress, the two entry points must
+   agree on every plan shape: identical primary key, qualified field names,
+   and tuples in identical order. This test stays in the suite through the
+   conversion as the regression net, and is removed once every caller has
+   switched to [eval_cps]. *)
+let qualified_field_names (schema : Schema.t) =
+  List.map
+    (fun (field : Schema.field) ->
+      match field.qualifier with
+      | Some qualifier -> qualifier ^ "." ^ field.name
+      | None -> field.name)
+    schema.fields
+
+let assert_eval_matches_eval_cps plan =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let eager = Eval.eval environment transaction plan in
+      let eager_rows = List.of_seq eager.tuples in
+      let cps_rows =
+        Eval.eval_cps environment transaction plan (fun streaming ->
+            List.of_seq streaming.tuples)
+      in
+      let cps_schema =
+        Eval.eval_cps environment transaction plan (fun streaming ->
+            streaming.schema)
+      in
+      Alcotest.(check (list string))
+        "qualified field names match"
+        (qualified_field_names eager.schema)
+        (qualified_field_names cps_schema);
+      Alcotest.(check (list string))
+        "primary key matches" eager.schema.primary_key cps_schema.primary_key;
+      Alcotest.(check tuple_list_testable)
+        "tuples match in order" eager_rows cps_rows)
+
+let parity_plans : (string * Physical.t) list =
+  [
+    ("FullScan(users)", FullScan { table = "users" });
+    ( "Filter(FullScan(users), id = 3)",
+      Filter
+        {
+          input = FullScan { table = "users" };
+          predicate =
+            predicate_compare ~left:(predicate_column "id") ~op:Equal
+              ~right:(predicate_literal (Value.Int64 3L));
+        } );
+    ( "Project(FullScan(users), [name; email])",
+      Project
+        {
+          input = FullScan { table = "users" };
+          columns =
+            [
+              { qualifier = None; name = "name" };
+              { qualifier = None; name = "email" };
+            ];
+        } );
+    ("CrossProduct(users, orders)", users_cross_orders_plan);
+    ( "NestedLoopJoin(users, orders, users.id = orders.user_id)",
+      nested_loop_join_plan users_join_orders_on_id_predicate );
+  ]
+
+let parity_test_cases =
+  List.map
+    (fun (label, plan) ->
+      Alcotest.test_case label `Quick (fun () ->
+          assert_eval_matches_eval_cps plan))
+    parity_plans
+
 let () =
   Alcotest.run "eval"
     [
@@ -553,4 +624,5 @@ let () =
              preserved"
             `Quick test_nested_loop_join_schema_preserves_qualifiers;
         ] );
+      ("eval / eval_cps parity", parity_test_cases);
     ]

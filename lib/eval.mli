@@ -21,3 +21,20 @@ val eval :
     Raises [Failure] if [plan] references a table the catalog has no schema for,
     or if a feature is required that slice 1 does not yet implement (e.g. a
     non-[int64] or composite primary key). *)
+
+val eval_cps :
+  Storage.environment ->
+  [> `Read ] Storage.transaction ->
+  Physical.t ->
+  ([ `Bag ] Relation.t -> 'a) ->
+  'a
+(** Exploratory CPS-shaped counterpart to {!eval}. Runs [plan] and invokes the
+    continuation with the resulting relation; the continuation runs inside
+    whatever cursor and resource scopes the plan opens, so the relation's
+    [tuples] sequence may be streamed directly from a live cursor rather than
+    eagerly materialised.
+
+    During the conversion to a streaming executor, this entry point delegates
+    operator-by-operator to {!eval}; the parity tests guarantee identical
+    behaviour. Once every operator is converted, {!eval} is removed and this
+    becomes the only entry point. *)
