@@ -19,9 +19,20 @@
     (and/or/not), ordering comparisons, and parens arrive in later slice-7
     steps. *)
 
-(** Comparison operator. Today's pair is equality and inequality; the four
-    ordering operators arrive in slice 7 step 3. *)
-type comparison_op = Equal | NotEqual
+(** Comparison operator.
+
+    {!Equal} and {!NotEqual} apply to any pair of operands whose kinds agree;
+    the four ordering operators are defined only for kinds with a meaningful
+    order -- {!Value.Kind.Int64} (numeric) and {!Value.Kind.String}
+    (lexicographic by byte). Applying an ordering operator to {!Value.Kind.Bool}
+    operands is rejected at resolve time. *)
+type comparison_op =
+  | Equal
+  | NotEqual
+  | Less
+  | LessEqual
+  | Greater
+  | GreaterEqual
 
 (** An expression node. *)
 type t =
@@ -54,6 +65,9 @@ val resolve : Schema.t -> t -> Schema.tuple -> bool
       match exactly one field by name.
     - Each {!Compare}'s left and right sub-expressions must agree on
       {!Value.Kind.t}.
+    - Ordering operators ({!Less}, {!LessEqual}, {!Greater}, {!GreaterEqual})
+      require the kind to be ordered: {!Value.Kind.Int64} or
+      {!Value.Kind.String}.
     - The whole expression's kind must be {!Value.Kind.Bool}. Predicate
       positions accept only Bool-valued expressions, so a standalone {!Column}
       of kind {!Value.Kind.Bool} is a valid predicate ([restrict active]), while
@@ -64,5 +78,6 @@ val resolve : Schema.t -> t -> Schema.tuple -> bool
     resolve time, so no name lookup happens per row.
 
     Raises [Failure] if a column reference is unknown or ambiguous, two sides of
-    a {!Compare} disagree on kind, or the top-level expression does not have
+    a {!Compare} disagree on kind, an ordering operator is applied to a
+    non-ordered kind, or the top-level expression does not have
     {!Value.Kind.Bool}. *)

@@ -73,14 +73,24 @@ let string_literal =
   List.iter (Buffer.add_char buffer) characters;
   Value.String (Buffer.contents buffer)
 
-(* The two slice-2 comparison operators. Dispatched by lookahead so the
-   choice between [=] and [<>] is unambiguous and doesn't depend on
+(* The six comparison operators. Dispatched by lookahead on the leading
+   character, then for [<] and [>] by a second lookahead at the byte that
+   follows. The two-stage dispatch keeps the choice between [<], [<=], and
+   [<>] (and likewise between [>] and [>=]) unambiguous and independent of
    [<|>] backtracking behaviour. *)
 let comparison_op =
   peek_char >>= function
   | Some '=' -> char '=' *> return Expression.Equal
-  | Some '<' -> string "<>" *> return Expression.NotEqual
-  | _ -> fail "expected '=' or '<>'"
+  | Some '<' -> (
+      char '<' *> peek_char >>= function
+      | Some '>' -> char '>' *> return Expression.NotEqual
+      | Some '=' -> char '=' *> return Expression.LessEqual
+      | _ -> return Expression.Less)
+  | Some '>' -> (
+      char '>' *> peek_char >>= function
+      | Some '=' -> char '=' *> return Expression.GreaterEqual
+      | _ -> return Expression.Greater)
+  | _ -> fail "expected a comparison operator"
 
 (* A column reference: either a bare identifier (unqualified) or two
    identifiers separated by a dot with no whitespace around it (qualified).

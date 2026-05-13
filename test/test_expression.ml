@@ -141,6 +141,74 @@ let test_column_inequality_on_orders () =
   in
   Alcotest.(check int) "five rows with id <> user_id" 5 (List.length matched)
 
+let test_int64_less_than_yields_lower_subset () =
+  let matched =
+    filter_users
+      (predicate_compare ~left:(predicate_column "id") ~op:Less
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check tuple_list_testable)
+    "ids strictly less than 3"
+    [ List.nth users_rows 0; List.nth users_rows 1 ]
+    matched
+
+let test_int64_less_or_equal_yields_lower_inclusive () =
+  let matched =
+    filter_users
+      (predicate_compare ~left:(predicate_column "id") ~op:LessEqual
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check tuple_list_testable)
+    "ids less than or equal to 3"
+    [ List.nth users_rows 0; List.nth users_rows 1; List.nth users_rows 2 ]
+    matched
+
+let test_int64_greater_than_yields_upper_subset () =
+  let matched =
+    filter_users
+      (predicate_compare ~left:(predicate_column "id") ~op:Greater
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check tuple_list_testable)
+    "ids strictly greater than 3"
+    [ List.nth users_rows 3; List.nth users_rows 4 ]
+    matched
+
+let test_int64_greater_or_equal_yields_upper_inclusive () =
+  let matched =
+    filter_users
+      (predicate_compare ~left:(predicate_column "id") ~op:GreaterEqual
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check tuple_list_testable)
+    "ids greater than or equal to 3"
+    [ List.nth users_rows 2; List.nth users_rows 3; List.nth users_rows 4 ]
+    matched
+
+let test_string_greater_or_equal_orders_lexicographically () =
+  (* Names lexicographically >= "C": Carol, Dave, Eve. Alice and Bob both
+     start with letters before 'C', so they're excluded. *)
+  let matched =
+    filter_users
+      (predicate_compare ~left:(predicate_column "name") ~op:GreaterEqual
+         ~right:(predicate_literal (Value.String "C")))
+  in
+  Alcotest.(check tuple_list_testable)
+    "names lexicographically >= \"C\""
+    [ List.nth users_rows 2; List.nth users_rows 3; List.nth users_rows 4 ]
+    matched
+
+let test_string_less_than_orders_lexicographically () =
+  let matched =
+    filter_users
+      (predicate_compare ~left:(predicate_column "name") ~op:Less
+         ~right:(predicate_literal (Value.String "C")))
+  in
+  Alcotest.(check tuple_list_testable)
+    "names lexicographically < \"C\""
+    [ List.nth users_rows 0; List.nth users_rows 1 ]
+    matched
+
 let test_bare_bool_column_resolves_as_predicate () =
   (* Slice 7 step 2 generalises the IR so a standalone column is a valid
      expression. A Bool-kinded column resolves directly as a predicate;
@@ -220,6 +288,22 @@ let test_type_mismatch_column_vs_literal_raises () =
         Expression.resolve users_schema
           (predicate_compare ~left:(predicate_column "name") ~op:Equal
              ~right:(predicate_literal (Value.Int64 1L)))
+      in
+      ())
+
+let test_ordering_on_bool_column_raises () =
+  (* Bool participates in = and <> but not <, <=, >, >=. The resolver must
+     reject ordering on Bool with a message that names the operator and the
+     offending kind. *)
+  Alcotest.check_raises "ordering operator on Bool"
+    (Failure "Expression.resolve: ordering operator > is not defined for Bool")
+    (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Expression.resolve users_schema
+          (predicate_compare
+             ~left:(predicate_column "active")
+             ~op:Greater
+             ~right:(predicate_literal (Value.Bool false)))
       in
       ())
 
@@ -308,6 +392,38 @@ let test_format_bare_literal_renders_as_literal () =
   Alcotest.(check string)
     "bare bool literal renders as the keyword" "true" rendered
 
+let test_format_less_than () =
+  let rendered =
+    format_to_string
+      (predicate_compare ~left:(predicate_column "id") ~op:Less
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check string) "id < 3" "id < 3" rendered
+
+let test_format_less_equal () =
+  let rendered =
+    format_to_string
+      (predicate_compare ~left:(predicate_column "id") ~op:LessEqual
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check string) "id <= 3" "id <= 3" rendered
+
+let test_format_greater_than () =
+  let rendered =
+    format_to_string
+      (predicate_compare ~left:(predicate_column "id") ~op:Greater
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check string) "id > 3" "id > 3" rendered
+
+let test_format_greater_equal () =
+  let rendered =
+    format_to_string
+      (predicate_compare ~left:(predicate_column "id") ~op:GreaterEqual
+         ~right:(predicate_literal (Value.Int64 3L)))
+  in
+  Alcotest.(check string) "id >= 3" "id >= 3" rendered
+
 let test_format_qualified_columns_use_dot_form () =
   let rendered =
     format_to_string
@@ -353,6 +469,18 @@ let () =
             test_bare_bool_column_resolves_as_predicate;
           Alcotest.test_case "bare bool literal resolves as a predicate" `Quick
             test_bare_bool_literal_resolves_as_predicate;
+          Alcotest.test_case "int64 less-than yields the lower subset" `Quick
+            test_int64_less_than_yields_lower_subset;
+          Alcotest.test_case "int64 less-or-equal is inclusive at the bound"
+            `Quick test_int64_less_or_equal_yields_lower_inclusive;
+          Alcotest.test_case "int64 greater-than yields the upper subset" `Quick
+            test_int64_greater_than_yields_upper_subset;
+          Alcotest.test_case "int64 greater-or-equal is inclusive at the bound"
+            `Quick test_int64_greater_or_equal_yields_upper_inclusive;
+          Alcotest.test_case "string greater-or-equal orders lexicographically"
+            `Quick test_string_greater_or_equal_orders_lexicographically;
+          Alcotest.test_case "string less-than orders lexicographically" `Quick
+            test_string_less_than_orders_lexicographically;
         ] );
       ( "errors",
         [
@@ -373,6 +501,9 @@ let () =
             `Quick test_non_bool_predicate_raises;
           Alcotest.test_case "non-Bool literal at the predicate position raises"
             `Quick test_non_bool_literal_predicate_raises;
+          Alcotest.test_case
+            "ordering operator on Bool operands raises naming the kind" `Quick
+            test_ordering_on_bool_column_raises;
         ] );
       ( "format",
         [
@@ -390,5 +521,13 @@ let () =
             test_format_bare_column_renders_as_column_name;
           Alcotest.test_case "bare literal renders as the literal" `Quick
             test_format_bare_literal_renders_as_literal;
+          Alcotest.test_case "less-than renders with <" `Quick
+            test_format_less_than;
+          Alcotest.test_case "less-or-equal renders with <=" `Quick
+            test_format_less_equal;
+          Alcotest.test_case "greater-than renders with >" `Quick
+            test_format_greater_than;
+          Alcotest.test_case "greater-or-equal renders with >=" `Quick
+            test_format_greater_equal;
         ] );
     ]

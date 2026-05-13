@@ -105,6 +105,26 @@ let test_bare_qualified_column () =
 let test_bare_bool_literal () =
   parses_predicate "true" (predicate_literal (Value.Bool true))
 
+let test_less_than () =
+  parses_predicate "id < 3"
+    (predicate_compare ~left:(predicate_column "id") ~op:Less
+       ~right:(predicate_literal (Value.Int64 3L)))
+
+let test_less_or_equal () =
+  parses_predicate "id <= 3"
+    (predicate_compare ~left:(predicate_column "id") ~op:LessEqual
+       ~right:(predicate_literal (Value.Int64 3L)))
+
+let test_greater_than () =
+  parses_predicate "id > 3"
+    (predicate_compare ~left:(predicate_column "id") ~op:Greater
+       ~right:(predicate_literal (Value.Int64 3L)))
+
+let test_greater_or_equal () =
+  parses_predicate "id >= 3"
+    (predicate_compare ~left:(predicate_column "id") ~op:GreaterEqual
+       ~right:(predicate_literal (Value.Int64 3L)))
+
 let test_compare_two_literals () =
   parses_predicate "5 = 5"
     (predicate_compare
@@ -189,6 +209,11 @@ let () =
             test_bare_bool_literal;
           Alcotest.test_case "comparison of two literals" `Quick
             test_compare_two_literals;
+          Alcotest.test_case "id < 3 (less-than)" `Quick test_less_than;
+          Alcotest.test_case "id <= 3 (less-or-equal)" `Quick test_less_or_equal;
+          Alcotest.test_case "id > 3 (greater-than)" `Quick test_greater_than;
+          Alcotest.test_case "id >= 3 (greater-or-equal)" `Quick
+            test_greater_or_equal;
         ] );
       ( "rejection",
         [

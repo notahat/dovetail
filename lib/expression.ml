@@ -1,4 +1,10 @@
-type comparison_op = Equal | NotEqual
+type comparison_op =
+  | Equal
+  | NotEqual
+  | Less
+  | LessEqual
+  | Greater
+  | GreaterEqual
 
 type t =
   | Literal of Value.t
@@ -26,7 +32,23 @@ let render_literal = function
   | Value.Bool true -> "true"
   | Value.Bool false -> "false"
 
-let render_op = function Equal -> "=" | NotEqual -> "<>"
+let render_op = function
+  | Equal -> "="
+  | NotEqual -> "<>"
+  | Less -> "<"
+  | LessEqual -> "<="
+  | Greater -> ">"
+  | GreaterEqual -> ">="
+
+(* Ordering operators only apply to kinds with a meaningful order. Today
+   that is [Int64] and [String]; [Bool] is excluded. *)
+let is_ordered_kind = function
+  | Value.Kind.Int64 | Value.Kind.String -> true
+  | Value.Kind.Bool -> false
+
+let is_ordering_op = function
+  | Less | LessEqual | Greater | GreaterEqual -> true
+  | Equal | NotEqual -> false
 
 let rec format formatter = function
   | Column reference ->
@@ -64,7 +86,21 @@ let rec resolve_value schema = function
              (Value.Kind.to_string left_kind)
              (describe_expression right)
              (Value.Kind.to_string right_kind));
-      let comparator = match op with Equal -> ( = ) | NotEqual -> ( <> ) in
+      if is_ordering_op op && not (is_ordered_kind left_kind) then
+        failwith
+          (Printf.sprintf
+             "Expression.resolve: ordering operator %s is not defined for %s"
+             (render_op op)
+             (Value.Kind.to_string left_kind));
+      let comparator =
+        match op with
+        | Equal -> ( = )
+        | NotEqual -> ( <> )
+        | Less -> ( < )
+        | LessEqual -> ( <= )
+        | Greater -> ( > )
+        | GreaterEqual -> ( >= )
+      in
       let read tuple =
         Value.Bool (comparator (read_left tuple) (read_right tuple))
       in

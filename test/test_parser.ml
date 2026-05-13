@@ -375,6 +375,65 @@ let test_pipeline_restrict_constant_true_yields_all_rows () =
           Alcotest.(check tuple_list_testable)
             "5 = 5 keeps every row" expected_users_rows rows))
 
+let test_pipeline_restrict_with_int64_greater_than_yields_upper_rows () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict id > 3" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Dave and Eve (ids > 3)"
+            [ List.nth expected_users_rows 3; List.nth expected_users_rows 4 ]
+            rows))
+
+let test_pipeline_restrict_with_string_ge_yields_lex_subset () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict name >= \"C\"" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "names lexicographically >= \"C\": Carol, Dave, Eve"
+            [
+              List.nth expected_users_rows 2;
+              List.nth expected_users_rows 3;
+              List.nth expected_users_rows 4;
+            ]
+            rows))
+
+let test_pipeline_restrict_with_ordering_on_bool_raises () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict active > false" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Alcotest.check_raises "ordering operator on Bool operands"
+        (Failure
+           "Expression.resolve: ordering operator > is not defined for Bool")
+        (fun () -> Eval.eval environment transaction physical (fun _ -> ())))
+
 let test_pipeline_restrict_with_non_bool_expression_raises () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -553,5 +612,13 @@ let () =
           Alcotest.test_case
             "parsed restrict with a non-Bool expression raises at resolve time"
             `Quick test_pipeline_restrict_with_non_bool_expression_raises;
+          Alcotest.test_case
+            "parsed restrict id > 3 yields the rows above the bound" `Quick
+            test_pipeline_restrict_with_int64_greater_than_yields_upper_rows;
+          Alcotest.test_case
+            "parsed restrict name >= \"C\" yields the lex-ordered upper subset"
+            `Quick test_pipeline_restrict_with_string_ge_yields_lex_subset;
+          Alcotest.test_case "parsed restrict active > false raises naming Bool"
+            `Quick test_pipeline_restrict_with_ordering_on_bool_raises;
         ] );
     ]
