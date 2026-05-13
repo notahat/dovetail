@@ -22,15 +22,28 @@ val parse : string -> (Ast.t, error) result
     whitespace are accepted; the parser must consume the entire input. *)
 
 val parse_predicate : string -> (Expression.t, error) result
-(** [parse_predicate input] parses [input] as a single predicate of the form
-    [<term> <op> <term>], with [op] one of [=] or [<>] and each term either a
-    column reference (a bare identifier) or a literal:
+(** [parse_predicate input] parses [input] as a single expression in the
+    sublanguage shared by [restrict] and [join ... on]. The grammar, from
+    loosest to tightest binding:
 
-    - signed int64 ([-1], [0], [42])
-    - double-quoted string; backslash-quote and backslash-backslash are the only
-      recognised escape sequences
-    - [true] / [false]
+    - [or] — left-associative, lowest precedence.
+    - [and] — left-associative.
+    - [not] — prefix unary; stacks ([not not active] parses).
+    - Comparisons [=], [<>], [<], [<=], [>], [>=] — non-associative.
+    - Atoms: literals, column references, or a parenthesised expression.
 
-    Either side can be a column reference, so column-vs-literal,
-    literal-vs-column, and column-vs-column all parse. Leading and trailing
-    whitespace are accepted; the parser must consume the entire input. *)
+    Atoms are:
+
+    - signed int64 literals ([-1], [0], [42]);
+    - double-quoted string literals (backslash-quote and backslash-backslash are
+      the only recognised escapes);
+    - [true] / [false];
+    - column references, bare ([name]) or qualified ([users.name]) with no
+      whitespace around the dot.
+
+    A standalone atom is a valid expression at the parser level; whether it
+    resolves to a [Bool] (and so is acceptable in a predicate position) is a
+    resolve-time concern handled by {!Expression.resolve}.
+
+    Leading and trailing whitespace are accepted; the parser must consume the
+    entire input. *)
