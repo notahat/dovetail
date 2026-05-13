@@ -11,6 +11,67 @@ operator's worth of code at every layer, end to end. See
 foundational design and the slice plans (`02-...`, `03-...`) for the work
 in flight.
 
+## Building and running
+
+OCaml 5.2 in a local opam switch at the repo root.
+
+```sh
+opam exec -- dune build              # compile
+opam exec -- dune test               # run all alcotest suites
+opam exec -- dune build @fmt --auto-promote   # format
+./dovetail                           # run the REPL (default env: ./dovetail-data)
+./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
+```
+
+`./dovetail` is a small wrapper around `opam exec -- dune exec dovetail`
+so the REPL can be launched with a single command.
+
+See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling
+conventions.
+
+## Query language examples
+
+The REPL queries a fixture with two tables, `users` (id, name, email,
+active) and `orders` (id, user_id, description, amount). A bare table
+name reads the whole table; pipeline operators `restrict`, `project`,
+`cross`, and `join` compose with `|`:
+
+```
+> users | restrict active | project name, email
+| users.name | users.email       |
+|------------|-------------------|
+| Alice      | alice@example.com |
+| Carol      | carol@example.com |
+| Dave       | dave@example.com  |
+```
+
+Joins use qualified column references, and the rest of the pipeline can
+keep going past the join:
+
+```
+> users | join orders on users.id = orders.user_id | project name, description, amount
+| users.name | orders.description | orders.amount |
+|------------|--------------------|---------------|
+| Alice      | Coffee             |             5 |
+| Alice      | Bagel              |             4 |
+| Bob        | Tea                |             3 |
+| Carol      | Sandwich           |             8 |
+| Carol      | Cake               |             6 |
+| Eve        | Cookie             |             2 |
+```
+
+Predicates support the six comparison operators (`=`, `<>`, `<`, `<=`,
+`>`, `>=`), boolean `and` / `or` / `not`, and parentheses; literals can
+be integers, strings, or booleans:
+
+```
+> orders | restrict amount >= 5 and not (description = "Cake")
+| orders.id | orders.user_id | orders.description | orders.amount |
+|-----------|----------------|--------------------|---------------|
+|         1 |              1 | Coffee             |             5 |
+|         4 |              3 | Sandwich           |             8 |
+```
+
 ## Layer diagram
 
 The query pipeline runs top-to-bottom from text to tuples and back to text.
@@ -87,20 +148,66 @@ lands in a later slice it goes away.
 | `Schema` | Ordered field list + primary-key column names. `Schema.tuple = Value.t array`.                     |
 | `Relation` | (See above.) Phantom-typed for set/bag semantics.                                                |
 
-## Building and running
+## Roadmap
 
-OCaml 5.2 in a local opam switch at the repo root.
+### Next up
 
-```sh
-opam exec -- dune build              # compile
-opam exec -- dune test               # run all alcotest suites
-opam exec -- dune build @fmt --auto-promote   # format
-./dovetail                           # run the REPL (default env: ./dovetail-data)
-./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
-```
+Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
+sub-steps; the ordering here is firm, but the scope of slices 11–13 will
+be pinned down when those slices start.
 
-`./dovetail` is a small wrapper around `opam exec -- dune exec dovetail`
-so the REPL can be launched with a single command.
+1. **Slice 8 — Primary-key range scans.** In flight. First time
+   `Translate` chooses between `FullScan` and `IndexScan`.
+2. **Slice 9 — Indexed nested-loop join over the primary key.** Makes
+   joins efficient when one side's join column is the primary key — one
+   full scan of the outer, one PK probe per row. No secondary indexes
+   yet; those wait for a workload that motivates them.
+3. **Slice 10 — Query-language documentation.** Short tutorial intro
+   followed by reference sections for each operator and for the
+   expression and projection sublanguages. Covers only what exists.
+4. **Slice 11 — DML as an RA-language extension.** Statement-level
+   forms for inserting rows, alongside the existing pipeline syntax.
+   Update and delete may land here or follow on. Exercised against the
+   existing fixture.
+5. **Slice 12 — DDL as an RA-language extension.** Statement-level
+   `create table` and `drop table`. Replaces the fixture-creation path.
+6. **Slice 13 — Minimal SQL frontend.** A second front-end — SQL
+   parser, SQL AST, SQL→logical lowering — feeding the existing logical
+   and physical IRs. Deliberately limited (no NULLs, scope otherwise
+   TBD): the focus is on how the architecture splits between two
+   surface languages, not on covering SQL.
 
-See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling
-conventions.
+### Beyond
+
+Unordered backlog. Some items are foundational, some are operator
+additions, some are tooling and infrastructure; the order they land in
+is not committed to here.
+
+- Secondary indexes on columns other than the primary key.
+- Hash join, for joins where neither side has a useful index.
+- NULL values and option-typed columns. Cross-cutting: touches `Value`,
+  `Schema`, `Encoding`, `Expression`, and `Eval`.
+- Set operators: `distinct`, `union`, `intersect`, `difference`.
+- `sort` and `limit`.
+- Outer joins.
+- Aggregation, group by, having.
+- Update and delete, if not bundled into the DML slice.
+- Arithmetic and value-producing expressions, so predicates like
+  `age + 1 > 18` and computed projection columns work.
+- Function calls in expressions.
+- Subqueries.
+- A `rename` operator on the surface RA language.
+- Constraints beyond the primary key: NOT NULL, UNIQUE, CHECK, foreign
+  keys.
+- Additional data types: date/time, decimal, floating point, blob.
+- Exposed transaction commands (begin / commit / rollback).
+- EXPLAIN-style plan introspection.
+- Schema introspection (list tables, describe table).
+- A cost-based query optimiser: statistics collection, a cost model,
+  plan search.
+- SQL elaboration beyond the first slice — joins, aggregation,
+  subqueries, the rest of SELECT.
+- An internals walkthrough that follows a query through the layers.
+- A network protocol so the database can run as a separate process.
+- Network client libraries.
+- An embeddable API for use as a library.
