@@ -14,6 +14,7 @@
   test_parser
   test_physical
   test_expression
+  test_expression_parser
   test_projection
   test_repl)
  (libraries alcotest dovetail unix)
