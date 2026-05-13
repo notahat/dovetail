@@ -15,6 +15,7 @@
   test_physical
   test_pipeline
   test_expression
+  test_expression_format
   test_expression_parser
   test_projection
   test_repl)
