@@ -13,6 +13,7 @@
   test_lower
   test_parser
   test_physical
+  test_pipeline
   test_expression
   test_expression_parser
   test_projection

@@ -1,8 +1,18 @@
-(** Shared test fixtures.
+(** Shared test fixtures and helpers.
 
-    These helpers set up scope-bound resources -- temp directories and LMDB
-    environments -- in the {!Fun.protect} style, guaranteeing cleanup whether
-    the body returns normally or raises. *)
+    Covers four overlapping concerns:
+
+    - Scope-bound resources ({!with_temp_dir}, {!with_environment}) in the
+      {!Fun.protect} style, guaranteeing cleanup whether the body returns
+      normally or raises.
+    - Fixture-row constants matching what {!Fixture.populate_if_empty} writes,
+      for tests that need to compare query results against a single shared
+      expectation.
+    - [Expression.t] constructors ({!predicate_column}, {!predicate_compare}, …)
+      that read close to the predicate's source form at the call site.
+    - Pipeline-integration helpers ({!with_query_result}, {!with_query_failure})
+      that run a query through parse / lower / translate / eval, so end-to-end
+      tests don't have to restate the boilerplate. *)
 
 open Dovetail
 
@@ -131,6 +141,44 @@ let predicate_or ~left ~right : Expression.t = Or (left, right)
 
 (** An [Expression.t] negating a predicate. *)
 let predicate_not operand : Expression.t = Not operand
+
+(** [with_query_result query check_rows] runs [query] through the full parse /
+    lower / translate / eval pipeline against the standard fixture and calls
+    [check_rows] with the resulting list of tuples. The temp directory, LMDB
+    environment, fixture population, and read transaction are all set up and
+    torn down around the call. *)
+let with_query_result query check_rows =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse query with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          check_rows (List.of_seq relation.tuples)))
+
+(** [with_query_failure ~label ~expected query] runs [query] through the same
+    pipeline as {!with_query_result} but asserts that [Eval.eval] raises
+    [expected]. [label] is the description shown in test output. *)
+let with_query_failure ~label ~expected query =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse query with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Alcotest.check_raises label expected (fun () ->
+          Eval.eval environment transaction physical (fun _relation -> ())))
 
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)
