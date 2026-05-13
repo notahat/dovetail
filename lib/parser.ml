@@ -94,12 +94,13 @@ let column_reference =
       ({ qualifier = Some first; name = second } : Schema.column_reference)
   | _ -> return ({ qualifier = None; name = first } : Schema.column_reference)
 
-(* A single side of a comparison: a literal or a column reference. The bool
-   literals [true] and [false] are spelled with letters that would otherwise
-   start an identifier, so when the input starts with a letter we try the
-   bool literal first and fall back to the column-reference parser. The bool
-   parser uses [keyword], which requires a word break after the literal
-   text, so [trueish] cleanly falls through to the column-reference branch. *)
+(* A single atom of the expression grammar: a literal or a column reference,
+   produced as an [Expression.t]. The bool literals [true] and [false] are
+   spelled with letters that would otherwise start an identifier, so when
+   the input starts with a letter we try the bool literal first and fall
+   back to the column-reference parser. The bool parser uses [keyword],
+   which requires a word break after the literal text, so [trueish] cleanly
+   falls through to the column-reference branch. *)
 let term =
   peek_char >>= function
   | Some '"' ->
@@ -114,14 +115,18 @@ let term =
       <|> (column_reference >>| fun reference -> Expression.Column reference)
   | _ -> fail "expected a column reference or literal"
 
-(* The predicate grammar: [<term> <op> <term>], where each term is either a
-   column reference or a literal. Slice 2 only allowed a literal on the
-   right; slice 4 step 2 lifts that restriction so column-vs-column
-   comparisons (used to match across cross-product inputs) parse. *)
+(* The predicate grammar: a term, optionally followed by a comparison
+   operator and another term. With the slice-7-step-2 IR generalisation,
+   the term alone is a valid predicate when its kind is Bool (e.g. [restrict
+   active]); the kind check happens at resolve time, not at parse time, so
+   the parser accepts any standalone term here. *)
 let predicate =
   term >>= fun left ->
-  whitespace *> comparison_op >>= fun op ->
-  whitespace *> term >>| fun right -> Expression.Compare { left; op; right }
+  let with_comparison =
+    whitespace *> comparison_op >>= fun op ->
+    whitespace *> term >>| fun right -> Expression.Compare { left; op; right }
+  in
+  with_comparison <|> return left
 
 (* The slice-3 projection grammar: one column reference followed by zero or
    more [, column-reference] tails. Whitespace is flexible around the comma.

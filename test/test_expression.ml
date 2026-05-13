@@ -141,6 +141,27 @@ let test_column_inequality_on_orders () =
   in
   Alcotest.(check int) "five rows with id <> user_id" 5 (List.length matched)
 
+let test_bare_bool_column_resolves_as_predicate () =
+  (* Slice 7 step 2 generalises the IR so a standalone column is a valid
+     expression. A Bool-kinded column resolves directly as a predicate;
+     each row's verdict equals its [active] flag. *)
+  let evaluator = Expression.resolve users_schema (predicate_column "active") in
+  let verdicts = List.map evaluator users_rows in
+  Alcotest.(check (list bool))
+    "predicate verdict tracks the active column"
+    [ true; false; true; true; false ]
+    verdicts
+
+let test_bare_bool_literal_resolves_as_predicate () =
+  (* A standalone Bool literal is a valid (degenerate) predicate; the
+     verdict is constant across all rows. *)
+  let always_true =
+    Expression.resolve users_schema (predicate_literal (Value.Bool true))
+  in
+  Alcotest.(check bool)
+    "true literal is true for every row" true
+    (always_true (List.hd users_rows))
+
 let test_qualified_column_resolves_identically_to_unqualified () =
   (* Single-relation queries should keep working when the user qualifies the
      column reference. Same row count, same result. *)
@@ -202,6 +223,28 @@ let test_type_mismatch_column_vs_literal_raises () =
       in
       ())
 
+let test_non_bool_predicate_raises () =
+  (* The top-level kind check fires when a standalone non-Bool expression
+     reaches a predicate position. Today the only way to construct one is
+     to pass a non-Bool column or literal to [resolve]. *)
+  Alcotest.check_raises "non-Bool top-level expression"
+    (Failure "Expression.resolve: predicate position requires Bool, got Int64")
+    (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Expression.resolve users_schema (predicate_column "id")
+      in
+      ())
+
+let test_non_bool_literal_predicate_raises () =
+  Alcotest.check_raises "non-Bool literal predicate"
+    (Failure "Expression.resolve: predicate position requires Bool, got String")
+    (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Expression.resolve users_schema
+          (predicate_literal (Value.String "hello"))
+      in
+      ())
+
 let test_type_mismatch_column_vs_column_raises () =
   Alcotest.check_raises "type mismatch column vs column"
     (Failure
@@ -256,6 +299,15 @@ let test_format_inequality_uses_angle_brackets () =
   in
   Alcotest.(check string) "id <> 3" "id <> 3" rendered
 
+let test_format_bare_column_renders_as_column_name () =
+  let rendered = format_to_string (predicate_column "active") in
+  Alcotest.(check string) "bare column renders as its name" "active" rendered
+
+let test_format_bare_literal_renders_as_literal () =
+  let rendered = format_to_string (predicate_literal (Value.Bool true)) in
+  Alcotest.(check string)
+    "bare bool literal renders as the keyword" "true" rendered
+
 let test_format_qualified_columns_use_dot_form () =
   let rendered =
     format_to_string
@@ -297,6 +349,10 @@ let () =
           Alcotest.test_case
             "qualified column reference resolves identically to unqualified"
             `Quick test_qualified_column_resolves_identically_to_unqualified;
+          Alcotest.test_case "bare bool column resolves as a predicate" `Quick
+            test_bare_bool_column_resolves_as_predicate;
+          Alcotest.test_case "bare bool literal resolves as a predicate" `Quick
+            test_bare_bool_literal_resolves_as_predicate;
         ] );
       ( "errors",
         [
@@ -313,6 +369,10 @@ let () =
           Alcotest.test_case
             "qualified reference to a column not in this schema raises" `Quick
             test_unknown_qualifier_raises;
+          Alcotest.test_case "non-Bool column at the predicate position raises"
+            `Quick test_non_bool_predicate_raises;
+          Alcotest.test_case "non-Bool literal at the predicate position raises"
+            `Quick test_non_bool_literal_predicate_raises;
         ] );
       ( "format",
         [
@@ -326,5 +386,9 @@ let () =
             test_format_inequality_uses_angle_brackets;
           Alcotest.test_case "qualified columns render in dotted form" `Quick
             test_format_qualified_columns_use_dot_form;
+          Alcotest.test_case "bare column renders as the column name" `Quick
+            test_format_bare_column_renders_as_column_name;
+          Alcotest.test_case "bare literal renders as the literal" `Quick
+            test_format_bare_literal_renders_as_literal;
         ] );
     ]

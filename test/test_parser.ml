@@ -127,6 +127,26 @@ let test_predicate_column_inequality_column () =
     (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
        ~right:(predicate_column "user_id"))
 
+let test_predicate_bare_column () =
+  (* Slice 7 step 2: a standalone column reference is a valid predicate at
+     the parser level. Whether it resolves to a Bool is a resolve-time
+     concern. *)
+  parses_predicate "active" (predicate_column "active")
+
+let test_predicate_bare_qualified_column () =
+  parses_predicate "users.active"
+    (predicate_qualified_column ~qualifier:"users" ~name:"active")
+
+let test_predicate_bare_bool_literal () =
+  parses_predicate "true" (predicate_literal (Value.Bool true))
+
+let test_predicate_compare_two_literals () =
+  parses_predicate "5 = 5"
+    (predicate_compare
+       ~left:(predicate_literal (Value.Int64 5L))
+       ~op:Equal
+       ~right:(predicate_literal (Value.Int64 5L)))
+
 let test_predicate_qualified_column_against_literal () =
   parses_predicate "users.id = 3"
     (predicate_compare
@@ -468,6 +488,57 @@ let test_pipeline_cross_then_ambiguous_restrict_raises () =
             \"users.id\" and \"orders.id\"") (fun () ->
           Eval.eval environment transaction physical (fun _relation -> ())))
 
+let test_pipeline_restrict_bare_bool_column_yields_active_rows () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict active" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check int)
+            "three active rows from restrict active" 3 (List.length rows)))
+
+let test_pipeline_restrict_constant_true_yields_all_rows () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict 5 = 5" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "5 = 5 keeps every row" expected_users_rows rows))
+
+let test_pipeline_restrict_with_non_bool_expression_raises () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict id" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Alcotest.check_raises "non-Bool predicate from int64 column"
+        (Failure
+           "Expression.resolve: predicate position requires Bool, got Int64")
+        (fun () -> Eval.eval environment transaction physical (fun _ -> ())))
+
 let test_pipeline_project_yields_projected_rows () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -554,6 +625,15 @@ let () =
             test_predicate_qualified_column_against_literal;
           Alcotest.test_case "qualified column = qualified column" `Quick
             test_predicate_qualified_column_against_qualified_column;
+          Alcotest.test_case "bare column reference is a valid predicate" `Quick
+            test_predicate_bare_column;
+          Alcotest.test_case
+            "bare qualified column reference is a valid predicate" `Quick
+            test_predicate_bare_qualified_column;
+          Alcotest.test_case "bare bool literal is a valid predicate" `Quick
+            test_predicate_bare_bool_literal;
+          Alcotest.test_case "comparison of two literals" `Quick
+            test_predicate_compare_two_literals;
         ] );
       ( "predicate rejection",
         [
@@ -669,5 +749,14 @@ let () =
           Alcotest.test_case
             "parsed cross then unqualified restrict raises ambiguity" `Quick
             test_pipeline_cross_then_ambiguous_restrict_raises;
+          Alcotest.test_case
+            "parsed restrict with a bare bool column yields active rows" `Quick
+            test_pipeline_restrict_bare_bool_column_yields_active_rows;
+          Alcotest.test_case
+            "parsed restrict with a constant-true comparison keeps every row"
+            `Quick test_pipeline_restrict_constant_true_yields_all_rows;
+          Alcotest.test_case
+            "parsed restrict with a non-Bool expression raises at resolve time"
+            `Quick test_pipeline_restrict_with_non_bool_expression_raises;
         ] );
     ]

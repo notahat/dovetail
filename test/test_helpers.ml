@@ -107,19 +107,19 @@ let column_reference name : Schema.column_reference = { qualifier = None; name }
 let qualified_column_reference ~qualifier ~name : Schema.column_reference =
   { qualifier = Some qualifier; name }
 
-(** An [Expression.term] referring to a bare (unqualified) column. *)
-let predicate_column name : Expression.term = Column (column_reference name)
+(** An [Expression.t] referring to a bare (unqualified) column. *)
+let predicate_column name : Expression.t = Column (column_reference name)
 
-(** An [Expression.term] referring to a qualified column. *)
-let predicate_qualified_column ~qualifier ~name : Expression.term =
+(** An [Expression.t] referring to a qualified column. *)
+let predicate_qualified_column ~qualifier ~name : Expression.t =
   Column (qualified_column_reference ~qualifier ~name)
 
-(** An [Expression.term] wrapping a literal value. *)
-let predicate_literal value : Expression.term = Literal value
+(** An [Expression.t] wrapping a literal value. *)
+let predicate_literal value : Expression.t = Literal value
 
-(** An [Expression.t] comparing two terms. The keyword arguments mirror the
-    record fields so the call site reads close to the predicate's source form.
-*)
+(** An [Expression.t] comparing two sub-expressions. The keyword arguments
+    mirror the record fields so the call site reads close to the predicate's
+    source form. *)
 let predicate_compare ~left ~op ~right : Expression.t =
   Compare { left; op; right }
 
