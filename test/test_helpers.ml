@@ -107,19 +107,20 @@ let column_reference name : Schema.column_reference = { qualifier = None; name }
 let qualified_column_reference ~qualifier ~name : Schema.column_reference =
   { qualifier = Some qualifier; name }
 
-(** A [Predicate.term] referring to a bare (unqualified) column. *)
-let predicate_column name : Predicate.term = Column (column_reference name)
+(** An [Expression.term] referring to a bare (unqualified) column. *)
+let predicate_column name : Expression.term = Column (column_reference name)
 
-(** A [Predicate.term] referring to a qualified column. *)
-let predicate_qualified_column ~qualifier ~name : Predicate.term =
+(** An [Expression.term] referring to a qualified column. *)
+let predicate_qualified_column ~qualifier ~name : Expression.term =
   Column (qualified_column_reference ~qualifier ~name)
 
-(** A [Predicate.term] wrapping a literal value. *)
-let predicate_literal value : Predicate.term = Literal value
+(** An [Expression.term] wrapping a literal value. *)
+let predicate_literal value : Expression.term = Literal value
 
-(** A [Predicate.t] comparing two terms. The keyword arguments mirror the record
-    fields so the call site reads close to the predicate's source form. *)
-let predicate_compare ~left ~op ~right : Predicate.t =
+(** An [Expression.t] comparing two terms. The keyword arguments mirror the
+    record fields so the call site reads close to the predicate's source form.
+*)
+let predicate_compare ~left ~op ~right : Expression.t =
   Compare { left; op; right }
 
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere

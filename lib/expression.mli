@@ -2,8 +2,8 @@
 
     A predicate is a single comparison of two terms, where each term is either a
     column reference or a literal. Both {!Logical.Restrict} and
-    {!Physical.Filter} carry a [Predicate.t]; the predicate refers to columns by
-    name so it stays human-readable for debugging and EXPLAIN-style
+    {!Physical.Filter} carry an [Expression.t]; the predicate refers to columns
+    by name so it stays human-readable for debugging and EXPLAIN-style
     introspection. Mapping names to tuple positions is an executor concern,
     handled by {!resolve}.
 

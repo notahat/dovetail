@@ -44,7 +44,7 @@ val find_field : t -> column_reference -> (int * field, string) result
       [ambiguous column reference "id": matches "users.id" and "orders.id"]).
 
     The error string is the body of the message; callers prepend their own
-    [Predicate.resolve:] or [Projection.resolve:] prefix. *)
+    [Expression.resolve:] or [Projection.resolve:] prefix. *)
 
 val format_column_reference : column_reference -> string
 (** Render a [column_reference] in its source form: dotted [qualifier.name] when

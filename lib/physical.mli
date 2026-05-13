@@ -12,7 +12,7 @@ type t =
   | FullScan of { table : string }
       (** [FullScan { table }] reads every row of [table] in primary-key order
           via a cursor over the table's storage subDB. *)
-  | Filter of { input : t; predicate : Predicate.t }
+  | Filter of { input : t; predicate : Expression.t }
       (** [Filter { input; predicate }] yields the rows from [input] for which
           [predicate] holds. Schema and multiplicity tag are passed through from
           [input] -- filtering preserves whether the input is a set or a bag. *)
@@ -32,7 +32,7 @@ type t =
           duplicate values that the inputs already had. The dedicated [Join]
           operator (with multiple strategies on the roadmap -- hash, merge)
           ships in a later slice. *)
-  | NestedLoopJoin of { left : t; right : t; predicate : Predicate.t }
+  | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
           tuple pair for which [predicate] holds, executed as a nested loop with
           the right side materialised once and the predicate fused into the

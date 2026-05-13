@@ -16,7 +16,7 @@ type t =
       (** [Scan { table }] reads every row of [table]. The logical operator
           carries no execution detail; it's the [Translate] layer's job to pick
           between full-scan, index-scan, and so on. *)
-  | Restrict of { input : t; predicate : Predicate.t }
+  | Restrict of { input : t; predicate : Expression.t }
       (** [Restrict { input; predicate }] keeps the rows of [input] for which
           [predicate] holds. The constructor name follows the relational-algebra
           term for σ; the executor convention (Filter) takes over once

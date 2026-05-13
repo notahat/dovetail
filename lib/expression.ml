@@ -22,7 +22,7 @@ let resolve_term schema = function
       (kind, read_value)
   | Column reference -> (
       match Schema.find_field schema reference with
-      | Error message -> failwith ("Predicate.resolve: " ^ message)
+      | Error message -> failwith ("Expression.resolve: " ^ message)
       | Ok (column_position, field) ->
           let read_value (tuple : Schema.tuple) = tuple.(column_position) in
           (field.kind, read_value))
@@ -52,7 +52,7 @@ let resolve schema (Compare { left; op; right }) =
   let right_kind, read_right = resolve_term schema right in
   if left_kind <> right_kind then
     failwith
-      (Printf.sprintf "Predicate.resolve: type mismatch: %s is %s, %s is %s"
+      (Printf.sprintf "Expression.resolve: type mismatch: %s is %s, %s is %s"
          (describe_term left)
          (Value.Kind.to_string left_kind)
          (describe_term right)

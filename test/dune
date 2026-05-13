@@ -13,7 +13,7 @@
   test_lower
   test_parser
   test_physical
-  test_predicate
+  test_expression
   test_projection
   test_repl)
  (libraries alcotest dovetail unix)

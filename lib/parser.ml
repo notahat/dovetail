@@ -78,8 +78,8 @@ let string_literal =
    [<|>] backtracking behaviour. *)
 let comparison_op =
   peek_char >>= function
-  | Some '=' -> char '=' *> return Predicate.Equal
-  | Some '<' -> string "<>" *> return Predicate.NotEqual
+  | Some '=' -> char '=' *> return Expression.Equal
+  | Some '<' -> string "<>" *> return Expression.NotEqual
   | _ -> fail "expected '=' or '<>'"
 
 (* A column reference: either a bare identifier (unqualified) or two
@@ -103,15 +103,15 @@ let column_reference =
 let term =
   peek_char >>= function
   | Some '"' ->
-      string_literal >>| fun literal_value -> Predicate.Literal literal_value
+      string_literal >>| fun literal_value -> Expression.Literal literal_value
   | Some '-' ->
-      int64_literal >>| fun literal_value -> Predicate.Literal literal_value
+      int64_literal >>| fun literal_value -> Expression.Literal literal_value
   | Some character when is_digit character ->
-      int64_literal >>| fun literal_value -> Predicate.Literal literal_value
+      int64_literal >>| fun literal_value -> Expression.Literal literal_value
   | Some character when is_letter character ->
       bool_literal
-      >>| (fun literal_value -> Predicate.Literal literal_value)
-      <|> (column_reference >>| fun reference -> Predicate.Column reference)
+      >>| (fun literal_value -> Expression.Literal literal_value)
+      <|> (column_reference >>| fun reference -> Expression.Column reference)
   | _ -> fail "expected a column reference or literal"
 
 (* The predicate grammar: [<term> <op> <term>], where each term is either a
@@ -121,7 +121,7 @@ let term =
 let predicate =
   term >>= fun left ->
   whitespace *> comparison_op >>= fun op ->
-  whitespace *> term >>| fun right -> Predicate.Compare { left; op; right }
+  whitespace *> term >>| fun right -> Expression.Compare { left; op; right }
 
 (* The slice-3 projection grammar: one column reference followed by zero or
    more [, column-reference] tails. Whitespace is flexible around the comma.

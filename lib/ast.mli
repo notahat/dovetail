@@ -13,7 +13,7 @@ type t =
   | Relation_name of string
       (** [Relation_name name] is a reference to the base relation called [name]
           — the surface syntax is just the bare identifier. *)
-  | Restrict of { input : t; predicate : Predicate.t }
+  | Restrict of { input : t; predicate : Expression.t }
       (** [Restrict { input; predicate }] is the surface form
           [input | restrict <predicate>]. The constructor name follows the
           relational-algebra term (σ); SQL's `SELECT` is intentionally avoided
@@ -28,7 +28,7 @@ type t =
           [left] and [right]; its schema is [left]'s fields followed by
           [right]'s, with each field carrying the qualifier it had on the way
           in. *)
-  | Join of { left : t; right : t; predicate : Predicate.t }
+  | Join of { left : t; right : t; predicate : Expression.t }
       (** [Join { left; right; predicate }] is the surface form
           [left | join right on <predicate>]. Sugar for cross product followed
           by a restriction: [Lower] desugars it to

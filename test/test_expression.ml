@@ -1,4 +1,4 @@
-(** Tests for [Predicate]. *)
+(** Tests for [Expression]. *)
 
 open Dovetail
 open Test_helpers
@@ -37,12 +37,12 @@ let orders_rows = expected_orders_rows
 
 (* Apply [predicate] to every users fixture row and return the survivors. *)
 let filter_users predicate =
-  let evaluator = Predicate.resolve users_schema predicate in
+  let evaluator = Expression.resolve users_schema predicate in
   List.filter evaluator users_rows
 
 (* Apply [predicate] to every orders fixture row and return the survivors. *)
 let filter_orders predicate =
-  let evaluator = Predicate.resolve orders_schema predicate in
+  let evaluator = Expression.resolve orders_schema predicate in
   List.filter evaluator orders_rows
 
 let test_equality_on_int64_column () =
@@ -158,9 +158,9 @@ let test_qualified_column_resolves_identically_to_unqualified () =
 
 let test_unknown_qualifier_raises () =
   Alcotest.check_raises "unknown qualified column"
-    (Failure "Predicate.resolve: unknown column \"orders.id\"") (fun () ->
+    (Failure "Expression.resolve: unknown column \"orders.id\"") (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Predicate.resolve users_schema
+        Expression.resolve users_schema
           (predicate_compare
              ~left:(predicate_qualified_column ~qualifier:"orders" ~name:"id")
              ~op:Equal
@@ -170,9 +170,9 @@ let test_unknown_qualifier_raises () =
 
 let test_unknown_column_on_left_raises () =
   Alcotest.check_raises "unknown column"
-    (Failure "Predicate.resolve: unknown column \"unknown_col\"") (fun () ->
+    (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Predicate.resolve users_schema
+        Expression.resolve users_schema
           (predicate_compare
              ~left:(predicate_column "unknown_col")
              ~op:Equal
@@ -182,9 +182,9 @@ let test_unknown_column_on_left_raises () =
 
 let test_unknown_column_on_right_raises () =
   Alcotest.check_raises "unknown column"
-    (Failure "Predicate.resolve: unknown column \"unknown_col\"") (fun () ->
+    (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Predicate.resolve users_schema
+        Expression.resolve users_schema
           (predicate_compare ~left:(predicate_column "id") ~op:Equal
              ~right:(predicate_column "unknown_col"))
       in
@@ -193,10 +193,10 @@ let test_unknown_column_on_right_raises () =
 let test_type_mismatch_column_vs_literal_raises () =
   Alcotest.check_raises "type mismatch"
     (Failure
-       "Predicate.resolve: type mismatch: column \"name\" is String, literal \
+       "Expression.resolve: type mismatch: column \"name\" is String, literal \
         Int64 is Int64") (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Predicate.resolve users_schema
+        Expression.resolve users_schema
           (predicate_compare ~left:(predicate_column "name") ~op:Equal
              ~right:(predicate_literal (Value.Int64 1L)))
       in
@@ -205,10 +205,10 @@ let test_type_mismatch_column_vs_literal_raises () =
 let test_type_mismatch_column_vs_column_raises () =
   Alcotest.check_raises "type mismatch column vs column"
     (Failure
-       "Predicate.resolve: type mismatch: column \"id\" is Int64, column \
+       "Expression.resolve: type mismatch: column \"id\" is Int64, column \
         \"name\" is String") (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Predicate.resolve users_schema
+        Expression.resolve users_schema
           (predicate_compare ~left:(predicate_column "id") ~op:Equal
              ~right:(predicate_column "name"))
       in
@@ -217,7 +217,7 @@ let test_type_mismatch_column_vs_column_raises () =
 let format_to_string predicate =
   let buffer = Buffer.create 64 in
   let formatter = Format.formatter_of_buffer buffer in
-  Predicate.format formatter predicate;
+  Expression.format formatter predicate;
   Format.pp_print_flush formatter ();
   Buffer.contents buffer
 
@@ -269,7 +269,7 @@ let test_format_qualified_columns_use_dot_form () =
     "users.id = orders.user_id" rendered
 
 let () =
-  Alcotest.run "predicate"
+  Alcotest.run "expression"
     [
       ( "compare",
         [

@@ -464,7 +464,7 @@ let test_pipeline_cross_then_ambiguous_restrict_raises () =
       let physical = Translate.translate logical in
       Alcotest.check_raises "ambiguous unqualified column"
         (Failure
-           "Predicate.resolve: ambiguous column reference \"id\": matches \
+           "Expression.resolve: ambiguous column reference \"id\": matches \
             \"users.id\" and \"orders.id\"") (fun () ->
           Eval.eval environment transaction physical (fun _relation -> ())))
 

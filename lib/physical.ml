@@ -1,9 +1,9 @@
 type t =
   | FullScan of { table : string }
-  | Filter of { input : t; predicate : Predicate.t }
+  | Filter of { input : t; predicate : Expression.t }
   | Project of { input : t; columns : Projection.t }
   | CrossProduct of { left : t; right : t }
-  | NestedLoopJoin of { left : t; right : t; predicate : Predicate.t }
+  | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
 
 (* Render a [Projection.t] as a comma-separated list, each column in its
    source-like form (bare or [qualifier.name] dotted). *)
@@ -20,7 +20,7 @@ let rec format_at formatter indent plan =
   | FullScan { table } ->
       Format.fprintf formatter "%sFullScan(%s)@\n" prefix table
   | Filter { input; predicate } ->
-      Format.fprintf formatter "%sFilter(%a)@\n" prefix Predicate.format
+      Format.fprintf formatter "%sFilter(%a)@\n" prefix Expression.format
         predicate;
       format_at formatter (indent + 1) input
   | Project { input; columns } ->
@@ -32,8 +32,8 @@ let rec format_at formatter indent plan =
       format_at formatter (indent + 1) left;
       format_at formatter (indent + 1) right
   | NestedLoopJoin { left; right; predicate } ->
-      Format.fprintf formatter "%sNestedLoopJoin(%a)@\n" prefix Predicate.format
-        predicate;
+      Format.fprintf formatter "%sNestedLoopJoin(%a)@\n" prefix
+        Expression.format predicate;
       format_at formatter (indent + 1) left;
       format_at formatter (indent + 1) right
 

@@ -21,7 +21,7 @@ val parse : string -> (Ast.t, error) result
 (** [parse input] parses [input] as a complete query. Leading and trailing
     whitespace are accepted; the parser must consume the entire input. *)
 
-val parse_predicate : string -> (Predicate.t, error) result
+val parse_predicate : string -> (Expression.t, error) result
 (** [parse_predicate input] parses [input] as a single predicate of the form
     [<term> <op> <term>], with [op] one of [=] or [<>] and each term either a
     column reference (a bare identifier) or a literal:

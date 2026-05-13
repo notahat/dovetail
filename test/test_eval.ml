@@ -111,7 +111,7 @@ let test_filter_column_equals_column_yields_no_rows () =
 
 let test_filter_unknown_column_raises () =
   Alcotest.check_raises "unknown column"
-    (Failure "Predicate.resolve: unknown column \"unknown_col\"") (fun () ->
+    (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
       let _ =
         evaluate_users_filter
           (predicate_compare
@@ -124,7 +124,7 @@ let test_filter_unknown_column_raises () =
 let test_filter_type_mismatch_raises () =
   Alcotest.check_raises "type mismatch"
     (Failure
-       "Predicate.resolve: type mismatch: column \"name\" is String, literal \
+       "Expression.resolve: type mismatch: column \"name\" is String, literal \
         Int64 is Int64") (fun () ->
       let _ =
         evaluate_users_filter
@@ -459,7 +459,7 @@ let test_cross_product_with_ambiguous_unqualified_filter_raises () =
   in
   Alcotest.check_raises "ambiguous unqualified column"
     (Failure
-       "Predicate.resolve: ambiguous column reference \"id\": matches \
+       "Expression.resolve: ambiguous column reference \"id\": matches \
         \"users.id\" and \"orders.id\"") (fun () ->
       let _ = evaluate_against_fixture plan in
       ())
