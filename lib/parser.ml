@@ -104,13 +104,13 @@ let column_reference =
       ({ qualifier = Some first; name = second } : Schema.column_reference)
   | _ -> return ({ qualifier = None; name = first } : Schema.column_reference)
 
-(* The predicate grammar, built bottom-up inside [fix] so the atom can
+(* The expression grammar, built bottom-up inside [fix] so the atom can
    recurse into the full expression via parens. Top-level layering, from
    loosest to tightest precedence, is [or_expression], [and_expression],
-   [comparison_expression], and the atomic [term]. Parens around an
-   expression appear in the atom position. *)
-let predicate =
-  fix (fun predicate ->
+   [not_expression], [comparison_expression], and the atomic [term]. Parens
+   around an expression appear in the atom position. *)
+let expression =
+  fix (fun expression ->
       (* A single atom: a literal, a column reference, or a parenthesised
        sub-expression. The bool literals [true] and [false] are spelled
        with letters that would otherwise start an identifier, so when
@@ -133,7 +133,7 @@ let predicate =
             <|> ( column_reference >>| fun reference ->
                   Expression.Column reference )
         | Some '(' ->
-            char '(' *> whitespace *> predicate <* whitespace <* char ')'
+            char '(' *> whitespace *> expression <* whitespace <* char ')'
         | _ -> fail "expected a column reference, literal, or '('"
       in
       (* A comparison atom: a term, optionally followed by a comparison
@@ -190,7 +190,7 @@ let project_columns =
 
 (* A restrict pipeline step: [| restrict <predicate>]. *)
 let restrict_step =
-  keyword "restrict" *> whitespace *> predicate
+  keyword "restrict" *> whitespace *> expression
   >>| fun parsed_predicate input ->
   Ast.Restrict { input; predicate = parsed_predicate }
 
@@ -214,7 +214,7 @@ let cross_step =
    and [oncology] don't sneakily match. *)
 let join_step =
   keyword "join" *> whitespace *> identifier >>= fun right_table ->
-  whitespace *> keyword "on" *> whitespace *> predicate
+  whitespace *> keyword "on" *> whitespace *> expression
   >>| fun parsed_predicate input ->
   Ast.Join
     {
@@ -241,7 +241,11 @@ let query =
 
 let parse input = parse_string ~consume:All query input
 
-(* Standalone predicate entry point: leading/trailing whitespace tolerated,
-   end_of_input forces full consumption. *)
-let predicate_query = whitespace *> predicate <* whitespace <* end_of_input
-let parse_predicate input = parse_string ~consume:All predicate_query input
+(* Standalone predicate entry point: parse a single expression with leading
+   and trailing whitespace tolerated; [end_of_input] forces full
+   consumption. The [parse_predicate] name reflects the role at the public
+   API -- the only callers parse expressions destined for a predicate
+   position -- while the underlying grammar is the full expression
+   sublanguage. *)
+let expression_query = whitespace *> expression <* whitespace <* end_of_input
+let parse_predicate input = parse_string ~consume:All expression_query input
