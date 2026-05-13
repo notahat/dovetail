@@ -198,18 +198,37 @@ firm; later ones are sketches and will evolve.
   supports qualified refs from slice 4, so this slice is focused on
   the join operator itself and its surface syntax (`join X on
   <pred>`).
-- **Slice 6** — Primary-key range scans (`IndexScan` physical operator).
-  First time the physical IR has a real choice; logical→physical picks
-  `IndexScan` over `FullScan` when the predicate is a PK range.
-- **Slice 7** — Secondary indexes. Catalog grows. Index maintenance on
-  fixture insertion. `IndexScan` on a secondary index.
-- **Slice 8** — `distinct`, `union`, `intersect`, `difference`. Set/bag
-  type machinery does real work.
-- **Slice 9** — Minimal SQL frontend: `SELECT cols FROM table WHERE pred`,
-  single table, no joins yet. SQL AST, SQL→logical lowering for the
-  basic shape. `option`-aware predicate translation for `IS NULL` etc.
-- **Slice 10** — SQL joins (inner only).
-- **Slice 11** — Aggregation operator (`γ`) and SQL `GROUP BY` /
+- **Slice 6** — Streaming CPS executor. Not a query-language slice;
+  an internal refactor of `Eval` to continuation-passing style so
+  storage cursors stay alive across the consumer's iteration of
+  the result. Inserted ahead of PK range scans because real-table
+  workloads were going to need streaming before the planner had to
+  start making physical-operator choices. See
+  `06-slice-6-streaming-cps-executor.md`.
+- **Slice 7** — Expression language. Generalises the predicate
+  sublanguage from a single `Compare` to an expression tree;
+  adds ordering comparisons (`<`, `<=`, `>`, `>=`), boolean
+  composition (`and`, `or`, `not`), and parentheses; renames the
+  module from `Predicate` to `Expression`. Inserted ahead of PK
+  range scans because the predicate forms needed to recognise a
+  PK range (ordering ops + `and`-conjunctions) didn't yet exist
+  in the surface language. See
+  `07-slice-7-expression-language.md`.
+- **Slice 8** — Primary-key range scans (`IndexScan` physical
+  operator). First time the physical IR has a real choice;
+  logical→physical picks `IndexScan` over `FullScan` when the
+  predicate is a PK range. (Was slice 6 in the original
+  numbering; shifted by the two detours above.)
+- **Slice 9** — Secondary indexes. Catalog grows. Index maintenance
+  on fixture insertion. `IndexScan` on a secondary index.
+- **Slice 10** — `distinct`, `union`, `intersect`, `difference`.
+  Set/bag type machinery does real work.
+- **Slice 11** — Minimal SQL frontend: `SELECT cols FROM table WHERE
+  pred`, single table, no joins yet. SQL AST, SQL→logical lowering
+  for the basic shape. `option`-aware predicate translation for
+  `IS NULL` etc.
+- **Slice 12** — SQL joins (inner only).
+- **Slice 13** — Aggregation operator (`γ`) and SQL `GROUP BY` /
   `HAVING`.
 - **Beyond** — outer joins, sort/limit, DML (probably SQL-side first),
   DDL (probably SQL-side first), more types, optimizer. Order TBD based
