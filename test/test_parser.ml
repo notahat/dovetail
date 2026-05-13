@@ -417,6 +417,87 @@ let test_pipeline_restrict_with_string_ge_yields_lex_subset () =
             ]
             rows))
 
+let test_pipeline_restrict_and_intersects () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict id > 1 and active" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Carol and Dave (id > 1 and active)"
+            [ List.nth expected_users_rows 2; List.nth expected_users_rows 3 ]
+            rows))
+
+let test_pipeline_restrict_or_unions () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match
+          Parser.parse "users | restrict name = \"Alice\" or name = \"Bob\""
+        with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Alice and Bob (union)"
+            [ List.nth expected_users_rows 0; List.nth expected_users_rows 1 ]
+            rows))
+
+let test_pipeline_restrict_and_chain_is_left_associative () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict id > 1 and id < 4 and active" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          (* id 1 < x < 4 = {2, 3}. Active among those: id 3 (Carol). *)
+          Alcotest.(check tuple_list_testable)
+            "Carol (id between 1 and 4, active)"
+            [ List.nth expected_users_rows 2 ]
+            rows))
+
+let test_pipeline_restrict_mixed_and_or_follows_precedence () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict id = 1 or id = 2 and active" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          (* Parses as [id = 1 or (id = 2 and active)]. Alice (id 1) always
+             matches; Bob (id 2, inactive) doesn't. Result: Alice only. *)
+          Alcotest.(check tuple_list_testable)
+            "Alice only (precedence)"
+            [ List.nth expected_users_rows 0 ]
+            rows))
+
 let test_pipeline_restrict_with_ordering_on_bool_raises () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -620,5 +701,16 @@ let () =
             `Quick test_pipeline_restrict_with_string_ge_yields_lex_subset;
           Alcotest.test_case "parsed restrict active > false raises naming Bool"
             `Quick test_pipeline_restrict_with_ordering_on_bool_raises;
+          Alcotest.test_case
+            "parsed restrict id > 1 and active intersects the two conditions"
+            `Quick test_pipeline_restrict_and_intersects;
+          Alcotest.test_case
+            "parsed restrict name = ... or name = ... unions the rows" `Quick
+            test_pipeline_restrict_or_unions;
+          Alcotest.test_case "parsed restrict with a left-associative and-chain"
+            `Quick test_pipeline_restrict_and_chain_is_left_associative;
+          Alcotest.test_case
+            "parsed restrict mixing and/or follows declared precedence" `Quick
+            test_pipeline_restrict_mixed_and_or_follows_precedence;
         ] );
     ]

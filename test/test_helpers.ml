@@ -123,6 +123,12 @@ let predicate_literal value : Expression.t = Literal value
 let predicate_compare ~left ~op ~right : Expression.t =
   Compare { left; op; right }
 
+(** An [Expression.t] composing two predicates with logical AND. *)
+let predicate_and ~left ~right : Expression.t = And (left, right)
+
+(** An [Expression.t] composing two predicates with logical OR. *)
+let predicate_or ~left ~right : Expression.t = Or (left, right)
+
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)
 let contains_substring haystack needle =

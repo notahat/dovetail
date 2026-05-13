@@ -10,17 +10,22 @@ type t =
   | Literal of Value.t
   | Column of Schema.column_reference
   | Compare of { left : t; op : comparison_op; right : t }
+  | And of t * t
+  | Or of t * t
 
 (* Render an expression node for inclusion in kind-mismatch error messages.
    Columns and literals get source-flavoured descriptions matching the
-   existing error wording; comparisons fall back to a generic label, since
-   the parser does not produce nested comparisons today. *)
+   existing error wording; compound nodes fall back to generic labels,
+   since the parser does not nest them inside a [Compare]'s operand
+   position today. *)
 let describe_expression = function
   | Column reference ->
       Printf.sprintf "column %S" (Schema.format_column_reference reference)
   | Literal value ->
       Printf.sprintf "literal %s" (Value.Kind.to_string (Value.kind_of value))
   | Compare _ -> "comparison expression"
+  | And _ -> "and expression"
+  | Or _ -> "or expression"
 
 (* Render a [Value.t] as a literal in source-like form: int64s as bare
    digits, strings double-quoted with no escaping, bools as the keywords
@@ -50,20 +55,74 @@ let is_ordering_op = function
   | Less | LessEqual | Greater | GreaterEqual -> true
   | Equal | NotEqual -> false
 
-let rec format formatter = function
-  | Column reference ->
-      Format.pp_print_string formatter
-        (Schema.format_column_reference reference)
-  | Literal value -> Format.pp_print_string formatter (render_literal value)
-  | Compare { left; op; right } ->
-      Format.fprintf formatter "%a %s %a" format left (render_op op) format
-        right
+(* Pretty-printer precedence levels, higher value binds tighter. The
+   formatter wraps a sub-expression in parens when its precedence is
+   below the surrounding context's minimum -- that keeps the rendering
+   unambiguous when re-parsed. *)
+let precedence_or = 1
+let precedence_and = 2
+let precedence_compare = 3
+let precedence_atom = 4
+
+let precedence_of = function
+  | Literal _ | Column _ -> precedence_atom
+  | Compare _ -> precedence_compare
+  | And _ -> precedence_and
+  | Or _ -> precedence_or
+
+(* Render [expression] inside a context that requires at least
+   [min_precedence]. Below the minimum, wrap in parens and recurse with
+   a fresh context. Above or equal, render the node directly.
+
+   For each left-associative binary operator the right operand is
+   rendered at one precedence level higher than the left, so a same-
+   precedence node on the right is parenthesised to preserve meaning
+   when re-parsed. *)
+let rec format_at min_precedence formatter expression =
+  let precedence = precedence_of expression in
+  if precedence < min_precedence then
+    Format.fprintf formatter "(%a)" (format_at 0) expression
+  else
+    match expression with
+    | Literal value -> Format.pp_print_string formatter (render_literal value)
+    | Column reference ->
+        Format.pp_print_string formatter
+          (Schema.format_column_reference reference)
+    | Compare { left; op; right } ->
+        Format.fprintf formatter "%a %s %a"
+          (format_at (precedence_compare + 1))
+          left (render_op op)
+          (format_at (precedence_compare + 1))
+          right
+    | And (left, right) ->
+        Format.fprintf formatter "%a and %a" (format_at precedence_and) left
+          (format_at (precedence_and + 1))
+          right
+    | Or (left, right) ->
+        Format.fprintf formatter "%a or %a" (format_at precedence_or) left
+          (format_at (precedence_or + 1))
+          right
+
+let format formatter expression = format_at 0 formatter expression
+
+(* Common helper for [And] and [Or]: the operator name (for the error
+   message) and the kind check on a single operand. *)
+let check_bool_operand operator_name operand kind =
+  if kind <> Value.Kind.Bool then
+    failwith
+      (Printf.sprintf "Expression.resolve: %s requires Bool operands: %s is %s"
+         operator_name
+         (describe_expression operand)
+         (Value.Kind.to_string kind))
 
 (* Walk [expression] once, producing the value-producing closure paired with
    the value's static kind. Each [Column] is resolved against [schema] here,
    so per-tuple evaluation is just an array index. Kind mismatches inside a
    [Compare] are reported here, naming both operands via
-   {!describe_expression}. *)
+   {!describe_expression}; [And]/[Or] operands are checked for {!Bool} kind
+   in the same way. Short-circuit evaluation for [And]/[Or] is built into
+   the produced closure: the right operand is only read when the left's
+   verdict doesn't determine the result. *)
 let rec resolve_value schema = function
   | Literal value ->
       let kind = Value.kind_of value in
@@ -103,6 +162,33 @@ let rec resolve_value schema = function
       in
       let read tuple =
         Value.Bool (comparator (read_left tuple) (read_right tuple))
+      in
+      (Value.Kind.Bool, read)
+  | And (left, right) ->
+      let left_kind, read_left = resolve_value schema left in
+      let right_kind, read_right = resolve_value schema right in
+      check_bool_operand "and" left left_kind;
+      check_bool_operand "and" right right_kind;
+      let read tuple =
+        (* Short-circuit: the right operand is only read when the left is
+           true. The two non-Bool cases are unreachable given the kind
+           checks above. *)
+        match read_left tuple with
+        | Value.Bool false -> Value.Bool false
+        | Value.Bool true -> read_right tuple
+        | _ -> assert false
+      in
+      (Value.Kind.Bool, read)
+  | Or (left, right) ->
+      let left_kind, read_left = resolve_value schema left in
+      let right_kind, read_right = resolve_value schema right in
+      check_bool_operand "or" left left_kind;
+      check_bool_operand "or" right right_kind;
+      let read tuple =
+        match read_left tuple with
+        | Value.Bool true -> Value.Bool true
+        | Value.Bool false -> read_right tuple
+        | _ -> assert false
       in
       (Value.Kind.Bool, read)
 

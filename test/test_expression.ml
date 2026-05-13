@@ -424,6 +424,157 @@ let test_format_greater_equal () =
   in
   Alcotest.(check string) "id >= 3" "id >= 3" rendered
 
+let test_and_returns_intersection () =
+  let matched =
+    filter_users
+      (predicate_and
+         ~left:
+           (predicate_compare ~left:(predicate_column "id") ~op:Greater
+              ~right:(predicate_literal (Value.Int64 1L)))
+         ~right:(predicate_column "active"))
+  in
+  (* id > 1 and active: ids 3 (Carol, active) and 4 (Dave, active). Id 2 is
+     active=false; id 5 is active=false. *)
+  Alcotest.(check tuple_list_testable)
+    "Carol and Dave (id > 1 and active)"
+    [ List.nth users_rows 2; List.nth users_rows 3 ]
+    matched
+
+let test_or_returns_union () =
+  let matched =
+    filter_users
+      (predicate_or
+         ~left:
+           (predicate_compare ~left:(predicate_column "name") ~op:Equal
+              ~right:(predicate_literal (Value.String "Alice")))
+         ~right:
+           (predicate_compare ~left:(predicate_column "name") ~op:Equal
+              ~right:(predicate_literal (Value.String "Bob"))))
+  in
+  Alcotest.(check tuple_list_testable)
+    "Alice and Bob"
+    [ List.nth users_rows 0; List.nth users_rows 1 ]
+    matched
+
+let test_and_short_circuits_on_false_left () =
+  (* Build [false and active]. The [active] column lives at field index 3,
+     so a tuple too short to contain index 3 would raise [Invalid_argument]
+     on array access if the resolver evaluated the right operand. Short-
+     circuit means it doesn't. *)
+  let predicate =
+    predicate_and
+      ~left:(predicate_literal (Value.Bool false))
+      ~right:(predicate_column "active")
+  in
+  let evaluator = Expression.resolve users_schema predicate in
+  let too_short_to_contain_active = [| Value.Int64 1L |] in
+  Alcotest.(check bool)
+    "short-circuits to false without reading right operand" false
+    (evaluator too_short_to_contain_active)
+
+let test_or_short_circuits_on_true_left () =
+  (* Mirror of the [and] short-circuit test: [true or active] should not
+     read the right operand. *)
+  let predicate =
+    predicate_or
+      ~left:(predicate_literal (Value.Bool true))
+      ~right:(predicate_column "active")
+  in
+  let evaluator = Expression.resolve users_schema predicate in
+  let too_short_to_contain_active = [| Value.Int64 1L |] in
+  Alcotest.(check bool)
+    "short-circuits to true without reading right operand" true
+    (evaluator too_short_to_contain_active)
+
+let test_and_with_non_bool_operand_raises () =
+  Alcotest.check_raises "non-Bool operand of and"
+    (Failure
+       "Expression.resolve: and requires Bool operands: column \"id\" is Int64")
+    (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Expression.resolve users_schema
+          (predicate_and ~left:(predicate_column "id")
+             ~right:(predicate_column "active"))
+      in
+      ())
+
+let test_or_with_non_bool_operand_raises () =
+  Alcotest.check_raises "non-Bool operand of or"
+    (Failure
+       "Expression.resolve: or requires Bool operands: column \"id\" is Int64")
+    (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Expression.resolve users_schema
+          (predicate_or
+             ~left:(predicate_column "active")
+             ~right:(predicate_column "id"))
+      in
+      ())
+
+let test_format_and_renders_with_keyword () =
+  let rendered =
+    format_to_string
+      (predicate_and
+         ~left:(predicate_column "active")
+         ~right:
+           (predicate_compare ~left:(predicate_column "id") ~op:Greater
+              ~right:(predicate_literal (Value.Int64 3L))))
+  in
+  Alcotest.(check string)
+    "and binds looser than comparison: no parens around id > 3"
+    "active and id > 3" rendered
+
+let test_format_or_renders_with_keyword () =
+  let rendered =
+    format_to_string
+      (predicate_or
+         ~left:(predicate_column "active")
+         ~right:(predicate_column "inactive_flag"))
+  in
+  Alcotest.(check string)
+    "active or inactive_flag" "active or inactive_flag" rendered
+
+let test_format_and_inside_or_omits_parens () =
+  (* [a or (b and c)] is the tree the parser builds for "a or b and c". The
+     formatter should preserve the source form: no parens around the [and]
+     because [and] binds tighter than [or]. *)
+  let rendered =
+    format_to_string
+      (predicate_or ~left:(predicate_column "a")
+         ~right:
+           (predicate_and ~left:(predicate_column "b")
+              ~right:(predicate_column "c")))
+  in
+  Alcotest.(check string) "a or b and c" "a or b and c" rendered
+
+let test_format_or_inside_and_uses_parens () =
+  (* [(a or b) and c] forces parens around the [or] because [and] binds
+     tighter; without parens the rendering would re-parse as
+     [a or (b and c)]. *)
+  let rendered =
+    format_to_string
+      (predicate_and
+         ~left:
+           (predicate_or ~left:(predicate_column "a")
+              ~right:(predicate_column "b"))
+         ~right:(predicate_column "c"))
+  in
+  Alcotest.(check string) "(a or b) and c" "(a or b) and c" rendered
+
+let test_format_and_right_associated_uses_parens () =
+  (* Source [a and b and c] is parsed left-associatively, yielding
+     [And (And a b) c]. The right-associated tree [And a (And b c)] is
+     legal but doesn't come out of the parser; the formatter still
+     handles it by parenthesising the right operand to preserve meaning. *)
+  let rendered =
+    format_to_string
+      (predicate_and ~left:(predicate_column "a")
+         ~right:
+           (predicate_and ~left:(predicate_column "b")
+              ~right:(predicate_column "c")))
+  in
+  Alcotest.(check string) "a and (b and c)" "a and (b and c)" rendered
+
 let test_format_qualified_columns_use_dot_form () =
   let rendered =
     format_to_string
@@ -481,6 +632,13 @@ let () =
             `Quick test_string_greater_or_equal_orders_lexicographically;
           Alcotest.test_case "string less-than orders lexicographically" `Quick
             test_string_less_than_orders_lexicographically;
+          Alcotest.test_case "and returns the intersection" `Quick
+            test_and_returns_intersection;
+          Alcotest.test_case "or returns the union" `Quick test_or_returns_union;
+          Alcotest.test_case "and short-circuits when the left is false" `Quick
+            test_and_short_circuits_on_false_left;
+          Alcotest.test_case "or short-circuits when the left is true" `Quick
+            test_or_short_circuits_on_true_left;
         ] );
       ( "errors",
         [
@@ -504,6 +662,11 @@ let () =
           Alcotest.test_case
             "ordering operator on Bool operands raises naming the kind" `Quick
             test_ordering_on_bool_column_raises;
+          Alcotest.test_case
+            "and with a non-Bool operand raises naming the kind" `Quick
+            test_and_with_non_bool_operand_raises;
+          Alcotest.test_case "or with a non-Bool operand raises naming the kind"
+            `Quick test_or_with_non_bool_operand_raises;
         ] );
       ( "format",
         [
@@ -529,5 +692,18 @@ let () =
             test_format_greater_than;
           Alcotest.test_case "greater-or-equal renders with >=" `Quick
             test_format_greater_equal;
+          Alcotest.test_case "and renders with the keyword" `Quick
+            test_format_and_renders_with_keyword;
+          Alcotest.test_case "or renders with the keyword" `Quick
+            test_format_or_renders_with_keyword;
+          Alcotest.test_case
+            "and inside or omits parens because and binds tighter" `Quick
+            test_format_and_inside_or_omits_parens;
+          Alcotest.test_case
+            "or inside and is parenthesised because and binds tighter" `Quick
+            test_format_or_inside_and_uses_parens;
+          Alcotest.test_case
+            "right-associated and is parenthesised to preserve meaning" `Quick
+            test_format_and_right_associated_uses_parens;
         ] );
     ]

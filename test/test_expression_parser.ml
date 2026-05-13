@@ -146,6 +146,76 @@ let test_qualified_column_against_qualified_column () =
        ~op:Equal
        ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id"))
 
+let test_and_of_two_columns () =
+  parses_predicate "active and inactive_flag"
+    (predicate_and
+       ~left:(predicate_column "active")
+       ~right:(predicate_column "inactive_flag"))
+
+let test_or_of_two_columns () =
+  parses_predicate "active or inactive_flag"
+    (predicate_or
+       ~left:(predicate_column "active")
+       ~right:(predicate_column "inactive_flag"))
+
+let test_and_chain_is_left_associative () =
+  parses_predicate "a and b and c"
+    (predicate_and
+       ~left:
+         (predicate_and ~left:(predicate_column "a")
+            ~right:(predicate_column "b"))
+       ~right:(predicate_column "c"))
+
+let test_or_chain_is_left_associative () =
+  parses_predicate "a or b or c"
+    (predicate_or
+       ~left:
+         (predicate_or ~left:(predicate_column "a")
+            ~right:(predicate_column "b"))
+       ~right:(predicate_column "c"))
+
+let test_and_binds_tighter_than_or () =
+  (* Plan precedence: [or] is the loosest, [and] sits between [or] and
+     comparison. [a or b and c] should parse as [a or (b and c)]. *)
+  parses_predicate "a or b and c"
+    (predicate_or ~left:(predicate_column "a")
+       ~right:
+         (predicate_and ~left:(predicate_column "b")
+            ~right:(predicate_column "c")))
+
+let test_comparison_binds_tighter_than_and () =
+  (* [id = 1 and active] should parse with the comparison on the left side
+     of [and] -- not as [id = (1 and active)]. *)
+  parses_predicate "id = 1 and active"
+    (predicate_and
+       ~left:
+         (predicate_compare ~left:(predicate_column "id") ~op:Equal
+            ~right:(predicate_literal (Value.Int64 1L)))
+       ~right:(predicate_column "active"))
+
+let test_mixed_and_or_with_comparison () =
+  (* Worked through in the slice plan: [id = 1 or id = 2 and active]
+     parses as [id = 1 or (id = 2 and active)] because [and] binds
+     tighter than [or]. *)
+  parses_predicate "id = 1 or id = 2 and active"
+    (predicate_or
+       ~left:
+         (predicate_compare ~left:(predicate_column "id") ~op:Equal
+            ~right:(predicate_literal (Value.Int64 1L)))
+       ~right:
+         (predicate_and
+            ~left:
+              (predicate_compare ~left:(predicate_column "id") ~op:Equal
+                 ~right:(predicate_literal (Value.Int64 2L)))
+            ~right:(predicate_column "active")))
+
+let test_keyword_prefix_is_a_column_name () =
+  (* [andante] starts with "and" but is a single identifier, so the parser
+     must not mistake it for the [and] keyword. With no [and] in sight,
+     [active andante] is two adjacent column references and rejects. *)
+  rejects_predicate "active andante";
+  rejects_predicate "active ornate"
+
 let test_rejects_dot_with_whitespace () =
   (* The dot in a qualified reference must have no whitespace around it, so
      the syntax stays disjoint from a future floating-point literal. *)
@@ -214,6 +284,22 @@ let () =
           Alcotest.test_case "id > 3 (greater-than)" `Quick test_greater_than;
           Alcotest.test_case "id >= 3 (greater-or-equal)" `Quick
             test_greater_or_equal;
+          Alcotest.test_case "and of two columns" `Quick test_and_of_two_columns;
+          Alcotest.test_case "or of two columns" `Quick test_or_of_two_columns;
+          Alcotest.test_case "and chains left-associatively" `Quick
+            test_and_chain_is_left_associative;
+          Alcotest.test_case "or chains left-associatively" `Quick
+            test_or_chain_is_left_associative;
+          Alcotest.test_case "and binds tighter than or" `Quick
+            test_and_binds_tighter_than_or;
+          Alcotest.test_case "comparison binds tighter than and" `Quick
+            test_comparison_binds_tighter_than_and;
+          Alcotest.test_case
+            "mixed and/or with comparisons follows declared precedence" `Quick
+            test_mixed_and_or_with_comparison;
+          Alcotest.test_case
+            "identifier with an and/or-keyword prefix is a column reference"
+            `Quick test_keyword_prefix_is_a_column_name;
         ] );
       ( "rejection",
         [

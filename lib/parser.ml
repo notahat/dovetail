@@ -125,18 +125,41 @@ let term =
       <|> (column_reference >>| fun reference -> Expression.Column reference)
   | _ -> fail "expected a column reference or literal"
 
-(* The predicate grammar: a term, optionally followed by a comparison
-   operator and another term. With the slice-7-step-2 IR generalisation,
-   the term alone is a valid predicate when its kind is Bool (e.g. [restrict
-   active]); the kind check happens at resolve time, not at parse time, so
-   the parser accepts any standalone term here. *)
-let predicate =
+(* A comparison atom: a term, optionally followed by a comparison operator
+   and another term. With slice-7 step 2 the term alone is a valid
+   expression; the kind check happens at resolve time, not at parse time,
+   so the parser accepts any standalone term here. *)
+let comparison_expression =
   term >>= fun left ->
   let with_comparison =
     whitespace *> comparison_op >>= fun op ->
     whitespace *> term >>| fun right -> Expression.Compare { left; op; right }
   in
   with_comparison <|> return left
+
+(* An [and]-chain: one or more comparison atoms joined by the [and]
+   keyword, left-associative. The chain is folded left so [a and b and c]
+   parses as [And (And (a, b), c)]. *)
+let and_expression =
+  comparison_expression >>= fun first ->
+  many (whitespace *> keyword "and" *> whitespace *> comparison_expression)
+  >>| fun rest ->
+  List.fold_left
+    (fun accumulator next -> Expression.And (accumulator, next))
+    first rest
+
+(* An [or]-chain: one or more [and]-chains joined by the [or] keyword,
+   left-associative. [or] is the loosest precedence in the predicate
+   grammar, so the top-level predicate parser is just this. *)
+let or_expression =
+  and_expression >>= fun first ->
+  many (whitespace *> keyword "or" *> whitespace *> and_expression)
+  >>| fun rest ->
+  List.fold_left
+    (fun accumulator next -> Expression.Or (accumulator, next))
+    first rest
+
+let predicate = or_expression
 
 (* The slice-3 projection grammar: one column reference followed by zero or
    more [, column-reference] tails. Whitespace is flexible around the comma.
