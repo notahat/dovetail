@@ -1,23 +1,22 @@
 (** Expression tree used in predicate positions across the IRs.
 
     An [Expression.t] is an algebraic expression that produces a {!Value.t} when
-    evaluated against a {!Schema.tuple}: a literal, a column reference, or a
-    comparison of two sub-expressions. Both {!Logical.Restrict} and
-    {!Physical.Filter} carry an [Expression.t]; the expression refers to columns
-    by name so it stays human-readable for debugging and EXPLAIN-style
-    introspection. Mapping names to tuple positions is an executor concern,
-    handled by {!resolve}.
+    evaluated against a {!Schema.tuple}. The tree's leaves are literals and
+    column references; its internal nodes are comparisons and boolean
+    composition ([and], [or], [not]). Column references carry a
+    {!Schema.column_reference} so a qualifier (set when a cross product or join
+    exposes same-named columns from different inputs) is preserved end to end.
+
+    Both {!Logical.Restrict} and {!Physical.Filter} carry an [Expression.t];
+    expressions refer to columns by name so they stay human-readable for
+    debugging and EXPLAIN-style introspection. Mapping names to tuple positions
+    is an executor concern, handled by {!resolve}.
 
     "Predicate" is the role an expression plays at the top of a
     {!Logical.Restrict} or {!Physical.Filter}: it must resolve to a value of
-    kind {!Value.Kind.Bool}. {!resolve} enforces that.
-
-    Slice 4 step 3 introduced {!Schema.column_reference} for column nodes so the
-    qualifier (set when a cross product or join exposes same-named columns from
-    different inputs) is carried end to end. Slice 7 step 2 generalised the IR
-    from a single comparison to the tree below. Boolean composition
-    (and/or/not), ordering comparisons, and parens arrive in later slice-7
-    steps. *)
+    kind {!Value.Kind.Bool}. {!resolve} enforces that, so a standalone
+    [Bool]-kinded column or literal is a valid predicate ([restrict active])
+    while a non-[Bool] expression at that position is rejected. *)
 
 (** Comparison operator.
 
