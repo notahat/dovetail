@@ -477,6 +477,31 @@ let test_pipeline_restrict_and_chain_is_left_associative () =
             [ List.nth expected_users_rows 2 ]
             rows))
 
+let test_pipeline_restrict_parens_override_precedence () =
+  (* Without parens [id = 1 or id = 2 and active] keeps Alice only (because
+     [and] binds tighter than [or]). With parens forcing the [or] first,
+     the [and active] filter applies to both ids -- and Bob (id 2,
+     inactive) drops out, leaving just Alice. The test isn't a strong
+     differentiator on its own; pair it with the precedence test for the
+     unparenthesised form below. *)
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict (id = 1 or id = 2) and active" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Alice only ((id = 1 or id = 2) and active)"
+            [ List.nth expected_users_rows 0 ]
+            rows))
+
 let test_pipeline_restrict_mixed_and_or_follows_precedence () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
@@ -712,5 +737,7 @@ let () =
           Alcotest.test_case
             "parsed restrict mixing and/or follows declared precedence" `Quick
             test_pipeline_restrict_mixed_and_or_follows_precedence;
+          Alcotest.test_case "parsed restrict with parens overriding precedence"
+            `Quick test_pipeline_restrict_parens_override_precedence;
         ] );
     ]

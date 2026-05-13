@@ -11,6 +11,16 @@ open Test_helpers
 let predicate_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<predicate>")) ( = )
 
+(* Render an [Expression.t] to a string via [Expression.format]. Local to
+   this file so the round-trip test below doesn't have to reach into
+   [test_expression.ml]. *)
+let format_to_string expression =
+  let buffer = Buffer.create 64 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Expression.format formatter expression;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
 let parses_predicate input expected =
   match Parser.parse_predicate input with
   | Ok predicate ->
@@ -209,6 +219,55 @@ let test_mixed_and_or_with_comparison () =
                  ~right:(predicate_literal (Value.Int64 2L)))
             ~right:(predicate_column "active")))
 
+let test_parens_override_precedence () =
+  (* Without parens [a or b and c] parses as [a or (b and c)] because [and]
+     binds tighter. Parens around [a or b] flip that grouping. *)
+  parses_predicate "(a or b) and c"
+    (predicate_and
+       ~left:
+         (predicate_or ~left:(predicate_column "a")
+            ~right:(predicate_column "b"))
+       ~right:(predicate_column "c"))
+
+let test_redundant_parens_are_accepted () =
+  parses_predicate "((id = 1))"
+    (predicate_compare ~left:(predicate_column "id") ~op:Equal
+       ~right:(predicate_literal (Value.Int64 1L)))
+
+let test_parens_tolerate_whitespace_inside () =
+  parses_predicate "(  id = 1  )"
+    (predicate_compare ~left:(predicate_column "id") ~op:Equal
+       ~right:(predicate_literal (Value.Int64 1L)))
+
+let test_parens_around_an_atom () =
+  parses_predicate "(active)" (predicate_column "active")
+
+let test_format_parse_roundtrip_through_mixed_logic () =
+  (* The formatter inserts parens only where precedence would change
+     meaning. Re-parsing the formatted string should reproduce the
+     original tree -- a useful end-to-end invariant for the formatter. *)
+  let original =
+    predicate_and
+      ~left:
+        (predicate_or
+           ~left:
+             (predicate_compare ~left:(predicate_column "id") ~op:Equal
+                ~right:(predicate_literal (Value.Int64 1L)))
+           ~right:
+             (predicate_compare ~left:(predicate_column "id") ~op:Equal
+                ~right:(predicate_literal (Value.Int64 2L))))
+      ~right:(predicate_column "active")
+  in
+  let formatted = format_to_string original in
+  Alcotest.(check string)
+    "formatted form includes parens only where needed"
+    "(id = 1 or id = 2) and active" formatted;
+  parses_predicate formatted original
+
+let test_rejects_open_paren_alone () = rejects_predicate "("
+let test_rejects_unclosed_paren () = rejects_predicate "(a or b"
+let test_rejects_orphan_close_paren () = rejects_predicate ")"
+
 let test_keyword_prefix_is_a_column_name () =
   (* [andante] starts with "and" but is a single identifier, so the parser
      must not mistake it for the [and] keyword. With no [and] in sight,
@@ -300,6 +359,17 @@ let () =
           Alcotest.test_case
             "identifier with an and/or-keyword prefix is a column reference"
             `Quick test_keyword_prefix_is_a_column_name;
+          Alcotest.test_case "parens override precedence" `Quick
+            test_parens_override_precedence;
+          Alcotest.test_case "redundant parens are accepted" `Quick
+            test_redundant_parens_are_accepted;
+          Alcotest.test_case "parens tolerate whitespace inside" `Quick
+            test_parens_tolerate_whitespace_inside;
+          Alcotest.test_case "parens around an atom" `Quick
+            test_parens_around_an_atom;
+          Alcotest.test_case
+            "format then parse round-trips a mixed and/or expression" `Quick
+            test_format_parse_roundtrip_through_mixed_logic;
         ] );
       ( "rejection",
         [
@@ -318,5 +388,11 @@ let () =
           Alcotest.test_case
             "rejects qualified-reference dot with whitespace around it" `Quick
             test_rejects_dot_with_whitespace;
+          Alcotest.test_case "rejects open paren alone" `Quick
+            test_rejects_open_paren_alone;
+          Alcotest.test_case "rejects unclosed paren" `Quick
+            test_rejects_unclosed_paren;
+          Alcotest.test_case "rejects orphan close paren" `Quick
+            test_rejects_orphan_close_paren;
         ] );
     ]

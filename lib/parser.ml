@@ -104,62 +104,68 @@ let column_reference =
       ({ qualifier = Some first; name = second } : Schema.column_reference)
   | _ -> return ({ qualifier = None; name = first } : Schema.column_reference)
 
-(* A single atom of the expression grammar: a literal or a column reference,
-   produced as an [Expression.t]. The bool literals [true] and [false] are
-   spelled with letters that would otherwise start an identifier, so when
-   the input starts with a letter we try the bool literal first and fall
-   back to the column-reference parser. The bool parser uses [keyword],
-   which requires a word break after the literal text, so [trueish] cleanly
-   falls through to the column-reference branch. *)
-let term =
-  peek_char >>= function
-  | Some '"' ->
-      string_literal >>| fun literal_value -> Expression.Literal literal_value
-  | Some '-' ->
-      int64_literal >>| fun literal_value -> Expression.Literal literal_value
-  | Some character when is_digit character ->
-      int64_literal >>| fun literal_value -> Expression.Literal literal_value
-  | Some character when is_letter character ->
-      bool_literal
-      >>| (fun literal_value -> Expression.Literal literal_value)
-      <|> (column_reference >>| fun reference -> Expression.Column reference)
-  | _ -> fail "expected a column reference or literal"
-
-(* A comparison atom: a term, optionally followed by a comparison operator
-   and another term. With slice-7 step 2 the term alone is a valid
-   expression; the kind check happens at resolve time, not at parse time,
-   so the parser accepts any standalone term here. *)
-let comparison_expression =
-  term >>= fun left ->
-  let with_comparison =
-    whitespace *> comparison_op >>= fun op ->
-    whitespace *> term >>| fun right -> Expression.Compare { left; op; right }
-  in
-  with_comparison <|> return left
-
-(* An [and]-chain: one or more comparison atoms joined by the [and]
-   keyword, left-associative. The chain is folded left so [a and b and c]
-   parses as [And (And (a, b), c)]. *)
-let and_expression =
-  comparison_expression >>= fun first ->
-  many (whitespace *> keyword "and" *> whitespace *> comparison_expression)
-  >>| fun rest ->
-  List.fold_left
-    (fun accumulator next -> Expression.And (accumulator, next))
-    first rest
-
-(* An [or]-chain: one or more [and]-chains joined by the [or] keyword,
-   left-associative. [or] is the loosest precedence in the predicate
-   grammar, so the top-level predicate parser is just this. *)
-let or_expression =
-  and_expression >>= fun first ->
-  many (whitespace *> keyword "or" *> whitespace *> and_expression)
-  >>| fun rest ->
-  List.fold_left
-    (fun accumulator next -> Expression.Or (accumulator, next))
-    first rest
-
-let predicate = or_expression
+(* The predicate grammar, built bottom-up inside [fix] so the atom can
+   recurse into the full expression via parens. Top-level layering, from
+   loosest to tightest precedence, is [or_expression], [and_expression],
+   [comparison_expression], and the atomic [term]. Parens around an
+   expression appear in the atom position. *)
+let predicate =
+  fix (fun predicate ->
+      (* A single atom: a literal, a column reference, or a parenthesised
+       sub-expression. The bool literals [true] and [false] are spelled
+       with letters that would otherwise start an identifier, so when
+       the input starts with a letter we try the bool literal first and
+       fall back to the column-reference parser. *)
+      let term =
+        peek_char >>= function
+        | Some '"' ->
+            string_literal >>| fun literal_value ->
+            Expression.Literal literal_value
+        | Some '-' ->
+            int64_literal >>| fun literal_value ->
+            Expression.Literal literal_value
+        | Some character when is_digit character ->
+            int64_literal >>| fun literal_value ->
+            Expression.Literal literal_value
+        | Some character when is_letter character ->
+            bool_literal
+            >>| (fun literal_value -> Expression.Literal literal_value)
+            <|> ( column_reference >>| fun reference ->
+                  Expression.Column reference )
+        | Some '(' ->
+            char '(' *> whitespace *> predicate <* whitespace <* char ')'
+        | _ -> fail "expected a column reference, literal, or '('"
+      in
+      (* A comparison atom: a term, optionally followed by a comparison
+       operator and another term. The term alone is a valid expression;
+       the kind check happens at resolve time, not at parse time. *)
+      let comparison_expression =
+        term >>= fun left ->
+        let with_comparison =
+          whitespace *> comparison_op >>= fun op ->
+          whitespace *> term >>| fun right ->
+          Expression.Compare { left; op; right }
+        in
+        with_comparison <|> return left
+      in
+      (* An [and]-chain: one or more comparison atoms joined by the [and]
+       keyword, left-associative. *)
+      let and_expression =
+        comparison_expression >>= fun first ->
+        many (whitespace *> keyword "and" *> whitespace *> comparison_expression)
+        >>| fun rest ->
+        List.fold_left
+          (fun accumulator next -> Expression.And (accumulator, next))
+          first rest
+      in
+      (* The top of the predicate grammar: one or more [and]-chains joined
+       by the [or] keyword, left-associative. *)
+      and_expression >>= fun first ->
+      many (whitespace *> keyword "or" *> whitespace *> and_expression)
+      >>| fun rest ->
+      List.fold_left
+        (fun accumulator next -> Expression.Or (accumulator, next))
+        first rest)
 
 (* The slice-3 projection grammar: one column reference followed by zero or
    more [, column-reference] tails. Whitespace is flexible around the comma.
