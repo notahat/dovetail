@@ -28,8 +28,8 @@ let test_pipeline_yields_fixture_rows () =
             "five rows from AST" expected_users_rows rows))
 
 let id_equals_three =
-  predicate_compare ~left:(predicate_column "id") ~op:Equal
-    ~right:(predicate_literal (Value.Int64 3L))
+  expression_compare ~left:(expression_column "id") ~op:Equal
+    ~right:(expression_literal (Value.Int64 3L))
 
 let test_restrict_lowers_to_logical_restrict () =
   let ast =
@@ -116,10 +116,10 @@ let test_cross_product_lowers_to_logical_cross_product () =
     logical
 
 let users_id_equals_orders_user_id =
-  predicate_compare
-    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+  expression_compare
+    ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
     ~op:Equal
-    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
+    ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let test_join_lowers_to_restrict_over_cross_product () =
   let ast =

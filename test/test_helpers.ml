@@ -8,8 +8,8 @@
     - Fixture-row constants matching what {!Fixture.populate_if_empty} writes,
       for tests that need to compare query results against a single shared
       expectation.
-    - [Expression.t] constructors ({!predicate_column}, {!predicate_compare}, …)
-      that read close to the predicate's source form at the call site.
+    - [Expression.t] constructors ({!expression_column}, {!expression_compare},
+      …) that read close to the expression's source form at the call site.
     - Pipeline-integration helpers ({!with_query_result}, {!with_query_failure})
       that run a query through parse / lower / translate / eval, so end-to-end
       tests don't have to restate the boilerplate. *)
@@ -118,29 +118,29 @@ let qualified_column_reference ~qualifier ~name : Schema.column_reference =
   { qualifier = Some qualifier; name }
 
 (** An [Expression.t] referring to a bare (unqualified) column. *)
-let predicate_column name : Expression.t = Column (column_reference name)
+let expression_column name : Expression.t = Column (column_reference name)
 
 (** An [Expression.t] referring to a qualified column. *)
-let predicate_qualified_column ~qualifier ~name : Expression.t =
+let expression_qualified_column ~qualifier ~name : Expression.t =
   Column (qualified_column_reference ~qualifier ~name)
 
 (** An [Expression.t] wrapping a literal value. *)
-let predicate_literal value : Expression.t = Literal value
+let expression_literal value : Expression.t = Literal value
 
 (** An [Expression.t] comparing two sub-expressions. The keyword arguments
-    mirror the record fields so the call site reads close to the predicate's
+    mirror the record fields so the call site reads close to the expression's
     source form. *)
-let predicate_compare ~left ~op ~right : Expression.t =
+let expression_compare ~left ~op ~right : Expression.t =
   Compare { left; op; right }
 
-(** An [Expression.t] composing two predicates with logical AND. *)
-let predicate_and ~left ~right : Expression.t = And (left, right)
+(** An [Expression.t] composing two sub-expressions with logical AND. *)
+let expression_and ~left ~right : Expression.t = And (left, right)
 
-(** An [Expression.t] composing two predicates with logical OR. *)
-let predicate_or ~left ~right : Expression.t = Or (left, right)
+(** An [Expression.t] composing two sub-expressions with logical OR. *)
+let expression_or ~left ~right : Expression.t = Or (left, right)
 
-(** An [Expression.t] negating a predicate. *)
-let predicate_not operand : Expression.t = Not operand
+(** An [Expression.t] negating a sub-expression. *)
+let expression_not operand : Expression.t = Not operand
 
 (** [with_query_result query check_rows] runs [query] through the full parse /
     lower / translate / eval pipeline against the standard fixture and calls

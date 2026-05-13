@@ -48,8 +48,8 @@ let filter_orders predicate =
 let test_equality_on_int64_column () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "id") ~op:Equal
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:Equal
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check int) "one row with id = 3" 1 (List.length matched);
   Alcotest.(check tuple_list_testable)
@@ -60,8 +60,8 @@ let test_equality_on_int64_column () =
 let test_equality_on_string_column () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "name") ~op:Equal
-         ~right:(predicate_literal (Value.String "Alice")))
+      (expression_compare ~left:(expression_column "name") ~op:Equal
+         ~right:(expression_literal (Value.String "Alice")))
   in
   Alcotest.(check tuple_list_testable)
     "row is Alice's"
@@ -71,18 +71,18 @@ let test_equality_on_string_column () =
 let test_equality_on_bool_column () =
   let matched =
     filter_users
-      (predicate_compare
-         ~left:(predicate_column "active")
+      (expression_compare
+         ~left:(expression_column "active")
          ~op:Equal
-         ~right:(predicate_literal (Value.Bool true)))
+         ~right:(expression_literal (Value.Bool true)))
   in
   Alcotest.(check int) "three active rows" 3 (List.length matched)
 
 let test_inequality_on_int64_column () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:NotEqual
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check int) "four rows with id <> 3" 4 (List.length matched)
 
@@ -92,19 +92,19 @@ let test_predicate_on_non_first_column_uses_correct_position () =
      mismatch -- so this test pins the position-cache behaviour. *)
   let matched =
     filter_users
-      (predicate_compare
-         ~left:(predicate_column "active")
+      (expression_compare
+         ~left:(expression_column "active")
          ~op:Equal
-         ~right:(predicate_literal (Value.Bool false)))
+         ~right:(expression_literal (Value.Bool false)))
   in
   Alcotest.(check int) "two inactive rows" 2 (List.length matched)
 
 let test_literal_on_left_and_column_on_right () =
   let matched =
     filter_users
-      (predicate_compare
-         ~left:(predicate_literal (Value.Int64 3L))
-         ~op:Equal ~right:(predicate_column "id"))
+      (expression_compare
+         ~left:(expression_literal (Value.Int64 3L))
+         ~op:Equal ~right:(expression_column "id"))
   in
   Alcotest.(check tuple_list_testable)
     "row is Carol's"
@@ -115,8 +115,8 @@ let test_column_equals_column_on_users_finds_no_matches () =
   (* No user has [name = email]; the predicate should match zero rows. *)
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "name") ~op:Equal
-         ~right:(predicate_column "email"))
+      (expression_compare ~left:(expression_column "name") ~op:Equal
+         ~right:(expression_column "email"))
   in
   Alcotest.(check tuple_list_testable) "no rows" [] matched
 
@@ -124,8 +124,8 @@ let test_column_equals_column_on_orders_finds_self_referential_rows () =
   (* In the orders fixture, only [(1, 1, ...)] has [id = user_id]. *)
   let matched =
     filter_orders
-      (predicate_compare ~left:(predicate_column "id") ~op:Equal
-         ~right:(predicate_column "user_id"))
+      (expression_compare ~left:(expression_column "id") ~op:Equal
+         ~right:(expression_column "user_id"))
   in
   Alcotest.(check tuple_list_testable)
     "single row where id = user_id"
@@ -136,16 +136,16 @@ let test_column_inequality_on_orders () =
   (* Five orders rows have [id <> user_id]; only the first has them equal. *)
   let matched =
     filter_orders
-      (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
-         ~right:(predicate_column "user_id"))
+      (expression_compare ~left:(expression_column "id") ~op:NotEqual
+         ~right:(expression_column "user_id"))
   in
   Alcotest.(check int) "five rows with id <> user_id" 5 (List.length matched)
 
 let test_int64_less_than_yields_lower_subset () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "id") ~op:Less
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:Less
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "ids strictly less than 3"
@@ -155,8 +155,8 @@ let test_int64_less_than_yields_lower_subset () =
 let test_int64_less_or_equal_yields_lower_inclusive () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "id") ~op:LessEqual
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:LessEqual
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "ids less than or equal to 3"
@@ -166,8 +166,8 @@ let test_int64_less_or_equal_yields_lower_inclusive () =
 let test_int64_greater_than_yields_upper_subset () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "id") ~op:Greater
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:Greater
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "ids strictly greater than 3"
@@ -177,8 +177,8 @@ let test_int64_greater_than_yields_upper_subset () =
 let test_int64_greater_or_equal_yields_upper_inclusive () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "id") ~op:GreaterEqual
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "ids greater than or equal to 3"
@@ -190,8 +190,8 @@ let test_string_greater_or_equal_orders_lexicographically () =
      start with letters before 'C', so they're excluded. *)
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "name") ~op:GreaterEqual
-         ~right:(predicate_literal (Value.String "C")))
+      (expression_compare ~left:(expression_column "name") ~op:GreaterEqual
+         ~right:(expression_literal (Value.String "C")))
   in
   Alcotest.(check tuple_list_testable)
     "names lexicographically >= \"C\""
@@ -201,8 +201,8 @@ let test_string_greater_or_equal_orders_lexicographically () =
 let test_string_less_than_orders_lexicographically () =
   let matched =
     filter_users
-      (predicate_compare ~left:(predicate_column "name") ~op:Less
-         ~right:(predicate_literal (Value.String "C")))
+      (expression_compare ~left:(expression_column "name") ~op:Less
+         ~right:(expression_literal (Value.String "C")))
   in
   Alcotest.(check tuple_list_testable)
     "names lexicographically < \"C\""
@@ -213,7 +213,9 @@ let test_bare_bool_column_resolves_as_predicate () =
   (* Slice 7 step 2 generalises the IR so a standalone column is a valid
      expression. A Bool-kinded column resolves directly as a predicate;
      each row's verdict equals its [active] flag. *)
-  let evaluator = Expression.resolve users_schema (predicate_column "active") in
+  let evaluator =
+    Expression.resolve users_schema (expression_column "active")
+  in
   let verdicts = List.map evaluator users_rows in
   Alcotest.(check (list bool))
     "predicate verdict tracks the active column"
@@ -224,7 +226,7 @@ let test_bare_bool_literal_resolves_as_predicate () =
   (* A standalone Bool literal is a valid (degenerate) predicate; the
      verdict is constant across all rows. *)
   let always_true =
-    Expression.resolve users_schema (predicate_literal (Value.Bool true))
+    Expression.resolve users_schema (expression_literal (Value.Bool true))
   in
   Alcotest.(check bool)
     "true literal is true for every row" true
@@ -235,10 +237,10 @@ let test_qualified_column_resolves_identically_to_unqualified () =
      column reference. Same row count, same result. *)
   let matched =
     filter_users
-      (predicate_compare
-         ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+      (expression_compare
+         ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
          ~op:Equal
-         ~right:(predicate_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check tuple_list_testable)
     "Carol's row from qualified id"
@@ -250,10 +252,10 @@ let test_unknown_qualifier_raises () =
     (Failure "Expression.resolve: unknown column \"orders.id\"") (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_compare
-             ~left:(predicate_qualified_column ~qualifier:"orders" ~name:"id")
+          (expression_compare
+             ~left:(expression_qualified_column ~qualifier:"orders" ~name:"id")
              ~op:Equal
-             ~right:(predicate_literal (Value.Int64 3L)))
+             ~right:(expression_literal (Value.Int64 3L)))
       in
       ())
 
@@ -262,10 +264,10 @@ let test_unknown_column_on_left_raises () =
     (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_compare
-             ~left:(predicate_column "unknown_col")
+          (expression_compare
+             ~left:(expression_column "unknown_col")
              ~op:Equal
-             ~right:(predicate_literal (Value.Int64 3L)))
+             ~right:(expression_literal (Value.Int64 3L)))
       in
       ())
 
@@ -274,8 +276,8 @@ let test_unknown_column_on_right_raises () =
     (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_compare ~left:(predicate_column "id") ~op:Equal
-             ~right:(predicate_column "unknown_col"))
+          (expression_compare ~left:(expression_column "id") ~op:Equal
+             ~right:(expression_column "unknown_col"))
       in
       ())
 
@@ -286,8 +288,8 @@ let test_type_mismatch_column_vs_literal_raises () =
         Int64 is Int64") (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_compare ~left:(predicate_column "name") ~op:Equal
-             ~right:(predicate_literal (Value.Int64 1L)))
+          (expression_compare ~left:(expression_column "name") ~op:Equal
+             ~right:(expression_literal (Value.Int64 1L)))
       in
       ())
 
@@ -300,10 +302,10 @@ let test_ordering_on_bool_column_raises () =
     (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_compare
-             ~left:(predicate_column "active")
+          (expression_compare
+             ~left:(expression_column "active")
              ~op:Greater
-             ~right:(predicate_literal (Value.Bool false)))
+             ~right:(expression_literal (Value.Bool false)))
       in
       ())
 
@@ -315,7 +317,7 @@ let test_non_bool_predicate_raises () =
     (Failure "Expression.resolve: predicate position requires Bool, got Int64")
     (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema (predicate_column "id")
+        Expression.resolve users_schema (expression_column "id")
       in
       ())
 
@@ -325,7 +327,7 @@ let test_non_bool_literal_predicate_raises () =
     (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_literal (Value.String "hello"))
+          (expression_literal (Value.String "hello"))
       in
       ())
 
@@ -336,8 +338,8 @@ let test_type_mismatch_column_vs_column_raises () =
         \"name\" is String") (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_compare ~left:(predicate_column "id") ~op:Equal
-             ~right:(predicate_column "name"))
+          (expression_compare ~left:(expression_column "id") ~op:Equal
+             ~right:(expression_column "name"))
       in
       ())
 
@@ -351,16 +353,16 @@ let format_to_string predicate =
 let test_format_column_equals_int64_literal () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "id") ~op:Equal
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:Equal
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check string) "id = 3" "id = 3" rendered
 
 let test_format_column_equals_string_literal_quotes_string () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "name") ~op:Equal
-         ~right:(predicate_literal (Value.String "Alice")))
+      (expression_compare ~left:(expression_column "name") ~op:Equal
+         ~right:(expression_literal (Value.String "Alice")))
   in
   Alcotest.(check string)
     "string literal is double-quoted" "name = \"Alice\"" rendered
@@ -368,70 +370,70 @@ let test_format_column_equals_string_literal_quotes_string () =
 let test_format_column_equals_bool_literal () =
   let rendered =
     format_to_string
-      (predicate_compare
-         ~left:(predicate_column "active")
+      (expression_compare
+         ~left:(expression_column "active")
          ~op:Equal
-         ~right:(predicate_literal (Value.Bool true)))
+         ~right:(expression_literal (Value.Bool true)))
   in
   Alcotest.(check string) "bool literal as keyword" "active = true" rendered
 
 let test_format_inequality_uses_angle_brackets () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:NotEqual
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check string) "id <> 3" "id <> 3" rendered
 
 let test_format_bare_column_renders_as_column_name () =
-  let rendered = format_to_string (predicate_column "active") in
+  let rendered = format_to_string (expression_column "active") in
   Alcotest.(check string) "bare column renders as its name" "active" rendered
 
 let test_format_bare_literal_renders_as_literal () =
-  let rendered = format_to_string (predicate_literal (Value.Bool true)) in
+  let rendered = format_to_string (expression_literal (Value.Bool true)) in
   Alcotest.(check string)
     "bare bool literal renders as the keyword" "true" rendered
 
 let test_format_less_than () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "id") ~op:Less
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:Less
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check string) "id < 3" "id < 3" rendered
 
 let test_format_less_equal () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "id") ~op:LessEqual
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:LessEqual
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check string) "id <= 3" "id <= 3" rendered
 
 let test_format_greater_than () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "id") ~op:Greater
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:Greater
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check string) "id > 3" "id > 3" rendered
 
 let test_format_greater_equal () =
   let rendered =
     format_to_string
-      (predicate_compare ~left:(predicate_column "id") ~op:GreaterEqual
-         ~right:(predicate_literal (Value.Int64 3L)))
+      (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
+         ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check string) "id >= 3" "id >= 3" rendered
 
 let test_and_returns_intersection () =
   let matched =
     filter_users
-      (predicate_and
+      (expression_and
          ~left:
-           (predicate_compare ~left:(predicate_column "id") ~op:Greater
-              ~right:(predicate_literal (Value.Int64 1L)))
-         ~right:(predicate_column "active"))
+           (expression_compare ~left:(expression_column "id") ~op:Greater
+              ~right:(expression_literal (Value.Int64 1L)))
+         ~right:(expression_column "active"))
   in
   (* id > 1 and active: ids 3 (Carol, active) and 4 (Dave, active). Id 2 is
      active=false; id 5 is active=false. *)
@@ -443,13 +445,13 @@ let test_and_returns_intersection () =
 let test_or_returns_union () =
   let matched =
     filter_users
-      (predicate_or
+      (expression_or
          ~left:
-           (predicate_compare ~left:(predicate_column "name") ~op:Equal
-              ~right:(predicate_literal (Value.String "Alice")))
+           (expression_compare ~left:(expression_column "name") ~op:Equal
+              ~right:(expression_literal (Value.String "Alice")))
          ~right:
-           (predicate_compare ~left:(predicate_column "name") ~op:Equal
-              ~right:(predicate_literal (Value.String "Bob"))))
+           (expression_compare ~left:(expression_column "name") ~op:Equal
+              ~right:(expression_literal (Value.String "Bob"))))
   in
   Alcotest.(check tuple_list_testable)
     "Alice and Bob"
@@ -462,9 +464,9 @@ let test_and_short_circuits_on_false_left () =
      on array access if the resolver evaluated the right operand. Short-
      circuit means it doesn't. *)
   let predicate =
-    predicate_and
-      ~left:(predicate_literal (Value.Bool false))
-      ~right:(predicate_column "active")
+    expression_and
+      ~left:(expression_literal (Value.Bool false))
+      ~right:(expression_column "active")
   in
   let evaluator = Expression.resolve users_schema predicate in
   let too_short_to_contain_active = [| Value.Int64 1L |] in
@@ -476,9 +478,9 @@ let test_or_short_circuits_on_true_left () =
   (* Mirror of the [and] short-circuit test: [true or active] should not
      read the right operand. *)
   let predicate =
-    predicate_or
-      ~left:(predicate_literal (Value.Bool true))
-      ~right:(predicate_column "active")
+    expression_or
+      ~left:(expression_literal (Value.Bool true))
+      ~right:(expression_column "active")
   in
   let evaluator = Expression.resolve users_schema predicate in
   let too_short_to_contain_active = [| Value.Int64 1L |] in
@@ -487,7 +489,7 @@ let test_or_short_circuits_on_true_left () =
     (evaluator too_short_to_contain_active)
 
 let test_not_inverts_a_bool_column () =
-  let matched = filter_users (predicate_not (predicate_column "active")) in
+  let matched = filter_users (expression_not (expression_column "active")) in
   Alcotest.(check tuple_list_testable)
     "Bob and Eve (not active)"
     [ List.nth users_rows 1; List.nth users_rows 4 ]
@@ -495,7 +497,7 @@ let test_not_inverts_a_bool_column () =
 
 let test_double_not_is_identity () =
   let matched =
-    filter_users (predicate_not (predicate_not (predicate_column "active")))
+    filter_users (expression_not (expression_not (expression_column "active")))
   in
   Alcotest.(check tuple_list_testable)
     "active rows (not not active)"
@@ -508,7 +510,8 @@ let test_not_with_non_bool_operand_raises () =
        "Expression.resolve: not requires a Bool operand: column \"id\" is Int64")
     (fun () ->
       let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema (predicate_not (predicate_column "id"))
+        Expression.resolve users_schema
+          (expression_not (expression_column "id"))
       in
       ())
 
@@ -519,8 +522,8 @@ let test_and_with_non_bool_operand_raises () =
     (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_and ~left:(predicate_column "id")
-             ~right:(predicate_column "active"))
+          (expression_and ~left:(expression_column "id")
+             ~right:(expression_column "active"))
       in
       ())
 
@@ -531,22 +534,24 @@ let test_or_with_non_bool_operand_raises () =
     (fun () ->
       let (_ : Schema.tuple -> bool) =
         Expression.resolve users_schema
-          (predicate_or
-             ~left:(predicate_column "active")
-             ~right:(predicate_column "id"))
+          (expression_or
+             ~left:(expression_column "active")
+             ~right:(expression_column "id"))
       in
       ())
 
 let test_format_not_of_atom () =
-  let rendered = format_to_string (predicate_not (predicate_column "active")) in
+  let rendered =
+    format_to_string (expression_not (expression_column "active"))
+  in
   Alcotest.(check string) "not active" "not active" rendered
 
 let test_format_not_of_comparison () =
   let rendered =
     format_to_string
-      (predicate_not
-         (predicate_compare ~left:(predicate_column "id") ~op:Equal
-            ~right:(predicate_literal (Value.Int64 5L))))
+      (expression_not
+         (expression_compare ~left:(expression_column "id") ~op:Equal
+            ~right:(expression_literal (Value.Int64 5L))))
   in
   Alcotest.(check string) "not id = 5" "not id = 5" rendered
 
@@ -555,9 +560,9 @@ let test_format_not_of_and_uses_parens () =
      parens to keep the meaning when re-parsed. *)
   let rendered =
     format_to_string
-      (predicate_not
-         (predicate_and ~left:(predicate_column "a")
-            ~right:(predicate_column "b")))
+      (expression_not
+         (expression_and ~left:(expression_column "a")
+            ~right:(expression_column "b")))
   in
   Alcotest.(check string) "not (a and b)" "not (a and b)" rendered
 
@@ -565,18 +570,19 @@ let test_format_stacked_not_omits_parens () =
   (* [not not active]: the inner [not] is also a [not], same precedence,
      no parens needed. *)
   let rendered =
-    format_to_string (predicate_not (predicate_not (predicate_column "active")))
+    format_to_string
+      (expression_not (expression_not (expression_column "active")))
   in
   Alcotest.(check string) "not not active" "not not active" rendered
 
 let test_format_and_renders_with_keyword () =
   let rendered =
     format_to_string
-      (predicate_and
-         ~left:(predicate_column "active")
+      (expression_and
+         ~left:(expression_column "active")
          ~right:
-           (predicate_compare ~left:(predicate_column "id") ~op:Greater
-              ~right:(predicate_literal (Value.Int64 3L))))
+           (expression_compare ~left:(expression_column "id") ~op:Greater
+              ~right:(expression_literal (Value.Int64 3L))))
   in
   Alcotest.(check string)
     "and binds looser than comparison: no parens around id > 3"
@@ -585,9 +591,9 @@ let test_format_and_renders_with_keyword () =
 let test_format_or_renders_with_keyword () =
   let rendered =
     format_to_string
-      (predicate_or
-         ~left:(predicate_column "active")
-         ~right:(predicate_column "inactive_flag"))
+      (expression_or
+         ~left:(expression_column "active")
+         ~right:(expression_column "inactive_flag"))
   in
   Alcotest.(check string)
     "active or inactive_flag" "active or inactive_flag" rendered
@@ -598,10 +604,10 @@ let test_format_and_inside_or_omits_parens () =
      because [and] binds tighter than [or]. *)
   let rendered =
     format_to_string
-      (predicate_or ~left:(predicate_column "a")
+      (expression_or ~left:(expression_column "a")
          ~right:
-           (predicate_and ~left:(predicate_column "b")
-              ~right:(predicate_column "c")))
+           (expression_and ~left:(expression_column "b")
+              ~right:(expression_column "c")))
   in
   Alcotest.(check string) "a or b and c" "a or b and c" rendered
 
@@ -611,11 +617,11 @@ let test_format_or_inside_and_uses_parens () =
      [a or (b and c)]. *)
   let rendered =
     format_to_string
-      (predicate_and
+      (expression_and
          ~left:
-           (predicate_or ~left:(predicate_column "a")
-              ~right:(predicate_column "b"))
-         ~right:(predicate_column "c"))
+           (expression_or ~left:(expression_column "a")
+              ~right:(expression_column "b"))
+         ~right:(expression_column "c"))
   in
   Alcotest.(check string) "(a or b) and c" "(a or b) and c" rendered
 
@@ -626,20 +632,21 @@ let test_format_and_right_associated_uses_parens () =
      handles it by parenthesising the right operand to preserve meaning. *)
   let rendered =
     format_to_string
-      (predicate_and ~left:(predicate_column "a")
+      (expression_and ~left:(expression_column "a")
          ~right:
-           (predicate_and ~left:(predicate_column "b")
-              ~right:(predicate_column "c")))
+           (expression_and ~left:(expression_column "b")
+              ~right:(expression_column "c")))
   in
   Alcotest.(check string) "a and (b and c)" "a and (b and c)" rendered
 
 let test_format_qualified_columns_use_dot_form () =
   let rendered =
     format_to_string
-      (predicate_compare
-         ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+      (expression_compare
+         ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
          ~op:Equal
-         ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id"))
+         ~right:
+           (expression_qualified_column ~qualifier:"orders" ~name:"user_id"))
   in
   Alcotest.(check string)
     "qualified column references render in dotted form"

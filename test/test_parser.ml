@@ -44,14 +44,14 @@ let test_rejects_two_identifiers () =
   rejects "users orders"
 
 let id_equals_three =
-  predicate_compare ~left:(predicate_column "id") ~op:Equal
-    ~right:(predicate_literal (Value.Int64 3L))
+  expression_compare ~left:(expression_column "id") ~op:Equal
+    ~right:(expression_literal (Value.Int64 3L))
 
 let active_equals_true =
-  predicate_compare
-    ~left:(predicate_column "active")
+  expression_compare
+    ~left:(expression_column "active")
     ~op:Equal
-    ~right:(predicate_literal (Value.Bool true))
+    ~right:(expression_literal (Value.Bool true))
 
 let test_pipeline_parses_single_restrict () =
   parses "users | restrict id = 3"
@@ -193,10 +193,10 @@ let test_pipeline_keyword_prefix_is_a_relation_name () =
        { left = users_relation; right = Ast.Relation_name "crossroads" })
 
 let users_id_equals_orders_user_id =
-  predicate_compare
-    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+  expression_compare
+    ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
     ~op:Equal
-    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
+    ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let test_pipeline_parses_join_on_predicate () =
   parses "users | join orders on users.id = orders.user_id"

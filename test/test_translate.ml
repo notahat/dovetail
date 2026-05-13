@@ -27,8 +27,8 @@ let test_pipeline_yields_fixture_rows () =
             "five rows from logical scan" expected_users_rows rows))
 
 let id_equals_three =
-  predicate_compare ~left:(predicate_column "id") ~op:Equal
-    ~right:(predicate_literal (Value.Int64 3L))
+  expression_compare ~left:(expression_column "id") ~op:Equal
+    ~right:(expression_literal (Value.Int64 3L))
 
 let name_then_email : Projection.t =
   [ column_reference "name"; column_reference "email" ]
@@ -129,10 +129,10 @@ let test_cross_product_translates_to_physical_cross_product () =
     physical
 
 let users_id_equals_orders_user_id =
-  predicate_compare
-    ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+  expression_compare
+    ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
     ~op:Equal
-    ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id")
+    ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let test_restrict_over_cross_product_translates_to_nested_loop_join () =
   let logical =

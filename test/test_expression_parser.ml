@@ -37,265 +37,265 @@ let rejects_predicate input =
 
 let test_int64_equality () =
   parses_predicate "id = 3"
-    (predicate_compare ~left:(predicate_column "id") ~op:Equal
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:Equal
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_negative_int64 () =
   parses_predicate "id = -1"
-    (predicate_compare ~left:(predicate_column "id") ~op:Equal
-       ~right:(predicate_literal (Value.Int64 (-1L))))
+    (expression_compare ~left:(expression_column "id") ~op:Equal
+       ~right:(expression_literal (Value.Int64 (-1L))))
 
 let test_string_equality () =
   parses_predicate "name = \"Alice\""
-    (predicate_compare ~left:(predicate_column "name") ~op:Equal
-       ~right:(predicate_literal (Value.String "Alice")))
+    (expression_compare ~left:(expression_column "name") ~op:Equal
+       ~right:(expression_literal (Value.String "Alice")))
 
 let test_string_with_escaped_quotes () =
   parses_predicate "name = \"with \\\"quotes\\\"\""
-    (predicate_compare ~left:(predicate_column "name") ~op:Equal
-       ~right:(predicate_literal (Value.String "with \"quotes\"")))
+    (expression_compare ~left:(expression_column "name") ~op:Equal
+       ~right:(expression_literal (Value.String "with \"quotes\"")))
 
 let test_string_with_escaped_backslash () =
   parses_predicate "name = \"a\\\\b\""
-    (predicate_compare ~left:(predicate_column "name") ~op:Equal
-       ~right:(predicate_literal (Value.String "a\\b")))
+    (expression_compare ~left:(expression_column "name") ~op:Equal
+       ~right:(expression_literal (Value.String "a\\b")))
 
 let test_bool_true () =
   parses_predicate "active = true"
-    (predicate_compare
-       ~left:(predicate_column "active")
+    (expression_compare
+       ~left:(expression_column "active")
        ~op:Equal
-       ~right:(predicate_literal (Value.Bool true)))
+       ~right:(expression_literal (Value.Bool true)))
 
 let test_bool_false () =
   parses_predicate "active = false"
-    (predicate_compare
-       ~left:(predicate_column "active")
+    (expression_compare
+       ~left:(expression_column "active")
        ~op:Equal
-       ~right:(predicate_literal (Value.Bool false)))
+       ~right:(expression_literal (Value.Bool false)))
 
 let test_inequality () =
   parses_predicate "id <> 3"
-    (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:NotEqual
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_tolerates_extra_whitespace () =
   parses_predicate "  id   =   3  "
-    (predicate_compare ~left:(predicate_column "id") ~op:Equal
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:Equal
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_literal_on_the_left () =
   (* Slice 4 step 2 lifts the slice-2 restriction that the right side must
      be a literal -- either side can now be a column or a literal. *)
   parses_predicate "3 = id"
-    (predicate_compare
-       ~left:(predicate_literal (Value.Int64 3L))
-       ~op:Equal ~right:(predicate_column "id"))
+    (expression_compare
+       ~left:(expression_literal (Value.Int64 3L))
+       ~op:Equal ~right:(expression_column "id"))
 
 let test_column_equals_column () =
   parses_predicate "name = email"
-    (predicate_compare ~left:(predicate_column "name") ~op:Equal
-       ~right:(predicate_column "email"))
+    (expression_compare ~left:(expression_column "name") ~op:Equal
+       ~right:(expression_column "email"))
 
 let test_column_inequality_column () =
   parses_predicate "id <> user_id"
-    (predicate_compare ~left:(predicate_column "id") ~op:NotEqual
-       ~right:(predicate_column "user_id"))
+    (expression_compare ~left:(expression_column "id") ~op:NotEqual
+       ~right:(expression_column "user_id"))
 
 let test_bare_column () =
   (* Slice 7 step 2: a standalone column reference is a valid predicate at
      the parser level. Whether it resolves to a Bool is a resolve-time
      concern. *)
-  parses_predicate "active" (predicate_column "active")
+  parses_predicate "active" (expression_column "active")
 
 let test_bare_qualified_column () =
   parses_predicate "users.active"
-    (predicate_qualified_column ~qualifier:"users" ~name:"active")
+    (expression_qualified_column ~qualifier:"users" ~name:"active")
 
 let test_bare_bool_literal () =
-  parses_predicate "true" (predicate_literal (Value.Bool true))
+  parses_predicate "true" (expression_literal (Value.Bool true))
 
 let test_less_than () =
   parses_predicate "id < 3"
-    (predicate_compare ~left:(predicate_column "id") ~op:Less
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:Less
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_less_or_equal () =
   parses_predicate "id <= 3"
-    (predicate_compare ~left:(predicate_column "id") ~op:LessEqual
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:LessEqual
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_greater_than () =
   parses_predicate "id > 3"
-    (predicate_compare ~left:(predicate_column "id") ~op:Greater
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:Greater
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_greater_or_equal () =
   parses_predicate "id >= 3"
-    (predicate_compare ~left:(predicate_column "id") ~op:GreaterEqual
-       ~right:(predicate_literal (Value.Int64 3L)))
+    (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_compare_two_literals () =
   parses_predicate "5 = 5"
-    (predicate_compare
-       ~left:(predicate_literal (Value.Int64 5L))
+    (expression_compare
+       ~left:(expression_literal (Value.Int64 5L))
        ~op:Equal
-       ~right:(predicate_literal (Value.Int64 5L)))
+       ~right:(expression_literal (Value.Int64 5L)))
 
 let test_qualified_column_against_literal () =
   parses_predicate "users.id = 3"
-    (predicate_compare
-       ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    (expression_compare
+       ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
        ~op:Equal
-       ~right:(predicate_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Value.Int64 3L)))
 
 let test_qualified_column_against_qualified_column () =
   parses_predicate "users.id = orders.user_id"
-    (predicate_compare
-       ~left:(predicate_qualified_column ~qualifier:"users" ~name:"id")
+    (expression_compare
+       ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
        ~op:Equal
-       ~right:(predicate_qualified_column ~qualifier:"orders" ~name:"user_id"))
+       ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id"))
 
 let test_and_of_two_columns () =
   parses_predicate "active and inactive_flag"
-    (predicate_and
-       ~left:(predicate_column "active")
-       ~right:(predicate_column "inactive_flag"))
+    (expression_and
+       ~left:(expression_column "active")
+       ~right:(expression_column "inactive_flag"))
 
 let test_or_of_two_columns () =
   parses_predicate "active or inactive_flag"
-    (predicate_or
-       ~left:(predicate_column "active")
-       ~right:(predicate_column "inactive_flag"))
+    (expression_or
+       ~left:(expression_column "active")
+       ~right:(expression_column "inactive_flag"))
 
 let test_and_chain_is_left_associative () =
   parses_predicate "a and b and c"
-    (predicate_and
+    (expression_and
        ~left:
-         (predicate_and ~left:(predicate_column "a")
-            ~right:(predicate_column "b"))
-       ~right:(predicate_column "c"))
+         (expression_and ~left:(expression_column "a")
+            ~right:(expression_column "b"))
+       ~right:(expression_column "c"))
 
 let test_or_chain_is_left_associative () =
   parses_predicate "a or b or c"
-    (predicate_or
+    (expression_or
        ~left:
-         (predicate_or ~left:(predicate_column "a")
-            ~right:(predicate_column "b"))
-       ~right:(predicate_column "c"))
+         (expression_or ~left:(expression_column "a")
+            ~right:(expression_column "b"))
+       ~right:(expression_column "c"))
 
 let test_and_binds_tighter_than_or () =
   (* Plan precedence: [or] is the loosest, [and] sits between [or] and
      comparison. [a or b and c] should parse as [a or (b and c)]. *)
   parses_predicate "a or b and c"
-    (predicate_or ~left:(predicate_column "a")
+    (expression_or ~left:(expression_column "a")
        ~right:
-         (predicate_and ~left:(predicate_column "b")
-            ~right:(predicate_column "c")))
+         (expression_and ~left:(expression_column "b")
+            ~right:(expression_column "c")))
 
 let test_comparison_binds_tighter_than_and () =
   (* [id = 1 and active] should parse with the comparison on the left side
      of [and] -- not as [id = (1 and active)]. *)
   parses_predicate "id = 1 and active"
-    (predicate_and
+    (expression_and
        ~left:
-         (predicate_compare ~left:(predicate_column "id") ~op:Equal
-            ~right:(predicate_literal (Value.Int64 1L)))
-       ~right:(predicate_column "active"))
+         (expression_compare ~left:(expression_column "id") ~op:Equal
+            ~right:(expression_literal (Value.Int64 1L)))
+       ~right:(expression_column "active"))
 
 let test_mixed_and_or_with_comparison () =
   (* Worked through in the slice plan: [id = 1 or id = 2 and active]
      parses as [id = 1 or (id = 2 and active)] because [and] binds
      tighter than [or]. *)
   parses_predicate "id = 1 or id = 2 and active"
-    (predicate_or
+    (expression_or
        ~left:
-         (predicate_compare ~left:(predicate_column "id") ~op:Equal
-            ~right:(predicate_literal (Value.Int64 1L)))
+         (expression_compare ~left:(expression_column "id") ~op:Equal
+            ~right:(expression_literal (Value.Int64 1L)))
        ~right:
-         (predicate_and
+         (expression_and
             ~left:
-              (predicate_compare ~left:(predicate_column "id") ~op:Equal
-                 ~right:(predicate_literal (Value.Int64 2L)))
-            ~right:(predicate_column "active")))
+              (expression_compare ~left:(expression_column "id") ~op:Equal
+                 ~right:(expression_literal (Value.Int64 2L)))
+            ~right:(expression_column "active")))
 
 let test_not_of_a_column () =
-  parses_predicate "not active" (predicate_not (predicate_column "active"))
+  parses_predicate "not active" (expression_not (expression_column "active"))
 
 let test_not_binds_looser_than_comparison () =
   (* [not a = 5] parses as [not (a = 5)] -- [=] binds tighter than [not],
      matching SQL. *)
   parses_predicate "not id = 5"
-    (predicate_not
-       (predicate_compare ~left:(predicate_column "id") ~op:Equal
-          ~right:(predicate_literal (Value.Int64 5L))))
+    (expression_not
+       (expression_compare ~left:(expression_column "id") ~op:Equal
+          ~right:(expression_literal (Value.Int64 5L))))
 
 let test_not_binds_tighter_than_and () =
   (* [not a and b] parses as [(not a) and b] -- [not] binds tighter than
      [and]. *)
   parses_predicate "not a and b"
-    (predicate_and
-       ~left:(predicate_not (predicate_column "a"))
-       ~right:(predicate_column "b"))
+    (expression_and
+       ~left:(expression_not (expression_column "a"))
+       ~right:(expression_column "b"))
 
 let test_stacked_not_parses () =
   parses_predicate "not not active"
-    (predicate_not (predicate_not (predicate_column "active")))
+    (expression_not (expression_not (expression_column "active")))
 
 let test_not_of_parenthesised_expression () =
   parses_predicate "not (a > 5 and b < 10)"
-    (predicate_not
-       (predicate_and
+    (expression_not
+       (expression_and
           ~left:
-            (predicate_compare ~left:(predicate_column "a") ~op:Greater
-               ~right:(predicate_literal (Value.Int64 5L)))
+            (expression_compare ~left:(expression_column "a") ~op:Greater
+               ~right:(expression_literal (Value.Int64 5L)))
           ~right:
-            (predicate_compare ~left:(predicate_column "b") ~op:Less
-               ~right:(predicate_literal (Value.Int64 10L)))))
+            (expression_compare ~left:(expression_column "b") ~op:Less
+               ~right:(expression_literal (Value.Int64 10L)))))
 
 let test_not_keyword_prefix_is_a_column_name () =
   (* [notation] starts with "not" but is a single identifier, so the parser
      must not mistake it for the [not] keyword. *)
-  parses_predicate "notation" (predicate_column "notation")
+  parses_predicate "notation" (expression_column "notation")
 
 let test_parens_override_precedence () =
   (* Without parens [a or b and c] parses as [a or (b and c)] because [and]
      binds tighter. Parens around [a or b] flip that grouping. *)
   parses_predicate "(a or b) and c"
-    (predicate_and
+    (expression_and
        ~left:
-         (predicate_or ~left:(predicate_column "a")
-            ~right:(predicate_column "b"))
-       ~right:(predicate_column "c"))
+         (expression_or ~left:(expression_column "a")
+            ~right:(expression_column "b"))
+       ~right:(expression_column "c"))
 
 let test_redundant_parens_are_accepted () =
   parses_predicate "((id = 1))"
-    (predicate_compare ~left:(predicate_column "id") ~op:Equal
-       ~right:(predicate_literal (Value.Int64 1L)))
+    (expression_compare ~left:(expression_column "id") ~op:Equal
+       ~right:(expression_literal (Value.Int64 1L)))
 
 let test_parens_tolerate_whitespace_inside () =
   parses_predicate "(  id = 1  )"
-    (predicate_compare ~left:(predicate_column "id") ~op:Equal
-       ~right:(predicate_literal (Value.Int64 1L)))
+    (expression_compare ~left:(expression_column "id") ~op:Equal
+       ~right:(expression_literal (Value.Int64 1L)))
 
 let test_parens_around_an_atom () =
-  parses_predicate "(active)" (predicate_column "active")
+  parses_predicate "(active)" (expression_column "active")
 
 let test_format_parse_roundtrip_through_mixed_logic () =
   (* The formatter inserts parens only where precedence would change
      meaning. Re-parsing the formatted string should reproduce the
      original tree -- a useful end-to-end invariant for the formatter. *)
   let original =
-    predicate_and
+    expression_and
       ~left:
-        (predicate_or
+        (expression_or
            ~left:
-             (predicate_compare ~left:(predicate_column "id") ~op:Equal
-                ~right:(predicate_literal (Value.Int64 1L)))
+             (expression_compare ~left:(expression_column "id") ~op:Equal
+                ~right:(expression_literal (Value.Int64 1L)))
            ~right:
-             (predicate_compare ~left:(predicate_column "id") ~op:Equal
-                ~right:(predicate_literal (Value.Int64 2L))))
-      ~right:(predicate_column "active")
+             (expression_compare ~left:(expression_column "id") ~op:Equal
+                ~right:(expression_literal (Value.Int64 2L))))
+      ~right:(expression_column "active")
   in
   let formatted = format_to_string original in
   Alcotest.(check string)
@@ -331,10 +331,10 @@ let test_keyword_prefix_is_an_identifier () =
      a single identifier, and so parses as a column reference on the
      right-hand side of the comparison. *)
   parses_predicate "active = trueish"
-    (predicate_compare
-       ~left:(predicate_column "active")
+    (expression_compare
+       ~left:(expression_column "active")
        ~op:Equal
-       ~right:(predicate_column "trueish"))
+       ~right:(expression_column "trueish"))
 
 let test_rejects_trailing_garbage () = rejects_predicate "id = 3 garbage"
 
