@@ -53,6 +53,9 @@ type t =
       (** Boolean disjunction of two sub-expressions. Both operands must be of
           kind {!Value.Kind.Bool}. The resolver short-circuits the same way: the
           right operand is only read when the left is false. *)
+  | Not of t
+      (** Boolean negation of a sub-expression. The operand must be of kind
+          {!Value.Kind.Bool}. *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter expression] writes a single-line, source-like rendering of
@@ -77,7 +80,8 @@ val resolve : Schema.t -> t -> Schema.tuple -> bool
     - Ordering operators ({!Less}, {!LessEqual}, {!Greater}, {!GreaterEqual})
       require the kind to be ordered: {!Value.Kind.Int64} or
       {!Value.Kind.String}.
-    - Both operands of an {!And} or {!Or} must have kind {!Value.Kind.Bool}.
+    - Both operands of an {!And} or {!Or}, and the operand of a {!Not}, must
+      have kind {!Value.Kind.Bool}.
     - The whole expression's kind must be {!Value.Kind.Bool}. Predicate
       positions accept only Bool-valued expressions, so a standalone {!Column}
       of kind {!Value.Kind.Bool} is a valid predicate ([restrict active]), while
@@ -89,5 +93,5 @@ val resolve : Schema.t -> t -> Schema.tuple -> bool
 
     Raises [Failure] if a column reference is unknown or ambiguous, two sides of
     a {!Compare} disagree on kind, an ordering operator is applied to a
-    non-ordered kind, an {!And} or {!Or} has a non-Bool operand, or the
+    non-ordered kind, an {!And} / {!Or} / {!Not} has a non-Bool operand, or the
     top-level expression does not have {!Value.Kind.Bool}. *)

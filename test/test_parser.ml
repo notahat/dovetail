@@ -477,6 +477,25 @@ let test_pipeline_restrict_and_chain_is_left_associative () =
             [ List.nth expected_users_rows 2 ]
             rows))
 
+let test_pipeline_restrict_not_inverts_the_predicate () =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Parser.parse "users | restrict not active" with
+        | Ok ast -> ast
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Lower.lower ast in
+      let physical = Translate.translate logical in
+      Eval.eval environment transaction physical (fun relation ->
+          let rows = List.of_seq relation.tuples in
+          Alcotest.(check tuple_list_testable)
+            "Bob and Eve (not active)"
+            [ List.nth expected_users_rows 1; List.nth expected_users_rows 4 ]
+            rows))
+
 let test_pipeline_restrict_parens_override_precedence () =
   (* Without parens [id = 1 or id = 2 and active] keeps Alice only (because
      [and] binds tighter than [or]). With parens forcing the [or] first,
@@ -739,5 +758,7 @@ let () =
             test_pipeline_restrict_mixed_and_or_follows_precedence;
           Alcotest.test_case "parsed restrict with parens overriding precedence"
             `Quick test_pipeline_restrict_parens_override_precedence;
+          Alcotest.test_case "parsed restrict not active yields the complement"
+            `Quick test_pipeline_restrict_not_inverts_the_predicate;
         ] );
     ]

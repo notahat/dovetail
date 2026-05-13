@@ -129,6 +129,9 @@ let predicate_and ~left ~right : Expression.t = And (left, right)
 (** An [Expression.t] composing two predicates with logical OR. *)
 let predicate_or ~left ~right : Expression.t = Or (left, right)
 
+(** An [Expression.t] negating a predicate. *)
+let predicate_not operand : Expression.t = Not operand
+
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)
 let contains_substring haystack needle =

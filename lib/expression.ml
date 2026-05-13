@@ -12,6 +12,7 @@ type t =
   | Compare of { left : t; op : comparison_op; right : t }
   | And of t * t
   | Or of t * t
+  | Not of t
 
 (* Render an expression node for inclusion in kind-mismatch error messages.
    Columns and literals get source-flavoured descriptions matching the
@@ -26,6 +27,7 @@ let describe_expression = function
   | Compare _ -> "comparison expression"
   | And _ -> "and expression"
   | Or _ -> "or expression"
+  | Not _ -> "not expression"
 
 (* Render a [Value.t] as a literal in source-like form: int64s as bare
    digits, strings double-quoted with no escaping, bools as the keywords
@@ -61,12 +63,14 @@ let is_ordering_op = function
    unambiguous when re-parsed. *)
 let precedence_or = 1
 let precedence_and = 2
-let precedence_compare = 3
-let precedence_atom = 4
+let precedence_not = 3
+let precedence_compare = 4
+let precedence_atom = 5
 
 let precedence_of = function
   | Literal _ | Column _ -> precedence_atom
   | Compare _ -> precedence_compare
+  | Not _ -> precedence_not
   | And _ -> precedence_and
   | Or _ -> precedence_or
 
@@ -102,6 +106,8 @@ let rec format_at min_precedence formatter expression =
         Format.fprintf formatter "%a or %a" (format_at precedence_or) left
           (format_at (precedence_or + 1))
           right
+    | Not operand ->
+        Format.fprintf formatter "not %a" (format_at precedence_not) operand
 
 let format formatter expression = format_at 0 formatter expression
 
@@ -188,6 +194,21 @@ let rec resolve_value schema = function
         match read_left tuple with
         | Value.Bool true -> Value.Bool true
         | Value.Bool false -> read_right tuple
+        | _ -> assert false
+      in
+      (Value.Kind.Bool, read)
+  | Not operand ->
+      let operand_kind, read_operand = resolve_value schema operand in
+      if operand_kind <> Value.Kind.Bool then
+        failwith
+          (Printf.sprintf
+             "Expression.resolve: not requires a Bool operand: %s is %s"
+             (describe_expression operand)
+             (Value.Kind.to_string operand_kind));
+      let read tuple =
+        match read_operand tuple with
+        | Value.Bool true -> Value.Bool false
+        | Value.Bool false -> Value.Bool true
         | _ -> assert false
       in
       (Value.Kind.Bool, read)

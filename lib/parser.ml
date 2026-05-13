@@ -148,11 +148,22 @@ let predicate =
         in
         with_comparison <|> return left
       in
-      (* An [and]-chain: one or more comparison atoms joined by the [and]
+      (* A [not]-prefixed expression: the prefix may stack, and binds
+         tighter than [and]/[or] but looser than the comparison operators
+         ([not a = 5] is [not (a = 5)]). Implemented with its own [fix] so
+         the prefix recurses into another [not_expression] before falling
+         through to [comparison_expression]. *)
+      let not_expression =
+        fix (fun not_expression ->
+            keyword "not" *> whitespace *> not_expression
+            >>| (fun operand -> Expression.Not operand)
+            <|> comparison_expression)
+      in
+      (* An [and]-chain: one or more [not]-expressions joined by the [and]
        keyword, left-associative. *)
       let and_expression =
-        comparison_expression >>= fun first ->
-        many (whitespace *> keyword "and" *> whitespace *> comparison_expression)
+        not_expression >>= fun first ->
+        many (whitespace *> keyword "and" *> whitespace *> not_expression)
         >>| fun rest ->
         List.fold_left
           (fun accumulator next -> Expression.And (accumulator, next))

@@ -219,6 +219,45 @@ let test_mixed_and_or_with_comparison () =
                  ~right:(predicate_literal (Value.Int64 2L)))
             ~right:(predicate_column "active")))
 
+let test_not_of_a_column () =
+  parses_predicate "not active" (predicate_not (predicate_column "active"))
+
+let test_not_binds_looser_than_comparison () =
+  (* [not a = 5] parses as [not (a = 5)] -- [=] binds tighter than [not],
+     matching SQL. *)
+  parses_predicate "not id = 5"
+    (predicate_not
+       (predicate_compare ~left:(predicate_column "id") ~op:Equal
+          ~right:(predicate_literal (Value.Int64 5L))))
+
+let test_not_binds_tighter_than_and () =
+  (* [not a and b] parses as [(not a) and b] -- [not] binds tighter than
+     [and]. *)
+  parses_predicate "not a and b"
+    (predicate_and
+       ~left:(predicate_not (predicate_column "a"))
+       ~right:(predicate_column "b"))
+
+let test_stacked_not_parses () =
+  parses_predicate "not not active"
+    (predicate_not (predicate_not (predicate_column "active")))
+
+let test_not_of_parenthesised_expression () =
+  parses_predicate "not (a > 5 and b < 10)"
+    (predicate_not
+       (predicate_and
+          ~left:
+            (predicate_compare ~left:(predicate_column "a") ~op:Greater
+               ~right:(predicate_literal (Value.Int64 5L)))
+          ~right:
+            (predicate_compare ~left:(predicate_column "b") ~op:Less
+               ~right:(predicate_literal (Value.Int64 10L)))))
+
+let test_not_keyword_prefix_is_a_column_name () =
+  (* [notation] starts with "not" but is a single identifier, so the parser
+     must not mistake it for the [not] keyword. *)
+  parses_predicate "notation" (predicate_column "notation")
+
 let test_parens_override_precedence () =
   (* Without parens [a or b and c] parses as [a or (b and c)] because [and]
      binds tighter. Parens around [a or b] flip that grouping. *)
@@ -370,6 +409,17 @@ let () =
           Alcotest.test_case
             "format then parse round-trips a mixed and/or expression" `Quick
             test_format_parse_roundtrip_through_mixed_logic;
+          Alcotest.test_case "not of a column" `Quick test_not_of_a_column;
+          Alcotest.test_case "not binds looser than comparison" `Quick
+            test_not_binds_looser_than_comparison;
+          Alcotest.test_case "not binds tighter than and" `Quick
+            test_not_binds_tighter_than_and;
+          Alcotest.test_case "stacked not parses" `Quick test_stacked_not_parses;
+          Alcotest.test_case "not of a parenthesised expression" `Quick
+            test_not_of_parenthesised_expression;
+          Alcotest.test_case
+            "identifier with a not-keyword prefix is a column reference" `Quick
+            test_not_keyword_prefix_is_a_column_name;
         ] );
       ( "rejection",
         [

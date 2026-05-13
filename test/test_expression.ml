@@ -486,6 +486,32 @@ let test_or_short_circuits_on_true_left () =
     "short-circuits to true without reading right operand" true
     (evaluator too_short_to_contain_active)
 
+let test_not_inverts_a_bool_column () =
+  let matched = filter_users (predicate_not (predicate_column "active")) in
+  Alcotest.(check tuple_list_testable)
+    "Bob and Eve (not active)"
+    [ List.nth users_rows 1; List.nth users_rows 4 ]
+    matched
+
+let test_double_not_is_identity () =
+  let matched =
+    filter_users (predicate_not (predicate_not (predicate_column "active")))
+  in
+  Alcotest.(check tuple_list_testable)
+    "active rows (not not active)"
+    [ List.nth users_rows 0; List.nth users_rows 2; List.nth users_rows 3 ]
+    matched
+
+let test_not_with_non_bool_operand_raises () =
+  Alcotest.check_raises "non-Bool operand of not"
+    (Failure
+       "Expression.resolve: not requires a Bool operand: column \"id\" is Int64")
+    (fun () ->
+      let (_ : Schema.tuple -> bool) =
+        Expression.resolve users_schema (predicate_not (predicate_column "id"))
+      in
+      ())
+
 let test_and_with_non_bool_operand_raises () =
   Alcotest.check_raises "non-Bool operand of and"
     (Failure
@@ -510,6 +536,38 @@ let test_or_with_non_bool_operand_raises () =
              ~right:(predicate_column "id"))
       in
       ())
+
+let test_format_not_of_atom () =
+  let rendered = format_to_string (predicate_not (predicate_column "active")) in
+  Alcotest.(check string) "not active" "not active" rendered
+
+let test_format_not_of_comparison () =
+  let rendered =
+    format_to_string
+      (predicate_not
+         (predicate_compare ~left:(predicate_column "id") ~op:Equal
+            ~right:(predicate_literal (Value.Int64 5L))))
+  in
+  Alcotest.(check string) "not id = 5" "not id = 5" rendered
+
+let test_format_not_of_and_uses_parens () =
+  (* [not (a and b)]: [and] binds looser than [not], so the [and] needs
+     parens to keep the meaning when re-parsed. *)
+  let rendered =
+    format_to_string
+      (predicate_not
+         (predicate_and ~left:(predicate_column "a")
+            ~right:(predicate_column "b")))
+  in
+  Alcotest.(check string) "not (a and b)" "not (a and b)" rendered
+
+let test_format_stacked_not_omits_parens () =
+  (* [not not active]: the inner [not] is also a [not], same precedence,
+     no parens needed. *)
+  let rendered =
+    format_to_string (predicate_not (predicate_not (predicate_column "active")))
+  in
+  Alcotest.(check string) "not not active" "not not active" rendered
 
 let test_format_and_renders_with_keyword () =
   let rendered =
@@ -639,6 +697,10 @@ let () =
             test_and_short_circuits_on_false_left;
           Alcotest.test_case "or short-circuits when the left is true" `Quick
             test_or_short_circuits_on_true_left;
+          Alcotest.test_case "not inverts a Bool column" `Quick
+            test_not_inverts_a_bool_column;
+          Alcotest.test_case "not not is the identity" `Quick
+            test_double_not_is_identity;
         ] );
       ( "errors",
         [
@@ -667,6 +729,9 @@ let () =
             test_and_with_non_bool_operand_raises;
           Alcotest.test_case "or with a non-Bool operand raises naming the kind"
             `Quick test_or_with_non_bool_operand_raises;
+          Alcotest.test_case
+            "not with a non-Bool operand raises naming the kind" `Quick
+            test_not_with_non_bool_operand_raises;
         ] );
       ( "format",
         [
@@ -705,5 +770,14 @@ let () =
           Alcotest.test_case
             "right-associated and is parenthesised to preserve meaning" `Quick
             test_format_and_right_associated_uses_parens;
+          Alcotest.test_case "not renders as 'not' followed by an atom" `Quick
+            test_format_not_of_atom;
+          Alcotest.test_case
+            "not of a comparison binds the comparison tighter (no parens)"
+            `Quick test_format_not_of_comparison;
+          Alcotest.test_case "not of an and-expression parenthesises the and"
+            `Quick test_format_not_of_and_uses_parens;
+          Alcotest.test_case "stacked not omits parens" `Quick
+            test_format_stacked_not_omits_parens;
         ] );
     ]
