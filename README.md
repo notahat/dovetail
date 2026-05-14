@@ -38,11 +38,11 @@ name reads the whole table; pipeline operators `restrict`, `project`,
 
 ```
 > users | restrict active | project name, email
-| users.name | users.email       |
-|------------|-------------------|
-| Alice      | alice@example.com |
-| Carol      | carol@example.com |
-| Dave       | dave@example.com  |
+│ users.name │ users.email       │
+├────────────┼───────────────────┤
+│ Alice      │ alice@example.com │
+│ Carol      │ carol@example.com │
+│ Dave       │ dave@example.com  │
 ```
 
 Joins use qualified column references, and the rest of the pipeline can
@@ -50,14 +50,14 @@ keep going past the join:
 
 ```
 > users | join orders on users.id = orders.user_id | project name, description, amount
-| users.name | orders.description | orders.amount |
-|------------|--------------------|---------------|
-| Alice      | Coffee             |             5 |
-| Alice      | Bagel              |             4 |
-| Bob        | Tea                |             3 |
-| Carol      | Sandwich           |             8 |
-| Carol      | Cake               |             6 |
-| Eve        | Cookie             |             2 |
+│ users.name │ orders.description │ orders.amount │
+├────────────┼────────────────────┼───────────────┤
+│ Alice      │ Coffee             │             5 │
+│ Alice      │ Bagel              │             4 │
+│ Bob        │ Tea                │             3 │
+│ Carol      │ Sandwich           │             8 │
+│ Carol      │ Cake               │             6 │
+│ Eve        │ Cookie             │             2 │
 ```
 
 Predicates support the six comparison operators (`=`, `<>`, `<`, `<=`,
@@ -66,10 +66,10 @@ be integers, strings, or booleans:
 
 ```
 > orders | restrict amount >= 5 and not (description = "Cake")
-| orders.id | orders.user_id | orders.description | orders.amount |
-|-----------|----------------|--------------------|---------------|
-|         1 |              1 | Coffee             |             5 |
-|         4 |              3 | Sandwich           |             8 |
+│ orders.id │ orders.user_id │ orders.description │ orders.amount │
+├───────────┼────────────────┼────────────────────┼───────────────┤
+│         1 │              1 │ Coffee             │             5 │
+│         4 │              3 │ Sandwich           │             8 │
 ```
 
 ## Layer diagram

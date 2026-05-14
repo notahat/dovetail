@@ -60,10 +60,10 @@ let test_renders_aligned_table_with_qualified_headers () =
   let expected =
     String.concat "\n"
       [
-        "| users.id | users.name | users.email       | users.active |";
-        "|----------|------------|-------------------|--------------|";
-        "|        1 | Alice      | alice@example.com | true         |";
-        "|       10 | Bob        | bob@example.com   | false        |";
+        "│ users.id │ users.name │ users.email       │ users.active │";
+        "├──────────┼────────────┼───────────────────┼──────────────┤";
+        "│        1 │ Alice      │ alice@example.com │ true         │";
+        "│       10 │ Bob        │ bob@example.com   │ false        │";
         "";
       ]
   in
@@ -78,7 +78,7 @@ let test_renders_unqualified_headers_when_fields_have_no_qualifier () =
   in
   let expected =
     String.concat "\n"
-      [ "| id | name  |"; "|----|-------|"; "|  1 | Alice |"; "" ]
+      [ "│ id │ name  │"; "├────┼───────┤"; "│  1 │ Alice │"; "" ]
   in
   Alcotest.(check string) "rendered table" expected (render relation)
 
@@ -89,8 +89,8 @@ let test_renders_header_only_when_empty () =
   let expected =
     String.concat "\n"
       [
-        "| users.id | users.name | users.email | users.active |";
-        "|----------|------------|-------------|--------------|";
+        "│ users.id │ users.name │ users.email │ users.active │";
+        "├──────────┼────────────┼─────────────┼──────────────┤";
         "";
       ]
   in

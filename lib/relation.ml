@@ -36,6 +36,16 @@ let column_widths headers rendered_rows =
     rendered_rows;
   widths
 
+(* Repeat [piece] [count] times. The horizontal border glyph [─] is three
+   UTF-8 bytes, so [String.make] -- which takes a single byte -- can't
+   build the runs we need. *)
+let repeat piece count =
+  let buffer = Buffer.create (String.length piece * count) in
+  for _ = 1 to count do
+    Buffer.add_string buffer piece
+  done;
+  Buffer.contents buffer
+
 let format_row ~widths ~right_aligns cells =
   let parts =
     Array.mapi
@@ -46,13 +56,16 @@ let format_row ~widths ~right_aligns cells =
       cells
     |> Array.to_list
   in
-  "| " ^ String.concat " | " parts ^ " |"
+  "│ " ^ String.concat " │ " parts ^ " │"
 
-let format_separator widths =
-  let dashes =
-    Array.map (fun width -> String.make width '-') widths |> Array.to_list
+(* Build the horizontal rule under the header. The segments between
+   corners are [─] runs two wider than the column to span the
+   single-space padding inside each cell. *)
+let format_header_separator widths =
+  let segments =
+    Array.map (fun width -> repeat "─" (width + 2)) widths |> Array.to_list
   in
-  "|-" ^ String.concat "-|-" dashes ^ "-|"
+  "├" ^ String.concat "┼" segments ^ "┤"
 
 let print ?(formatter = Format.std_formatter) relation =
   let fields = relation.schema.fields in
@@ -70,7 +83,7 @@ let print ?(formatter = Format.std_formatter) relation =
   in
   let widths = column_widths headers rendered_rows in
   Format.fprintf formatter "%s@\n" (format_row ~widths ~right_aligns headers);
-  Format.fprintf formatter "%s@\n" (format_separator widths);
+  Format.fprintf formatter "%s@\n" (format_header_separator widths);
   List.iter
     (fun row ->
       Format.fprintf formatter "%s@\n" (format_row ~widths ~right_aligns row))

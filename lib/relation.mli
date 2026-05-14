@@ -20,8 +20,9 @@ type 'tag t = {
 (** A relation tagged with its multiplicity semantics. *)
 
 val print : ?formatter:Format.formatter -> _ t -> unit
-(** [print ?formatter relation] renders [relation] as a pipe-delimited ASCII
-    table to [formatter] (defaulting to [Format.std_formatter]).
+(** [print ?formatter relation] renders [relation] as a table to [formatter]
+    (defaulting to [Format.std_formatter]), using Unicode box-drawing characters
+    for the cell dividers and the header rule.
 
     Column widths are sized to the wider of the header and the rendered values;
     [Int64] columns are right-aligned and the others left-aligned. Materialises
