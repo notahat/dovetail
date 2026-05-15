@@ -32,6 +32,16 @@ type t =
           duplicate values that the inputs already had. The dedicated [Join]
           operator (with multiple strategies on the roadmap -- hash, merge)
           ships in a later slice. *)
+  | IndexLookup of { table : string; key : int64 }
+      (** [IndexLookup { table; key }] fetches the single row in [table] whose
+          primary key equals [key], by encoding [key] and calling [Storage.get]
+          on the table's storage subDB. The result is a relation with the
+          table's full schema and either zero or one tuples. Always cheaper than
+          a [FullScan] when the predicate fixes the primary key.
+
+          The [key] field is [int64] for now: every primary key in dovetail is a
+          single [int64] column at this point. The field widens to [Value.t]
+          when other key kinds arrive. *)
   | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
           tuple pair for which [predicate] holds, executed as a nested loop with

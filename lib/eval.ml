@@ -40,6 +40,25 @@ let evaluate_full_scan environment transaction table continue =
   let tuples = Seq.map (Row_codec.decode_row schema) pairs in
   continue ({ schema; tuples } : [ `Bag ] Relation.t)
 
+(* Encode [key], probe the table's storage subDB with [Storage.get], and
+   hand [continue] a relation whose [tuples] seq has either one element
+   (the decoded row) or zero (no row at that key). The seq is [Seq.empty]
+   or [Seq.return _] -- a regular OCaml seq, not a live cursor -- so there
+   is no resource scope to keep open across [continue]; the relation can
+   safely be consumed at any point. *)
+let evaluate_index_lookup environment transaction ~table ~key continue =
+  let schema, table_map =
+    lookup_table_resources environment transaction table
+  in
+  let encoded_key = Encoding.encode_int64_key key in
+  let tuples =
+    match Storage.get table_map transaction ~key:encoded_key with
+    | None -> Seq.empty
+    | Some value_bytes ->
+        Seq.return (Row_codec.decode_row schema (encoded_key, value_bytes))
+  in
+  continue ({ schema; tuples } : [ `Bag ] Relation.t)
+
 (* CPS-shaped executor. Every operator is in continuation-passing form so
    the consumer's [continue] runs inside whatever cursor and resource
    scopes the plan opens, letting tuples stream directly from live
@@ -54,6 +73,8 @@ let rec eval environment transaction plan continue =
       evaluate_project environment transaction ~input ~columns continue
   | CrossProduct { left; right } ->
       evaluate_cross_product environment transaction ~left ~right continue
+  | IndexLookup { table; key } ->
+      evaluate_index_lookup environment transaction ~table ~key continue
   | NestedLoopJoin { left; right; predicate } ->
       evaluate_nested_loop_join environment transaction ~left ~right ~predicate
         continue

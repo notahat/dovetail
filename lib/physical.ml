@@ -3,6 +3,7 @@ type t =
   | Filter of { input : t; predicate : Expression.t }
   | Project of { input : t; columns : Projection.t }
   | CrossProduct of { left : t; right : t }
+  | IndexLookup of { table : string; key : int64 }
   | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
 
 (* Render a [Projection.t] as a comma-separated list, each column in its
@@ -31,6 +32,8 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter "%sCrossProduct@\n" prefix;
       format_at formatter (indent + 1) left;
       format_at formatter (indent + 1) right
+  | IndexLookup { table; key } ->
+      Format.fprintf formatter "%sIndexLookup(%s, key=%Ld)@\n" prefix table key
   | NestedLoopJoin { left; right; predicate } ->
       Format.fprintf formatter "%sNestedLoopJoin(%a)@\n" prefix
         Expression.format predicate;

@@ -78,6 +78,12 @@ let test_nested_loop_join_renders_predicate_and_both_inputs () =
     \  FullScan(orders)\n"
     (format_to_string plan)
 
+let test_index_lookup_renders_with_table_and_key () =
+  let plan : Physical.t = IndexLookup { table = "users"; key = 3L } in
+  Alcotest.(check string)
+    "IndexLookup renders table and key on a single line"
+    "IndexLookup(users, key=3)\n" (format_to_string plan)
+
 let test_nested_indentation_compounds () =
   (* A Filter wrapping a CrossProduct: confirms that each level of nesting
      adds two spaces, not just the immediate one. *)
@@ -112,6 +118,8 @@ let () =
             test_cross_product_renders_both_inputs_indented;
           Alcotest.test_case "NestedLoopJoin renders predicate and both inputs"
             `Quick test_nested_loop_join_renders_predicate_and_both_inputs;
+          Alcotest.test_case "IndexLookup renders table and key" `Quick
+            test_index_lookup_renders_with_table_and_key;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
         ] );
