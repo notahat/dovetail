@@ -156,8 +156,12 @@ Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
 sub-steps; the ordering here is firm, but the scope of slices 11–13 will
 be pinned down when those slices start.
 
-1. **Slice 8 — Primary-key range scans.** In flight. First time
-   `Translate` chooses between `FullScan` and `IndexScan`.
+1. **Slice 8 — Primary-key point lookup.** In flight. `restrict
+   pk = literal` becomes an `IndexLookup` that fetches the
+   single matching row via `Storage.get` instead of a full scan.
+   First time `Translate` picks a physical strategy based on the
+   predicate's shape. Range scans are deferred until a workload
+   motivates them.
 2. **Slice 9 — Indexed nested-loop join over the primary key.** Makes
    joins efficient when one side's join column is the primary key — one
    full scan of the outer, one PK probe per row. No secondary indexes
