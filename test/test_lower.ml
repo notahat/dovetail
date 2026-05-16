@@ -21,7 +21,8 @@ let test_pipeline_yields_fixture_rows () =
   Storage.with_read_transaction environment (fun transaction ->
       let ast = Ast.Relation_name "users" in
       let logical = Lower.lower ast in
-      let physical = Translate.translate logical in
+      let catalog = make_catalog environment transaction in
+      let physical = Translate.translate ~catalog logical in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
@@ -53,7 +54,8 @@ let test_restrict_pipeline_yields_filtered_rows () =
           { input = Ast.Relation_name "users"; predicate = id_equals_three }
       in
       let logical = Lower.lower ast in
-      let physical = Translate.translate logical in
+      let catalog = make_catalog environment transaction in
+      let physical = Translate.translate ~catalog logical in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
@@ -85,7 +87,8 @@ let test_project_pipeline_yields_projected_rows () =
           { input = Ast.Relation_name "users"; columns = name_then_email }
       in
       let logical = Lower.lower ast in
-      let physical = Translate.translate logical in
+      let catalog = make_catalog environment transaction in
+      let physical = Translate.translate ~catalog logical in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =

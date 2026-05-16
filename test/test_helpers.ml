@@ -110,6 +110,11 @@ let expected_orders_rows : Schema.tuple list =
 let tuple_list_testable : Schema.tuple list Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuples>")) ( = )
 
+(** Alcotest testable for a [Physical.t]. Polymorphic-equality based; the
+    printer is a placeholder. Same reasoning as {!tuple_list_testable}. *)
+let physical_testable : Physical.t Alcotest.testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<physical>")) ( = )
+
 (** Build a bare (unqualified) [Schema.column_reference]. *)
 let column_reference name : Schema.column_reference = { qualifier = None; name }
 
@@ -142,6 +147,18 @@ let expression_or ~left ~right : Expression.t = Or (left, right)
 (** An [Expression.t] negating a sub-expression. *)
 let expression_not operand : Expression.t = Not operand
 
+(** A catalog callback that knows about no tables. Use in [Translate]-level unit
+    tests that don't exercise schema-dependent rewrites; the catalog is
+    consulted only for [IndexLookup] recognition, so a [None]-everywhere
+    callback yields the same translation as the slice-5 era did. *)
+let noop_catalog : string -> Schema.t option = fun _table_name -> None
+
+(** Build a catalog callback bound to [environment] and [transaction] so that
+    [Translate] sees the real fixture schemas. Used by the pipeline-integration
+    helpers below and any other test that wants the catalog wired up. *)
+let make_catalog environment transaction table_name =
+  Catalog.get environment transaction ~table_name
+
 (** [with_query_result query check_rows] runs [query] through the full parse /
     lower / translate / eval pipeline against the standard fixture and calls
     [check_rows] with the resulting list of tuples. The temp directory, LMDB
@@ -158,7 +175,8 @@ let with_query_result query check_rows =
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Lower.lower ast in
-      let physical = Translate.translate logical in
+      let catalog = make_catalog environment transaction in
+      let physical = Translate.translate ~catalog logical in
       Eval.eval environment transaction physical (fun relation ->
           check_rows (List.of_seq relation.tuples)))
 
@@ -176,7 +194,8 @@ let with_query_failure ~label ~expected query =
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Lower.lower ast in
-      let physical = Translate.translate logical in
+      let catalog = make_catalog environment transaction in
+      let physical = Translate.translate ~catalog logical in
       Alcotest.check_raises label expected (fun () ->
           Eval.eval environment transaction physical (fun _relation -> ())))
 

@@ -28,6 +28,20 @@ let test_restrict_equality_yields_one_row () =
         [ List.nth expected_users_rows 2 ]
         rows)
 
+let test_restrict_pk_equality_yields_alice () =
+  (* End-to-end check that [id = 1] still produces Alice once Translate
+     starts folding it to IndexLookup. The shape of the plan is verified
+     in test_translate.ml; this test pins the user-visible behaviour. *)
+  with_query_result "users | restrict id = 1" (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "Alice's row from PK lookup"
+        [ List.nth expected_users_rows 0 ]
+        rows)
+
+let test_restrict_pk_equality_with_missing_key_yields_no_rows () =
+  with_query_result "users | restrict id = 99" (fun rows ->
+      Alcotest.(check tuple_list_testable) "no rows for absent key" [] rows)
+
 let test_restrict_bare_bool_column_yields_active_rows () =
   with_query_result "users | restrict active" (fun rows ->
       Alcotest.(check int)
@@ -170,6 +184,10 @@ let () =
         [
           Alcotest.test_case "id = 3 yields Carol's row" `Quick
             test_restrict_equality_yields_one_row;
+          Alcotest.test_case "id = 1 yields Alice via PK lookup" `Quick
+            test_restrict_pk_equality_yields_alice;
+          Alcotest.test_case "id = 99 yields no rows via PK lookup" `Quick
+            test_restrict_pk_equality_with_missing_key_yields_no_rows;
           Alcotest.test_case "bare Bool column yields the active rows" `Quick
             test_restrict_bare_bool_column_yields_active_rows;
           Alcotest.test_case "constant-true comparison keeps every row" `Quick

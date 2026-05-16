@@ -10,10 +10,13 @@ let prompt = "> "
    -- so [try]/[with] necessarily catches errors from both evaluation and
    printing. *)
 let evaluate_and_print environment ~output ~show_physical logical =
-  let physical = Translate.translate logical in
-  if show_physical then Physical.format output physical;
   try
     Storage.with_read_transaction environment (fun transaction ->
+        let catalog table_name =
+          Catalog.get environment transaction ~table_name
+        in
+        let physical = Translate.translate ~catalog logical in
+        if show_physical then Physical.format output physical;
         Eval.eval environment transaction physical (fun relation ->
             Relation.print ~formatter:output relation))
   with Failure message -> Format.fprintf output "error: %s@." message

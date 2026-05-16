@@ -71,13 +71,17 @@ let test_show_physical_defaults_off_omits_plan () =
     (contains_substring output "FullScan")
 
 let test_show_physical_prints_plan_before_results () =
+  (* [restrict active] stays as Filter(FullScan) -- a predicate that
+     doesn't fold to IndexLookup, so the printed plan has two lines and
+     this test can check both the header and the indented input. *)
   let output =
-    run_with_input ~show_physical:true [ "users | restrict id = 3" ]
+    run_with_input ~show_physical:true [ "users | restrict active" ]
   in
-  check_contains "plan header line" output "Filter(id = 3)";
+  check_contains "plan header line" output "Filter(active)";
   check_contains "plan input line" output "FullScan(users)";
   (* The plan prints before the result table; assert ordering by checking
-     that "FullScan" appears before "Carol" in the captured output. *)
+     that "FullScan" appears before the first row's name in the captured
+     output. *)
   let plan_position =
     String.index output 'F'
     (* opening "FullScan" *)
@@ -85,7 +89,7 @@ let test_show_physical_prints_plan_before_results () =
   let row_position =
     let rec search position =
       if position >= String.length output - 5 then String.length output
-      else if String.sub output position 5 = "Carol" then position
+      else if String.sub output position 5 = "Alice" then position
       else search (position + 1)
     in
     search 0

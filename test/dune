@@ -10,6 +10,7 @@
   test_eval
   test_row_codec
   test_translate
+  test_translate_index_lookup
   test_lower
   test_parser
   test_physical
