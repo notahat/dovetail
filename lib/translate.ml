@@ -109,17 +109,117 @@ let try_index_lookup ~catalog ~table ~predicate =
                     (Physical.Filter { input = lookup; predicate = residual })))
       )
 
+(* If [logical] is a bare [Scan] whose catalog schema has a single-column
+   [Int64] primary key, return the table name and the PK column's name.
+   Anything else (a sub-plan that isn't a [Scan], an unknown table, a
+   composite or non-[Int64] PK) yields [None] and disqualifies the side
+   from being an indexed-join inner candidate. *)
+let inner_candidate ~catalog (logical : Logical.t) =
+  match logical with
+  | Scan { table } -> (
+      match catalog table with
+      | None -> None
+      | Some schema -> (
+          match single_int64_primary_key schema with
+          | None -> None
+          | Some primary_key_name -> Some (table, primary_key_name)))
+  | _ -> None
+
+(* True if [reference] is qualified to [table] and names [primary_key_name].
+   Step 2 requires qualified references: a bare column couldn't be reliably
+   attributed to a side of the cross product without resolving against a
+   combined schema, and the canonical join queries already produce qualified
+   references from the parser. *)
+let column_references_table_primary_key ~table ~primary_key_name
+    (reference : Schema.column_reference) =
+  reference.qualifier = Some table && reference.name = primary_key_name
+
+(* Recognise [predicate] as a column-on-column equality where exactly one
+   side is the candidate inner's PK column. Returns the *other* column
+   reference, which becomes the outer's probe key. Returns [None] when
+   neither or both sides match -- "both" rules out a self-join equality
+   like [users.id = users.id]. Step 2 only handles a bare [Compare];
+   conjunctions arrive in step 3. *)
+let try_join_pk_column_equality ~table ~primary_key_name
+    (predicate : Expression.t) =
+  match predicate with
+  | Compare
+      {
+        left = Column left_reference;
+        op = Equal;
+        right = Column right_reference;
+      } ->
+      let left_is_pk =
+        column_references_table_primary_key ~table ~primary_key_name
+          left_reference
+      in
+      let right_is_pk =
+        column_references_table_primary_key ~table ~primary_key_name
+          right_reference
+      in
+      if left_is_pk && not right_is_pk then Some right_reference
+      else if right_is_pk && not left_is_pk then Some left_reference
+      else None
+  | _ -> None
+
+(* Decide which side of [CrossProduct(left, right)] should be the inner
+   of an [IndexedNestedLoopJoin], based on [predicate]. Returns the
+   choice as [(outer_logical, inner_table, outer_key_column, inner_position)]
+   so the caller can recurse into the outer side. Returns [None] when no
+   side qualifies; in that case the caller falls back to [NestedLoopJoin].
+
+   When both sides qualify (e.g. two tables with PK [id] joined on
+   [a.id = b.id]), the tiebreaker prefers the right side as the inner,
+   so [inner_position = `Right]. This keeps the left-as-outer choice that
+   preserves the logical CrossProduct's column order when there is no
+   other reason to flip. *)
+let plan_indexed_join_match ~catalog ~left ~right ~predicate =
+  let consider candidate =
+    match candidate with
+    | None -> None
+    | Some (table, primary_key_name) -> (
+        match
+          try_join_pk_column_equality ~table ~primary_key_name predicate
+        with
+        | Some outer_key_column -> Some (table, outer_key_column)
+        | None -> None)
+  in
+  let left_candidate = inner_candidate ~catalog left in
+  let right_candidate = inner_candidate ~catalog right in
+  let left_match = consider left_candidate in
+  let right_match = consider right_candidate in
+  match (left_match, right_match) with
+  | Some _, Some (table, outer_key_column) ->
+      Some (left, table, outer_key_column, `Right)
+  | Some (table, outer_key_column), None ->
+      Some (right, table, outer_key_column, `Left)
+  | None, Some (table, outer_key_column) ->
+      Some (left, table, outer_key_column, `Right)
+  | None, None -> None
+
 let rec translate ~catalog (plan : Logical.t) : Physical.t =
   match plan with
   | Scan { table } -> FullScan { table }
-  (* Inner-join rewrite: must precede the general [Restrict] case below. *)
-  | Restrict { input = CrossProduct { left; right }; predicate } ->
-      NestedLoopJoin
-        {
-          left = translate ~catalog left;
-          right = translate ~catalog right;
-          predicate;
-        }
+  (* Inner-join rewrite: must precede the general [Restrict] case below.
+     Try the indexed strategy first; fall through to [NestedLoopJoin]
+     when no side has a PK-equality match against the predicate. *)
+  | Restrict { input = CrossProduct { left; right }; predicate } -> (
+      match plan_indexed_join_match ~catalog ~left ~right ~predicate with
+      | Some (outer_logical, inner_table, outer_key_column, inner_position) ->
+          IndexedNestedLoopJoin
+            {
+              outer = translate ~catalog outer_logical;
+              inner_table;
+              outer_key_column;
+              inner_position;
+            }
+      | None ->
+          NestedLoopJoin
+            {
+              left = translate ~catalog left;
+              right = translate ~catalog right;
+              predicate;
+            })
   (* PK point-lookup rewrite: fires when [predicate] is a bare equality
      between the scanned table's PK column and an [Int64] literal. Falls
      through to the general [Filter (FullScan ...)] form when the catalog

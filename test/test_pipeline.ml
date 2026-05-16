@@ -173,6 +173,80 @@ let test_join_yields_matched_pairs () =
         "six matched (user, order) pairs from parsed join"
         six_matched_user_order_pairs (List.length rows))
 
+(* The six matched (user, order) rows the canonical PK-equality join
+   produces, with users' columns first and orders' columns second.
+   Used by the indexed-join pipeline tests below to pin both row and
+   column order: the indexed rewrite picks orders as the outer (so
+   rows arrive in orders' primary-key order) and tags users as the
+   inner with inner_position = Left (so column order matches what the
+   pre-rewrite plan produced). *)
+let expected_join_rows : Schema.tuple list =
+  let user index = List.nth expected_users_rows index in
+  let order index = List.nth expected_orders_rows index in
+  let pair user_index order_index =
+    Array.append (user user_index) (order order_index)
+  in
+  [
+    pair 0 0;
+    (* Alice + Coffee *)
+    pair 0 1;
+    (* Alice + Bagel *)
+    pair 1 2;
+    (* Bob + Tea *)
+    pair 2 3;
+    (* Carol + Sandwich *)
+    pair 2 4;
+    (* Carol + Cake *)
+    pair 4 5;
+    (* Eve + Cookie *)
+  ]
+
+let test_indexed_join_yields_expected_rows_and_column_order () =
+  (* Translate now folds this query into an IndexedNestedLoopJoin
+     (orders streamed, users probed). The inner_position = Left tag
+     keeps the output columns in users.* / orders.* order -- the same
+     order the pre-rewrite NestedLoopJoin produced -- so existing
+     callers see no shape change. *)
+  with_query_result "users | join orders on users.id = orders.user_id"
+    (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "matched pairs in users.* / orders.* column order, orders PK row order"
+        expected_join_rows rows)
+
+let test_indexed_join_then_project_matches_readme_example () =
+  (* The README example query. Pins the project's row order against
+     the rendered table in the slice's Goal section. *)
+  with_query_result
+    "users | join orders on users.id = orders.user_id | project name, \
+     description, amount" (fun rows ->
+      let expected : Schema.tuple list =
+        [
+          [| Value.String "Alice"; Value.String "Coffee"; Value.Int64 5L |];
+          [| Value.String "Alice"; Value.String "Bagel"; Value.Int64 4L |];
+          [| Value.String "Bob"; Value.String "Tea"; Value.Int64 3L |];
+          [| Value.String "Carol"; Value.String "Sandwich"; Value.Int64 8L |];
+          [| Value.String "Carol"; Value.String "Cake"; Value.Int64 6L |];
+          [| Value.String "Eve"; Value.String "Cookie"; Value.Int64 2L |];
+        ]
+      in
+      Alcotest.(check tuple_list_testable)
+        "projected (name, description, amount) rows from README example"
+        expected rows)
+
+let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
+  (* Regression: the indexed rewrite only fires for column-on-column
+     equalities that name an inner's PK. An ordering predicate like
+     [users.id < orders.user_id] doesn't match, so this query keeps
+     running through the slice-5 NestedLoopJoin path. We don't assert
+     the plan shape directly here (test_translate_indexed_nested_loop_join
+     does), only that the end-to-end behaviour is unchanged. *)
+  with_query_result "users | cross orders | restrict users.id < orders.user_id"
+    (fun rows ->
+      (* Pair count: users.id < orders.user_id over the fixture's
+         5 users x 6 orders. user_ids in orders are 1,1,2,3,3,5. *)
+      Alcotest.(check int)
+        "nine pairs with users.id < orders.user_id" 9 (List.length rows))
+
 (* Evaluate [plan] against the populated fixture and render the result
    the way Repl does, returning the rendered string for substring
    assertions. Used by the IndexedNestedLoopJoin pipeline test, which
@@ -318,6 +392,17 @@ let () =
           Alcotest.test_case
             "hand-built IndexedNestedLoopJoin renders matched pairs" `Quick
             test_indexed_nested_loop_join_renders_matched_pairs;
+          Alcotest.test_case
+            "parsed join folds to IndexedNestedLoopJoin and keeps row and \
+             column order"
+            `Quick test_indexed_join_yields_expected_rows_and_column_order;
+          Alcotest.test_case
+            "parsed join then project matches the README example rows" `Quick
+            test_indexed_join_then_project_matches_readme_example;
+          Alcotest.test_case
+            "cross with an ordering predicate keeps the NestedLoopJoin path"
+            `Quick
+            test_cross_with_ordering_predicate_still_uses_nested_loop_join;
         ] );
       ( "errors",
         [
