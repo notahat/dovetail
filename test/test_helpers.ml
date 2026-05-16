@@ -199,6 +199,18 @@ let with_query_failure ~label ~expected query =
       Alcotest.check_raises label expected (fun () ->
           Eval.eval environment transaction physical (fun _relation -> ())))
 
+(** [evaluate_against_fixture plan] populates the standard fixture and evaluates
+    [plan] inside a read transaction, returning the resulting schema and tuples.
+    The temp directory, LMDB environment, fixture population, and read
+    transaction are all set up and torn down around the call. *)
+let evaluate_against_fixture plan =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      Eval.eval environment transaction plan (fun relation ->
+          (relation.schema, List.of_seq relation.tuples)))
+
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)
 let contains_substring haystack needle =
