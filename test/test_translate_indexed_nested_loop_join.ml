@@ -3,15 +3,13 @@
     The rewrite widens the existing
     [Restrict (CrossProduct (left, right), predicate)] arm: when one side is a
     bare [Scan] whose catalog schema has a single-column [Int64] primary key,
-    and the predicate is a cross-side equality naming that PK column on exactly
-    one side, translate emits an [IndexedNestedLoopJoin] streaming the other
-    side. Every other shape (no matching PK, non-bare scans, non-equality
-    predicates, conjunctions) falls through to today's
-    {!Physical.NestedLoopJoin}.
-
-    Step 2's recogniser is deliberately narrow: only the bare
-    [Compare (Column, Equal, Column)] shape is matched. Conjunct flattening
-    arrives in step 3.
+    and the predicate contains a cross-side equality naming that PK column on
+    exactly one side, translate emits an [IndexedNestedLoopJoin] streaming the
+    other side. Step 3 generalises step 2's bare-[Compare] match to a conjunct
+    walk: the [predicate] is flattened, the first PK-equality conjunct is folded
+    into the indexed join, and any remaining conjuncts become a wrapping
+    [Filter]. Every other shape (no matching PK, non-bare scans, no PK-equality
+    conjunct) falls through to today's {!Physical.NestedLoopJoin}.
 
     Each test builds its own in-test catalog so the unit tests don't need a live
     LMDB environment; pipeline-level integration tests live in
@@ -361,13 +359,74 @@ let test_both_sides_reference_the_same_scan_falls_back () =
        })
     physical
 
-let test_conjunction_predicate_falls_back_in_step_2 () =
-  (* Step 2 only recognises a bare [Compare]. Any [And] at the top
-     level (or nested) falls through; step 3 will partition the
-     conjunct list and absorb a PK-eq into the indexed join. *)
+let test_multiple_pk_eqs_pick_the_first_conjunct () =
+  (* Two PK-equalities, each matching a *different* candidate:
+     conjunct 0 (users.id = admins.level) matches the users candidate
+     only; conjunct 1 (users.active = admins.id) matches the admins
+     candidate only. The "first in conjunct order wins" rule means
+     users is folded as inner; conjunct 1 stays in the residual. *)
+  let users_id_equals_admins_level =
+    expression_compare ~left:(Column users_id_column) ~op:Equal
+      ~right:(expression_qualified_column ~qualifier:"admins" ~name:"level")
+  in
+  let users_active_equals_admins_id =
+    expression_compare
+      ~left:(expression_qualified_column ~qualifier:"users" ~name:"active")
+      ~op:Equal ~right:(Column admins_id_column)
+  in
   let predicate =
-    expression_and ~left:users_id_equals_orders_user_id
-      ~right:(expression_column "active")
+    expression_and ~left:users_id_equals_admins_level
+      ~right:users_active_equals_admins_id
+  in
+  let logical : Logical.t =
+    Restrict
+      {
+        input =
+          CrossProduct
+            {
+              left = Scan { table = "users" };
+              right = Scan { table = "admins" };
+            };
+        predicate;
+      }
+  in
+  let physical =
+    Translate.translate ~catalog:users_and_admins_catalog logical
+  in
+  Alcotest.(check physical_testable)
+    "first PK-eq conjunct wins; later PK-eq goes to residual"
+    (Physical.Filter
+       {
+         input =
+           Physical.IndexedNestedLoopJoin
+             {
+               outer = Physical.FullScan { table = "admins" };
+               inner_table = "users";
+               outer_key_column =
+                 qualified_column_reference ~qualifier:"admins" ~name:"level";
+               inner_position = `Left;
+             };
+         predicate = users_active_equals_admins_id;
+       })
+    physical
+
+let test_nested_and_tree_flattens_before_partitioning () =
+  (* [(users.id = orders.user_id and r1) and r2]: a left-nested [And]
+     tree. The partitioning step flattens it into [pk_eq; r1; r2] and
+     folds the PK-eq, leaving [r1 and r2] in the residual. The residual
+     conjuncts rebuild left-associatively, mirroring the parser's
+     and-chains. *)
+  let r1 = expression_column "active" in
+  let r2 =
+    expression_compare
+      ~left:(expression_qualified_column ~qualifier:"orders" ~name:"amount")
+      ~op:Greater
+      ~right:(expression_literal (Value.Int64 5L))
+  in
+  let predicate =
+    expression_and
+      ~left:(expression_and ~left:users_id_equals_orders_user_id ~right:r1)
+      ~right:r2
   in
   let logical : Logical.t =
     Restrict
@@ -385,7 +444,192 @@ let test_conjunction_predicate_falls_back_in_step_2 () =
     Translate.translate ~catalog:users_and_orders_catalog logical
   in
   Alcotest.(check physical_testable)
-    "predicate with And -> NestedLoopJoin fallback (step 3 handles this)"
+    "nested And tree flattens; residual rebuilt left-associatively"
+    (Physical.Filter
+       {
+         input =
+           Physical.IndexedNestedLoopJoin
+             {
+               outer = Physical.FullScan { table = "orders" };
+               inner_table = "users";
+               outer_key_column = orders_user_id_column;
+               inner_position = `Left;
+             };
+         predicate = expression_and ~left:r1 ~right:r2;
+       })
+    physical
+
+let test_reversed_conjunct_order_folds_to_the_same_plan () =
+  (* [orders.amount > 5 and users.id = orders.user_id]: same conjuncts
+     as the canonical residual case, but with the PK-eq conjunct in the
+     trailing position. The partition walk finds the PK-eq wherever it
+     sits, so the resulting plan is identical to the leading-PK-eq
+     version (residual conjuncts otherwise preserve order). *)
+  let residual = expression_column "active" in
+  let predicate =
+    expression_and ~left:residual ~right:users_id_equals_orders_user_id
+  in
+  let logical : Logical.t =
+    Restrict
+      {
+        input =
+          CrossProduct
+            {
+              left = Scan { table = "users" };
+              right = Scan { table = "orders" };
+            };
+        predicate;
+      }
+  in
+  let physical =
+    Translate.translate ~catalog:users_and_orders_catalog logical
+  in
+  Alcotest.(check physical_testable)
+    "reversed conjunct order folds to the same Filter(residual, INLJ)"
+    (Physical.Filter
+       {
+         input =
+           Physical.IndexedNestedLoopJoin
+             {
+               outer = Physical.FullScan { table = "orders" };
+               inner_table = "users";
+               outer_key_column = orders_user_id_column;
+               inner_position = `Left;
+             };
+         predicate = residual;
+       })
+    physical
+
+let test_pk_equality_with_residual_conjunct_folds_and_wraps_in_filter () =
+  (* [users.id = orders.user_id and active]: the PK-equality conjunct
+     folds into the IndexedNestedLoopJoin; the [active] conjunct stays
+     in a wrapping Filter. (The bare [active] reference is resolved
+     against the join's combined schema at eval time, the same way the
+     pre-fold NestedLoopJoin would have resolved it.) *)
+  let residual = expression_column "active" in
+  let predicate =
+    expression_and ~left:users_id_equals_orders_user_id ~right:residual
+  in
+  let logical : Logical.t =
+    Restrict
+      {
+        input =
+          CrossProduct
+            {
+              left = Scan { table = "users" };
+              right = Scan { table = "orders" };
+            };
+        predicate;
+      }
+  in
+  let physical =
+    Translate.translate ~catalog:users_and_orders_catalog logical
+  in
+  Alcotest.(check physical_testable)
+    "PK-eq + residual -> Filter(residual, IndexedNestedLoopJoin(...))"
+    (Physical.Filter
+       {
+         input =
+           Physical.IndexedNestedLoopJoin
+             {
+               outer = Physical.FullScan { table = "orders" };
+               inner_table = "users";
+               outer_key_column = orders_user_id_column;
+               inner_position = `Left;
+             };
+         predicate = residual;
+       })
+    physical
+
+let test_on_clause_and_trailing_restrict_produce_the_same_plan () =
+  (* Slice-9 invariant: a conjunct lives in the same physical plan
+     whether the user spells it on the [on]-clause or in a trailing
+     [| restrict]. Building both as logical plans:
+
+       (a) Restrict(CrossProduct, pk_eq and amount_gt)
+       (b) Restrict(Restrict(CrossProduct, pk_eq), amount_gt)
+
+     ... and translating both should produce equal Physical.t values.
+     Without partitioning (or with a pushdown rule that ran on (a)
+     only), the two forms would diverge -- the user's stylistic choice
+     would silently change performance. *)
+  let amount_greater_than_five =
+    expression_compare
+      ~left:(expression_qualified_column ~qualifier:"orders" ~name:"amount")
+      ~op:Greater
+      ~right:(expression_literal (Value.Int64 5L))
+  in
+  let cross_product : Logical.t =
+    CrossProduct
+      { left = Scan { table = "users" }; right = Scan { table = "orders" } }
+  in
+  let on_clause_form : Logical.t =
+    Restrict
+      {
+        input = cross_product;
+        predicate =
+          expression_and ~left:users_id_equals_orders_user_id
+            ~right:amount_greater_than_five;
+      }
+  in
+  let trailing_restrict_form : Logical.t =
+    Restrict
+      {
+        input =
+          Restrict
+            {
+              input = cross_product;
+              predicate = users_id_equals_orders_user_id;
+            };
+        predicate = amount_greater_than_five;
+      }
+  in
+  let from_on_clause =
+    Translate.translate ~catalog:users_and_orders_catalog on_clause_form
+  in
+  let from_trailing_restrict =
+    Translate.translate ~catalog:users_and_orders_catalog trailing_restrict_form
+  in
+  Alcotest.(check physical_testable)
+    "on-clause [and] and trailing [| restrict] yield the same plan"
+    from_on_clause from_trailing_restrict
+
+let test_conjunction_with_no_pk_equality_falls_back () =
+  (* [users.name = orders.description and orders.amount > 5]: every
+     conjunct involves non-PK columns, so no candidate's PK is named
+     by any conjunct. Falls back to NestedLoopJoin carrying the full
+     predicate (not partitioned). *)
+  let conjunct_a =
+    expression_compare
+      ~left:(expression_qualified_column ~qualifier:"users" ~name:"name")
+      ~op:Equal
+      ~right:
+        (expression_qualified_column ~qualifier:"orders" ~name:"description")
+  in
+  let conjunct_b =
+    expression_compare
+      ~left:(expression_qualified_column ~qualifier:"orders" ~name:"amount")
+      ~op:Greater
+      ~right:(expression_literal (Value.Int64 5L))
+  in
+  let predicate = expression_and ~left:conjunct_a ~right:conjunct_b in
+  let logical : Logical.t =
+    Restrict
+      {
+        input =
+          CrossProduct
+            {
+              left = Scan { table = "users" };
+              right = Scan { table = "orders" };
+            };
+        predicate;
+      }
+  in
+  let physical =
+    Translate.translate ~catalog:users_and_orders_catalog logical
+  in
+  Alcotest.(check physical_testable)
+    "conjunction with no PK-eq -> NestedLoopJoin with the full predicate"
     (Physical.NestedLoopJoin
        {
          left = Physical.FullScan { table = "users" };
@@ -429,6 +673,22 @@ let () =
           Alcotest.test_case
             "both sides qualify -> tiebreaker picks right as inner" `Quick
             test_both_sides_qualify_tiebreaker_picks_right_as_inner;
+          Alcotest.test_case
+            "PK-eq + residual conjunct folds into Filter(residual, \
+             IndexedNestedLoopJoin)"
+            `Quick
+            test_pk_equality_with_residual_conjunct_folds_and_wraps_in_filter;
+          Alcotest.test_case
+            "reversed conjunct order (residual first) folds to the same plan"
+            `Quick test_reversed_conjunct_order_folds_to_the_same_plan;
+          Alcotest.test_case "nested And tree flattens before partitioning"
+            `Quick test_nested_and_tree_flattens_before_partitioning;
+          Alcotest.test_case
+            "multiple PK-eqs across different candidates: first conjunct wins"
+            `Quick test_multiple_pk_eqs_pick_the_first_conjunct;
+          Alcotest.test_case
+            "on-clause [and] and trailing [| restrict] produce the same plan"
+            `Quick test_on_clause_and_trailing_restrict_produce_the_same_plan;
         ] );
       ( "no fold",
         [
@@ -443,8 +703,8 @@ let () =
             "both sides of the equality reference the same scan falls back"
             `Quick test_both_sides_reference_the_same_scan_falls_back;
           Alcotest.test_case
-            "predicate with And falls back in step 2 (step 3 closes this)"
-            `Quick test_conjunction_predicate_falls_back_in_step_2;
+            "conjunction with no PK-equality conjunct falls back" `Quick
+            test_conjunction_with_no_pk_equality_falls_back;
           Alcotest.test_case "inner table catalog miss falls back" `Quick
             test_inner_table_catalog_miss_falls_back;
         ] );

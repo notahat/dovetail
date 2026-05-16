@@ -233,6 +233,41 @@ let test_indexed_join_then_project_matches_readme_example () =
         "projected (name, description, amount) rows from README example"
         expected rows)
 
+(* The three matched (user, order) rows that survive an
+   [orders.amount >= 5] filter on top of the indexed join. Carved out
+   of [expected_join_rows] so both forms of the residual-filter query
+   (on-clause [and], trailing [| restrict]) can assert against it. *)
+let expected_join_rows_with_amount_at_least_five : Schema.tuple list =
+  [
+    List.nth expected_join_rows 0;
+    (* Alice + Coffee, amount 5 *)
+    List.nth expected_join_rows 3;
+    (* Carol + Sandwich, amount 8 *)
+    List.nth expected_join_rows 4;
+    (* Carol + Cake, amount 6 *)
+  ]
+
+let test_indexed_join_with_on_clause_residual_yields_filtered_rows () =
+  (* The [on]-clause [and] form: the PK-eq folds into the indexed join,
+     [orders.amount >= 5] becomes a wrapping Filter. *)
+  with_query_result
+    "users | join orders on users.id = orders.user_id and orders.amount >= 5"
+    (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "PK-eq folded; amount >= 5 applied by wrapping Filter"
+        expected_join_rows_with_amount_at_least_five rows)
+
+let test_indexed_join_with_trailing_restrict_yields_same_rows () =
+  (* The trailing [| restrict] form. The slice-9 syntactic-equivalence
+     invariant says this must produce the same physical plan -- and so
+     the same rows -- as the on-clause [and] form above. *)
+  with_query_result
+    "users | join orders on users.id = orders.user_id | restrict orders.amount \
+     >= 5" (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "trailing restrict yields the same rows as the on-clause [and] form"
+        expected_join_rows_with_amount_at_least_five rows)
+
 let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
   (* Regression: the indexed rewrite only fires for column-on-column
      equalities that name an inner's PK. An ordering predicate like
@@ -399,6 +434,13 @@ let () =
           Alcotest.test_case
             "parsed join then project matches the README example rows" `Quick
             test_indexed_join_then_project_matches_readme_example;
+          Alcotest.test_case
+            "parsed join with on-clause [and] residual returns filtered rows"
+            `Quick
+            test_indexed_join_with_on_clause_residual_yields_filtered_rows;
+          Alcotest.test_case
+            "parsed join with trailing | restrict yields the same rows" `Quick
+            test_indexed_join_with_trailing_restrict_yields_same_rows;
           Alcotest.test_case
             "cross with an ordering predicate keeps the NestedLoopJoin path"
             `Quick
