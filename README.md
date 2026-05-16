@@ -125,8 +125,8 @@ lands in a later slice it goes away.
 | `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| Join \| ...` | What the user typed, structured. No semantics yet.                                                                                |
 | `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes. `Ast.Join` desugars to `Logical.Restrict (Logical.CrossProduct ..., predicate)`. |
 | `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×.                  |
-| `Translate` | `Logical.t -> Physical.t`                      | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; future home of further optimisation. |
-| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| NestedLoopJoin \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, future hash joins, etc.                  |
+| `Translate` | `catalog:(string -> Schema.t option) -> Logical.t -> Physical.t` | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; folds `Restrict (Scan, pk = literal)` into an `IndexLookup` when the catalog says the PK matches. Future home of further optimisation. |
+| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| IndexLookup \| NestedLoopJoin \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, primary-key point lookups, future hash joins, etc. |
 | `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
 | `Projection`| `t = Schema.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
 | `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |
@@ -156,26 +156,20 @@ Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
 sub-steps; the ordering here is firm, but the scope of slices 11–13 will
 be pinned down when those slices start.
 
-1. **Slice 8 — Primary-key point lookup.** In flight. `restrict
-   pk = literal` becomes an `IndexLookup` that fetches the
-   single matching row via `Storage.get` instead of a full scan.
-   First time `Translate` picks a physical strategy based on the
-   predicate's shape. Range scans are deferred until a workload
-   motivates them.
-2. **Slice 9 — Indexed nested-loop join over the primary key.** Makes
+1. **Slice 9 — Indexed nested-loop join over the primary key.** Makes
    joins efficient when one side's join column is the primary key — one
    full scan of the outer, one PK probe per row. No secondary indexes
    yet; those wait for a workload that motivates them.
-3. **Slice 10 — Query-language documentation.** Short tutorial intro
+2. **Slice 10 — Query-language documentation.** Short tutorial intro
    followed by reference sections for each operator and for the
    expression and projection sublanguages. Covers only what exists.
-4. **Slice 11 — DML as an RA-language extension.** Statement-level
+3. **Slice 11 — DML as an RA-language extension.** Statement-level
    forms for inserting rows, alongside the existing pipeline syntax.
    Update and delete may land here or follow on. Exercised against the
    existing fixture.
-5. **Slice 12 — DDL as an RA-language extension.** Statement-level
+4. **Slice 12 — DDL as an RA-language extension.** Statement-level
    `create table` and `drop table`. Replaces the fixture-creation path.
-6. **Slice 13 — Minimal SQL frontend.** A second front-end — SQL
+5. **Slice 13 — Minimal SQL frontend.** A second front-end — SQL
    parser, SQL AST, SQL→logical lowering — feeding the existing logical
    and physical IRs. Deliberately limited (no NULLs, scope otherwise
    TBD): the focus is on how the architecture splits between two
@@ -187,6 +181,7 @@ Unordered backlog. Some items are foundational, some are operator
 additions, some are tooling and infrastructure; the order they land in
 is not committed to here.
 
+- Primary key range lookups.
 - Secondary indexes on columns other than the primary key.
 - Hash join, for joins where neither side has a useful index.
 - NULL values and option-typed columns. Cross-cutting: touches `Value`,
