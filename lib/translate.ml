@@ -41,10 +41,53 @@ let try_primary_key_equality_literal ~table ~primary_key_name
       Some key
   | _ -> None
 
-(* Try to rewrite [Restrict (Scan table, predicate)] as an [IndexLookup].
+(* Flatten a conjunction tree into a list of leaf conjuncts, in
+   left-to-right order. [And] nodes nest arbitrarily -- both
+   [(a And b) And c] and [a And (b And c)] flatten to [[a; b; c]] -- so
+   the partitioning step below sees a flat list regardless of how the
+   parser associated the [and]s. Non-[And] expressions return as a
+   single-element list. *)
+let rec flatten_conjunction (expression : Expression.t) =
+  match expression with
+  | And (left, right) -> flatten_conjunction left @ flatten_conjunction right
+  | leaf -> [ leaf ]
+
+(* Walk [conjuncts] in order looking for the first PK-equality with an
+   [Int64] literal. If found, return the literal key plus the remaining
+   conjuncts (with the matching one removed, order otherwise preserved).
+   Two PK-equalities in the same conjunction are handled the simple way:
+   the first is folded into the lookup, the rest stay in the residual --
+   the runtime [Filter] will then evaluate them against the fetched row,
+   which is correct even when the constants disagree. *)
+let partition_primary_key_conjunct ~table ~primary_key_name conjuncts =
+  let rec walk before = function
+    | [] -> None
+    | conjunct :: after -> (
+        match
+          try_primary_key_equality_literal ~table ~primary_key_name conjunct
+        with
+        | Some key -> Some (key, List.rev_append before after)
+        | None -> walk (conjunct :: before) after)
+  in
+  walk [] conjuncts
+
+(* Fold a non-empty list of conjuncts back into a left-associative [And]
+   tree, mirroring how the parser produces left-associative [and] chains.
+   Returns [None] for the empty list so the caller can omit the wrapping
+   [Filter] when every conjunct has been absorbed into the [IndexLookup]. *)
+let build_conjunction = function
+  | [] -> None
+  | first :: rest ->
+      Some
+        (List.fold_left
+           (fun left right : Expression.t -> And (left, right))
+           first rest)
+
+(* Try to rewrite [Restrict (Scan table, predicate)] as an [IndexLookup],
+   possibly wrapped in a [Filter] carrying the predicate's other conjuncts.
    Returns [None] when any precondition fails (no catalog entry, composite
-   or non-[Int64] PK, predicate doesn't match the PK-equality shape), in
-   which case the caller falls back to [Filter (FullScan ...)]. *)
+   or non-[Int64] PK, no PK-equality conjunct), in which case the caller
+   falls back to [Filter (FullScan ...)]. *)
 let try_index_lookup ~catalog ~table ~predicate =
   match catalog table with
   | None -> None
@@ -52,11 +95,19 @@ let try_index_lookup ~catalog ~table ~predicate =
       match single_int64_primary_key schema with
       | None -> None
       | Some primary_key_name -> (
+          let conjuncts = flatten_conjunction predicate in
           match
-            try_primary_key_equality_literal ~table ~primary_key_name predicate
+            partition_primary_key_conjunct ~table ~primary_key_name conjuncts
           with
           | None -> None
-          | Some key -> Some (Physical.IndexLookup { table; key })))
+          | Some (key, residual_conjuncts) -> (
+              let lookup = Physical.IndexLookup { table; key } in
+              match build_conjunction residual_conjuncts with
+              | None -> Some lookup
+              | Some residual ->
+                  Some
+                    (Physical.Filter { input = lookup; predicate = residual })))
+      )
 
 let rec translate ~catalog (plan : Logical.t) : Physical.t =
   match plan with

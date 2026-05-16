@@ -156,10 +156,9 @@ let test_pk_ordering_comparison_does_not_fold () =
        { input = Physical.FullScan { table = "users" }; predicate })
     physical
 
-let test_conjunction_predicate_does_not_fold_yet () =
-  (* Step 2 only handles bare [Compare] predicates; conjunctions arrive
-     in step 3. [id = 5 and active] should keep going through Filter
-     until then. *)
+let test_pk_equality_with_residual_conjunct_folds () =
+  (* [id = 5 and active] partitions: [id = 5] folds into the lookup,
+     [active] stays as the Filter's predicate. *)
   let predicate =
     expression_and
       ~left:(id_equals_int64_literal 5L)
@@ -168,7 +167,129 @@ let test_conjunction_predicate_does_not_fold_yet () =
   let logical = scan_users_restricted_by predicate in
   let physical = Translate.translate ~catalog:users_catalog logical in
   Alcotest.(check physical_testable)
-    "stays as Filter(FullScan) -- partitioning is step 3"
+    "Filter(active, IndexLookup(users, 5))"
+    (Physical.Filter
+       {
+         input = Physical.IndexLookup { table = "users"; key = 5L };
+         predicate = expression_column "active";
+       })
+    physical
+
+let test_residual_then_pk_equality_folds () =
+  (* Same as above but with the PK conjunct on the right side of the [And].
+     The partitioning has to find it regardless of position. *)
+  let predicate =
+    expression_and
+      ~left:(expression_column "active")
+      ~right:(id_equals_int64_literal 5L)
+  in
+  let logical = scan_users_restricted_by predicate in
+  let physical = Translate.translate ~catalog:users_catalog logical in
+  Alcotest.(check physical_testable)
+    "Filter(active, IndexLookup(users, 5))"
+    (Physical.Filter
+       {
+         input = Physical.IndexLookup { table = "users"; key = 5L };
+         predicate = expression_column "active";
+       })
+    physical
+
+let test_two_pk_equalities_keep_first_and_drop_rest_into_residual () =
+  (* [id = 5 and id = 7] is a contradiction at runtime; we don't try to
+     constant-fold. The first PK-equality folds; the second stays in the
+     residual Filter and evaluates to false against the fetched row. *)
+  let predicate =
+    expression_and
+      ~left:(id_equals_int64_literal 5L)
+      ~right:(id_equals_int64_literal 7L)
+  in
+  let logical = scan_users_restricted_by predicate in
+  let physical = Translate.translate ~catalog:users_catalog logical in
+  Alcotest.(check physical_testable)
+    "Filter(id = 7, IndexLookup(users, 5))"
+    (Physical.Filter
+       {
+         input = Physical.IndexLookup { table = "users"; key = 5L };
+         predicate = id_equals_int64_literal 7L;
+       })
+    physical
+
+let test_three_way_conjunction_rebuilds_two_conjunct_residual () =
+  (* [id = 5 and name = "Alice" and active] parses left-associative as
+     [(id = 5 and name = "Alice") and active]. Flattening yields three
+     conjuncts; [id = 5] folds; the residual rebuilds as
+     [name = "Alice" and active] (left-associative). *)
+  let name_equals_alice =
+    expression_compare ~left:(expression_column "name") ~op:Equal
+      ~right:(expression_literal (Value.String "Alice"))
+  in
+  let predicate =
+    expression_and
+      ~left:
+        (expression_and
+           ~left:(id_equals_int64_literal 5L)
+           ~right:name_equals_alice)
+      ~right:(expression_column "active")
+  in
+  let logical = scan_users_restricted_by predicate in
+  let physical = Translate.translate ~catalog:users_catalog logical in
+  let expected_residual =
+    expression_and ~left:name_equals_alice ~right:(expression_column "active")
+  in
+  Alcotest.(check physical_testable)
+    "Filter(name = \"Alice\" and active, IndexLookup(users, 5))"
+    (Physical.Filter
+       {
+         input = Physical.IndexLookup { table = "users"; key = 5L };
+         predicate = expected_residual;
+       })
+    physical
+
+let test_right_associative_nesting_flattens () =
+  (* Same three-conjunct predicate but parenthesised the other way:
+     [active and (id = 5 and name = "Alice")]. Flattening must walk both
+     sides of the [And] tree so the PK conjunct in the middle is still
+     found. *)
+  let name_equals_alice =
+    expression_compare ~left:(expression_column "name") ~op:Equal
+      ~right:(expression_literal (Value.String "Alice"))
+  in
+  let predicate =
+    expression_and
+      ~left:(expression_column "active")
+      ~right:
+        (expression_and
+           ~left:(id_equals_int64_literal 5L)
+           ~right:name_equals_alice)
+  in
+  let logical = scan_users_restricted_by predicate in
+  let physical = Translate.translate ~catalog:users_catalog logical in
+  let expected_residual =
+    expression_and ~left:(expression_column "active") ~right:name_equals_alice
+  in
+  Alcotest.(check physical_testable)
+    "Filter(active and name = \"Alice\", IndexLookup(users, 5))"
+    (Physical.Filter
+       {
+         input = Physical.IndexLookup { table = "users"; key = 5L };
+         predicate = expected_residual;
+       })
+    physical
+
+let test_conjunction_with_no_pk_equality_does_not_fold () =
+  (* No conjunct names the PK; the rewrite must not invent one and must
+     keep the original predicate intact for [Filter (FullScan ...)]. *)
+  let name_equals_alice =
+    expression_compare ~left:(expression_column "name") ~op:Equal
+      ~right:(expression_literal (Value.String "Alice"))
+  in
+  let predicate =
+    expression_and ~left:name_equals_alice ~right:(expression_column "active")
+  in
+  let logical = scan_users_restricted_by predicate in
+  let physical = Translate.translate ~catalog:users_catalog logical in
+  Alcotest.(check physical_testable)
+    "stays as Filter(FullScan)"
     (Physical.Filter
        { input = Physical.FullScan { table = "users" }; predicate })
     physical
@@ -288,9 +409,28 @@ let () =
           Alcotest.test_case
             "ordering comparison on the PK column does not fold" `Quick
             test_pk_ordering_comparison_does_not_fold;
+          Alcotest.test_case "conjunction with no PK equality does not fold"
+            `Quick test_conjunction_with_no_pk_equality_does_not_fold;
+        ] );
+      ( "conjunct partitioning",
+        [
           Alcotest.test_case
-            "conjunction predicate does not fold yet (step 3 work)" `Quick
-            test_conjunction_predicate_does_not_fold_yet;
+            "PK = literal and <other> folds with the other as a residual Filter"
+            `Quick test_pk_equality_with_residual_conjunct_folds;
+          Alcotest.test_case
+            "<other> and PK = literal also folds (position-independent)" `Quick
+            test_residual_then_pk_equality_folds;
+          Alcotest.test_case
+            "two PK equalities keep the first and drop the rest into the \
+             residual"
+            `Quick test_two_pk_equalities_keep_first_and_drop_rest_into_residual;
+          Alcotest.test_case
+            "three-way conjunction with one PK equality rebuilds a \
+             two-conjunct residual"
+            `Quick test_three_way_conjunction_rebuilds_two_conjunct_residual;
+          Alcotest.test_case
+            "right-associative nesting flattens for partitioning" `Quick
+            test_right_associative_nesting_flattens;
         ] );
       ( "catalog preconditions",
         [

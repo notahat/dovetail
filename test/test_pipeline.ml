@@ -42,6 +42,27 @@ let test_restrict_pk_equality_with_missing_key_yields_no_rows () =
   with_query_result "users | restrict id = 99" (fun rows ->
       Alcotest.(check tuple_list_testable) "no rows for absent key" [] rows)
 
+let test_restrict_pk_equality_with_residual_keeps_matching_row () =
+  (* [id = 1 and active] partitions: [id = 1] folds, [active] stays in
+     the residual Filter. Alice is active, so the row survives. *)
+  with_query_result "users | restrict id = 1 and active" (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "Alice's row from PK lookup + residual Filter"
+        [ List.nth expected_users_rows 0 ]
+        rows)
+
+let test_restrict_pk_equality_with_residual_filters_out_inactive_row () =
+  (* [id = 2 and active] looks up Bob, then the residual Filter rejects
+     him because [active] is false. *)
+  with_query_result "users | restrict id = 2 and active" (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "Bob's row dropped by the residual Filter" [] rows)
+
+let test_restrict_pk_equality_with_missing_key_and_residual_yields_no_rows () =
+  with_query_result "users | restrict id = 99 and active" (fun rows ->
+      Alcotest.(check tuple_list_testable)
+        "no rows when the PK lookup misses, regardless of the residual" [] rows)
+
 let test_restrict_bare_bool_column_yields_active_rows () =
   with_query_result "users | restrict active" (fun rows ->
       Alcotest.(check int)
@@ -188,6 +209,15 @@ let () =
             test_restrict_pk_equality_yields_alice;
           Alcotest.test_case "id = 99 yields no rows via PK lookup" `Quick
             test_restrict_pk_equality_with_missing_key_yields_no_rows;
+          Alcotest.test_case
+            "id = 1 and active yields Alice via PK lookup and residual filter"
+            `Quick test_restrict_pk_equality_with_residual_keeps_matching_row;
+          Alcotest.test_case
+            "id = 2 and active yields no rows because Bob is inactive" `Quick
+            test_restrict_pk_equality_with_residual_filters_out_inactive_row;
+          Alcotest.test_case
+            "id = 99 and active yields no rows when the PK lookup misses" `Quick
+            test_restrict_pk_equality_with_missing_key_and_residual_yields_no_rows;
           Alcotest.test_case "bare Bool column yields the active rows" `Quick
             test_restrict_bare_bool_column_yields_active_rows;
           Alcotest.test_case "constant-true comparison keeps every row" `Quick
