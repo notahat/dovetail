@@ -84,6 +84,42 @@ let test_index_lookup_renders_with_table_and_key () =
     "IndexLookup renders table and key on a single line"
     "IndexLookup(users, key=3)\n" (format_to_string plan)
 
+let test_indexed_nested_loop_join_renders_with_inner_position_left () =
+  let plan : Physical.t =
+    IndexedNestedLoopJoin
+      {
+        outer = orders_full_scan;
+        inner_table = "users";
+        outer_key_column =
+          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+        inner_position = `Left;
+      }
+  in
+  Alcotest.(check string)
+    "IndexedNestedLoopJoin renders header fields and indents outer"
+    "IndexedNestedLoopJoin(inner=users, outer_key=orders.user_id, \
+     inner_position=Left)\n\
+    \  FullScan(orders)\n"
+    (format_to_string plan)
+
+let test_indexed_nested_loop_join_renders_with_inner_position_right () =
+  let plan : Physical.t =
+    IndexedNestedLoopJoin
+      {
+        outer = orders_full_scan;
+        inner_table = "users";
+        outer_key_column =
+          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+        inner_position = `Right;
+      }
+  in
+  Alcotest.(check string)
+    "IndexedNestedLoopJoin renders inner_position=Right"
+    "IndexedNestedLoopJoin(inner=users, outer_key=orders.user_id, \
+     inner_position=Right)\n\
+    \  FullScan(orders)\n"
+    (format_to_string plan)
+
 let test_nested_indentation_compounds () =
   (* A Filter wrapping a CrossProduct: confirms that each level of nesting
      adds two spaces, not just the immediate one. *)
@@ -120,6 +156,12 @@ let () =
             `Quick test_nested_loop_join_renders_predicate_and_both_inputs;
           Alcotest.test_case "IndexLookup renders table and key" `Quick
             test_index_lookup_renders_with_table_and_key;
+          Alcotest.test_case
+            "IndexedNestedLoopJoin renders with inner_position=Left" `Quick
+            test_indexed_nested_loop_join_renders_with_inner_position_left;
+          Alcotest.test_case
+            "IndexedNestedLoopJoin renders with inner_position=Right" `Quick
+            test_indexed_nested_loop_join_renders_with_inner_position_right;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
         ] );

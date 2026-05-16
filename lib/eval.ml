@@ -78,6 +78,10 @@ let rec eval environment transaction plan continue =
   | NestedLoopJoin { left; right; predicate } ->
       evaluate_nested_loop_join environment transaction ~left ~right ~predicate
         continue
+  | IndexedNestedLoopJoin
+      { outer; inner_table; outer_key_column; inner_position } ->
+      evaluate_indexed_nested_loop_join environment transaction ~outer
+        ~inner_table ~outer_key_column ~inner_position continue
 
 (* Stream the input through [eval], then wrap its tuple seq in a
    [Seq.filter] guarded by the resolved predicate. The schema is unchanged.
@@ -128,6 +132,80 @@ and evaluate_cross_product environment transaction ~left ~right continue =
         List.to_seq right_tuples
         |> Seq.map (fun right_tuple -> Array.append left_tuple right_tuple))
       left_relation.tuples
+  in
+  continue { schema = combined_schema; tuples = combined_tuples }
+
+(* Resolve [outer_key_column] against the outer relation's schema and
+   verify that the resolved field is the [Int64] kind required by the
+   inner's primary-key encoding. Raises [Failure] on either resolution
+   failure or a kind mismatch. Returns the column's zero-based position
+   in an outer tuple. *)
+and resolve_int64_outer_key_position outer_schema outer_key_column =
+  let position, field =
+    match Schema.find_field outer_schema outer_key_column with
+    | Ok result -> result
+    | Error message ->
+        failwith
+          (Printf.sprintf "Eval: IndexedNestedLoopJoin outer key column: %s"
+             message)
+  in
+  match field.kind with
+  | Int64 -> position
+  | other_kind ->
+      failwith
+        (Printf.sprintf
+           "Eval: IndexedNestedLoopJoin requires Int64 outer key column, got \
+            %s for %S"
+           (Value.Kind.to_string other_kind)
+           (Schema.format_column_reference outer_key_column))
+
+(* Stream the [outer] sub-plan and probe [inner_table]'s storage by the
+   outer tuple's value at [outer_key_column]. Each outer tuple yields
+   one combined row when the probe hits, and is dropped when it misses.
+   The combined schema and tuples are ordered by [inner_position]:
+   [`Left] puts inner first, [`Right] puts outer first. *)
+and evaluate_indexed_nested_loop_join environment transaction ~outer
+    ~inner_table ~outer_key_column ~inner_position continue =
+  let inner_schema, inner_table_map =
+    lookup_table_resources environment transaction inner_table
+  in
+  let* outer_relation = eval environment transaction outer in
+  let outer_key_position =
+    resolve_int64_outer_key_position outer_relation.schema outer_key_column
+  in
+  let combined_fields =
+    match inner_position with
+    | `Left -> inner_schema.fields @ outer_relation.schema.fields
+    | `Right -> outer_relation.schema.fields @ inner_schema.fields
+  in
+  let combined_schema : Schema.t =
+    { fields = combined_fields; primary_key = [] }
+  in
+  let combine_tuples ~inner_tuple ~outer_tuple =
+    match inner_position with
+    | `Left -> Array.append inner_tuple outer_tuple
+    | `Right -> Array.append outer_tuple inner_tuple
+  in
+  let probe_outer_tuple outer_tuple =
+    match outer_tuple.(outer_key_position) with
+    | Value.Int64 key -> (
+        let encoded_key = Encoding.encode_int64_key key in
+        match Storage.get inner_table_map transaction ~key:encoded_key with
+        | None -> None
+        | Some value_bytes ->
+            let inner_tuple =
+              Row_codec.decode_row inner_schema (encoded_key, value_bytes)
+            in
+            Some (combine_tuples ~inner_tuple ~outer_tuple))
+    | _ ->
+        (* [resolve_int64_outer_key_position] has already checked that the
+           column's static kind is [Int64], so a tuple value of any other
+           kind would be an internal invariant violation rather than user
+           error. *)
+        assert false
+  in
+  let combined_tuples =
+    Seq.filter_map probe_outer_tuple outer_relation.tuples
   in
   continue { schema = combined_schema; tuples = combined_tuples }
 

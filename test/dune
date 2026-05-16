@@ -13,6 +13,7 @@
   test_eval_cross_product
   test_eval_nested_loop_join
   test_eval_index_lookup
+  test_eval_indexed_nested_loop_join
   test_row_codec
   test_translate
   test_translate_index_lookup

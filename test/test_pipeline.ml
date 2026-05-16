@@ -173,6 +173,65 @@ let test_join_yields_matched_pairs () =
         "six matched (user, order) pairs from parsed join"
         six_matched_user_order_pairs (List.length rows))
 
+(* Evaluate [plan] against the populated fixture and render the result
+   the way Repl does, returning the rendered string for substring
+   assertions. Used by the IndexedNestedLoopJoin pipeline test, which
+   has no parser path yet (Translate support arrives in step 2). *)
+let render_plan_against_fixture plan =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  Storage.with_read_transaction environment (fun transaction ->
+      Eval.eval environment transaction plan (fun relation ->
+          let buffer = Buffer.create 512 in
+          let formatter = Format.formatter_of_buffer buffer in
+          Relation.print ~formatter relation;
+          Format.pp_print_flush formatter ();
+          Buffer.contents buffer))
+
+let test_indexed_nested_loop_join_renders_matched_pairs () =
+  (* Hand-built plan: stream [orders], probe [users] by
+     [orders.user_id]. Step 1 doesn't add Translate support, so this
+     test exercises Eval + Relation.print without going through the
+     parser. The assertions cover the rendered column headers and
+     every (user, order) pair the join should produce. *)
+  let plan : Physical.t =
+    IndexedNestedLoopJoin
+      {
+        outer = FullScan { table = "orders" };
+        inner_table = "users";
+        outer_key_column =
+          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+        inner_position = `Left;
+      }
+  in
+  let rendered = render_plan_against_fixture plan in
+  List.iter
+    (fun expected ->
+      if not (contains_substring rendered expected) then
+        Alcotest.failf
+          "expected rendered output to contain %S\n--- output ---\n%s" expected
+          rendered)
+    [
+      (* Header row: inner (users) columns then outer (orders) columns. *)
+      "users.id";
+      "users.name";
+      "orders.description";
+      "orders.amount";
+      (* Matched pairs across the six fixture orders, in orders'
+         primary-key order. *)
+      "Alice";
+      "Coffee";
+      "Bagel";
+      "Bob";
+      "Tea";
+      "Carol";
+      "Sandwich";
+      "Cake";
+      "Eve";
+      "Cookie";
+    ]
+
 let test_cross_then_ambiguous_restrict_raises () =
   with_query_failure ~label:"ambiguous unqualified column"
     ~expected:
@@ -256,6 +315,9 @@ let () =
         [
           Alcotest.test_case "yields matched (user, order) pairs" `Quick
             test_join_yields_matched_pairs;
+          Alcotest.test_case
+            "hand-built IndexedNestedLoopJoin renders matched pairs" `Quick
+            test_indexed_nested_loop_join_renders_matched_pairs;
         ] );
       ( "errors",
         [

@@ -55,6 +55,32 @@ type t =
           exists so that {!Translate} has a place to emit when it recognises an
           inner join, and so future strategies (indexed nested-loop, hash join,
           merge join) have siblings to slot in next to. *)
+  | IndexedNestedLoopJoin of {
+      outer : t;
+      inner_table : string;
+      outer_key_column : Schema.column_reference;
+      inner_position : [ `Left | `Right ];
+    }
+      (** [IndexedNestedLoopJoin { outer; inner_table; outer_key_column;
+           inner_position }] streams [outer] and probes [inner_table]'s storage
+          subDB once per outer tuple by the value at [outer_key_column], joining
+          on the inner's primary key. Per-row cost is O(log |inner|) rather than
+          the O(|inner|) of a plain nested-loop join.
+
+          [outer_key_column] names a column in [outer]'s schema; its per-row
+          value is encoded with [Encoding.encode_int64_key] and used as the
+          probe key. Its kind must be [Int64] -- the inner's PK kind -- checked
+          at eval time. An outer tuple whose probe misses is dropped.
+
+          [inner_position] records where the inner sat in the original logical
+          [CrossProduct]: [`Left] produces [inner.fields @ outer.fields],
+          [`Right] produces [outer.fields @ inner.fields]. The tag exists so the
+          indexed rewrite doesn't silently reorder a query's output columns when
+          the optimisation flips outer and inner -- optimisations are observable
+          in the plan and in performance, not in the result shape.
+
+          The output [primary_key] is [], matching [NestedLoopJoin] and
+          [CrossProduct]. *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter plan] writes [plan] to [formatter] as an indented tree,
