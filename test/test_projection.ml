@@ -159,6 +159,39 @@ let test_unknown_qualifier_raises () =
       in
       ())
 
+(* Render a [Projection.t] to a string via [Projection.format]. *)
+let format_to_string projection =
+  let buffer = Buffer.create 64 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Projection.format formatter projection;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_single_bare_column () =
+  Alcotest.(check string)
+    "bare column renders as its name" "name"
+    (format_to_string [ column_reference "name" ])
+
+let test_format_single_qualified_column () =
+  Alcotest.(check string)
+    "qualified column renders as qualifier.name" "users.email"
+    (format_to_string
+       [ qualified_column_reference ~qualifier:"users" ~name:"email" ])
+
+let test_format_multiple_columns_joined_by_commas () =
+  Alcotest.(check string)
+    "columns are comma-separated in input order" "id, name, active"
+    (format_to_string
+       [
+         column_reference "id";
+         column_reference "name";
+         column_reference "active";
+       ])
+
+let test_format_empty_projection_renders_empty_string () =
+  Alcotest.(check string)
+    "empty list renders as the empty string" "" (format_to_string [])
+
 let test_duplicate_column_raises () =
   Alcotest.check_raises "duplicate column"
     (Failure "Projection.resolve: duplicate column \"name\"") (fun () ->
@@ -189,6 +222,18 @@ let () =
             test_projected_schema_preserves_qualifiers;
           Alcotest.test_case "projected schema has empty primary key" `Quick
             test_projected_schema_has_empty_primary_key;
+        ] );
+      ( "format",
+        [
+          Alcotest.test_case "single bare column renders as its name" `Quick
+            test_format_single_bare_column;
+          Alcotest.test_case "single qualified column renders as qualifier.name"
+            `Quick test_format_single_qualified_column;
+          Alcotest.test_case
+            "multiple columns are comma-separated in input order" `Quick
+            test_format_multiple_columns_joined_by_commas;
+          Alcotest.test_case "empty projection renders as the empty string"
+            `Quick test_format_empty_projection_renders_empty_string;
         ] );
       ( "errors",
         [

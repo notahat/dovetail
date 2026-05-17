@@ -16,11 +16,6 @@ type t =
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation
 
-(* Render a [Projection.t] as a comma-separated list, each column in its
-   source-like form (bare or [qualifier.name] dotted). *)
-let render_columns columns =
-  columns |> List.map Schema.format_column_reference |> String.concat ", "
-
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
    its inputs at one more level of indent. The recursion terminates at
@@ -41,8 +36,8 @@ let rec format_at formatter indent plan =
         predicate;
       format_at formatter (indent + 1) input
   | Project { input; columns } ->
-      Format.fprintf formatter "%sProject(%s)@\n" prefix
-        (render_columns columns);
+      Format.fprintf formatter "%sProject(%a)@\n" prefix Projection.format
+        columns;
       format_at formatter (indent + 1) input
   | CrossProduct { left; right } ->
       Format.fprintf formatter "%sCrossProduct@\n" prefix;

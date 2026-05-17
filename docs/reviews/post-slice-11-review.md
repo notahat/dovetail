@@ -130,7 +130,7 @@ Why: documentation about a rule in two `.mli` files plus an
 implementation in a third file is a drift trap. One implementation
 eliminates the trap without disturbing the IR layering.
 
-### `Physical.format` should leave room for `Logical.format` — **[open]**
+### `Physical.format` should leave room for `Logical.format` — **[done]** (relocation half; `Logical.format` deferred)
 
 Only `Physical` has a `format`/`format_plan` (used by
 `--show-physical`). When a Translate rewrite produces a surprising
@@ -140,6 +140,12 @@ shared rendering helpers (`render_columns` at physical.ml:21-22 is
 purely about `Projection.t` and doesn't belong in `Physical` at all)
 into the relevant sub-language modules: `Projection.format`,
 `Expression.format` already exists.
+
+Resolution: `render_columns` moved to `Projection.format`
+(`Physical.format`'s `Project` arm now delegates). `Logical.format`
+itself is left as "note as upcoming" — no consumer in the codebase
+today, so building it would be speculative scaffolding per the
+"don't design for hypothetical future requirements" rule.
 
 ## Naming and consistency
 
@@ -352,7 +358,7 @@ exiting. Add `test/test_cli.ml`. Matches the stated pattern of "bulk of
 work lives in `Dovetail.*` so it's testable without subprocess
 spawning."
 
-### `Physical.render_columns` belongs in `Projection` — **[open]**
+### `Physical.render_columns` belongs in `Projection` — **[done]**
 
 `physical.ml:21-22` is pure formatting of a `Projection.t` with zero
 physical-plan concerns. Move to `Projection.format` (formatter-based,

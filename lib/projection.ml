@@ -20,6 +20,12 @@ let check_no_duplicates columns =
       Hashtbl.add seen key ())
     columns
 
+let format formatter columns =
+  let rendered =
+    columns |> List.map Schema.format_column_reference |> String.concat ", "
+  in
+  Format.pp_print_string formatter rendered
+
 let resolve input_schema columns =
   check_no_duplicates columns;
   let resolved =

@@ -10,6 +10,13 @@ type t = Schema.column_reference list
 (** The ordered list of column references to project. Order is preserved in the
     output schema and tuples. *)
 
+val format : Format.formatter -> t -> unit
+(** [format formatter projection] writes [projection] as a comma-separated list
+    of column references in their source-like form (bare [name] or qualified
+    [qualifier.name]). The empty projection renders as the empty string.
+    Intended for EXPLAIN-style debug printing -- {!Physical.format} renders a
+    [Project] operator's [columns] parameter through this function. *)
+
 val resolve : Schema.t -> t -> Schema.t * (Schema.tuple -> Schema.tuple)
 (** [resolve input_schema columns] validates [columns] against [input_schema]
     and returns the projected schema together with a closure that builds the
