@@ -311,8 +311,7 @@ let render_value_for_error : Value.t -> string = function
 
 (* Extract a human-readable string for the primary-key value of a tuple
    already projected to [target_schema]'s field order. Used only to build
-   the PK-collision error message; on any anomaly returns ["?"] so the
-   message still renders. *)
+   the PK-collision error message. *)
 let primary_key_value_text (target_schema : Schema.t) target_tuple =
   match target_schema.primary_key with
   | [ primary_key_name ] -> (
@@ -321,7 +320,11 @@ let primary_key_value_text (target_schema : Schema.t) target_tuple =
           { qualifier = None; name = primary_key_name }
       with
       | Ok (position, _field) -> render_value_for_error target_tuple.(position)
-      | Error _ -> "?")
+      (* Internal invariant: by the time we're rendering an error for a row
+         we just encoded, the PK column is in the schema. *)
+      | Error _ -> assert false)
+  (* TODO(composite-pk): render multi-column PKs once they are supported.
+     For now no schema in the codebase has one. *)
   | _ -> "?"
 
 (* Encode one source row in target form, fail on PK collision, else write

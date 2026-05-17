@@ -31,10 +31,9 @@ let primary_key_position (schema : Schema.t) primary_key_name =
     Schema.find_field schema { qualifier = None; name = primary_key_name }
   with
   | Ok (position, _field) -> position
-  | Error message ->
-      failwith
-        (Printf.sprintf
-           "Row_codec.encode_row: primary-key column not in schema: %s" message)
+  (* Internal invariant: catalog construction guarantees every name in
+     [schema.primary_key] is present in [schema.fields]. *)
+  | Error _ -> assert false
 
 (* Split [tuple] into the single PK value and the remaining values, in
    field order. Slice 1 only supports a single-column primary key. *)

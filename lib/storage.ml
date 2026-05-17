@@ -8,15 +8,17 @@ let open_environment ?(map_size = 1 lsl 30) ?(max_maps = 4096) path =
 
 let close_environment = Lmdb.Env.close
 
+(* [Lmdb.Txn.go] returns [None] only when the callback calls [Lmdb.Txn.abort];
+   we never do, so the [None] arms below are internal invariants. *)
 let with_read_transaction environment f =
   match Lmdb.Txn.go Lmdb.Ro environment f with
-  | Some x -> x
-  | None -> failwith "Storage.with_read_transaction: transaction was aborted"
+  | Some result -> result
+  | None -> assert false
 
 let with_write_transaction environment f =
   match Lmdb.Txn.go Lmdb.Rw environment f with
-  | Some x -> x
-  | None -> failwith "Storage.with_write_transaction: transaction was aborted"
+  | Some result -> result
+  | None -> assert false
 
 let open_map environment transaction ~name =
   match
