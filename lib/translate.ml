@@ -83,12 +83,14 @@ let build_conjunction = function
            (fun left right : Expression.t -> And (left, right))
            first rest)
 
-(* Try to rewrite [Restrict (Scan table, predicate)] as an [IndexLookup],
-   possibly wrapped in a [Filter] carrying the predicate's other conjuncts.
-   Returns [None] when any precondition fails (no catalog entry, composite
-   or non-[Int64] PK, no PK-equality conjunct), in which case the caller
-   falls back to [Filter (FullScan ...)]. *)
-let try_index_lookup ~catalog ~table ~predicate =
+(* Rewrite rule: collapse [Restrict (Scan table, predicate)] into an
+   [IndexLookup] (optionally wrapped in a [Filter] carrying the other
+   conjuncts) when [predicate] contains an equality between the scanned
+   table's [Int64] primary key and a literal. Returns [None] when any
+   precondition fails (no catalog entry, composite or non-[Int64] PK, no
+   PK-equality conjunct); the caller then falls back to
+   [Filter (FullScan ...)]. *)
+let rewrite_point_lookup ~catalog ~table ~predicate =
   match catalog table with
   | None -> None
   | Some schema -> (
@@ -162,12 +164,24 @@ let try_join_pk_column_equality ~table ~primary_key_name
       else None
   | _ -> None
 
+(* Everything the indexed-join rewrite needs in order to emit the operator:
+   the chosen outer's logical sub-plan, the inner table, the outer's probe
+   column, the inner's position in the original [CrossProduct], and the
+   conjuncts left over after the equality has been absorbed. *)
+type indexed_join_match = {
+  outer_logical : Logical.t;
+  inner_table : string;
+  outer_key_column : Schema.column_reference;
+  inner_position : [ `Left | `Right ];
+  residual_conjuncts : Expression.t list;
+}
+
 (* Match a single conjunct against the left/right candidates, applying
    the "both sides of the equality match" tiebreaker (prefer right as
    inner). Returns the chosen outer's logical sub-plan, the inner
    table, the outer's probe column, and the inner's logical position --
-   everything [plan_indexed_join_match] needs to assemble the operator,
-   except the residual conjunct list that the caller assembles. *)
+   the match-without-residual that the partition walker assembles into
+   the full [indexed_join_match] record. *)
 let try_match_conjunct ~left ~right ~left_candidate ~right_candidate conjunct =
   let try_candidate candidate =
     match candidate with
@@ -200,38 +214,63 @@ let partition_join_pk_conjunct ~left ~right ~left_candidate ~right_candidate
           try_match_conjunct ~left ~right ~left_candidate ~right_candidate
             conjunct
         with
-        | Some (outer_logical, table, outer_key_column, inner_position) ->
+        | Some (outer_logical, inner_table, outer_key_column, inner_position) ->
             Some
-              ( outer_logical,
-                table,
-                outer_key_column,
-                inner_position,
-                List.rev_append before after )
+              {
+                outer_logical;
+                inner_table;
+                outer_key_column;
+                inner_position;
+                residual_conjuncts = List.rev_append before after;
+              }
         | None -> walk (conjunct :: before) after)
   in
   walk [] conjuncts
 
-(* Decide whether [Restrict (CrossProduct(left, right), predicate)] can
-   be rewritten as an [IndexedNestedLoopJoin]. Flattens [predicate] into
-   a conjunct list, then walks left-to-right looking for the first
-   conjunct that names one of the candidates' PKs. Returns
-   [(outer_logical, inner_table, outer_key_column, inner_position,
-   residual_conjuncts)] so the caller can recurse into the outer side
-   and wrap a [Filter] around the residual if non-empty. Returns [None]
-   when no conjunct matches; in that case the caller falls back to
-   [NestedLoopJoin] with the original predicate.
+(* Rewrite rule: collapse [Restrict (CrossProduct(left, right), predicate)]
+   into an [IndexedNestedLoopJoin] (optionally wrapped in a [Filter] for
+   the residual conjuncts) when one side is a [Scan] of a table with a
+   single-column [Int64] PK and [predicate] contains a column-on-column
+   equality naming that PK. Returns [None] when no such match is found;
+   the caller then falls back to [NestedLoopJoin] with the original
+   predicate.
 
-   Two layered choices: across conjuncts, left-to-right order wins;
-   within a single conjunct that names both candidates' PKs (e.g.
-   [a.id = b.id] with both having PK [id]), the tiebreaker prefers the
-   right side as the inner so the outer side preserves the logical
-   CrossProduct's column order. *)
-let plan_indexed_join_match ~catalog ~left ~right ~predicate =
+   Two layered choices when more than one shape qualifies: across
+   conjuncts, left-to-right order wins; within a single conjunct that
+   names both candidates' PKs (e.g. [a.id = b.id] with both having PK
+   [id]), the tiebreaker prefers the right side as the inner so the
+   outer side preserves the logical [CrossProduct]'s column order. *)
+let rewrite_indexed_nested_loop_join ~translate_outer ~catalog ~left ~right
+    ~predicate =
   let left_candidate = inner_candidate ~catalog left in
   let right_candidate = inner_candidate ~catalog right in
   let conjuncts = flatten_conjunction predicate in
-  partition_join_pk_conjunct ~left ~right ~left_candidate ~right_candidate
-    conjuncts
+  match
+    partition_join_pk_conjunct ~left ~right ~left_candidate ~right_candidate
+      conjuncts
+  with
+  | None -> None
+  | Some
+      {
+        outer_logical;
+        inner_table;
+        outer_key_column;
+        inner_position;
+        residual_conjuncts;
+      } -> (
+      let join =
+        Physical.IndexedNestedLoopJoin
+          {
+            outer = translate_outer outer_logical;
+            inner_table;
+            outer_key_column;
+            inner_position;
+          }
+      in
+      match build_conjunction residual_conjuncts with
+      | None -> Some join
+      | Some residual ->
+          Some (Physical.Filter { input = join; predicate = residual }))
 
 let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   match plan with
@@ -240,26 +279,12 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
      Try the indexed strategy first; fall through to [NestedLoopJoin]
      when no side has a PK-equality match against the predicate. *)
   | Restrict { input = CrossProduct { left; right }; predicate } -> (
-      match plan_indexed_join_match ~catalog ~left ~right ~predicate with
-      | Some
-          ( outer_logical,
-            inner_table,
-            outer_key_column,
-            inner_position,
-            residual_conjuncts ) -> (
-          let join =
-            Physical.IndexedNestedLoopJoin
-              {
-                outer = translate_relation ~catalog outer_logical;
-                inner_table;
-                outer_key_column;
-                inner_position;
-              }
-          in
-          match build_conjunction residual_conjuncts with
-          | None -> join
-          | Some residual ->
-              Physical.Filter { input = join; predicate = residual })
+      match
+        rewrite_indexed_nested_loop_join
+          ~translate_outer:(translate_relation ~catalog)
+          ~catalog ~left ~right ~predicate
+      with
+      | Some plan -> plan
       | None ->
           NestedLoopJoin
             {
@@ -273,7 +298,7 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
      doesn't recognise the table, the PK isn't a single [Int64] column, or
      the predicate isn't shaped right. *)
   | Restrict { input = Scan { table }; predicate } -> (
-      match try_index_lookup ~catalog ~table ~predicate with
+      match rewrite_point_lookup ~catalog ~table ~predicate with
       | Some plan -> plan
       | None -> Filter { input = FullScan { table }; predicate })
   | Restrict { input; predicate } ->
