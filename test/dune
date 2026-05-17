@@ -33,6 +33,7 @@
   test_expression_parser
   test_projection
   test_repl
+  test_ddl
   test_doctest
   test_documentation)
  (libraries alcotest dovetail unix)
