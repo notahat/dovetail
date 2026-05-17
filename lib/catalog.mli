@@ -35,3 +35,15 @@ val list_table_names :
     bound in the catalog, in byte-sorted (cursor) order. Returns [] if the
     catalog subDB has not yet been created. Safe to call inside a read-only
     transaction. *)
+
+val delete :
+  Storage.environment ->
+  [ `Read | `Write ] Storage.transaction ->
+  table_name:string ->
+  unit
+(** [delete environment transaction ~table_name] removes the catalog binding for
+    [table_name], if any. A no-op when no such binding exists, and a no-op when
+    the catalog subDB has not yet been created -- the catalog-aware "no such
+    table" error message lives in the higher layer ({!Ddl.execute_write}) so it
+    can share scope with the storage drop. Must be called inside a read-write
+    transaction. *)

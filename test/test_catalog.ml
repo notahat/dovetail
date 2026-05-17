@@ -72,6 +72,38 @@ let test_multiple_schemas_dont_collide () =
         "orders" (Some orders_schema)
         (Catalog.get environment transaction ~table_name:"orders"))
 
+let test_delete_removes_table_entry () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      Catalog.put environment transaction ~table_name:"users" users_schema;
+      Catalog.delete environment transaction ~table_name:"users");
+  Storage.with_read_transaction environment (fun transaction ->
+      Alcotest.(check (option schema_testable))
+        "users gone after delete" None
+        (Catalog.get environment transaction ~table_name:"users"))
+
+let test_delete_is_no_op_on_absent_table () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      Catalog.put environment transaction ~table_name:"users" users_schema;
+      (* Deleting a never-bound table must not raise and must leave
+         sibling bindings untouched. *)
+      Catalog.delete environment transaction ~table_name:"never-there");
+  Storage.with_read_transaction environment (fun transaction ->
+      Alcotest.(check (option schema_testable))
+        "sibling binding untouched" (Some users_schema)
+        (Catalog.get environment transaction ~table_name:"users"))
+
+let test_delete_on_fresh_environment_is_no_op () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  (* Fresh environment -- catalog subDB has never been created. Delete must
+     tolerate this without raising. *)
+  Storage.with_write_transaction environment (fun transaction ->
+      Catalog.delete environment transaction ~table_name:"users")
+
 let test_list_table_names_returns_byte_sorted_names () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -111,5 +143,14 @@ let () =
             test_list_table_names_returns_byte_sorted_names;
           Alcotest.test_case "returns empty list when catalog absent" `Quick
             test_list_table_names_empty_catalog;
+        ] );
+      ( "delete",
+        [
+          Alcotest.test_case "delete removes the table entry" `Quick
+            test_delete_removes_table_entry;
+          Alcotest.test_case "delete on an absent table is a no-op" `Quick
+            test_delete_is_no_op_on_absent_table;
+          Alcotest.test_case "delete on a fresh environment is a no-op" `Quick
+            test_delete_on_fresh_environment_is_no_op;
         ] );
     ]

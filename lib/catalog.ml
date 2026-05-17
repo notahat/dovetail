@@ -21,3 +21,8 @@ let list_table_names environment transaction =
   | Some map ->
       Storage.with_iter_seq map transaction (fun pairs ->
           pairs |> Seq.map (fun (key, _value) -> key) |> List.of_seq)
+
+let delete environment transaction ~table_name =
+  match Storage.open_map environment transaction ~name:map_name with
+  | None -> ()
+  | Some map -> Storage.delete map transaction ~key:table_name
