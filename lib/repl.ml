@@ -68,14 +68,50 @@ let evaluate_and_print environment ~output ~show_physical logical_plan =
               logical_plan)
   with Failure message -> Format.fprintf output "error: %s@." message
 
-(* Process one input line: parse, lower, evaluate, print. Parse and eval
+(* Render the result of a read-only DDL statement to [output]. [Listed] is
+   one table name per line, in cursor order; an empty catalog produces no
+   output (the prompt that follows the call sits immediately after). *)
+let print_ddl_read_result ~output = function
+  | Ddl.Listed names ->
+      List.iter (fun name -> Format.fprintf output "%s@." name) names
+
+(* Render the result of a write DDL statement to [output]. [Dropped] is
+   the single status line [dropped table "<name>"]; quoting is explicit so
+   the wording matches the slice-12 spec regardless of identifier shape. *)
+let print_ddl_write_result ~output = function
+  | Ddl.Dropped table_name ->
+      Format.fprintf output "dropped table \"%s\"@." table_name
+
+(* Execute a DDL statement against [environment] and write the rendered
+   result to [output]. The classifier picks the transaction kind, mirroring
+   the [Logical.classify] split above for pipelines; [Failure] raised
+   inside [execute_write] aborts the in-flight transaction and lands in
+   the [error: ...] line, sharing the contract used by pipelines. *)
+let execute_and_print_ddl environment ~output statement =
+  try
+    match Ddl.classify statement with
+    | `Read ->
+        Storage.with_read_transaction environment (fun transaction ->
+            print_ddl_read_result ~output
+              (Ddl.execute_read environment transaction statement))
+    | `Write ->
+        Storage.with_write_transaction environment (fun transaction ->
+            print_ddl_write_result ~output
+              (Ddl.execute_write environment transaction statement))
+  with Failure message -> Format.fprintf output "error: %s@." message
+
+(* Process one input line: parse, dispatch on the program universe (a
+   relational pipeline goes through Lower / Translate / Eval; a DDL
+   statement goes straight to [Ddl.execute_*]), print. Parse and eval
    errors land in [output]; nothing is raised. *)
 let process_line environment ~output ~show_physical line =
   match Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message
-  | Ok ast ->
-      let logical_plan = Lower.lower ast in
+  | Ok (Ast.Pipeline plan) ->
+      let logical_plan = Lower.lower plan in
       evaluate_and_print environment ~output ~show_physical logical_plan
+  | Ok (Ast.Ddl statement) ->
+      execute_and_print_ddl environment ~output statement
 
 let run ?(show_physical = false) environment ~read_line ~output =
   let rec loop () =

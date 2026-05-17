@@ -255,7 +255,10 @@ let with_query_result query check_rows =
   Storage.with_read_transaction environment (fun transaction ->
       let ast =
         match Parser.parse query with
-        | Ok ast -> ast
+        | Ok (Ast.Pipeline plan) -> plan
+        | Ok (Ast.Ddl _) ->
+            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
+              query
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Lower.lower ast in
@@ -272,7 +275,10 @@ let with_query_failure ~label ~expected query =
   Storage.with_read_transaction environment (fun transaction ->
       let ast =
         match Parser.parse query with
-        | Ok ast -> ast
+        | Ok (Ast.Pipeline plan) -> plan
+        | Ok (Ast.Ddl _) ->
+            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
+              query
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Lower.lower ast in

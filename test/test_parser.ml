@@ -3,19 +3,20 @@
 open Dovetail
 open Test_helpers
 
-let ast_plan_testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-plan>")) ( = )
+let ast_program_testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )
 
-(* Wraps the expected [Ast.t] in [Ast.Query] before comparing against the
-   parser's [Ast.plan] output. Most surface forms parse as queries; the
-   sink-production tests below use [parses_plan] to assert against a
-   [Mutation] directly. *)
+(* Wraps the expected [Ast.t] in [Ast.Pipeline (Ast.Query ...)] before
+   comparing against the parser's [Ast.program] output. Most surface forms
+   parse as pipeline queries; the sink-production tests below use
+   [parses_plan] to assert against a [Mutation], and the DDL tests use
+   [parses_program] to assert against an [Ast.Ddl] directly. *)
 let parses input expected_inner_ast =
   match Parser.parse input with
-  | Ok actual_plan ->
-      Alcotest.(check ast_plan_testable)
+  | Ok actual_program ->
+      Alcotest.(check ast_program_testable)
         (Printf.sprintf "%S parses" input)
-        (Ast.Query expected_inner_ast) actual_plan
+        (Ast.Pipeline (Ast.Query expected_inner_ast)) actual_program
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
@@ -331,10 +332,23 @@ let test_relation_literal_rejects_column_reference_in_value_position () =
 
 let parses_plan input expected_plan =
   match Parser.parse input with
-  | Ok actual_plan ->
-      Alcotest.(check ast_plan_testable)
+  | Ok actual_program ->
+      Alcotest.(check ast_program_testable)
         (Printf.sprintf "%S parses to plan" input)
-        expected_plan actual_plan
+        (Ast.Pipeline expected_plan) actual_program
+  | Error message ->
+      Alcotest.failf "expected %S to parse but got error: %s" input message
+
+(* Bare program assertion: compare against an arbitrary [Ast.program]
+   without the [Pipeline] wrapping that {!parses} and {!parses_plan}
+   provide. The DDL tests below use this to assert against [Ast.Ddl]
+   constructors directly. *)
+let parses_program input expected_program =
+  match Parser.parse input with
+  | Ok actual_program ->
+      Alcotest.(check ast_program_testable)
+        (Printf.sprintf "%S parses to program" input)
+        expected_program actual_program
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
@@ -387,6 +401,44 @@ let test_pipeline_rejects_sink_without_into_keyword () =
 
 let test_pipeline_rejects_two_sinks () =
   rejects "users | insert into orders | insert into orders"
+
+(* Slice 12 step 3: the DDL sigil. A leading [:] (after any optional
+   whitespace) marks a DDL statement; slice 12 admits [:list tables] only
+   at this step, with [:drop table <name>] arriving in step 5b. The sigil
+   is recognised only at the top of input -- a [:] inside a pipeline is a
+   parse error rather than an embedded DDL statement. *)
+
+let test_ddl_list_tables_parses () =
+  parses_program ":list tables" (Ast.Ddl Ddl.List_tables)
+
+let test_ddl_list_tables_tolerates_leading_whitespace () =
+  parses_program "   :list tables" (Ast.Ddl Ddl.List_tables)
+
+let test_ddl_list_tables_tolerates_whitespace_after_sigil () =
+  parses_program ":   list tables" (Ast.Ddl Ddl.List_tables)
+
+let test_ddl_list_tables_tolerates_extra_whitespace_between_keywords () =
+  parses_program ":list    tables" (Ast.Ddl Ddl.List_tables)
+
+let test_ddl_list_tables_tolerates_trailing_whitespace () =
+  parses_program ":list tables    " (Ast.Ddl Ddl.List_tables)
+
+let test_ddl_rejects_bare_sigil () = rejects ":"
+let test_ddl_rejects_unknown_body () = rejects ":list"
+let test_ddl_rejects_unknown_keyword () = rejects ":wibble"
+let test_ddl_rejects_trailing_garbage () = rejects ":list tables xyz"
+
+let test_ddl_sigil_mid_pipeline_is_parse_error () =
+  rejects "users | :drop table x"
+
+(* The DDL keywords are not globally reserved -- [list] and [tables] are
+   valid identifiers inside a pipeline. This locks in that the sigil is
+   what reserves them, and the reservation is bounded to the DDL body. *)
+let test_pipeline_keyword_list_is_a_relation_name () =
+  parses "list" (Ast.Relation_name "list")
+
+let test_pipeline_keyword_tables_is_a_relation_name () =
+  parses "tables" (Ast.Relation_name "tables")
 
 let () =
   Alcotest.run "parser"
@@ -547,5 +599,33 @@ let () =
             test_pipeline_rejects_sink_without_into_keyword;
           Alcotest.test_case "rejects two sinks in the same pipeline" `Quick
             test_pipeline_rejects_two_sinks;
+        ] );
+      ( "ddl syntax",
+        [
+          Alcotest.test_case ":list tables parses to Ddl List_tables" `Quick
+            test_ddl_list_tables_parses;
+          Alcotest.test_case "tolerates whitespace before the sigil" `Quick
+            test_ddl_list_tables_tolerates_leading_whitespace;
+          Alcotest.test_case "tolerates whitespace after the sigil" `Quick
+            test_ddl_list_tables_tolerates_whitespace_after_sigil;
+          Alcotest.test_case "tolerates extra whitespace between keywords"
+            `Quick
+            test_ddl_list_tables_tolerates_extra_whitespace_between_keywords;
+          Alcotest.test_case "tolerates trailing whitespace" `Quick
+            test_ddl_list_tables_tolerates_trailing_whitespace;
+          Alcotest.test_case "rejects a bare sigil" `Quick
+            test_ddl_rejects_bare_sigil;
+          Alcotest.test_case "rejects an unknown body" `Quick
+            test_ddl_rejects_unknown_body;
+          Alcotest.test_case "rejects an unknown DDL keyword" `Quick
+            test_ddl_rejects_unknown_keyword;
+          Alcotest.test_case "rejects trailing garbage after the body" `Quick
+            test_ddl_rejects_trailing_garbage;
+          Alcotest.test_case "rejects a sigil mid-pipeline" `Quick
+            test_ddl_sigil_mid_pipeline_is_parse_error;
+          Alcotest.test_case "[list] is a relation name in a pipeline" `Quick
+            test_pipeline_keyword_list_is_a_relation_name;
+          Alcotest.test_case "[tables] is a relation name in a pipeline" `Quick
+            test_pipeline_keyword_tables_is_a_relation_name;
         ] );
     ]

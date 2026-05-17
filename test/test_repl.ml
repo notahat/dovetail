@@ -124,6 +124,34 @@ let test_insert_into_orders_writes_row_and_reports_status () =
   check_contains "inserted row's description" output "Pretzel";
   check_contains "inserted row's id column" output " 9 "
 
+(* Slice 12 step 3: [:list tables] runs through Parser → REPL DDL
+   dispatch → Ddl.execute_read → Catalog.list_table_names and prints
+   each table name on its own line. The fixture seeds [users] and
+   [orders]; cursor (byte-sorted) order puts [orders] first. *)
+let test_list_tables_prints_fixture_tables_in_byte_sorted_order () =
+  let output = run_with_input [ ":list tables" ] in
+  check_contains ":list tables output" output "orders";
+  check_contains ":list tables output" output "users";
+  let orders_position =
+    let rec search position =
+      if position >= String.length output - 6 then String.length output
+      else if String.sub output position 6 = "orders" then position
+      else search (position + 1)
+    in
+    search 0
+  in
+  let users_position =
+    let rec search position =
+      if position >= String.length output - 5 then String.length output
+      else if String.sub output position 5 = "users" then position
+      else search (position + 1)
+    in
+    search 0
+  in
+  Alcotest.(check bool)
+    "orders precedes users (byte-sorted)" true
+    (orders_position < users_position)
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -160,6 +188,9 @@ let () =
           Alcotest.test_case
             "insert into orders writes the row and prints the status line"
             `Quick test_insert_into_orders_writes_row_and_reports_status;
+          Alcotest.test_case
+            ":list tables prints fixture tables in byte-sorted order" `Quick
+            test_list_tables_prints_fixture_tables_in_byte_sorted_order;
         ] );
       ( "mutation rendering",
         [

@@ -1,11 +1,14 @@
 (** Parser for the relational-algebra query language.
 
-    Built on [angstrom]. The grammar is a base relation reference followed by
-    zero or more pipe-separated steps: [restrict <predicate>],
-    [project <columns>], [cross <relation>], and
-    [join <relation> on <predicate>]. Whitespace surrounding tokens is
-    tolerated; anything else (extra tokens, malformed identifiers, empty input)
-    is rejected.
+    Built on [angstrom]. A top-level input is one of two universes, decided by
+    the first non-whitespace character: a leading [:] introduces a DDL statement
+    (slice 12 admits [:list tables] and [:drop table <name>]); anything else is
+    a relational pipeline -- a base relation reference followed by zero or more
+    pipe-separated steps: [restrict <predicate>], [project <columns>],
+    [cross <relation>], [join <relation> on <predicate>], and optionally a
+    terminal sink ([insert into <table>]). Whitespace surrounding tokens is
+    tolerated; anything else (extra tokens, malformed identifiers, empty input,
+    a [:] mid-pipeline) is rejected.
 
     The error type is currently a string passed straight from angstrom. When a
     later slice produces user-visible errors with location information or
@@ -17,12 +20,17 @@ type error = string
 (** Slice-1 placeholder for parser errors. The string is whatever angstrom
     produced. *)
 
-val parse : string -> (Ast.plan, error) result
-(** [parse input] parses [input] as a complete top-level pipeline. The result is
-    an {!Ast.plan} — an {!Ast.Query} for any pipeline without a sink, or an
-    {!Ast.Mutation} for a pipeline whose final step is a sink (today, only
-    [| insert into <table>]). The wrapper enforces in the grammar that a sink
-    terminates a pipeline: a query operator after a sink is a parse error.
+val parse : string -> (Ast.program, error) result
+(** [parse input] parses [input] as a complete top-level program. The result is
+    an {!Ast.program}: either an {!Ast.Pipeline} carrying an {!Ast.plan} (a
+    relational pipeline) or an {!Ast.Ddl} carrying a {!Ddl.statement} (a
+    data-definition statement introduced by the leading [:] sigil).
+
+    The pipeline grammar enforces structurally that a sink terminates a pipeline
+    -- a query operator after [| insert into ...] is a parse error. The DDL
+    grammar admits only the slice-12 statements; the [:] sigil is recognised
+    only at the very top of the input, so a [:] inside a pipeline or expression
+    is a parse error rather than a DDL statement.
 
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)

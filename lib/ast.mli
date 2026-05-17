@@ -5,9 +5,16 @@
     typed, and nothing more. {!Lower} converts the AST into a logical plan,
     where the operators take their meaning from algebra rather than syntax.
 
-    A top-level {!plan} is either a {!Query} carrying a relation tree or a
-    {!Mutation} carrying a sink. The wrapper enforces "a sink terminates a
-    pipeline" structurally: a mutation can only appear at the top, and its
+    A top-level {!program} is one of two universes: a {!Pipeline} (a relation
+    pipeline -- query or mutation), or a {!Ddl} (a data-definition statement
+    such as [:list tables]). The {!Pipeline} arm carries an {!plan}, which is
+    itself either a {!Query} or a {!Mutation}; the {!Ddl} arm carries a
+    {!Ddl.statement}. The two universes meet only at this top-level wrapper: DDL
+    doesn't pass through {!Lower} / {!Translate} / {!Physical} / {!Eval}, so
+    those layers see only the {!plan} that lives inside {!Pipeline}.
+
+    The inner {!plan} wrapper enforces "a sink terminates a pipeline"
+    structurally: a mutation can only appear at the top of a pipeline, and its
     source field is a {!t}, not a {!plan}, so sinks cannot nest. *)
 
 type t =
@@ -71,3 +78,15 @@ type plan =
 
           {!Lower.lower} returns the same wrapper shape at the Logical layer,
           and {!Translate.translate} carries it through to {!Physical.plan}. *)
+
+type program =
+  | Pipeline of plan
+      (** [Pipeline plan] is the relational pipeline universe: every input the
+          surface language has accepted up to slice 11. Threaded through
+          {!Lower.lower}, {!Translate.translate}, and {!Eval.eval} or
+          {!Eval.eval_mutation} as appropriate. *)
+  | Ddl of Ddl.statement
+      (** [Ddl statement] is the data-definition universe, marked at the surface
+          by the leading [:] sigil. {!Lower}, {!Translate}, and the physical
+          layers know nothing of DDL; the REPL hands the statement straight to
+          {!Ddl.execute_read} or {!Ddl.execute_write}. *)
