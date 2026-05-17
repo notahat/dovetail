@@ -175,6 +175,24 @@ let test_standalone_restrict_does_not_trigger_join_rewrite () =
        })
     physical
 
+let test_relation_literal_translates_through () =
+  let logical : Logical.t =
+    RelationLiteral
+      {
+        columns = [ "id"; "name" ];
+        rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+      }
+  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
+  Alcotest.(check physical_testable)
+    "Logical.RelationLiteral -> Physical.RelationLiteral with same payload"
+    (Physical.RelationLiteral
+       {
+         columns = [ "id"; "name" ];
+         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+       })
+    physical
+
 let test_standalone_cross_product_does_not_trigger_join_rewrite () =
   let logical =
     Logical.CrossProduct
@@ -225,6 +243,12 @@ let () =
           Alcotest.test_case
             "translates Logical.CrossProduct to Physical.CrossProduct" `Quick
             test_cross_product_translates_to_physical_cross_product;
+        ] );
+      ( "relation literal",
+        [
+          Alcotest.test_case
+            "translates Logical.RelationLiteral through unchanged" `Quick
+            test_relation_literal_translates_through;
         ] );
       ( "nested loop join rewrite",
         [

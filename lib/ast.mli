@@ -38,3 +38,15 @@ type t =
           [CrossProduct] -- both inputs' fields, each retaining its qualifier --
           so a [predicate] like [users.id = orders.user_id] resolves
           unambiguously across the combined schema. *)
+  | RelationLiteral of { columns : string list; rows : Value.t list list }
+      (** [RelationLiteral { columns; rows }] is the surface form
+          [{col: val, col: val, ...}] -- a relation whose contents the user gave
+          directly, instead of a reference to a stored table. Slice 11's parser
+          accepts the single-row named-pair form only, so [rows] always has
+          length one; the IR shape leaves room for a future multi-row literal
+          grammar.
+
+          Column names are bare identifiers (the parser rejects qualified keys)
+          and must be unique within the literal (the parser rejects duplicates).
+          Each row in [rows] has the same length as [columns], and the values
+          appear in column order. *)

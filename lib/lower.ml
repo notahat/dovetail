@@ -11,3 +11,4 @@ let rec lower (ast : Ast.t) : Logical.t =
           input = CrossProduct { left = lower left; right = lower right };
           predicate;
         }
+  | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }

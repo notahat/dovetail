@@ -98,6 +98,16 @@ let test_show_physical_prints_plan_before_results () =
     "plan precedes the result rows" true
     (plan_position < row_position)
 
+let test_relation_literal_alone_prints_one_row () =
+  let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
+  (* Bare column headers, no qualifier prefix. *)
+  check_contains "literal column headers" output "│ id │ name";
+  check_contains "literal column headers" output "amount";
+  (* The literal's own values appear in the row. *)
+  check_contains "literal row values" output "Pretzel";
+  check_contains "literal row values" output " 7 ";
+  check_contains "literal row values" output " 9 "
+
 let () =
   Alcotest.run "repl"
     [
@@ -118,5 +128,8 @@ let () =
           Alcotest.test_case
             "show-physical prints the plan before the result rows" `Quick
             test_show_physical_prints_plan_before_results;
+          Alcotest.test_case
+            "a bare relation literal prints as a one-row relation" `Quick
+            test_relation_literal_alone_prints_one_row;
         ] );
     ]

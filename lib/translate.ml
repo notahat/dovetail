@@ -283,3 +283,4 @@ let rec translate ~catalog (plan : Logical.t) : Physical.t =
   | CrossProduct { left; right } ->
       CrossProduct
         { left = translate ~catalog left; right = translate ~catalog right }
+  | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }

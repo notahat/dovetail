@@ -227,6 +227,61 @@ let test_pipeline_join_on_keyword_prefix_is_a_column_name () =
      [on], the rest of the input is unparseable. *)
   rejects "users | join orders oncology users.id = orders.user_id"
 
+let test_relation_literal_parses_single_pair () =
+  parses "{id: 7}"
+    (Ast.RelationLiteral { columns = [ "id" ]; rows = [ [ Value.Int64 7L ] ] })
+
+let test_relation_literal_parses_multiple_pairs () =
+  parses "{id: 7, name: \"Pretzel\", active: true}"
+    (Ast.RelationLiteral
+       {
+         columns = [ "id"; "name"; "active" ];
+         rows = [ [ Value.Int64 7L; Value.String "Pretzel"; Value.Bool true ] ];
+       })
+
+let test_relation_literal_tolerates_trailing_comma () =
+  parses "{id: 7, name: \"Pretzel\",}"
+    (Ast.RelationLiteral
+       {
+         columns = [ "id"; "name" ];
+         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+       })
+
+let test_relation_literal_tolerates_extra_whitespace () =
+  parses "{  id  :  7  ,  name  :  \"Pretzel\"  }"
+    (Ast.RelationLiteral
+       {
+         columns = [ "id"; "name" ];
+         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+       })
+
+let test_relation_literal_accepts_negative_int () =
+  parses "{amount: -5}"
+    (Ast.RelationLiteral
+       { columns = [ "amount" ]; rows = [ [ Value.Int64 (-5L) ] ] })
+
+let test_relation_literal_alone_is_a_valid_pipeline_head () =
+  parses "{id: 7} | restrict id = 7"
+    (Ast.Restrict
+       {
+         input =
+           Ast.RelationLiteral
+             { columns = [ "id" ]; rows = [ [ Value.Int64 7L ] ] };
+         predicate =
+           expression_compare ~left:(expression_column "id") ~op:Equal
+             ~right:(expression_literal (Value.Int64 7L));
+       })
+
+let test_relation_literal_rejects_empty () = rejects "{}"
+let test_relation_literal_rejects_leading_comma () = rejects "{, id: 7}"
+let test_relation_literal_rejects_duplicate_column () = rejects "{id: 1, id: 2}"
+let test_relation_literal_rejects_qualified_key () = rejects "{users.id: 7}"
+let test_relation_literal_rejects_missing_colon () = rejects "{id 7}"
+let test_relation_literal_rejects_missing_value () = rejects "{id:}"
+
+let test_relation_literal_rejects_column_reference_in_value_position () =
+  rejects "{id: x}"
+
 let () =
   Alcotest.run "parser"
     [
@@ -333,5 +388,35 @@ let () =
           Alcotest.test_case
             "identifier with an on-keyword prefix is not the on keyword" `Quick
             test_pipeline_join_on_keyword_prefix_is_a_column_name;
+        ] );
+      ( "relation literal syntax",
+        [
+          Alcotest.test_case "parses a single-pair literal" `Quick
+            test_relation_literal_parses_single_pair;
+          Alcotest.test_case "parses a multi-pair literal" `Quick
+            test_relation_literal_parses_multiple_pairs;
+          Alcotest.test_case "tolerates a trailing comma" `Quick
+            test_relation_literal_tolerates_trailing_comma;
+          Alcotest.test_case "tolerates extra whitespace inside the literal"
+            `Quick test_relation_literal_tolerates_extra_whitespace;
+          Alcotest.test_case "accepts a negative int64 value" `Quick
+            test_relation_literal_accepts_negative_int;
+          Alcotest.test_case "a literal alone is a valid pipeline head" `Quick
+            test_relation_literal_alone_is_a_valid_pipeline_head;
+          Alcotest.test_case "rejects the empty literal" `Quick
+            test_relation_literal_rejects_empty;
+          Alcotest.test_case "rejects a literal with a leading comma" `Quick
+            test_relation_literal_rejects_leading_comma;
+          Alcotest.test_case "rejects a literal with a duplicate column" `Quick
+            test_relation_literal_rejects_duplicate_column;
+          Alcotest.test_case "rejects a literal with a qualified key" `Quick
+            test_relation_literal_rejects_qualified_key;
+          Alcotest.test_case "rejects a literal missing the colon" `Quick
+            test_relation_literal_rejects_missing_colon;
+          Alcotest.test_case "rejects a literal with a missing value" `Quick
+            test_relation_literal_rejects_missing_value;
+          Alcotest.test_case "rejects a column reference in the value position"
+            `Quick
+            test_relation_literal_rejects_column_reference_in_value_position;
         ] );
     ]

@@ -11,6 +11,7 @@ type t =
       outer_key_column : Schema.column_reference;
       inner_position : [ `Left | `Right ];
     }
+  | RelationLiteral of { columns : string list; rows : Value.t list list }
 
 (* Render a [Projection.t] as a comma-separated list, each column in its
    source-like form (bare or [qualifier.name] dotted). *)
@@ -56,5 +57,10 @@ let rec format_at formatter indent plan =
         (Schema.format_column_reference outer_key_column)
         inner_position_label;
       format_at formatter (indent + 1) outer
+  | RelationLiteral { columns; rows } ->
+      Format.fprintf formatter "%sRelationLiteral(columns=%s, rows=%d)@\n"
+        prefix
+        (String.concat ", " columns)
+        (List.length rows)
 
 let format formatter plan = format_at formatter 0 plan

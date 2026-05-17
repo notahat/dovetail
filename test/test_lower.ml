@@ -148,6 +148,24 @@ let test_join_lowers_to_restrict_over_cross_product () =
        })
     logical
 
+let test_relation_literal_lowers_through () =
+  let ast : Ast.t =
+    RelationLiteral
+      {
+        columns = [ "id"; "name" ];
+        rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+      }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.RelationLiteral -> Logical.RelationLiteral with same payload"
+    (Logical.RelationLiteral
+       {
+         columns = [ "id"; "name" ];
+         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+       })
+    logical
+
 let () =
   Alcotest.run "lower"
     [
@@ -185,5 +203,11 @@ let () =
           Alcotest.test_case
             "lowers Ast.Join to Logical.Restrict over Logical.CrossProduct"
             `Quick test_join_lowers_to_restrict_over_cross_product;
+        ] );
+      ( "relation literal",
+        [
+          Alcotest.test_case
+            "lowers Ast.RelationLiteral to Logical.RelationLiteral" `Quick
+            test_relation_literal_lowers_through;
         ] );
     ]

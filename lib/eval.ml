@@ -59,6 +59,34 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
   in
   continue ({ schema; tuples } : [ `Bag ] Relation.t)
 
+(* Materialise a [RelationLiteral] as a [Relation.t]. The schema's field
+   kinds come from the first row's values at each position; the primary
+   key is empty and qualifiers are absent, matching the convention for
+   derived relations and the design's "bare keys go in, bare names come
+   out" rule. The literal stays small enough that the tuples can be
+   produced eagerly via [List.to_seq] without any storage scope. *)
+let evaluate_relation_literal ~columns ~rows continue =
+  let first_row =
+    match rows with
+    | first :: _ -> first
+    | [] -> failwith "Eval: relation literal must have at least one row"
+  in
+  if List.length first_row <> List.length columns then
+    failwith
+      (Printf.sprintf
+         "Eval: relation literal row has %d value(s) but %d column(s) are \
+          declared"
+         (List.length first_row) (List.length columns));
+  let fields =
+    List.map2
+      (fun column_name row_value : Schema.field ->
+        { name = column_name; kind = Value.kind_of row_value; qualifier = None })
+      columns first_row
+  in
+  let schema : Schema.t = { fields; primary_key = [] } in
+  let tuples = rows |> List.to_seq |> Seq.map Array.of_list in
+  continue ({ schema; tuples } : [ `Bag ] Relation.t)
+
 (* CPS-shaped executor. Every operator is in continuation-passing form so
    the consumer's [continue] runs inside whatever cursor and resource
    scopes the plan opens, letting tuples stream directly from live
@@ -82,6 +110,8 @@ let rec eval environment transaction plan continue =
       { outer; inner_table; outer_key_column; inner_position } ->
       evaluate_indexed_nested_loop_join environment transaction ~outer
         ~inner_table ~outer_key_column ~inner_position continue
+  | RelationLiteral { columns; rows } ->
+      evaluate_relation_literal ~columns ~rows continue
 
 (* Stream the input through [eval], then wrap its tuple seq in a
    [Seq.filter] guarded by the resolved predicate. The schema is unchanged.

@@ -73,6 +73,74 @@ let string_literal =
   List.iter (Buffer.add_char buffer) characters;
   Value.String (Buffer.contents buffer)
 
+(* A single literal value in a relation literal's value position: int,
+   string, or bool. The dispatch on the leading character matches the
+   [term] parser inside [expression]; bare identifiers (column references)
+   are deliberately not accepted here -- the design doc reserves the
+   value position for expressions, but in insert context columns have no
+   row to resolve against, so until a future slice introduces an
+   expression IR for the value position the surface form is "literal." *)
+let literal_value =
+  peek_char >>= function
+  | Some '"' -> string_literal
+  | Some '-' -> int64_literal
+  | Some character when is_digit character -> int64_literal
+  | Some character when is_letter character -> bool_literal
+  | _ -> fail "expected a literal value (number, string, or bool)"
+
+(* A single key-value pair inside a relation literal: [identifier : value].
+   Whitespace around the colon is tolerated. The key is a bare identifier;
+   qualified keys (e.g. [users.id: 1]) are rejected because [identifier]
+   does not consume a dot. *)
+let relation_literal_pair =
+  identifier >>= fun column_name ->
+  whitespace *> char ':' *> whitespace *> literal_value >>| fun value ->
+  (column_name, value)
+
+(* One or more pairs separated by commas, with whitespace tolerated around
+   commas and an optional trailing comma. The list is non-empty: the empty
+   literal [{}] is rejected because we require at least one pair. *)
+let relation_literal_pairs =
+  relation_literal_pair >>= fun first_pair ->
+  many (whitespace *> char ',' *> whitespace *> relation_literal_pair)
+  >>= fun more_pairs ->
+  whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
+  first_pair :: more_pairs
+
+(* Raise a parse error if [pairs] contains the same column name twice. The
+   error names the duplicate so the user can find it. *)
+let check_for_duplicate_columns pairs =
+  let seen = Hashtbl.create 8 in
+  let rec scan = function
+    | [] -> return ()
+    | (column_name, _value) :: rest ->
+        if Hashtbl.mem seen column_name then
+          fail
+            (Printf.sprintf "duplicate column %S in relation literal"
+               column_name)
+        else (
+          Hashtbl.add seen column_name ();
+          scan rest)
+  in
+  scan pairs
+
+(* A relation literal: [{column: value, column: value, ...}]. Single-row
+   named-pair form only -- the multi-row literal grammar is a separate
+   production deferred to a future slice. *)
+let relation_literal =
+  char '{' *> whitespace *> relation_literal_pairs <* whitespace <* char '}'
+  >>= fun pairs ->
+  check_for_duplicate_columns pairs >>| fun () ->
+  let columns = List.map fst pairs in
+  let values = List.map snd pairs in
+  Ast.RelationLiteral { columns; rows = [ values ] }
+
+(* The leading position of a pipeline: either a bare table reference or a
+   relation literal. Disjoint on the first character ([{] vs a letter), so
+   no backtracking is required. *)
+let relation_expr =
+  peek_char >>= function Some '{' -> relation_literal | _ -> relation_name
+
 (* The six comparison operators. Dispatched by lookahead on the leading
    character, then for [<] and [>] by a second lookahead at the byte that
    follows. The two-stage dispatch keeps the choice between [<], [<=], and
@@ -234,7 +302,7 @@ let pipeline_step =
    pipeline steps, surrounded by optional whitespace. Each step wraps the
    running AST in a [Restrict], left-associatively. *)
 let query =
-  whitespace *> relation_name >>= fun base ->
+  whitespace *> relation_expr >>= fun base ->
   many pipeline_step >>= fun steps ->
   whitespace *> end_of_input
   *> return (List.fold_left (fun current step -> step current) base steps)
