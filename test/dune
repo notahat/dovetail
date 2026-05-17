@@ -34,4 +34,6 @@
   ../bin/main.exe
   ../docs/query-language.md
   ../docs/query-language-tutorial.md
-  ../docs/query-language-pipeline-operators.md))
+  ../docs/query-language-pipeline-operators.md
+  ../docs/query-language-expressions.md
+  ../README.md))

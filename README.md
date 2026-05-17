@@ -29,24 +29,12 @@ so the REPL can be launched with a single command.
 See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling
 conventions.
 
-## Query language examples
+## Query language
 
-The REPL queries a fixture with two tables, `users` (id, name, email,
-active) and `orders` (id, user_id, description, amount). A bare table
-name reads the whole table; pipeline operators `restrict`, `project`,
-`cross`, and `join` compose with `|`:
-
-```
-> users | restrict active | project name, email
-│ users.name │ users.email       │
-├────────────┼───────────────────┤
-│ Alice      │ alice@example.com │
-│ Carol      │ carol@example.com │
-│ Dave       │ dave@example.com  │
-```
-
-Joins use qualified column references, and the rest of the pipeline can
-keep going past the join:
+The REPL queries a fixture with two tables, `users` and `orders`.
+Pipeline operators (`restrict`, `project`, `cross`, `join`) compose
+with `|`, and the canonical multi-operator query joins them and
+projects:
 
 ```
 > users | join orders on users.id = orders.user_id | project name, description, amount
@@ -60,17 +48,9 @@ keep going past the join:
 │ Eve        │ Cookie             │             2 │
 ```
 
-Predicates support the six comparison operators (`=`, `<>`, `<`, `<=`,
-`>`, `>=`), boolean `and` / `or` / `not`, and parentheses; literals can
-be integers, strings, or booleans:
-
-```
-> orders | restrict amount >= 5 and not (description = "Cake")
-│ orders.id │ orders.user_id │ orders.description │ orders.amount │
-├───────────┼────────────────┼────────────────────┼───────────────┤
-│         1 │              1 │ Coffee             │             5 │
-│         4 │              3 │ Sandwich           │             8 │
-```
+See [`docs/query-language.md`](docs/query-language.md) for the full
+guide -- tutorial, per-operator reference, and the expression and
+projection sublanguages.
 
 ## Layer diagram
 

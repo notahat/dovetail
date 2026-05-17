@@ -16,6 +16,8 @@ let verified_files =
     "../docs/query-language.md";
     "../docs/query-language-tutorial.md";
     "../docs/query-language-pipeline-operators.md";
+    "../docs/query-language-expressions.md";
+    "../README.md";
   ]
 
 (** Verify one markdown file end to end: spin up a fresh environment, populate
