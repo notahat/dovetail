@@ -8,7 +8,7 @@
     Slice 1 introduced [Relation_name]; slice 2 adds [Restrict]. Further nodes
     arrive as later slices introduce them. *)
 
-val lower : Ast.t -> Logical.t
+val lower : Ast.t -> Logical.plan
 (** [lower ast] rewrites [ast] into an equivalent logical plan. [Relation_name]
     becomes [Scan]; [Ast.Restrict], [Ast.Project], and [Ast.CrossProduct] map to
     their like-named [Logical] counterparts.
@@ -16,4 +16,9 @@ val lower : Ast.t -> Logical.t
     [Logical.Restrict (Logical.CrossProduct { left; right }, predicate)] --
     [Logical] has no [Join] node; the join is just sugar at this layer, and
     {!Translate} is responsible for collapsing the
-    [Restrict]-over-[CrossProduct] shape into [Physical.NestedLoopJoin]. *)
+    [Restrict]-over-[CrossProduct] shape into [Physical.NestedLoopJoin].
+
+    The return type is {!Logical.plan} so the wrapper shape lines up with
+    {!Translate.translate}'s input. Until slice 11 step 4 lands the Ast-side
+    wrapper, every output is a {!Logical.Query} -- the Ast is still flat and
+    can't express a mutation. *)

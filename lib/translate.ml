@@ -288,10 +288,101 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
         }
   | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
 
-(* Public entry: translate a logical relation tree and wrap it in the
-   Physical.Query arm of the plan wrapper. The Mutation arm is unreachable
-   from here today -- the Logical IR doesn't have a mutation constructor until
-   slice 11 step 3 -- so the wrap is unconditional. Translation of a
-   Logical.Mutation arrives in step 3 alongside the Logical wrapper. *)
-let translate ~catalog plan : Physical.plan =
-  Physical.Query (translate_relation ~catalog plan)
+(* Compare two string lists as multisets: returns the names present in
+   [expected] but not in [actual] and the names present in [actual] but not
+   in [expected]. Used by the literal/schema permutation check; the
+   non-overlapping difference is exactly the actionable error wording
+   ("missing columns: x, y" / "unknown columns: z"). *)
+let multiset_difference ~expected ~actual =
+  let missing = List.filter (fun name -> not (List.mem name actual)) expected in
+  let unknown = List.filter (fun name -> not (List.mem name expected)) actual in
+  (missing, unknown)
+
+(* Validate that [literal_columns] is a permutation of [target_schema]'s
+   column names and that each value in [first_row] has the kind the target
+   schema declares for that column. Raises [Failure] with a message naming
+   the target table and the offending columns/kinds. The first-row kinds are
+   sufficient because slice 11's literal grammar is single-row; multi-row
+   literals would extend the check to every row. *)
+let validate_literal_against_target ~target_table ~(target_schema : Schema.t)
+    ~literal_columns ~first_row =
+  let schema_column_names =
+    List.map (fun (field : Schema.field) -> field.name) target_schema.fields
+  in
+  let missing, unknown =
+    multiset_difference ~expected:schema_column_names ~actual:literal_columns
+  in
+  if missing <> [] then
+    failwith
+      (Printf.sprintf "Translate: insert into %S: missing column(s): %s"
+         target_table
+         (String.concat ", " missing));
+  if unknown <> [] then
+    failwith
+      (Printf.sprintf "Translate: insert into %S: unknown column(s): %s"
+         target_table
+         (String.concat ", " unknown));
+  if List.length first_row <> List.length literal_columns then
+    failwith
+      (Printf.sprintf
+         "Translate: insert into %S: row has %d value(s) but %d column(s) \
+          declared"
+         target_table (List.length first_row)
+         (List.length literal_columns));
+  List.iter2
+    (fun column_name value ->
+      let target_field =
+        List.find
+          (fun (field : Schema.field) -> field.name = column_name)
+          target_schema.fields
+      in
+      let actual_kind = Value.kind_of value in
+      if actual_kind <> target_field.kind then
+        failwith
+          (Printf.sprintf
+             "Translate: insert into %S: column %S expects %s, got %s"
+             target_table column_name
+             (Value.Kind.to_string target_field.kind)
+             (Value.Kind.to_string actual_kind)))
+    literal_columns first_row
+
+(* Run validation when the insert source is a [RelationLiteral]; pass through
+   silently for any other source. Insert-from-query isn't a tested path in
+   slice 11 (no DDL means fixture PKs would always collide), but the design
+   keeps the sink source-agnostic, so non-literal sources translate without
+   shape-level checks here -- the sink itself enforces column coverage at
+   eval time. *)
+let validate_mutation_source ~target_table ~target_schema (source : Logical.t) =
+  match source with
+  | RelationLiteral { columns; rows } -> (
+      match rows with
+      | first_row :: _ ->
+          validate_literal_against_target ~target_table ~target_schema
+            ~literal_columns:columns ~first_row
+      | [] ->
+          failwith
+            (Printf.sprintf
+               "Translate: insert into %S: relation literal has no rows"
+               target_table))
+  | _ -> ()
+
+(* Look up [target_table]'s schema in the catalog and validate the literal
+   source's columns and value kinds against it. Returns the translated
+   physical mutation. Raises [Failure] if the catalog has no schema for the
+   table or any validation check fails. *)
+let translate_mutation ~catalog (Logical.Insert { table; source }) :
+    Physical.mutation =
+  let target_schema =
+    match catalog table with
+    | Some schema -> schema
+    | None ->
+        failwith
+          (Printf.sprintf "Translate: insert into %S: unknown table" table)
+  in
+  validate_mutation_source ~target_table:table ~target_schema source;
+  Insert { table; source = translate_relation ~catalog source }
+
+let translate ~catalog (plan : Logical.plan) : Physical.plan =
+  match plan with
+  | Query relation -> Query (translate_relation ~catalog relation)
+  | Mutation mutation -> Mutation (translate_mutation ~catalog mutation)

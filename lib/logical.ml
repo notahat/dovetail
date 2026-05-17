@@ -4,3 +4,8 @@ type t =
   | Project of { input : t; columns : Projection.t }
   | CrossProduct of { left : t; right : t }
   | RelationLiteral of { columns : string list; rows : Value.t list list }
+
+type mutation = Insert of { table : string; source : t }
+type plan = Query of t | Mutation of mutation
+
+let classify = function Query _ -> `Read | Mutation _ -> `Write

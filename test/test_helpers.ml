@@ -127,6 +127,18 @@ let unwrap_query (plan : Physical.plan) : Physical.t =
   | Query plan -> plan
   | Mutation _ -> Alcotest.fail "expected a Query plan, got a Mutation"
 
+(** Extract the relation sub-plan from a [Logical.plan] that is known to be a
+    [Query]. Sibling to {!unwrap_query} for the Logical side: the Lower tests
+    use this to keep their structural assertions aimed at the relation tree
+    while [Lower.lower]'s wrapper shape is pinned by its type signature. A
+    [Mutation] reaching this helper would mean the Ast somehow produced one,
+    which is impossible until slice 11 step 4 wires the sink production. *)
+let unwrap_logical_query (plan : Logical.plan) : Logical.t =
+  match plan with
+  | Query plan -> plan
+  | Mutation _ ->
+      Alcotest.fail "expected a Logical.Query plan, got a Logical.Mutation"
+
 (** Build a bare (unqualified) [Schema.column_reference]. *)
 let column_reference name : Schema.column_reference = { qualifier = None; name }
 

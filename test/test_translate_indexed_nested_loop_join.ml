@@ -105,7 +105,7 @@ let test_canonical_users_id_equals_orders_user_id_folds () =
   let physical =
     unwrap_query
     @@ Translate.translate ~catalog:users_and_orders_catalog
-         users_join_orders_on_pk_equality
+         (Logical.Query users_join_orders_on_pk_equality)
   in
   Alcotest.(check physical_testable)
     "Restrict(CrossProduct, users.id = orders.user_id) -> \
@@ -140,7 +140,8 @@ let test_mirrored_equality_folds_to_the_same_indexed_join () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "mirrored PK equality produces the same indexed join"
@@ -172,7 +173,8 @@ let test_syntactic_flip_picks_users_as_inner_with_right_position () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "users on the right -> inner_position = Right"
@@ -209,7 +211,8 @@ let test_both_sides_qualify_tiebreaker_picks_right_as_inner () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_admins_catalog logical
+    @@ Translate.translate ~catalog:users_and_admins_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "both qualify -> right (admins) is the inner"
@@ -246,7 +249,8 @@ let test_inner_candidate_wrapped_in_project_falls_back () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "users wrapped in Project -> NestedLoopJoin fallback"
@@ -287,7 +291,8 @@ let test_equality_on_non_pk_columns_falls_back () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "non-PK equality -> NestedLoopJoin fallback"
@@ -320,7 +325,8 @@ let test_ordering_predicate_falls_back () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "non-Equal predicate -> NestedLoopJoin fallback"
@@ -355,7 +361,8 @@ let test_both_sides_reference_the_same_scan_falls_back () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "self-join self-equality -> NestedLoopJoin fallback"
@@ -400,7 +407,8 @@ let test_multiple_pk_eqs_pick_the_first_conjunct () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_admins_catalog logical
+    @@ Translate.translate ~catalog:users_and_admins_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "first PK-eq conjunct wins; later PK-eq goes to residual"
@@ -451,7 +459,8 @@ let test_nested_and_tree_flattens_before_partitioning () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "nested And tree flattens; residual rebuilt left-associatively"
@@ -493,7 +502,8 @@ let test_reversed_conjunct_order_folds_to_the_same_plan () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "reversed conjunct order folds to the same Filter(residual, INLJ)"
@@ -535,7 +545,8 @@ let test_pk_equality_with_residual_conjunct_folds_and_wraps_in_filter () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "PK-eq + residual -> Filter(residual, IndexedNestedLoopJoin(...))"
@@ -598,12 +609,13 @@ let test_on_clause_and_trailing_restrict_produce_the_same_plan () =
   in
   let from_on_clause =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog on_clause_form
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query on_clause_form)
   in
   let from_trailing_restrict =
     unwrap_query
     @@ Translate.translate ~catalog:users_and_orders_catalog
-         trailing_restrict_form
+         (Logical.Query trailing_restrict_form)
   in
   Alcotest.(check physical_testable)
     "on-clause [and] and trailing [| restrict] yield the same plan"
@@ -642,7 +654,8 @@ let test_conjunction_with_no_pk_equality_falls_back () =
   in
   let physical =
     unwrap_query
-    @@ Translate.translate ~catalog:users_and_orders_catalog logical
+    @@ Translate.translate ~catalog:users_and_orders_catalog
+         (Logical.Query logical)
   in
   Alcotest.(check physical_testable)
     "conjunction with no PK-eq -> NestedLoopJoin with the full predicate"
@@ -660,7 +673,7 @@ let test_inner_table_catalog_miss_falls_back () =
   let physical =
     unwrap_query
     @@ Translate.translate ~catalog:noop_catalog
-         users_join_orders_on_pk_equality
+         (Logical.Query users_join_orders_on_pk_equality)
   in
   Alcotest.(check physical_testable)
     "catalog returns None -> NestedLoopJoin fallback"

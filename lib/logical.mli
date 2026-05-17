@@ -41,3 +41,30 @@ type t =
 
           Slice 11's parser produces single-row literals only; the IR shape
           leaves room for a future multi-row literal grammar. *)
+
+type mutation =
+  | Insert of { table : string; source : t }
+      (** A row-writing mutation. [source] is a relation-yielding sub-plan; its
+          rows are what get written to [table]. The {!plan} wrapper below sits
+          above this type so the REPL can dispatch on plan kind: queries open a
+          read transaction and call {!Eval.eval}; mutations open a write
+          transaction and call {!Eval.eval_mutation}. Update and delete are
+          deferred to slice 12. *)
+
+type plan =
+  | Query of t
+  | Mutation of mutation
+      (** A top-level logical plan: either a relation-yielding {!t} or a
+          row-writing {!mutation}. {!Lower.lower} returns this, and the REPL
+          uses {!classify} to pick a transaction kind before handing the plan to
+          {!Translate.translate}. Mutations don't nest, because {!mutation}'s
+          [source] field is a {!t}, not a [plan]. *)
+
+val classify : plan -> [ `Read | `Write ]
+(** [classify plan] returns the transaction permission the REPL should open for
+    [plan]: [`Read] for a query, [`Write] for a mutation. The wrapper
+    constructor is the only thing inspected -- the inner relation tree or
+    mutation isn't walked. The REPL uses this to choose between
+    {!Storage.with_read_transaction} and {!Storage.with_write_transaction}
+    before translation, so a read-only query isn't unnecessarily serialised
+    against LMDB's writer lock. *)

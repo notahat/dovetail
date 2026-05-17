@@ -3,15 +3,15 @@
 open Dovetail
 open Test_helpers
 
-let logical_testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical>")) ( = )
+let logical_plan_testable : Logical.plan Alcotest.testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical-plan>")) ( = )
 
 let test_relation_name_lowers_to_scan () =
   let ast = Ast.Relation_name "users" in
   let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
+  Alcotest.(check logical_plan_testable)
     "Relation_name -> Scan"
-    (Logical.Scan { table = "users" })
+    (Logical.Query (Scan { table = "users" }))
     logical
 
 let test_pipeline_yields_fixture_rows () =
@@ -38,10 +38,11 @@ let test_restrict_lowers_to_logical_restrict () =
       { input = Ast.Relation_name "users"; predicate = id_equals_three }
   in
   let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
+  Alcotest.(check logical_plan_testable)
     "Ast.Restrict -> Logical.Restrict wrapping Scan"
-    (Logical.Restrict
-       { input = Logical.Scan { table = "users" }; predicate = id_equals_three })
+    (Logical.Query
+       (Restrict
+          { input = Scan { table = "users" }; predicate = id_equals_three }))
     logical
 
 let test_restrict_pipeline_yields_filtered_rows () =
@@ -71,10 +72,10 @@ let test_project_lowers_to_logical_project () =
     Ast.Project { input = Ast.Relation_name "users"; columns = name_then_email }
   in
   let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
+  Alcotest.(check logical_plan_testable)
     "Ast.Project -> Logical.Project wrapping Scan"
-    (Logical.Project
-       { input = Logical.Scan { table = "users" }; columns = name_then_email })
+    (Logical.Query
+       (Project { input = Scan { table = "users" }; columns = name_then_email }))
     logical
 
 let test_project_pipeline_yields_projected_rows () =
@@ -109,13 +110,11 @@ let test_cross_product_lowers_to_logical_cross_product () =
       { left = Ast.Relation_name "users"; right = Ast.Relation_name "orders" }
   in
   let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
+  Alcotest.(check logical_plan_testable)
     "Ast.CrossProduct -> Logical.CrossProduct wrapping Scans"
-    (Logical.CrossProduct
-       {
-         left = Logical.Scan { table = "users" };
-         right = Logical.Scan { table = "orders" };
-       })
+    (Logical.Query
+       (CrossProduct
+          { left = Scan { table = "users" }; right = Scan { table = "orders" } }))
     logical
 
 let users_id_equals_orders_user_id =
@@ -134,18 +133,19 @@ let test_join_lowers_to_restrict_over_cross_product () =
       }
   in
   let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
+  Alcotest.(check logical_plan_testable)
     "Ast.Join -> Logical.Restrict wrapping Logical.CrossProduct"
-    (Logical.Restrict
-       {
-         input =
-           Logical.CrossProduct
-             {
-               left = Logical.Scan { table = "users" };
-               right = Logical.Scan { table = "orders" };
-             };
-         predicate = users_id_equals_orders_user_id;
-       })
+    (Logical.Query
+       (Restrict
+          {
+            input =
+              CrossProduct
+                {
+                  left = Scan { table = "users" };
+                  right = Scan { table = "orders" };
+                };
+            predicate = users_id_equals_orders_user_id;
+          }))
     logical
 
 let test_relation_literal_lowers_through () =
@@ -157,13 +157,14 @@ let test_relation_literal_lowers_through () =
       }
   in
   let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
+  Alcotest.(check logical_plan_testable)
     "Ast.RelationLiteral -> Logical.RelationLiteral with same payload"
-    (Logical.RelationLiteral
-       {
-         columns = [ "id"; "name" ];
-         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
-       })
+    (Logical.Query
+       (RelationLiteral
+          {
+            columns = [ "id"; "name" ];
+            rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+          }))
     logical
 
 let () =
