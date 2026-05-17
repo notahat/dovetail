@@ -9,9 +9,18 @@ called out where they exist.
 
 Items are roughly ordered by leverage within each section.
 
+## Status
+
+The ten items in the Ranked TL;DR have all shipped (commits `dede5b7`
+through `2d3131d`). Each subsection in the body below is annotated with
+its status: **[done]** for items that landed, **[open]** for items not
+yet actioned. The "Smaller items by file" section is mostly **[open]** —
+it was below the TL;DR cut. Cross-cutting captures for `CLAUDE.md` are
+also **[open]**.
+
 ## Architecture-level themes
 
-### Stale slice-1 scaffolding in `Fixture`
+### Stale slice-1 scaffolding in `Fixture` — **[done]** (TL;DR 1, commit `dede5b7`)
 
 `lib/fixture.ml:50-66` defines `encode_users_row` and `encode_orders_row`
 by hand, with `_ -> assert false` arms covering shapes that never occur
@@ -28,7 +37,7 @@ deleted, one degree of freedom removed, the `assert false` arms vanish.
 Why: this is the cleanest "earlier slices' code that the codebase has
 since grown past" item in the review.
 
-### `Row_codec.split_primary_key` is `Schema.assemble_tuple`'s inverse — move it home
+### `Row_codec.split_primary_key` is `Schema.assemble_tuple`'s inverse — move it home — **[done]** (TL;DR 6, commit `50de0f6`)
 
 `Row_codec` currently owns half of a bijection (`encode_row` → bytes) and
 calls `Schema.assemble_tuple` for the other half (`decode_row` → tuple).
@@ -45,7 +54,7 @@ Why: the round-trip `assemble_tuple ∘ split_tuple = id` (and converse)
 is a property worth being able to test at the `Schema` layer without
 involving bytes at all.
 
-### `Translate`'s optimiser rewrites are unnamed
+### `Translate`'s optimiser rewrites are unnamed — **[done]** (TL;DR 5, commit `75eb671`)
 
 `Translate` already runs two distinct rewrite rules: PK-equality →
 `IndexLookup`, and join-on-PK → `IndexedNestedLoopJoin`. The module-level
@@ -79,7 +88,7 @@ deferred until slice 13/14 when more rules force the issue. Flagging
 because it's the place the architecture most clearly wants something
 next.
 
-### Eval has two CPS entry points; the ref-through-fold inside `evaluate_insert` can still go
+### Eval has two CPS entry points; the ref-through-fold inside `evaluate_insert` can still go — **[done]** (TL;DR 8, commit `7e9317d`)
 
 Post-review change: `eval_mutation` was originally synchronous (returned
 `int`); a follow-up converted it to CPS to mirror `eval`. The mutation
@@ -101,7 +110,7 @@ affected_rows` in the iter body. The future multi-row case still lands
 cleanly. Drops two parameters from `insert_one_row` and removes the
 "take a count, return count + 1" oddity.
 
-### IR triplication: live with it, but unify the kind-inference rule
+### IR triplication: live with it, but unify the kind-inference rule — **[open]**
 
 The `RelationLiteral { columns; rows }` record and the
 `plan = Query of t | Mutation of mutation` wrapper are now copy-pasted
@@ -121,7 +130,7 @@ Why: documentation about a rule in two `.mli` files plus an
 implementation in a third file is a drift trap. One implementation
 eliminates the trap without disturbing the IR layering.
 
-### `Physical.format` should leave room for `Logical.format`
+### `Physical.format` should leave room for `Logical.format` — **[open]**
 
 Only `Physical` has a `format`/`format_plan` (used by
 `--show-physical`). When a Translate rewrite produces a surprising
@@ -134,7 +143,7 @@ into the relevant sub-language modules: `Projection.format`,
 
 ## Naming and consistency
 
-### `Insert` field-order drift across IR layers
+### `Insert` field-order drift across IR layers — **[open]**
 
 - `Ast.mutation = Insert { source : t; table : string }` (ast.mli:60-61)
 - `Logical.mutation = Insert { table : string; source : t }` (logical.mli:46)
@@ -142,7 +151,7 @@ into the relevant sub-language modules: `Projection.format`,
 
 `Ast` is the odd one out. Realign to `{ table; source }` everywhere.
 
-### Error-message prefix convention is consistent but undocumented
+### Error-message prefix convention is consistent but undocumented — **[open]**
 
 Every user-facing error string in the codebase starts with `Module:` or
 `Module: operation:`. `Translate: insert into %S: ...`, `Eval: insert
@@ -152,7 +161,7 @@ into %S failed: ...`, `Projection.resolve: ...`, `Schema.assemble_tuple:
 Small inconsistency: `Eval` uses `... failed: ...` for the PK-collision
 case; nobody else uses "failed". Drop it for consistency.
 
-### Abbreviations slipping into local bindings
+### Abbreviations slipping into local bindings — **[open]**
 
 The "spell things out" rule is well-followed in the public API but
 slips occasionally in locals:
@@ -167,7 +176,7 @@ Not urgent; mention because consistency on these is cheap.
 
 ## Functions getting long, doing too much, or oddly shaped
 
-### `Schema.find_field` (schema.ml:27-67) — 41 lines, duplicated ladders
+### `Schema.find_field` (schema.ml:27-67) — 41 lines, duplicated ladders — **[done]** (TL;DR 3, commit `8027b92`)
 
 The qualified and unqualified branches each pattern-match `matching` for
 `[one] / [] / many` with the "no match" arm being byte-identical. Worth
@@ -195,7 +204,7 @@ should always be unique within a schema). The `internal error`
 explaining the invariant, rather than masquerading as a normal column
 lookup failure that callers will surface verbatim in REPL output.
 
-### `Parser.expression` (parser.ml:209-276) — 67 lines, one `fix`
+### `Parser.expression` (parser.ml:209-276) — 67 lines, one `fix` — **[done]** (TL;DR 10, commit `2d3131d` — kept nested, comment added)
 
 The expression grammar is built as five precedence tiers (`term`,
 `comparison_expression`, `not_expression`, `and_expression`, top-level
@@ -215,7 +224,7 @@ Smaller: `term` (parser.ml:216-234) and `literal_value` (parser.ml:83-89)
 share the leading-character dispatch on `"`, `-`, digit, letter. A
 `literal_by_lookahead` helper would dry it up; not urgent.
 
-### `Translate.validate_literal_against_target` (translate.ml:307-347) — 41 lines, four invariants
+### `Translate.validate_literal_against_target` (translate.ml:307-347) — 41 lines, four invariants — **[open]**
 
 Four independent checks (missing columns, unknown columns, row arity,
 per-column kind), each its own `if ... failwith ...`. Splitting into
@@ -223,7 +232,7 @@ per-column kind), each its own `if ... failwith ...`. Splitting into
 `unit`-returning, raising on failure — makes the orchestration body four
 lines and lets each check grow a more specific error.
 
-### `Storage.with_iter_seq` (storage.ml:46-68) — two interlocking refs
+### `Storage.with_iter_seq` (storage.ml:46-68) — two interlocking refs — **[open]**
 
 `started : bool ref` and `exhausted : bool ref` encode a state machine
 with four nominal states, two of which are unreachable. A tagged variant
@@ -242,7 +251,7 @@ in
 Why: a reader can list the states in two seconds rather than reasoning
 about two booleans' joint truth values.
 
-### `doctest.ml` extractor — heavily mutable
+### `doctest.ml` extractor — heavily mutable — **[open]**
 
 `parse_session_lines` (doctest.ml:64-93, 30 lines, 3 refs),
 `extract_sessions` (doctest.ml:100-128, four refs), `split_outputs`
@@ -251,7 +260,11 @@ position mutation). All would read better as folds. The "functional
 core, imperative shell" preference applies — these are pure parsers and
 have no I/O justifying the mutable shapes.
 
-## Error-handling discipline
+## Error-handling discipline — **[done]** (TL;DR 4, commit `a62cc77`; schema.ml spot rolled into commit `8027b92`)
+
+All four flagged spots have been reclassified to `assert false` with one-line
+invariant comments. The slice-1 `"?"` fallback in `primary_key_value_text`
+for composite PKs has been kept and labelled `TODO(composite-pk)`.
 
 The rule from `~/.claude/CLAUDE.md`: exceptions are for exceptional
 cases; fail early; never silently swallow. Mostly followed. A few
@@ -292,7 +305,7 @@ matches the precedent at `expression.ml:185, 197, 212, 227`.
 
 ## Documentation drift
 
-### Stale "Slice N introduces X" sentences in `.mli` files
+### Stale "Slice N introduces X" sentences in `.mli` files — **[done]** (TL;DR 2, commit `fe260ca`)
 
 Several module docs lead with a per-slice changelog that has gone stale:
 
@@ -311,7 +324,7 @@ Suggested change: replace each with a single forward-looking sentence
 about *what the module does today*, and let per-constructor doc comments
 carry the rest. Slice history lives in `git log` and `docs/plans/`.
 
-### Doc that's drifted from code
+### Doc that's drifted from code — **[open]**
 
 - `physical.mli:118-125` enumerates `Filter`, `Project`,
   `NestedLoopJoin` as examples of operators that "carry a parameter
@@ -327,7 +340,7 @@ carry the rest. Slice history lives in `git log` and `docs/plans/`.
 
 ## Misplaced code
 
-### `parse_cli` belongs in `lib`
+### `parse_cli` belongs in `lib` — **[done]** (TL;DR 9, commit `e5696f8`)
 
 `bin/main.ml:18-39` parses argv and handles `--show-physical` /
 `--data-directory`. It's interesting code with edge cases (duplicate
@@ -339,7 +352,7 @@ exiting. Add `test/test_cli.ml`. Matches the stated pattern of "bulk of
 work lives in `Dovetail.*` so it's testable without subprocess
 spawning."
 
-### `Physical.render_columns` belongs in `Projection`
+### `Physical.render_columns` belongs in `Projection` — **[open]**
 
 `physical.ml:21-22` is pure formatting of a `Projection.t` with zero
 physical-plan concerns. Move to `Projection.format` (formatter-based,
@@ -347,7 +360,7 @@ matching `Expression.format`).
 
 ## Tests
 
-### `test_helpers.ml` should grow common boilerplate
+### `test_helpers.ml` should grow common boilerplate — **[done]** (TL;DR 7, commit `2421976`)
 
 Three patterns are reinvented across multiple test files:
 
@@ -363,7 +376,7 @@ Three patterns are reinvented across multiple test files:
 - **a stdin-from-a-list `input_line` shim**: in `test_repl.ml:8-15`
   and inlined in `doctest.ml:138-145`. Move to `test_helpers`.
 
-### Placeholder testables hurt failure diffs
+### Placeholder testables hurt failure diffs — **[open]**
 
 `test_helpers.ml:110-116` defines `tuple_list_testable` and
 `physical_testable` with placeholder printers (`<tuples>`,
@@ -372,7 +385,7 @@ real one-line printer — `Value.to_string` of each element, joined —
 would make these failures self-diagnosing. (And `Value` arguably wants
 a `to_string` anyway; see below.)
 
-### A handful of plain-language test name nits
+### A handful of plain-language test name nits — **[open]**
 
 Mostly good; one outlier:
 
@@ -383,12 +396,12 @@ Mostly good; one outlier:
   field names, inferred kinds, qualifier-and-PK absence, and tuple
   contents.
 
-### `test_dovetail.ml` discards subprocess exit status
+### `test_dovetail.ml` discards subprocess exit status — **[open]**
 
 `test_dovetail.ml:27` does `let _ = Unix.close_process_full ...` —
 masking a binary crash. Capture and assert `WEXITED 0`.
 
-## Smaller items by file
+## Smaller items by file — **[open]** (entire section below the TL;DR cut)
 
 ### `lib/value.ml`
 
@@ -465,7 +478,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   duplicate the same shape. A small `unreachable_classification`
   helper, or just `assert false` with a comment, would be cleaner.
 
-## Cross-cutting captures for `CLAUDE.md`
+## Cross-cutting captures for `CLAUDE.md` — **[open]** (partial: one `TODO(composite-pk)` marker placed during TL;DR 4)
 
 A few project conventions are being followed consistently but aren't
 captured anywhere. Worth a brief paragraph in `CLAUDE.md`:
@@ -486,22 +499,29 @@ captured anywhere. Worth a brief paragraph in `CLAUDE.md`:
 
 If only some of this gets touched, in priority order:
 
-1. Delete `Fixture.encode_users_row`/`encode_orders_row`; use
+1. **[done]** Delete `Fixture.encode_users_row`/`encode_orders_row`; use
    `Row_codec.encode_row`. ~20 lines deleted, one parameter removed.
-2. Drop the slice-history sentences from the six `.mli` files.
-3. Tighten `Schema.find_field` to one dispatch and reclassify the
-   qualified-ambiguous case as `assert false`.
-4. Sort out `failwith` vs `assert false` in the four flagged spots.
-5. Name the indexed-join match (record) and the two `Translate` rules
+   (commit `dede5b7`)
+2. **[done]** Drop the slice-history sentences from the six `.mli` files.
+   (commit `fe260ca`)
+3. **[done]** Tighten `Schema.find_field` to one dispatch and reclassify the
+   qualified-ambiguous case as `assert false`. (commit `8027b92`)
+4. **[done]** Sort out `failwith` vs `assert false` in the four flagged spots.
+   (commit `a62cc77`)
+5. **[done]** Name the indexed-join match (record) and the two `Translate` rules
    (`rewrite_point_lookup`, `rewrite_indexed_nested_loop_join`).
-6. Move `Row_codec.split_primary_key` to `Schema` as `split_tuple`.
-7. Add `with_fixture_environment` and `with_captured_formatter` to
-   `test_helpers`; consolidate the duplicated setup.
-8. Replace `evaluate_insert`'s ref-through-fold with `incr` + `unit`-
-   returning `insert_one_row`.
-9. Promote `parse_cli` to `lib/cli.ml`; add `test_cli.ml`.
-10. Either flatten `Parser.expression` into top-level precedence tiers
-    or accept the inner-let shape and leave a comment.
+   (commit `75eb671`)
+6. **[done]** Move `Row_codec.split_primary_key` to `Schema` as `split_tuple`.
+   (commit `50de0f6`)
+7. **[done]** Add `with_fixture_environment` and `with_captured_formatter` to
+   `test_helpers`; consolidate the duplicated setup. (commit `2421976`)
+8. **[done]** Replace `evaluate_insert`'s ref-through-fold with `incr` + `unit`-
+   returning `insert_one_row`. (commit `7e9317d`)
+9. **[done]** Promote `parse_cli` to `lib/cli.ml`; add `test_cli.ml`.
+   (commit `e5696f8`)
+10. **[done]** Either flatten `Parser.expression` into top-level precedence tiers
+    or accept the inner-let shape and leave a comment. Kept nested,
+    comment added. (commit `2d3131d`)
 
 Slice 12 (update + delete) will land an upstream-identity validator and
 an assignments sublanguage. The naming-the-rewrites pass (item 5) and
