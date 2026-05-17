@@ -109,6 +109,34 @@ let test_with_iter_seq_yields_empty_for_empty_map () =
       Alcotest.(check (list (pair string string)))
         "empty map yields empty seq" [] pairs)
 
+let test_delete_removes_key () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      let map = Storage.create_map environment transaction ~name:"test" in
+      Storage.put map transaction ~key:"hello" ~value:"world";
+      Storage.delete map transaction ~key:"hello");
+  Storage.with_read_transaction environment (fun transaction ->
+      let map =
+        Option.get (Storage.open_map environment transaction ~name:"test")
+      in
+      Alcotest.(check (option string))
+        "deleted key returns None" None
+        (Storage.get map transaction ~key:"hello"))
+
+let test_delete_is_no_op_on_absent_key () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      let map = Storage.create_map environment transaction ~name:"test" in
+      Storage.put map transaction ~key:"kept" ~value:"value";
+      (* The absent-key delete must not raise. *)
+      Storage.delete map transaction ~key:"never-there";
+      (* Sibling keys must remain untouched. *)
+      Alcotest.(check (option string))
+        "sibling key untouched" (Some "value")
+        (Storage.get map transaction ~key:"kept"))
+
 let test_exception_aborts_write_transaction () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -137,6 +165,13 @@ let () =
           Alcotest.test_case "put then get" `Quick test_round_trip;
           Alcotest.test_case "open_map returns None when map missing" `Quick
             test_open_map_returns_none_when_missing;
+        ] );
+      ( "delete",
+        [
+          Alcotest.test_case "delete removes a present key" `Quick
+            test_delete_removes_key;
+          Alcotest.test_case "delete on an absent key is a no-op" `Quick
+            test_delete_is_no_op_on_absent_key;
         ] );
       ( "with_iter_seq",
         [

@@ -40,6 +40,13 @@ let get map transaction ~key =
   | v -> Some v
   | exception Lmdb.Not_found -> None
 
+(* The lmdb binding raises [Lmdb.Not_found] when the key is absent; we
+   swallow it to honour the no-op-on-absent contract. *)
+let delete map transaction ~key =
+  match Lmdb.Map.remove map ~txn:transaction key with
+  | () -> ()
+  | exception Lmdb.Not_found -> ()
+
 (* Open a cursor for the duration of [continue] and expose a one-shot
    sequence that pulls each pair lazily.
 

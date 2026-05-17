@@ -62,6 +62,13 @@ val get : map -> [> `Read ] transaction -> key:string -> string option
 (** [get map transaction ~key] returns [Some v] if [key] is bound, else [None].
 *)
 
+val delete : map -> [ `Read | `Write ] transaction -> key:string -> unit
+(** [delete map transaction ~key] removes [key] from [map]. A no-op if [key] is
+    not bound, mirroring [get]'s tolerance of an absent key: callers that
+    require an existence check are expected to perform it themselves (the
+    catalog-aware "no such table" check inside {!Ddl.execute_write} is the
+    motivating example). Must be called inside a read-write transaction. *)
+
 val with_iter_seq :
   map -> [> `Read ] transaction -> ((string * string) Seq.t -> 'a) -> 'a
 (** [with_iter_seq map transaction continue] opens a cursor over [map] and
