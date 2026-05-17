@@ -17,9 +17,15 @@ type error = string
 (** Slice-1 placeholder for parser errors. The string is whatever angstrom
     produced. *)
 
-val parse : string -> (Ast.t, error) result
-(** [parse input] parses [input] as a complete query. Leading and trailing
-    whitespace are accepted; the parser must consume the entire input. *)
+val parse : string -> (Ast.plan, error) result
+(** [parse input] parses [input] as a complete top-level pipeline. The result is
+    an {!Ast.plan} — an {!Ast.Query} for any pipeline without a sink, or an
+    {!Ast.Mutation} for a pipeline whose final step is a sink (today, only
+    [| insert into <table>]). The wrapper enforces in the grammar that a sink
+    terminates a pipeline: a query operator after a sink is a parse error.
+
+    Leading and trailing whitespace are accepted; the parser must consume the
+    entire input. *)
 
 val parse_predicate : string -> (Expression.t, error) result
 (** [parse_predicate input] parses [input] as a single expression in the

@@ -7,7 +7,13 @@
 
     Slice 1 introduced [Relation_name] (bare identifiers); slice 2 adds
     [Restrict] (the `restrict` pipeline step). Operators (projection, joins) and
-    richer literals arrive as later slices introduce them. *)
+    richer literals arrive as later slices introduce them.
+
+    Slice 11 adds the {!plan} wrapper sitting above {!t}: a top-level query is
+    either a {!Query} carrying a relation tree or a {!Mutation} carrying a sink
+    (today, [insert into <table>]). The wrapper enforces "a sink terminates a
+    pipeline" structurally — the only place a mutation can appear is at the top,
+    and its source field is a {!t}, not a {!plan}, so sinks cannot nest. *)
 
 type t =
   | Relation_name of string
@@ -50,3 +56,23 @@ type t =
           and must be unique within the literal (the parser rejects duplicates).
           Each row in [rows] has the same length as [columns], and the values
           appear in column order. *)
+
+type mutation =
+  | Insert of { source : t; table : string }
+      (** [Insert { source; table }] is the surface form
+          [source | insert into <table>]. [source] is the upstream relation
+          whose rows get written; [table] names the target. The constructor name
+          follows the SQL verb the user typed. *)
+
+type plan =
+  | Query of t
+      (** [Query relation] is a pipeline that produces rows: every operator
+          chain that doesn't end in a sink. *)
+  | Mutation of mutation
+      (** [Mutation mutation] is a pipeline that ends in a sink. The wrapper
+          enforces "a sink terminates a pipeline" in the type system:
+          {!mutation}'s [source] field is a {!t}, so a sink cannot appear
+          anywhere except at the top of a {!plan}, and cannot nest.
+
+          {!Lower.lower} returns the same wrapper shape at the Logical layer,
+          and {!Translate.translate} carries it through to {!Physical.plan}. *)

@@ -3,14 +3,19 @@
 open Dovetail
 open Test_helpers
 
-let ast_testable = Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast>")) ( = )
+let ast_plan_testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-plan>")) ( = )
 
-let parses input expected_ast =
+(* Wraps the expected [Ast.t] in [Ast.Query] before comparing against the
+   parser's [Ast.plan] output. Most surface forms parse as queries; the
+   sink-production tests below use [parses_plan] to assert against a
+   [Mutation] directly. *)
+let parses input expected_inner_ast =
   match Parser.parse input with
-  | Ok ast ->
-      Alcotest.(check ast_testable)
+  | Ok actual_plan ->
+      Alcotest.(check ast_plan_testable)
         (Printf.sprintf "%S parses" input)
-        expected_ast ast
+        (Ast.Query expected_inner_ast) actual_plan
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
@@ -282,6 +287,71 @@ let test_relation_literal_rejects_missing_value () = rejects "{id:}"
 let test_relation_literal_rejects_column_reference_in_value_position () =
   rejects "{id: x}"
 
+(* Slice 11 step 4: the sink production. A pipeline that ends in [| insert
+   into <table>] parses as an [Ast.Mutation], with everything before the
+   sink as the upstream relation. Pipelines without a sink parse as
+   [Ast.Query]. The wrapper is the parser's only structural change at this
+   step. *)
+
+let parses_plan input expected_plan =
+  match Parser.parse input with
+  | Ok actual_plan ->
+      Alcotest.(check ast_plan_testable)
+        (Printf.sprintf "%S parses to plan" input)
+        expected_plan actual_plan
+  | Error message ->
+      Alcotest.failf "expected %S to parse but got error: %s" input message
+
+let test_pipeline_ending_in_sink_parses_as_mutation () =
+  parses_plan
+    "{id: 9, user_id: 1, description: \"Pretzel\", amount: 9} | insert into \
+     orders"
+    (Ast.Mutation
+       (Insert
+          {
+            source =
+              Ast.RelationLiteral
+                {
+                  columns = [ "id"; "user_id"; "description"; "amount" ];
+                  rows =
+                    [
+                      [
+                        Value.Int64 9L;
+                        Value.Int64 1L;
+                        Value.String "Pretzel";
+                        Value.Int64 9L;
+                      ];
+                    ];
+                };
+            table = "orders";
+          }))
+
+let test_pipeline_without_sink_parses_as_query () =
+  parses_plan "users" (Ast.Query (Ast.Relation_name "users"))
+
+let test_pipeline_with_upstream_pipeline_then_sink_parses_as_mutation () =
+  parses_plan "users | insert into orders"
+    (Ast.Mutation
+       (Insert { source = Ast.Relation_name "users"; table = "orders" }))
+
+let test_pipeline_rejects_query_op_after_sink () =
+  (* The grammar admits at most one sink, in terminal position. A
+     [restrict] (or any other [query_op]) after [| insert into ...] is a
+     parse error. *)
+  rejects "users | insert into orders | restrict id = 1"
+
+let test_pipeline_rejects_sink_with_nothing_before_it () =
+  rejects "| insert into orders"
+
+let test_pipeline_rejects_sink_without_target_table () =
+  rejects "users | insert into"
+
+let test_pipeline_rejects_sink_without_into_keyword () =
+  rejects "users | insert orders"
+
+let test_pipeline_rejects_two_sinks () =
+  rejects "users | insert into orders | insert into orders"
+
 let () =
   Alcotest.run "parser"
     [
@@ -418,5 +488,25 @@ let () =
           Alcotest.test_case "rejects a column reference in the value position"
             `Quick
             test_relation_literal_rejects_column_reference_in_value_position;
+        ] );
+      ( "insert sink syntax",
+        [
+          Alcotest.test_case "pipeline ending in a sink parses as Mutation"
+            `Quick test_pipeline_ending_in_sink_parses_as_mutation;
+          Alcotest.test_case "pipeline without a sink parses as Query" `Quick
+            test_pipeline_without_sink_parses_as_query;
+          Alcotest.test_case
+            "upstream pipeline followed by a sink parses as Mutation" `Quick
+            test_pipeline_with_upstream_pipeline_then_sink_parses_as_mutation;
+          Alcotest.test_case "rejects a query operator after the sink" `Quick
+            test_pipeline_rejects_query_op_after_sink;
+          Alcotest.test_case "rejects a sink with nothing before it" `Quick
+            test_pipeline_rejects_sink_with_nothing_before_it;
+          Alcotest.test_case "rejects a sink without a target table" `Quick
+            test_pipeline_rejects_sink_without_target_table;
+          Alcotest.test_case "rejects a sink without the into keyword" `Quick
+            test_pipeline_rejects_sink_without_into_keyword;
+          Alcotest.test_case "rejects two sinks in the same pipeline" `Quick
+            test_pipeline_rejects_two_sinks;
         ] );
     ]

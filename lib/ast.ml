@@ -5,3 +5,6 @@ type t =
   | CrossProduct of { left : t; right : t }
   | Join of { left : t; right : t; predicate : Expression.t }
   | RelationLiteral of { columns : string list; rows : Value.t list list }
+
+type mutation = Insert of { source : t; table : string }
+type plan = Query of t | Mutation of mutation

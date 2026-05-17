@@ -17,9 +17,10 @@ let rec lower_relation (ast : Ast.t) : Logical.t =
         }
   | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
 
-(* Slice 11 step 3 widens Lower's output to [Logical.plan] so the Logical IR
-   can carry the Query/Mutation wrapper alongside the relation tree. The Ast
-   is still flat -- no sink production yet -- so every output is a
-   [Logical.Query] for the moment. The Mutation arm appears in step 4
-   alongside the Ast wrapper. *)
-let lower (ast : Ast.t) : Logical.plan = Query (lower_relation ast)
+let lower_mutation (Ast.Insert { source; table }) : Logical.mutation =
+  Insert { table; source = lower_relation source }
+
+let lower (ast : Ast.plan) : Logical.plan =
+  match ast with
+  | Query relation -> Query (lower_relation relation)
+  | Mutation mutation -> Mutation (lower_mutation mutation)

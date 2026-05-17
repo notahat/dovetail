@@ -123,6 +123,23 @@ let test_format_mutation_status_many_rows_pluralises () =
     "many rows use the plural noun" "inserted 5 rows"
     (Repl.format_mutation_status example_insert 5)
 
+(* Slice 11 step 4 end-to-end: a user-typed insert pipeline runs through
+   parse / lower / translate / eval, commits the row inside a write
+   transaction, and prints the affected-row status line. The follow-up
+   restrict query confirms the row landed in storage and is readable. *)
+let test_insert_into_orders_writes_row_and_reports_status () =
+  let output =
+    run_with_input
+      [
+        "{id: 9, user_id: 1, description: \"Pretzel\", amount: 9} | insert \
+         into orders";
+        "orders | restrict id = 9";
+      ]
+  in
+  check_contains "insert status line" output "inserted 1 row";
+  check_contains "inserted row's description" output "Pretzel";
+  check_contains "inserted row's id column" output " 9 "
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -156,6 +173,9 @@ let () =
           Alcotest.test_case
             "a bare relation literal prints as a one-row relation" `Quick
             test_relation_literal_alone_prints_one_row;
+          Alcotest.test_case
+            "insert into orders writes the row and prints the status line"
+            `Quick test_insert_into_orders_writes_row_and_reports_status;
         ] );
       ( "mutation rendering",
         [

@@ -298,16 +298,44 @@ let pipeline_step =
   whitespace *> char '|' *> whitespace
   *> (restrict_step <|> project_step <|> cross_step <|> join_step)
 
-(* The slice-2 grammar: a relation reference followed by zero or more
-   pipeline steps, surrounded by optional whitespace. Each step wraps the
-   running AST in a [Restrict], left-associatively. *)
-let query =
+(* A query pipeline: a relation reference followed by zero or more
+   query-operator steps, folded left-associatively. The result is an
+   [Ast.t]; the outer [plan] wrapper is applied by [plan_parser] below
+   depending on whether a sink follows. *)
+let query_pipeline =
   whitespace *> relation_expr >>= fun base ->
-  many pipeline_step >>= fun steps ->
-  whitespace *> end_of_input
-  *> return (List.fold_left (fun current step -> step current) base steps)
+  many pipeline_step >>| fun steps ->
+  List.fold_left (fun current step -> step current) base steps
 
-let parse input = parse_string ~consume:All query input
+(* An insert sink: [insert into <identifier>]. Returned as a function
+   from the upstream relation to an [Ast.mutation], so the caller can
+   thread the upstream pipeline through. Currently the only sink the
+   grammar admits; future sinks (delete, ...) sit alongside this one
+   inside a [sink_step] disjunction. *)
+let insert_sink =
+  keyword "insert" *> whitespace *> keyword "into" *> whitespace *> identifier
+  >>| fun target_table source -> Ast.Insert { source; table = target_table }
+
+(* The slice-11 grammar: a query pipeline, optionally terminated by a
+   single sink step. A sink lifts the result into [Ast.Mutation]; absent
+   a sink the result is an [Ast.Query]. The grammar is "at most one
+   sink, in terminal position" -- [end_of_input] after the optional
+   sink rejects any further input, so a query operator following a sink
+   produces a parse error. *)
+let plan_parser =
+  query_pipeline >>= fun upstream ->
+  whitespace
+  *> option None
+       ( char '|' *> whitespace *> insert_sink >>| fun build_sink ->
+         Some build_sink )
+  >>= fun maybe_build_sink ->
+  whitespace *> end_of_input
+  *> return
+       (match maybe_build_sink with
+       | None -> Ast.Query upstream
+       | Some build_sink -> Ast.Mutation (build_sink upstream))
+
+let parse input = parse_string ~consume:All plan_parser input
 
 (* Standalone predicate entry point: parse a single expression with leading
    and trailing whitespace tolerated; [end_of_input] forces full
