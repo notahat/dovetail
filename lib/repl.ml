@@ -52,11 +52,10 @@ let evaluate_and_print environment ~output ~show_physical logical_plan =
                 logical_plan
             with
             | Physical.Mutation mutation ->
-                let affected_rows =
-                  Eval.eval_mutation environment transaction mutation
-                in
-                Format.fprintf output "%s@."
-                  (format_mutation_status mutation affected_rows)
+                Eval.eval_mutation environment transaction mutation
+                  (fun affected_rows ->
+                    Format.fprintf output "%s@."
+                      (format_mutation_status mutation affected_rows))
             | Physical.Query _ ->
                 failwith
                   "internal error: Logical.Mutation translated to \

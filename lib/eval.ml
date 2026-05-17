@@ -348,7 +348,7 @@ let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
    written. The affected-row count is threaded imperatively through a ref
    so a future multi-row literal lands without restructuring the
    accumulator. *)
-let evaluate_insert environment transaction ~target_table ~source =
+let evaluate_insert environment transaction ~target_table ~source continue =
   let target_schema, target_map =
     lookup_table_resources environment transaction target_table
   in
@@ -365,9 +365,10 @@ let evaluate_insert environment transaction ~target_table ~source =
               ~write_transaction:transaction ~position_map source_tuple
               !affected_rows)
         source_relation.tuples);
-  !affected_rows
+  continue !affected_rows
 
-let eval_mutation environment transaction mutation =
+let eval_mutation environment transaction mutation continue =
   match (mutation : Physical.mutation) with
   | Insert { table; source } ->
       evaluate_insert environment transaction ~target_table:table ~source
+        continue

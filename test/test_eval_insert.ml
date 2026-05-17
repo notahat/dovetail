@@ -34,8 +34,8 @@ let test_insert_writes_row_and_reports_one_affected () =
         ]
   in
   Storage.with_write_transaction environment (fun transaction ->
-      let affected_rows = Eval.eval_mutation environment transaction mutation in
-      Alcotest.(check int) "one row affected" 1 affected_rows);
+      Eval.eval_mutation environment transaction mutation (fun affected_rows ->
+          Alcotest.(check int) "one row affected" 1 affected_rows));
   (* The row should now be present in a fresh read transaction, so we know
      the write committed rather than just being visible to the writer. *)
   Storage.with_read_transaction environment (fun transaction ->
@@ -83,7 +83,7 @@ let test_insert_with_existing_primary_key_raises () =
        "Eval: insert into \"orders\" failed: row with primary key 1 already \
         exists") (fun () ->
       Storage.with_write_transaction environment (fun transaction ->
-          ignore (Eval.eval_mutation environment transaction mutation)));
+          Eval.eval_mutation environment transaction mutation (fun _ -> ())));
   (* The transaction aborted on the raised exception, so the table should
      be unchanged. *)
   Storage.with_read_transaction environment (fun transaction ->

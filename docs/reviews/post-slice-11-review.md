@@ -79,16 +79,22 @@ deferred until slice 13/14 when more rules force the issue. Flagging
 because it's the place the architecture most clearly wants something
 next.
 
-### Two-entry-point Eval is the right call, but `evaluate_insert` could lose its `ref`
+### Eval has two CPS entry points; the ref-through-fold inside `evaluate_insert` can still go
 
-`eval` (CPS) and `eval_mutation` (synchronous, returns `int`) are
-genuinely different shapes; the slice 11 plan justified the split well
-and the result reads cleanly. One small wart inside the mutation path:
+Post-review change: `eval_mutation` was originally synchronous (returned
+`int`); a follow-up converted it to CPS to mirror `eval`. The mutation
+entry's return shape (an `int`) doesn't carry a scoped resource today,
+but routing it through a continuation keeps the REPL dispatch arms
+structurally uniform and leaves room for slice-12-onwards mutation
+outputs (RETURNING-style row streams) to slot in additively. The two
+honest signatures argument lost to the symmetry-at-call-sites argument
+once the RETURNING horizon was factored in.
 
-`evaluate_insert` (eval.ml:351-368) threads `affected_rows : int ref`
-through `Seq.iter`, with `insert_one_row` (eval.ml:329-344) taking the
-current count *as a parameter* and returning `current + 1`. The pattern
-is fold-shaped but called inside `Seq.iter`.
+Wart that's still there inside the mutation path: `evaluate_insert`
+(eval.ml:351-368) threads `affected_rows : int ref` through `Seq.iter`,
+with `insert_one_row` (eval.ml:329-344) taking the current count *as a
+parameter* and returning `current + 1`. The pattern is fold-shaped but
+called inside `Seq.iter`.
 
 Suggested change: make `insert_one_row` return `unit` and use `incr
 affected_rows` in the iter body. The future multi-row case still lands
