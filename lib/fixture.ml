@@ -44,31 +44,10 @@ let orders_rows : Schema.tuple list =
 let users_table_subdb_name = "table:users"
 let orders_table_subdb_name = "table:orders"
 
-(* Decompose a users row into (key_bytes, value_bytes). The shape is fixed
-   for slice 1: PK is the single int64 [id] column, non-PK is [name; email;
-   active]. *)
-let encode_users_row = function
-  | [| Value.Int64 id; name; email; active |] ->
-      let key = Encoding.encode_int64_key id in
-      let value = Encoding.encode_tuple_value [ name; email; active ] in
-      (key, value)
-  | _ -> assert false
-
-(* Decompose an orders row into (key_bytes, value_bytes). PK is the single
-   int64 [id] column, non-PK is [user_id; description; amount]. *)
-let encode_orders_row = function
-  | [| Value.Int64 id; user_id; description; amount |] ->
-      let key = Encoding.encode_int64_key id in
-      let value =
-        Encoding.encode_tuple_value [ user_id; description; amount ]
-      in
-      (key, value)
-  | _ -> assert false
-
 (* Write [schema] to the catalog and [rows] to a fresh subDB named
    [subdb_name], if [table_name] is not already present in the catalog. *)
 let populate_table environment transaction ~table_name ~subdb_name ~schema ~rows
-    ~encode_row =
+    =
   match Catalog.get environment transaction ~table_name with
   | Some _ -> ()
   | None ->
@@ -78,15 +57,14 @@ let populate_table environment transaction ~table_name ~subdb_name ~schema ~rows
       in
       List.iter
         (fun row ->
-          let key, value = encode_row row in
+          let key, value = Row_codec.encode_row schema row in
           Storage.put table_map transaction ~key ~value)
         rows
 
 let populate_if_empty environment =
   Storage.with_write_transaction environment (fun transaction ->
       populate_table environment transaction ~table_name:"users"
-        ~subdb_name:users_table_subdb_name ~schema:users_schema ~rows:users_rows
-        ~encode_row:encode_users_row;
+        ~subdb_name:users_table_subdb_name ~schema:users_schema ~rows:users_rows;
       populate_table environment transaction ~table_name:"orders"
         ~subdb_name:orders_table_subdb_name ~schema:orders_schema
-        ~rows:orders_rows ~encode_row:encode_orders_row)
+        ~rows:orders_rows)
