@@ -232,7 +232,7 @@ per-column kind), each its own `if ... failwith ...`. Splitting into
 `unit`-returning, raising on failure — makes the orchestration body four
 lines and lets each check grow a more specific error.
 
-### `Storage.with_iter_seq` (storage.ml:46-68) — two interlocking refs — **[open]**
+### `Storage.with_iter_seq` (storage.ml:46-68) — two interlocking refs — **[done]**
 
 `started : bool ref` and `exhausted : bool ref` encode a state machine
 with four nominal states, two of which are unreachable. A tagged variant

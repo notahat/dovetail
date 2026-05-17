@@ -41,30 +41,36 @@ let get map transaction ~key =
   | exception Lmdb.Not_found -> None
 
 (* Open a cursor for the duration of [continue] and expose a one-shot
-   sequence that pulls each pair lazily. The [exhausted] flag closes the
-   seq once it has either run to its end or been re-entered after
-   exhaustion -- the lmdb package doesn't expose a cursor reset, so
-   re-iteration is not supported. *)
+   sequence that pulls each pair lazily.
+
+   The dispenser walks a three-state machine: [`Before_first] is the
+   initial state and triggers a [Cursor.first] on the first pull;
+   [`Active] means at least one pair has been yielded and subsequent
+   pulls use [Cursor.next]; [`Exhausted] is terminal, reached when
+   either cursor call raises [Lmdb.Not_found], and pins [None] for the
+   rest of the sequence. The lmdb package doesn't expose a cursor
+   reset, so re-iteration is not supported -- once [`Exhausted], that's
+   it. *)
 let with_iter_seq map transaction continue =
   let transaction = (transaction :> [ `Read ] Lmdb.Txn.t) in
   Lmdb.Cursor.go Lmdb.Ro ~txn:transaction map (fun cursor ->
-      let exhausted = ref false in
-      let started = ref false in
+      let state = ref `Before_first in
       let next_pair () =
-        if !exhausted then None
-        else
-          let step =
-            if !started then
-              match Lmdb.Cursor.next cursor with
-              | pair -> Some pair
-              | exception Lmdb.Not_found -> None
-            else (
-              started := true;
-              match Lmdb.Cursor.first cursor with
-              | pair -> Some pair
-              | exception Lmdb.Not_found -> None)
-          in
-          (match step with None -> exhausted := true | Some _ -> ());
-          step
+        match !state with
+        | `Exhausted -> None
+        | `Before_first -> (
+            match Lmdb.Cursor.first cursor with
+            | pair ->
+                state := `Active;
+                Some pair
+            | exception Lmdb.Not_found ->
+                state := `Exhausted;
+                None)
+        | `Active -> (
+            match Lmdb.Cursor.next cursor with
+            | pair -> Some pair
+            | exception Lmdb.Not_found ->
+                state := `Exhausted;
+                None)
       in
       continue (Seq.of_dispenser next_pair))
