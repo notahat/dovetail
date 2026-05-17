@@ -71,3 +71,16 @@ val assemble_tuple :
     Used to reconstruct a tuple after reading a row from storage, where the PK
     columns come from the decoded key and the remaining columns from the decoded
     value. Raises [Invalid_argument] if either list has the wrong length. *)
+
+val split_tuple : t -> tuple -> Value.t list * Value.t list
+(** [split_tuple schema tuple] is the inverse of {!assemble_tuple}: it returns
+    [(primary_key_values, non_primary_key_values)], where [primary_key_values]
+    are in primary-key order (the order they appear in [schema.primary_key]) and
+    [non_primary_key_values] are in field order with the PK columns omitted. The
+    round-trip is
+    [assemble_tuple schema ~primary_key_values ~non_primary_key_values = tuple]
+    and vice versa.
+
+    Used when writing a row to storage: the PK values are handed to the key
+    codec, the remaining values to the tuple-value codec. Raises
+    [Invalid_argument] if [tuple] is not the right length for [schema]. *)

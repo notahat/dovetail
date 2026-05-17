@@ -100,8 +100,8 @@ let test_encode_row_raises_for_composite_primary_key () =
 let test_encode_row_raises_for_wrong_arity_tuple () =
   Alcotest.check_raises "tuple shorter than schema"
     (Invalid_argument
-       "Row_codec.encode_row: tuple has 2 value(s) but schema declares 4 \
-        field(s)") (fun () ->
+       "Schema.split_tuple: tuple has 2 value(s) but schema declares 4 field(s)")
+    (fun () ->
       ignore
         (Row_codec.encode_row users_schema
            [| Value.Int64 7L; Value.String "Alice" |]))

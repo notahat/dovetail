@@ -149,6 +149,77 @@ let test_unqualified_lookup_ambiguous_returns_error_naming_qualifiers () =
          \"orders.id\""
         message
 
+let values_list_testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<values>")) ( = )
+
+let test_splits_tuple_with_leading_pk () =
+  let tuple : Schema.tuple =
+    [|
+      Value.Int64 42L;
+      Value.String "Alice";
+      Value.String "alice@example.com";
+      Value.Bool true;
+    |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Schema.split_tuple users_schema tuple
+  in
+  Alcotest.(check values_list_testable)
+    "primary-key values" [ Value.Int64 42L ] primary_key_values;
+  Alcotest.(check values_list_testable)
+    "non-primary-key values"
+    [ Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true ]
+    non_primary_key_values
+
+let test_splits_tuple_with_pk_in_the_middle () =
+  let tuple : Schema.tuple =
+    [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Schema.split_tuple mid_pk_schema tuple
+  in
+  Alcotest.(check values_list_testable)
+    "primary-key values" [ Value.Int64 7L ] primary_key_values;
+  Alcotest.(check values_list_testable)
+    "non-primary-key values in field order"
+    [ Value.String "Bob"; Value.Bool false ]
+    non_primary_key_values
+
+let test_splits_tuple_with_composite_primary_key () =
+  let tuple : Schema.tuple =
+    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Schema.split_tuple composite_pk_schema tuple
+  in
+  Alcotest.(check values_list_testable)
+    "primary-key values in primary-key order"
+    [ Value.String "acme"; Value.Int64 3L ]
+    primary_key_values;
+  Alcotest.(check values_list_testable)
+    "non-primary-key values" [ Value.String "Carol" ] non_primary_key_values
+
+let test_split_is_the_inverse_of_assemble () =
+  let tuple : Schema.tuple =
+    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Schema.split_tuple composite_pk_schema tuple
+  in
+  let reassembled =
+    Schema.assemble_tuple composite_pk_schema ~primary_key_values
+      ~non_primary_key_values
+  in
+  Alcotest.(check tuple_testable)
+    "split then assemble round-trips the tuple" tuple reassembled
+
+let test_split_rejects_wrong_length_tuple () =
+  let tuple : Schema.tuple = [| Value.Int64 1L; Value.String "Alice" |] in
+  Alcotest.check_raises "raises Invalid_argument"
+    (Invalid_argument
+       "Schema.split_tuple: tuple has 2 value(s) but schema declares 4 field(s)")
+    (fun () -> ignore (Schema.split_tuple users_schema tuple))
+
 let test_qualified_lookup_disambiguates_in_cross_product_schema () =
   match
     Schema.find_field cross_product_schema
@@ -169,6 +240,20 @@ let () =
             `Quick test_assembles_with_pk_in_the_middle;
           Alcotest.test_case "interleaves values for a composite primary key"
             `Quick test_assembles_composite_primary_key;
+        ] );
+      ( "split_tuple",
+        [
+          Alcotest.test_case "splits a tuple whose PK is the leading field"
+            `Quick test_splits_tuple_with_leading_pk;
+          Alcotest.test_case "splits a tuple whose PK sits in the middle" `Quick
+            test_splits_tuple_with_pk_in_the_middle;
+          Alcotest.test_case
+            "splits a tuple with a composite primary key in PK order" `Quick
+            test_splits_tuple_with_composite_primary_key;
+          Alcotest.test_case "round-trips through assemble_tuple" `Quick
+            test_split_is_the_inverse_of_assemble;
+          Alcotest.test_case "rejects a tuple of the wrong length" `Quick
+            test_split_rejects_wrong_length_tuple;
         ] );
       ( "find_field",
         [

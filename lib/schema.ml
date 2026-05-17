@@ -71,6 +71,41 @@ let index_in_primary_key primary_key_names primary_key_name =
   in
   find 0 primary_key_names
 
+(* Locate [primary_key_name] in [schema.fields] and return its zero-based
+   position. Internal invariant: catalog construction guarantees every name
+   in [schema.primary_key] is present in [schema.fields]. *)
+let position_of_primary_key_field (schema : t) primary_key_name =
+  let rec find index = function
+    | [] -> assert false
+    | (field : field) :: _ when field.name = primary_key_name -> index
+    | _ :: rest -> find (index + 1) rest
+  in
+  find 0 schema.fields
+
+let split_tuple (schema : t) tuple =
+  let expected_length = List.length schema.fields in
+  if Array.length tuple <> expected_length then
+    invalid_arg
+      (Printf.sprintf
+         "Schema.split_tuple: tuple has %d value(s) but schema declares %d \
+          field(s)"
+         (Array.length tuple) expected_length);
+  let primary_key_values =
+    List.map
+      (fun primary_key_name ->
+        tuple.(position_of_primary_key_field schema primary_key_name))
+      schema.primary_key
+  in
+  let is_primary_key_name name = List.mem name schema.primary_key in
+  let non_primary_key_values =
+    List.mapi
+      (fun position (field : field) ->
+        if is_primary_key_name field.name then None else Some tuple.(position))
+      schema.fields
+    |> List.filter_map Fun.id
+  in
+  (primary_key_values, non_primary_key_values)
+
 let assemble_tuple schema ~primary_key_values ~non_primary_key_values =
   let primary_key_array = Array.of_list primary_key_values in
   let expected_pk_count = List.length schema.primary_key in
