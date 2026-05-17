@@ -27,8 +27,8 @@ val parse : string -> (Ast.plan, error) result
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)
 
-val parse_predicate : string -> (Expression.t, error) result
-(** [parse_predicate input] parses [input] as a single expression in the
+val parse_expression : string -> (Expression.t, error) result
+(** [parse_expression input] parses [input] as a single expression in the
     sublanguage shared by [restrict] and [join ... on]. The grammar, from
     loosest to tightest binding:
 

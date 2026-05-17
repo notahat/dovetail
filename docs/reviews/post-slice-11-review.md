@@ -432,7 +432,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   the type parameter is on track to earn its keep when the relevant
   slice (set/bag/distinct) lands.
 
-### `lib/parser.ml`
+### `lib/parser.ml` — **[done]**
 
 - `parse_predicate` (line 369) accepts the full expression grammar but
   is named for the predicate use case. Either rename to
@@ -444,7 +444,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   pattern-match it on the next line. A direct `<|>` between
   "pipeline + sink" and "pipeline alone" reads flatter.
 
-### `lib/parser.ml` — small ergonomic items
+### `lib/parser.ml` — small ergonomic items — **[done]**
 
 - `relation_literal_pair` (parser.ml:99-108) returns a 3-tuple with a
   trailing `bool` for "qualified key seen". A named record would survive

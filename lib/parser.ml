@@ -1,4 +1,5 @@
 open Angstrom
+module StringSet = Set.Make (String)
 
 type error = string
 
@@ -88,6 +89,17 @@ let literal_value =
   | Some character when is_letter character -> bool_literal
   | _ -> fail "expected a literal value (number, string, or bool)"
 
+(* One pair parsed inside a relation literal's braces. [column_key] is the
+   key text as written (bare [id] or dotted [users.id]); [key_is_qualified]
+   records the dotted-form flag so post-pass validation can name it in the
+   error. A record rather than a 3-tuple so the eventual addition of, say,
+   a source-span field doesn't force every destructure site to change. *)
+type literal_pair = {
+  column_key : string;
+  value : Value.t;
+  key_is_qualified : bool;
+}
+
 (* A single key-value pair inside a relation literal: [identifier : value].
    Whitespace around the colon is tolerated. The key grammar accepts both
    bare and qualified forms ([id] and [users.id]); the surface language
@@ -105,7 +117,7 @@ let relation_literal_pair =
     | _ -> return (first_segment, false) )
   >>= fun (column_key, key_is_qualified) ->
   whitespace *> char ':' *> whitespace *> literal_value >>| fun value ->
-  (column_key, value, key_is_qualified)
+  { column_key; value; key_is_qualified }
 
 (* One or more pairs separated by commas, with whitespace tolerated around
    commas and an optional trailing comma. The list is non-empty: the empty
@@ -122,35 +134,29 @@ let relation_literal_pairs =
    user can find what they typed. Runs after [many] has gathered the
    pairs, sidestepping angstrom's backtracking on inner-parser failure. *)
 let check_for_qualified_keys pairs =
-  match
-    List.find_opt
-      (fun (_column_key, _value, key_is_qualified) -> key_is_qualified)
-      pairs
-  with
+  match List.find_opt (fun pair -> pair.key_is_qualified) pairs with
   | None -> return ()
-  | Some (offending_key, _value, _flag) ->
+  | Some offender ->
       fail
         (Printf.sprintf
            "qualified column key %S in relation literal: only bare column \
             names are allowed"
-           offending_key)
+           offender.column_key)
 
 (* Raise a parse error if [pairs] contains the same column name twice. The
-   error names the duplicate so the user can find it. *)
+   error names the first duplicate so the user can find it. Walks [pairs]
+   left to right accumulating a [StringSet] of seen names; the
+   accumulator-passing form replaces the prior [Hashtbl] mutation. *)
 let check_for_duplicate_columns pairs =
-  let seen = Hashtbl.create 8 in
-  let rec scan = function
+  let rec walk seen = function
     | [] -> return ()
-    | (column_name, _value, _key_is_qualified) :: rest ->
-        if Hashtbl.mem seen column_name then
-          fail
-            (Printf.sprintf "duplicate column %S in relation literal"
-               column_name)
-        else (
-          Hashtbl.add seen column_name ();
-          scan rest)
+    | pair :: _ when StringSet.mem pair.column_key seen ->
+        fail
+          (Printf.sprintf "duplicate column %S in relation literal"
+             pair.column_key)
+    | pair :: rest -> walk (StringSet.add pair.column_key seen) rest
   in
-  scan pairs
+  walk StringSet.empty pairs
 
 (* A relation literal: [{column: value, column: value, ...}]. Single-row
    named-pair form only -- the multi-row literal grammar is a separate
@@ -160,8 +166,8 @@ let relation_literal =
   >>= fun pairs ->
   check_for_qualified_keys pairs >>= fun () ->
   check_for_duplicate_columns pairs >>| fun () ->
-  let columns = List.map (fun (key, _value, _qualified) -> key) pairs in
-  let values = List.map (fun (_key, value, _qualified) -> value) pairs in
+  let columns = List.map (fun pair -> pair.column_key) pairs in
+  let values = List.map (fun pair -> pair.value) pairs in
   Ast.RelationLiteral { columns; rows = [ values ] }
 
 (* The leading position of a pipeline: either a bare table reference or a
@@ -357,29 +363,22 @@ let insert_sink =
 (* The slice-11 grammar: a query pipeline, optionally terminated by a
    single sink step. A sink lifts the result into [Ast.Mutation]; absent
    a sink the result is an [Ast.Query]. The grammar is "at most one
-   sink, in terminal position" -- [end_of_input] after the optional
-   sink rejects any further input, so a query operator following a sink
+   sink, in terminal position" -- [end_of_input] after the disjunction
+   rejects any further input, so a query operator following a sink
    produces a parse error. *)
 let plan_parser =
   query_pipeline >>= fun upstream ->
-  whitespace
-  *> option None
-       ( char '|' *> whitespace *> insert_sink >>| fun build_sink ->
-         Some build_sink )
-  >>= fun maybe_build_sink ->
-  whitespace *> end_of_input
-  *> return
-       (match maybe_build_sink with
-       | None -> Ast.Query upstream
-       | Some build_sink -> Ast.Mutation (build_sink upstream))
+  let with_sink =
+    whitespace *> char '|' *> whitespace *> insert_sink >>| fun build_sink ->
+    Ast.Mutation (build_sink upstream)
+  in
+  let without_sink = return (Ast.Query upstream) in
+  with_sink <|> without_sink <* whitespace <* end_of_input
 
 let parse input = parse_string ~consume:All plan_parser input
 
-(* Standalone predicate entry point: parse a single expression with leading
+(* Standalone expression entry point: parse a single expression with leading
    and trailing whitespace tolerated; [end_of_input] forces full
-   consumption. The [parse_predicate] name reflects the role at the public
-   API -- the only callers parse expressions destined for a predicate
-   position -- while the underlying grammar is the full expression
-   sublanguage. *)
+   consumption. *)
 let expression_query = whitespace *> expression <* whitespace <* end_of_input
-let parse_predicate input = parse_string ~consume:All expression_query input
+let parse_expression input = parse_string ~consume:All expression_query input

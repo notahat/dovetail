@@ -1,6 +1,6 @@
 (** Tests for the expression sublanguage in [Parser].
 
-    Exercises [Parser.parse_predicate] across the literal, column, and
+    Exercises [Parser.parse_expression] across the literal, column, and
     comparison cases of [Expression.t], plus the rejection paths. The full query
     grammar (pipeline operators, integration with lower/translate/eval) lives in
     [test_parser.ml]. *)
@@ -22,7 +22,7 @@ let format_to_string expression =
   Buffer.contents buffer
 
 let parses_predicate input expected =
-  match Parser.parse_predicate input with
+  match Parser.parse_expression input with
   | Ok predicate ->
       Alcotest.(check predicate_testable)
         (Printf.sprintf "%S parses" input)
@@ -31,7 +31,7 @@ let parses_predicate input expected =
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
 let rejects_predicate input =
-  match Parser.parse_predicate input with
+  match Parser.parse_expression input with
   | Ok _ -> Alcotest.failf "expected %S to be rejected, but it parsed" input
   | Error _ -> ()
 
