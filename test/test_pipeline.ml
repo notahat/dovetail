@@ -287,16 +287,11 @@ let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
    assertions. Used by the IndexedNestedLoopJoin pipeline test, which
    has no parser path yet (Translate support arrives in step 2). *)
 let render_plan_against_fixture plan =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction plan (fun relation ->
-          let buffer = Buffer.create 512 in
-          let formatter = Format.formatter_of_buffer buffer in
-          Relation.print ~formatter relation;
-          Format.pp_print_flush formatter ();
-          Buffer.contents buffer))
+          with_captured_formatter @@ fun formatter ->
+          Relation.print ~formatter relation))
 
 let test_indexed_nested_loop_join_renders_matched_pairs () =
   (* Hand-built plan: stream [orders], probe [users] by

@@ -1,10 +1,13 @@
 (** Shared test fixtures and helpers.
 
-    Covers four overlapping concerns:
+    Covers five overlapping concerns:
 
-    - Scope-bound resources ({!with_temp_dir}, {!with_environment}) in the
-      {!Fun.protect} style, guaranteeing cleanup whether the body returns
-      normally or raises.
+    - Scope-bound resources ({!with_temp_dir}, {!with_environment},
+      {!with_fixture_environment}) in the {!Fun.protect} style, guaranteeing
+      cleanup whether the body returns normally or raises.
+    - Output and input capture ({!with_captured_formatter},
+      {!read_line_from_list}) for tests that exercise {!Repl.run} or any other
+      formatter-driven code.
     - Fixture-row constants matching what {!Fixture.populate_if_empty} writes,
       for tests that need to compare query results against a single shared
       expectation.
@@ -50,6 +53,42 @@ let with_environment path f =
   Fun.protect
     ~finally:(fun () -> Storage.close_environment environment)
     (fun () -> f environment)
+
+(** [with_fixture_environment f] creates a temp directory, opens an LMDB
+    environment in it, populates the standard fixture, runs [f environment], and
+    tears everything down on exit. Composes {!with_temp_dir},
+    {!with_environment}, and {!Fixture.populate_if_empty} -- the shape every
+    integration test that touches storage and expects fixture data starts with.
+*)
+let with_fixture_environment f =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  f environment
+
+(** [with_captured_formatter write_to_formatter] runs [write_to_formatter]
+    against a fresh buffered formatter, flushes it, and returns the captured
+    string. The shape every test that compares formatted output (REPL
+    transcripts, [Relation.print] renderings, plan dumps) starts with. *)
+let with_captured_formatter write_to_formatter =
+  let buffer = Buffer.create 512 in
+  let formatter = Format.formatter_of_buffer buffer in
+  write_to_formatter formatter;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+(** [read_line_from_list lines] returns a [unit -> string option] callback
+    suitable for {!Repl.run}'s [~read_line] argument. Each call returns the next
+    string in [lines]; once exhausted, every call returns [None] (mirroring the
+    contract a real stdin closure has at EOF). *)
+let read_line_from_list lines =
+  let remaining = ref lines in
+  fun () ->
+    match !remaining with
+    | [] -> None
+    | head :: rest ->
+        remaining := rest;
+        Some head
 
 (** The five [users] fixture rows as [Schema.tuple]s, in primary-key order.
     Mirrors [Fixture.users_rows] but lives here so tests can compare pipeline
@@ -189,9 +228,7 @@ let make_catalog environment transaction table_name =
     environment, fixture population, and read transaction are all set up and
     torn down around the call. *)
 let with_query_result query check_rows =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
       let ast =
         match Parser.parse query with
@@ -208,9 +245,7 @@ let with_query_result query check_rows =
     pipeline as {!with_query_result} but asserts that [Eval.eval] raises
     [expected]. [label] is the description shown in test output. *)
 let with_query_failure ~label ~expected query =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
       let ast =
         match Parser.parse query with
@@ -228,9 +263,7 @@ let with_query_failure ~label ~expected query =
     The temp directory, LMDB environment, fixture population, and read
     transaction are all set up and torn down around the call. *)
 let evaluate_against_fixture plan =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction plan (fun relation ->
           (relation.schema, List.of_seq relation.tuples)))

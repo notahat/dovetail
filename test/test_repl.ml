@@ -3,31 +3,15 @@
 open Dovetail
 open Test_helpers
 
-(** Build a [read_line] callback that returns each string in [lines] in order,
-    then [None] forever. *)
-let read_line_from_list lines =
-  let remaining = ref lines in
-  fun () ->
-    match !remaining with
-    | [] -> None
-    | head :: rest ->
-        remaining := rest;
-        Some head
-
 (** Run the REPL against a populated environment with [lines] as input,
     capturing all formatter output as a string. [show_physical] defaults to
     [false], matching the binary's default. *)
 let run_with_input ?(show_physical = false) lines =
-  let captured = Buffer.create 512 in
-  let formatter = Format.formatter_of_buffer captured in
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
+  with_captured_formatter @@ fun formatter ->
   Repl.run ~show_physical environment
     ~read_line:(read_line_from_list lines)
-    ~output:formatter;
-  Format.pp_print_flush formatter ();
-  Buffer.contents captured
+    ~output:formatter
 
 let check_contains label output expected =
   if not (contains_substring output expected) then

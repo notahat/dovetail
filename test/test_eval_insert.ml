@@ -20,9 +20,7 @@ let insert_mutation ~table ~pairs : Physical.mutation =
   Insert { table; source = RelationLiteral { columns; rows = [ values ] } }
 
 let test_insert_writes_row_and_reports_one_affected () =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   let mutation =
     insert_mutation ~table:"orders"
       ~pairs:
@@ -64,9 +62,7 @@ let test_insert_writes_row_and_reports_one_affected () =
                 [ tuple ]))
 
 let test_insert_with_existing_primary_key_raises () =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   let mutation =
     insert_mutation ~table:"orders"
       ~pairs:

@@ -133,19 +133,11 @@ let extract_sessions markdown =
 (** Feed every query's source line into {!Repl.run} against [environment],
     capturing all formatter output into a single string. *)
 let capture_repl_output environment queries =
-  let buffer = Buffer.create 1024 in
-  let formatter = Format.formatter_of_buffer buffer in
-  let remaining = ref (List.map (fun query -> query.source) queries) in
-  let read_line () =
-    match !remaining with
-    | [] -> None
-    | head :: rest ->
-        remaining := rest;
-        Some head
-  in
-  Repl.run environment ~read_line ~output:formatter;
-  Format.pp_print_flush formatter ();
-  Buffer.contents buffer
+  let lines = List.map (fun query -> query.source) queries in
+  Test_helpers.with_captured_formatter @@ fun formatter ->
+  Repl.run environment
+    ~read_line:(Test_helpers.read_line_from_list lines)
+    ~output:formatter
 
 (** Split a captured REPL stream into one segment per query.
 

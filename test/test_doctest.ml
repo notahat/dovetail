@@ -1,7 +1,6 @@
 (** Unit tests for [Doctest], the markdown REPL-session extractor and verifier.
 *)
 
-open Dovetail
 open Test_helpers
 
 (** Extract sessions from [markdown] and assert exactly [n] came out. *)
@@ -103,9 +102,7 @@ let test_trailing_ellipsis_accepts_extra_actual_rows () =
 |}
   in
   let sessions = Doctest.extract_sessions markdown in
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   match Doctest.verify_sessions environment sessions with
   | Ok () -> ()
   | Error error ->
@@ -128,9 +125,7 @@ let test_ellipsis_only_recognised_on_its_own_line () =
 |}
   in
   let sessions = Doctest.extract_sessions markdown in
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   match Doctest.verify_sessions environment sessions with
   | Ok () ->
       Alcotest.fail
@@ -144,9 +139,7 @@ this is deliberately wrong
 ```
 |} in
   let sessions = Doctest.extract_sessions markdown in
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   match Doctest.verify_sessions environment sessions with
   | Ok () ->
       Alcotest.fail "expected a doctest mismatch, but verification succeeded"

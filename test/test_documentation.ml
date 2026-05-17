@@ -4,7 +4,6 @@
     through {!Repl.run} against a fresh fixture-populated environment, and
     asserted to match its documented expected output. *)
 
-open Dovetail
 open Test_helpers
 
 (** Markdown files that participate in doctest verification. Paths are resolved
@@ -24,9 +23,7 @@ let verified_files =
     the fixture, hand both off to {!Doctest.verify_file}, fail with a
     descriptive error on any mismatch. *)
 let verify_one markdown_path () =
-  with_temp_dir @@ fun directory ->
-  with_environment directory @@ fun environment ->
-  Fixture.populate_if_empty environment;
+  with_fixture_environment @@ fun environment ->
   match Doctest.verify_file environment ~markdown_path with
   | Ok () -> ()
   | Error error -> Alcotest.fail (Doctest.format_error ~markdown_path error)
