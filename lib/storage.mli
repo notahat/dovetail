@@ -53,6 +53,14 @@ val create_map :
 (** [create_map environment transaction ~name] opens the named subDB, creating
     it if it does not exist. Must be called inside a read-write transaction. *)
 
+val drop_map :
+  environment -> [ `Read | `Write ] transaction -> name:string -> unit
+(** [drop_map environment transaction ~name] destroys the named subDB, including
+    every key it holds. Raises [Invalid_argument] if no subDB by that name
+    exists: this is a precondition the caller is expected to have enforced (e.g.
+    {!Ddl.execute_write}'s catalog-aware "no such table" check before reaching
+    the storage primitive). Must be called inside a read-write transaction. *)
+
 val put :
   map -> [ `Read | `Write ] transaction -> key:string -> value:string -> unit
 (** [put map transaction ~key ~value] writes [key]→[value], silently overwriting

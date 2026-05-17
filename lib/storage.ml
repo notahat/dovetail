@@ -32,6 +32,20 @@ let create_map environment transaction ~name =
   Lmdb.Map.create Nodup ~key:Lmdb.Conv.string ~value:Lmdb.Conv.string
     ~txn:transaction ~name environment
 
+(* [Lmdb.Map.drop ~delete:true] destroys the subDB; opening it via
+   [open_existing] first both turns "no such subDB" into a clear
+   [Invalid_argument] (rather than leaking [Lmdb.Not_found]) and gives
+   [drop] the map handle it needs. *)
+let drop_map environment transaction ~name =
+  match
+    Lmdb.Map.open_existing Nodup ~key:Lmdb.Conv.string ~value:Lmdb.Conv.string
+      ~txn:transaction ~name environment
+  with
+  | map -> Lmdb.Map.drop ~txn:transaction ~delete:true map
+  | exception Lmdb.Not_found ->
+      invalid_arg
+        (Printf.sprintf "Storage.drop_map: subDB %S does not exist" name)
+
 let put map transaction ~key ~value =
   Lmdb.Map.set map ~txn:transaction key value
 

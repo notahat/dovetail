@@ -137,6 +137,27 @@ let test_delete_is_no_op_on_absent_key () =
         "sibling key untouched" (Some "value")
         (Storage.get map transaction ~key:"kept"))
 
+let test_drop_map_removes_subdb_and_contents () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      let map = Storage.create_map environment transaction ~name:"doomed" in
+      Storage.put map transaction ~key:"a" ~value:"1";
+      Storage.drop_map environment transaction ~name:"doomed");
+  Storage.with_read_transaction environment (fun transaction ->
+      Alcotest.(check bool)
+        "subDB no longer exists" true
+        (Storage.open_map environment transaction ~name:"doomed" = None))
+
+let test_drop_map_raises_on_missing_subdb () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Alcotest.check_raises "missing subDB raises Invalid_argument"
+    (Invalid_argument "Storage.drop_map: subDB \"never-there\" does not exist")
+    (fun () ->
+      Storage.with_write_transaction environment (fun transaction ->
+          Storage.drop_map environment transaction ~name:"never-there"))
+
 let test_exception_aborts_write_transaction () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -172,6 +193,13 @@ let () =
             test_delete_removes_key;
           Alcotest.test_case "delete on an absent key is a no-op" `Quick
             test_delete_is_no_op_on_absent_key;
+        ] );
+      ( "drop_map",
+        [
+          Alcotest.test_case "drop_map removes the subDB and its contents"
+            `Quick test_drop_map_removes_subdb_and_contents;
+          Alcotest.test_case "drop_map raises on a never-existed subDB" `Quick
+            test_drop_map_raises_on_missing_subdb;
         ] );
       ( "with_iter_seq",
         [
