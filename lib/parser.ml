@@ -375,12 +375,19 @@ let pipeline_parser =
   with_sink <|> without_sink
 
 (* The slice-12 DDL body grammar: the productions admitted after the [:]
-   sigil has been consumed. Slice 12 step 3 admits [list tables] only;
-   step 5b extends this with [drop table <identifier>]. *)
+   sigil has been consumed. The disjunction relies on [<|>]'s backtracking
+   on inner failure: each branch starts with a distinct keyword
+   ([list]/[drop]), so a failed first branch rewinds to the start of the
+   body and the second branch tries from the same position. Future
+   productions ([describe], [create]) slot in alongside these. *)
 let ddl_list_tables =
   keyword "list" *> whitespace *> keyword "tables" *> return Ddl.List_tables
 
-let ddl_body = ddl_list_tables
+let ddl_drop_table =
+  keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
+  >>| fun table_name -> Ddl.Drop_table { table_name }
+
+let ddl_body = ddl_list_tables <|> ddl_drop_table
 
 (* The top-level grammar: optional leading whitespace, then dispatch on the
    first non-whitespace character. A leading [:] introduces a DDL statement

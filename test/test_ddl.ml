@@ -1,12 +1,12 @@
 (** Tests for [Ddl].
 
     Covers the slice-12 universe: [classify] for both statement constructors,
-    [execute_read] on [List_tables] (happy path and the empty-catalog edge),
-    and [execute_write] on [Drop_table] (catalog and storage state after a
-    successful drop, sibling tables untouched, and the catalog-aware
-    "no such table" error). [Ddl.execute_write] is reached directly here
-    rather than through the REPL so the failure-mode assertions can pin both
-    the raised wording and the post-abort state in one place. *)
+    [execute_read] on [List_tables] (happy path and the empty-catalog edge), and
+    [execute_write] on [Drop_table] (catalog and storage state after a
+    successful drop, sibling tables untouched, and the catalog-aware "no such
+    table" error). [Ddl.execute_write] is reached directly here rather than
+    through the REPL so the failure-mode assertions can pin both the raised
+    wording and the post-abort state in one place. *)
 
 open Dovetail
 open Test_helpers

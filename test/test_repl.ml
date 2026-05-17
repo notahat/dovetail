@@ -152,6 +152,34 @@ let test_list_tables_prints_fixture_tables_in_byte_sorted_order () =
     "orders precedes users (byte-sorted)" true
     (orders_position < users_position)
 
+(* Slice 12 step 5b end-to-end: [:drop table <name>] parses, classifies
+   as a write, removes the catalog entry and storage subDB inside a
+   write transaction, and prints the [dropped table "<name>"] status.
+   The follow-up [:list tables] confirms the table is gone while its
+   sibling remains. *)
+let test_drop_table_removes_table_and_reports_status () =
+  let output = run_with_input [ ":drop table users"; ":list tables" ] in
+  check_contains "drop status line" output "dropped table \"users\"";
+  check_contains "orders still listed after drop" output "orders";
+  Alcotest.(check bool)
+    "users not listed after drop" false
+    (* Match a whole-token "users" on its own line so substrings like
+       [alice@example.com] in earlier output can't satisfy the check.
+       The post-drop list output is the only place a bare [users] would
+       appear after the drop, so its absence here is the assertion. *)
+    (contains_substring output "\nusers\n")
+
+(* The "no such table" error path: dropping an unseeded table raises in
+   [Ddl.execute_write], the REPL catches it via its generic error guard,
+   prints the failure with the [Ddl: drop table ...: no such table]
+   prefix, and continues so the follow-up query still executes. *)
+let test_drop_nonexistent_table_reports_error_and_continues () =
+  let output = run_with_input [ ":drop table nonexistent"; ":list tables" ] in
+  check_contains "no-such-table error" output
+    "Ddl: drop table \"nonexistent\": no such table";
+  check_contains "loop continues after drop error" output "users";
+  check_contains "loop continues after drop error" output "orders"
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -191,6 +219,12 @@ let () =
           Alcotest.test_case
             ":list tables prints fixture tables in byte-sorted order" `Quick
             test_list_tables_prints_fixture_tables_in_byte_sorted_order;
+          Alcotest.test_case
+            ":drop table removes the table and prints the status line" `Quick
+            test_drop_table_removes_table_and_reports_status;
+          Alcotest.test_case
+            ":drop table on a missing table reports the error and continues"
+            `Quick test_drop_nonexistent_table_reports_error_and_continues;
         ] );
       ( "mutation rendering",
         [
