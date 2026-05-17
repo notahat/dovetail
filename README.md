@@ -133,19 +133,23 @@ lands in a later slice it goes away.
 ### Next up
 
 Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
-sub-steps; the ordering here is firm, but the scope of slices 11–13 will
-be pinned down when those slices start.
+sub-steps; the ordering here is firm, but the scope of slice 15 will be
+pinned down when that slice starts.
 
-1. **Slice 10 — Query-language documentation.** Short tutorial intro
-   followed by reference sections for each operator and for the
-   expression and projection sublanguages. Covers only what exists.
-2. **Slice 11 — DML as an RA-language extension.** Statement-level
-   forms for inserting rows, alongside the existing pipeline syntax.
-   Update and delete may land here or follow on. Exercised against the
-   existing fixture.
-3. **Slice 12 — DDL as an RA-language extension.** Statement-level
-   `create table` and `drop table`. Replaces the fixture-creation path.
-4. **Slice 13 — Minimal SQL frontend.** A second front-end — SQL
+1. **Slice 12 — DDL part 1: list and drop tables.** Introduces the
+   `:` sigil for DDL statements, the `Ast.program` wrapper, the `Ddl`
+   module, and the REPL dispatch arm. Ships `:list tables` and
+   `:drop table <name>`. Storage and catalog gain primitives for key
+   deletion, subDB deletion, and table-name enumeration.
+2. **Slice 13 — DDL part 2: describe and create table.** Paired so
+   the round-trip property `parse(format(s)) ≡ s` lands in one PR.
+   Adds `Ddl.validate` (structural rules: empty column list,
+   duplicate columns, PK references), the canonical-form printer,
+   and the catalog write path for new tables.
+3. **Slice 14 — Fixture retirement.** Removes `lib/fixture.ml` and
+   migrates tests off the seeded `users`/`orders` tables. Held back
+   until `create table` exists to replace the fixture's role.
+4. **Slice 15 — Minimal SQL frontend.** A second front-end — SQL
    parser, SQL AST, SQL→logical lowering — feeding the existing logical
    and physical IRs. Deliberately limited (no NULLs, scope otherwise
    TBD): the focus is on how the architecture splits between two
@@ -166,7 +170,9 @@ is not committed to here.
 - `sort` and `limit`.
 - Outer joins.
 - Aggregation, group by, having.
-- Update and delete, if not bundled into the DML slice.
+- Update and delete (the slice-11 DML deferrals), with the
+  upstream-identity validator the DML design doc describes and an
+  assignments expression sublanguage.
 - Arithmetic and value-producing expressions, so predicates like
   `age + 1 > 18` and computed projection columns work.
 - Function calls in expressions.
