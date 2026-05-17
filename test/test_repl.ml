@@ -98,6 +98,31 @@ let test_show_physical_prints_plan_before_results () =
     "plan precedes the result rows" true
     (plan_position < row_position)
 
+(* A hand-built insert mutation used only as a constructor witness for the
+   render-status tests below. The source plan is irrelevant -- the renderer
+   keys off the mutation constructor for the verb and never touches [source]. *)
+let example_insert : Physical.mutation =
+  Insert
+    {
+      table = "orders";
+      source = Physical.RelationLiteral { columns = []; rows = [ [] ] };
+    }
+
+let test_format_mutation_status_singular_row () =
+  Alcotest.(check string)
+    "one row uses the singular noun" "inserted 1 row"
+    (Repl.format_mutation_status example_insert 1)
+
+let test_format_mutation_status_zero_rows_pluralises () =
+  Alcotest.(check string)
+    "zero rows uses the plural noun" "inserted 0 rows"
+    (Repl.format_mutation_status example_insert 0)
+
+let test_format_mutation_status_many_rows_pluralises () =
+  Alcotest.(check string)
+    "many rows use the plural noun" "inserted 5 rows"
+    (Repl.format_mutation_status example_insert 5)
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -131,5 +156,14 @@ let () =
           Alcotest.test_case
             "a bare relation literal prints as a one-row relation" `Quick
             test_relation_literal_alone_prints_one_row;
+        ] );
+      ( "mutation rendering",
+        [
+          Alcotest.test_case "one affected row uses the singular noun" `Quick
+            test_format_mutation_status_singular_row;
+          Alcotest.test_case "zero affected rows uses the plural noun" `Quick
+            test_format_mutation_status_zero_rows_pluralises;
+          Alcotest.test_case "many affected rows use the plural noun" `Quick
+            test_format_mutation_status_many_rows_pluralises;
         ] );
     ]

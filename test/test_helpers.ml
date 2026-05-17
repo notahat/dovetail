@@ -115,6 +115,18 @@ let tuple_list_testable : Schema.tuple list Alcotest.testable =
 let physical_testable : Physical.t Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<physical>")) ( = )
 
+(** Extract the relation sub-plan from a [Physical.plan] that is known to be a
+    [Query]. The translate tests use this to keep their assertions focused on
+    the rewrite-recognised inner plan; [Physical.plan]'s wrapper shape is pinned
+    by [Translate.translate]'s type signature, so no value-level check of the
+    wrapper is needed. A [Mutation] reaching this helper would be a
+    translate-side bug -- the parser path for mutations doesn't land until step
+    4 -- so we abort the test loudly. *)
+let unwrap_query (plan : Physical.plan) : Physical.t =
+  match plan with
+  | Query plan -> plan
+  | Mutation _ -> Alcotest.fail "expected a Query plan, got a Mutation"
+
 (** Build a bare (unqualified) [Schema.column_reference]. *)
 let column_reference name : Schema.column_reference = { qualifier = None; name }
 
@@ -176,7 +188,7 @@ let with_query_result query check_rows =
       in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           check_rows (List.of_seq relation.tuples)))
 
@@ -195,7 +207,7 @@ let with_query_failure ~label ~expected query =
       in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Alcotest.check_raises label expected (fun () ->
           Eval.eval environment transaction physical (fun _relation -> ())))
 

@@ -7,7 +7,9 @@ open Test_helpers
 
 let test_scan_lowers_to_full_scan () =
   let logical = Logical.Scan { table = "users" } in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Scan -> FullScan"
     (Physical.FullScan { table = "users" })
@@ -20,7 +22,7 @@ let test_pipeline_yields_fixture_rows () =
   Storage.with_read_transaction environment (fun transaction ->
       let logical = Logical.Scan { table = "users" } in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
@@ -38,7 +40,9 @@ let test_restrict_translates_to_filter () =
     Logical.Restrict
       { input = Logical.Scan { table = "users" }; predicate = id_equals_three }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Restrict -> Filter wrapping FullScan"
     (Physical.Filter
@@ -61,7 +65,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
           }
       in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
@@ -74,7 +78,9 @@ let test_project_translates_to_physical_project () =
     Logical.Project
       { input = Logical.Scan { table = "users" }; columns = name_then_email }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Project -> Project wrapping FullScan"
     (Physical.Project
@@ -97,7 +103,7 @@ let test_project_pipeline_yields_projected_rows () =
           }
       in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =
@@ -120,7 +126,9 @@ let test_cross_product_translates_to_physical_cross_product () =
         right = Logical.Scan { table = "orders" };
       }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Logical.CrossProduct -> Physical.CrossProduct wrapping FullScans"
     (Physical.CrossProduct
@@ -149,7 +157,9 @@ let test_restrict_over_cross_product_translates_to_nested_loop_join () =
         predicate = users_id_equals_orders_user_id;
       }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Restrict(CrossProduct(...), pred) -> NestedLoopJoin(..., pred)"
     (Physical.NestedLoopJoin
@@ -165,7 +175,9 @@ let test_standalone_restrict_does_not_trigger_join_rewrite () =
     Logical.Restrict
       { input = Logical.Scan { table = "users" }; predicate = id_equals_three }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Restrict over a non-CrossProduct input still becomes Filter"
     (Physical.Filter
@@ -183,7 +195,9 @@ let test_relation_literal_translates_through () =
         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
       }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "Logical.RelationLiteral -> Physical.RelationLiteral with same payload"
     (Physical.RelationLiteral
@@ -201,7 +215,9 @@ let test_standalone_cross_product_does_not_trigger_join_rewrite () =
         right = Logical.Scan { table = "orders" };
       }
   in
-  let physical = Translate.translate ~catalog:noop_catalog logical in
+  let physical =
+    unwrap_query (Translate.translate ~catalog:noop_catalog logical)
+  in
   Alcotest.(check physical_testable)
     "CrossProduct without an enclosing Restrict stays as CrossProduct"
     (Physical.CrossProduct

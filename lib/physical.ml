@@ -14,6 +14,7 @@ type t =
   | RelationLiteral of { columns : string list; rows : Value.t list list }
 
 type mutation = Insert of { table : string; source : t }
+type plan = Query of t | Mutation of mutation
 
 (* Render a [Projection.t] as a comma-separated list, each column in its
    source-like form (bare or [qualifier.name] dotted). *)
@@ -66,3 +67,15 @@ let rec format_at formatter indent plan =
         (List.length rows)
 
 let format formatter plan = format_at formatter 0 plan
+
+(* Render a mutation as a one-line header with its source sub-plan indented
+   one level beneath. Mirrors [format_at]'s style so a [Mutation] and a bare
+   [t] read consistently to a user looking at [--show-physical] output. *)
+let format_mutation_at formatter indent (Insert { table; source }) =
+  let prefix = String.make (indent * 2) ' ' in
+  Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
+  format_at formatter (indent + 1) source
+
+let format_plan formatter = function
+  | Query plan -> format formatter plan
+  | Mutation mutation -> format_mutation_at formatter 0 mutation

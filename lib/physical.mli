@@ -99,11 +99,21 @@ type mutation =
           {!Eval.eval_mutation} is the executor entry. The [source] field is a
           relation-yielding sub-plan: its rows are what get written.
 
-          Slice 11 step 2b adds a {!Physical.plan} wrapper above this type so
-          the REPL can dispatch on plan kind between {!Eval.eval} (for queries)
-          and {!Eval.eval_mutation} (for mutations). The constructor is part of
-          the slice 11 DML surface; further mutations (update, delete) land
+          The {!plan} wrapper below sits above this type so the REPL can
+          dispatch on plan kind between {!Eval.eval} (for queries) and
+          {!Eval.eval_mutation} (for mutations). The constructor is part of the
+          slice 11 DML surface; further mutations (update, delete) land
           additively in slice 12. *)
+
+type plan =
+  | Query of t
+  | Mutation of mutation
+      (** A top-level physical plan: either a relation-yielding {!t} or a
+          row-writing {!mutation}. {!Translate.translate} returns this, and the
+          REPL dispatches on it to pick a transaction kind and the right {!Eval}
+          entry point. Mutations don't nest, because the wrapper's {!Mutation}
+          constructor only appears at the top: [Insert]'s [source] is a {!t},
+          not a [plan]. *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter plan] writes [plan] to [formatter] as an indented tree,
@@ -113,3 +123,10 @@ val format : Format.formatter -> t -> unit
     parentheses on the operator's line ([Filter(predicate)], [Project(columns)],
     [NestedLoopJoin(predicate)]). The output is for EXPLAIN-style debug printing
     -- the [--show-physical] flag on the binary is the primary consumer. *)
+
+val format_plan : Format.formatter -> plan -> unit
+(** [format_plan formatter plan] writes [plan] to [formatter]. For a {!Query},
+    the inner relation tree renders exactly as {!format} would render it -- no
+    wrapping header. For a {!Mutation}, the mutation prints its operator header
+    ([Insert(table)]) on one line with the [source] indented one level beneath,
+    matching the per-operator indentation convention {!format} uses. *)

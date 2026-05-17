@@ -233,7 +233,7 @@ let plan_indexed_join_match ~catalog ~left ~right ~predicate =
   partition_join_pk_conjunct ~left ~right ~left_candidate ~right_candidate
     conjuncts
 
-let rec translate ~catalog (plan : Logical.t) : Physical.t =
+let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   match plan with
   | Scan { table } -> FullScan { table }
   (* Inner-join rewrite: must precede the general [Restrict] case below.
@@ -250,7 +250,7 @@ let rec translate ~catalog (plan : Logical.t) : Physical.t =
           let join =
             Physical.IndexedNestedLoopJoin
               {
-                outer = translate ~catalog outer_logical;
+                outer = translate_relation ~catalog outer_logical;
                 inner_table;
                 outer_key_column;
                 inner_position;
@@ -263,8 +263,8 @@ let rec translate ~catalog (plan : Logical.t) : Physical.t =
       | None ->
           NestedLoopJoin
             {
-              left = translate ~catalog left;
-              right = translate ~catalog right;
+              left = translate_relation ~catalog left;
+              right = translate_relation ~catalog right;
               predicate;
             })
   (* PK point-lookup rewrite: fires when [predicate] is a bare equality
@@ -277,10 +277,21 @@ let rec translate ~catalog (plan : Logical.t) : Physical.t =
       | Some plan -> plan
       | None -> Filter { input = FullScan { table }; predicate })
   | Restrict { input; predicate } ->
-      Filter { input = translate ~catalog input; predicate }
+      Filter { input = translate_relation ~catalog input; predicate }
   | Project { input; columns } ->
-      Project { input = translate ~catalog input; columns }
+      Project { input = translate_relation ~catalog input; columns }
   | CrossProduct { left; right } ->
       CrossProduct
-        { left = translate ~catalog left; right = translate ~catalog right }
+        {
+          left = translate_relation ~catalog left;
+          right = translate_relation ~catalog right;
+        }
   | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
+
+(* Public entry: translate a logical relation tree and wrap it in the
+   Physical.Query arm of the plan wrapper. The Mutation arm is unreachable
+   from here today -- the Logical IR doesn't have a mutation constructor until
+   slice 11 step 3 -- so the wrap is unconditional. Translation of a
+   Logical.Mutation arrives in step 3 alongside the Logical wrapper. *)
+let translate ~catalog plan : Physical.plan =
+  Physical.Query (translate_relation ~catalog plan)

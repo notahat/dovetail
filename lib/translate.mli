@@ -13,14 +13,22 @@
     but the door to a real optimiser is now open: future rewrite rules
     (predicate pushdown, equi-join detection) will sit alongside this one. *)
 
-val translate : catalog:(string -> Schema.t option) -> Logical.t -> Physical.t
-(** [translate ~catalog plan] rewrites [plan] into an equivalent physical plan.
-    Slice 1 maps [Scan] to [FullScan]; slice 2 adds [Restrict] -> [Filter];
-    slice 3 adds [Project] -> [Project]; slice 4 adds [CrossProduct] ->
-    [CrossProduct]; slice 5 adds the first non-structural rewrite,
-    [Restrict (CrossProduct (L, R), pred)] -> [NestedLoopJoin (L, R, pred)].
-    Slice 8 adds the [IndexLookup] rewrite on [Restrict (Scan t, pk = K)], which
-    is why the catalog handle is needed.
+val translate :
+  catalog:(string -> Schema.t option) -> Logical.t -> Physical.plan
+(** [translate ~catalog plan] rewrites [plan] into an equivalent physical plan,
+    wrapped in {!Physical.Query}. Slice 1 maps [Scan] to [FullScan]; slice 2
+    adds [Restrict] -> [Filter]; slice 3 adds [Project] -> [Project]; slice 4
+    adds [CrossProduct] -> [CrossProduct]; slice 5 adds the first non-structural
+    rewrite, [Restrict (CrossProduct (L, R), pred)] ->
+    [NestedLoopJoin (L, R, pred)]. Slice 8 adds the [IndexLookup] rewrite on
+    [Restrict (Scan t, pk = K)], which is why the catalog handle is needed.
+
+    The return type is {!Physical.plan} because slice 11 step 3 widens
+    {!Logical.t} into a [Query | Mutation] wrapper; step 2b lands the wrapper on
+    the physical side and the REPL's dispatch on it, in advance of the
+    logical-side change so the existing call sites have a stable shape to
+    consume. Until step 3 lands, every output is a {!Physical.Query} -- there is
+    no [Mutation] arm in the logical IR yet to translate from.
 
     [catalog] is consulted only by rewrites that need a table's schema --
     currently the [IndexLookup] rewrite, which needs to know the primary-key

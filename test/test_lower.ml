@@ -22,7 +22,7 @@ let test_pipeline_yields_fixture_rows () =
       let ast = Ast.Relation_name "users" in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
@@ -55,7 +55,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
       in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
@@ -88,7 +88,7 @@ let test_project_pipeline_yields_projected_rows () =
       in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = Translate.translate ~catalog logical in
+      let physical = unwrap_query (Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =

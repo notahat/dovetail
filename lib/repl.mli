@@ -12,6 +12,15 @@
     streams, while tests pass list-backed and buffer-backed adapters to drive
     the loop in-process. *)
 
+val format_mutation_status : Physical.mutation -> int -> string
+(** [format_mutation_status mutation affected_rows] renders the one-line status
+    the REPL prints after a successful mutation, e.g. ["inserted 1 row"] or
+    ["inserted 5 rows"]. The verb is chosen by the [mutation] constructor (so
+    future {!Physical.mutation} constructors slot in next to [Insert]'s
+    "inserted"); the noun pluralises on [affected_rows = 1]. Exposed so a unit
+    test can pin the wording without having to drive a real mutation through the
+    REPL loop. *)
+
 val run :
   ?show_physical:bool ->
   Storage.environment ->
