@@ -30,3 +30,29 @@ val eval :
     schema mismatch surfaced by the operators. Errors are raised eagerly where
     possible (e.g. predicate resolution runs before any tuples are pulled), so
     most failure modes surface before [continue] is called. *)
+
+val eval_mutation :
+  Storage.environment ->
+  [ `Read | `Write ] Storage.transaction ->
+  Physical.mutation ->
+  int
+(** [eval_mutation environment transaction mutation] runs [mutation] against the
+    database open in [environment] and returns the number of rows it wrote.
+
+    For [Insert { table; source }], the sink evaluates [source] as a relation
+    via {!eval} (inside the same write [transaction]), then for each source
+    tuple performs a [Storage.get] to detect a primary-key collision against an
+    existing row, and a [Storage.put] to write the row otherwise. The returned
+    count is the number of [put]s performed.
+
+    Raises [Failure] under the same conditions as {!eval}, plus on a primary-key
+    collision against an existing row in the target table. A raise aborts the
+    in-flight write transaction via the standard exception path of
+    {!Storage.with_write_transaction}, so any earlier writes in the same
+    mutation are discarded -- multi-row inserts (once the multi-row literal
+    grammar lands) commit all-or-nothing.
+
+    [transaction] is required to be a write transaction at the type level; there
+    is no perm-coercion machinery inside the sink. Read-only callers keep using
+    {!eval}; slice 11 step 2b adds the REPL's plan classifier that dispatches to
+    the right entry. *)

@@ -93,6 +93,18 @@ type t =
           one in user-driven plans; the IR shape leaves room for a future
           multi-row literal grammar. *)
 
+type mutation =
+  | Insert of { table : string; source : t }
+      (** A mutation produces no relation -- only a count of affected rows.
+          {!Eval.eval_mutation} is the executor entry. The [source] field is a
+          relation-yielding sub-plan: its rows are what get written.
+
+          Slice 11 step 2b adds a {!Physical.plan} wrapper above this type so
+          the REPL can dispatch on plan kind between {!Eval.eval} (for queries)
+          and {!Eval.eval_mutation} (for mutations). The constructor is part of
+          the slice 11 DML surface; further mutations (update, delete) land
+          additively in slice 12. *)
+
 val format : Format.formatter -> t -> unit
 (** [format formatter plan] writes [plan] to [formatter] as an indented tree,
     one operator per line, with each operator's inputs indented two spaces

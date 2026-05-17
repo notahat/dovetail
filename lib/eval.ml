@@ -265,3 +265,109 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
       left_relation.tuples
   in
   continue { schema = combined_schema; tuples = combined_tuples }
+
+(* Slice 11 step 2a: insert sink + dedicated mutation entry point. The
+   read-only [eval] above is unchanged; mutations have their own entry
+   point below so the transaction perm and the return shape can each
+   match a mutation's natural cardinality without going through a
+   read-write-tolerant variant. *)
+
+(* For each target field, find the position in [source_schema] that supplies
+   its value. Raises [Failure] if a target field has no matching source
+   column. Source columns absent from the target are tolerated here; Step 3's
+   Translate-level validation rejects them upstream. *)
+let build_source_position_map ~source_schema ~(target_schema : Schema.t) =
+  List.map
+    (fun (target_field : Schema.field) ->
+      match
+        Schema.find_field source_schema
+          { qualifier = None; name = target_field.name }
+      with
+      | Ok (position, _source_field) -> position
+      | Error _ ->
+          failwith
+            (Printf.sprintf
+               "Eval: insert source is missing column %S required by target \
+                schema"
+               target_field.name))
+    target_schema.fields
+
+(* Reorder [source_tuple] into a tuple matching [target_schema]'s field
+   order, by indexing through [position_map]. The map has one entry per
+   target field, in target order, giving the source position for that
+   field's value. *)
+let project_to_target_order ~position_map source_tuple =
+  Array.of_list
+    (List.map
+       (fun source_position -> source_tuple.(source_position))
+       position_map)
+
+(* Render a [Value.t] inline for an error message. Strings are quoted so
+   the boundary is visible; numbers and booleans render bare. *)
+let render_value_for_error : Value.t -> string = function
+  | Int64 number -> Int64.to_string number
+  | String text -> Printf.sprintf "%S" text
+  | Bool flag -> string_of_bool flag
+
+(* Extract a human-readable string for the primary-key value of a tuple
+   already projected to [target_schema]'s field order. Used only to build
+   the PK-collision error message; on any anomaly returns ["?"] so the
+   message still renders. *)
+let primary_key_value_text (target_schema : Schema.t) target_tuple =
+  match target_schema.primary_key with
+  | [ primary_key_name ] -> (
+      match
+        Schema.find_field target_schema
+          { qualifier = None; name = primary_key_name }
+      with
+      | Ok (position, _field) -> render_value_for_error target_tuple.(position)
+      | Error _ -> "?")
+  | _ -> "?"
+
+(* Encode one source row in target form, fail on PK collision, else write
+   it. Returns the row count incremented by one. *)
+let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
+    ~position_map source_tuple affected_rows =
+  let target_tuple = project_to_target_order ~position_map source_tuple in
+  let key_bytes, value_bytes =
+    Row_codec.encode_row target_schema target_tuple
+  in
+  (match Storage.get target_map write_transaction ~key:key_bytes with
+  | None -> ()
+  | Some _ ->
+      failwith
+        (Printf.sprintf
+           "Eval: insert into %S failed: row with primary key %s already exists"
+           target_table
+           (primary_key_value_text target_schema target_tuple)));
+  Storage.put target_map write_transaction ~key:key_bytes ~value:value_bytes;
+  affected_rows + 1
+
+(* Evaluate the [source] sub-plan inside its own resource scope and write
+   each tuple it produces into [target_table]. Returns the number of rows
+   written. The affected-row count is threaded imperatively through a ref
+   so a future multi-row literal lands without restructuring the
+   accumulator. *)
+let evaluate_insert environment transaction ~target_table ~source =
+  let target_schema, target_map =
+    lookup_table_resources environment transaction target_table
+  in
+  let affected_rows = ref 0 in
+  eval environment transaction source (fun source_relation ->
+      let position_map =
+        build_source_position_map ~source_schema:source_relation.schema
+          ~target_schema
+      in
+      Seq.iter
+        (fun source_tuple ->
+          affected_rows :=
+            insert_one_row ~target_schema ~target_map ~target_table
+              ~write_transaction:transaction ~position_map source_tuple
+              !affected_rows)
+        source_relation.tuples);
+  !affected_rows
+
+let eval_mutation environment transaction mutation =
+  match (mutation : Physical.mutation) with
+  | Insert { table; source } ->
+      evaluate_insert environment transaction ~target_table:table ~source

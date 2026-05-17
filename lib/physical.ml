@@ -13,6 +13,8 @@ type t =
     }
   | RelationLiteral of { columns : string list; rows : Value.t list list }
 
+type mutation = Insert of { table : string; source : t }
+
 (* Render a [Projection.t] as a comma-separated list, each column in its
    source-like form (bare or [qualifier.name] dotted). *)
 let render_columns columns =

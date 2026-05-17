@@ -299,42 +299,54 @@ different shape — a tree walk classifying each operator. It
 lands in slice 12 alongside update and delete; insert needs
 none of it.
 
-### Eval: single CPS entry point, `eval_result` variant
+### Eval: two entry points
 
-`Eval.eval` keeps its existing continuation-passing shape and
-the variant lands as its return type:
+`Eval.eval` keeps its existing continuation-passing shape
+for queries, and the slice adds a sibling entry for
+mutations:
 
 ```ocaml
-type eval_result =
-  | Query    of [ `Bag ] Relation.t
-  | Mutation of { affected_rows : int }
-
 val eval :
   Storage.environment ->
   [> `Read ] Storage.transaction ->
-  Physical.plan ->
-  (eval_result -> 'a) ->
+  Physical.t ->
+  ([ `Bag ] Relation.t -> 'a) ->
   'a
+
+val eval_mutation :
+  Storage.environment ->
+  [ `Read | `Write ] Storage.transaction ->
+  Physical.mutation ->
+  int
 ```
 
-The `Mutation` payload carries the count only, not the verb.
-The REPL has the `Physical.plan` in scope at the dispatch
-site (it just translated and evaluated it) and reads the
-verb off the plan's mutation constructor for the output.
-Keeping the verb off the variant keeps it minimal — the
-result is the *result* of the work, not a redescription of
-the request — and means slice 12 needs no change to
-`eval_result` when update and delete land.
+The two signatures track each operation's natural shape.
+Queries are CPS because the relation's tuple sequence
+streams from live cursors that must stay scoped to the
+caller's continuation. Mutations have no live cursor scope
+to hand back — the sink consumes the source plan inside its
+own scope, writes to LMDB, and returns the affected-row
+count synchronously.
 
-Rejected: a two-entry-point split (`eval_query` CPS,
-`eval_mutation` plain). The two-signature shape matches each
-operation's natural cardinality more honestly, but commits
-the executor to a precedent where every new sink kind grows
-the entry-point list. Keeping a single CPS entry point holds
-the line on the existing pattern; the small awkwardness of
-the variant in the mutation arm (no live cursor scope
-actually needed inside the continuation) is the right
-tradeoff.
+Splitting also tracks each operation's natural transaction
+shape. `eval` accepts a read-or-write transaction so a
+read-only query can call it from
+{!Storage.with_read_transaction}. `eval_mutation` requires
+a write transaction at the type level, so the caller is
+forced to open `with_write_transaction` and there is no
+unsafe coercion in the sink. The REPL's plan classifier
+picks the right transaction kind, then dispatches to the
+right entry — both decisions read off the same
+`Physical.plan` constructor.
+
+Rejected: a single CPS entry returning an
+`eval_result = Query of [`Bag] Relation.t | Mutation of {
+affected_rows : int }` variant. Symmetric on paper but
+forces an awkward `[> `Read]` transaction signature that
+needs an unsafe coercion to call `Storage.put`, plus a
+CPS-shaped mutation arm where the continuation has nothing
+to gain from being CPS. Two honest signatures beats one
+contrived one.
 
 ### Read/write transaction dispatch
 
@@ -443,90 +455,83 @@ Tests:
 - One end-to-end test that runs a literal through
   `Repl.run` and asserts the rendered output.
 
-### Step 2a — Physical + Eval, additive
+### Step 2a — Eval mutation entry, additive
 
-Land the new types and the insert sink as a *second* entry
-point alongside the existing one, so the change is purely
-additive and existing callers (REPL, all current tests)
-keep working unchanged. The canonical-entry-point swap
-follows in step 2b.
+Land the insert sink as a second `Eval` entry point, plus
+the type and helper it needs. The change is purely
+additive: existing `Eval.eval`, Translate, and the REPL are
+untouched, so all current tests stay green without
+modification.
 
-- **Physical:** new `plan = Query of t | Mutation of
-  mutation`; new `mutation = Insert { table; source }`.
-  The existing `Physical.t` is untouched.
-- **Eval:** new `eval_result = Query of [`Bag] Relation.t
-  | Mutation of { affected_rows : int }`; new entry
-  `eval_plan : Storage.environment -> [> `Read]
-  Storage.transaction -> Physical.plan -> (eval_result ->
-  'a) -> 'a`. The `Query` arm delegates to the existing
-  `Eval.eval`; the `Mutation` arm fully implements the
-  insert sink: iterate the source, do `Storage.get` then
-  `Storage.put` per row, count writes, return `Mutation
-  { affected_rows }`. PK collision raises `Failure` with a
-  clear message. The existing `Eval.eval` keeps its
-  current signature.
-- **Storage:** new `as_write_transaction : [> `Read]
-  transaction -> [`Read | `Write] transaction` coercion
-  helper. The insert sink needs to call `Storage.put`; the
-  perm phantom is purely compile-time, so the helper is a
-  no-op at runtime but loosens the static type. Documented
-  as unsafe-in-general, safe inside the sink because the
-  REPL classifier (slice-2b / slice-3) will guarantee a
-  write transaction at runtime.
+- **Physical:** new `mutation = Insert { table; source }`.
+  The `Physical.plan` wrapper is deferred to step 2b — 2a
+  doesn't need it because Eval grows a dedicated mutation
+  entry rather than dispatching on a wrapper.
 - **Row_codec:** new `encode_row : Schema.t -> Schema.tuple
   -> string * string`, the inverse of `decode_row`. The
   sink uses it to serialise a tuple into the (key, value)
   pair that `Storage.put` expects, without having to
   hand-roll the split per table the way `Fixture` does.
-- **Translate, REPL:** unchanged. The new entry isn't
-  reachable from user input yet.
+- **Eval:** new entry `eval_mutation : Storage.environment
+  -> [`Read | `Write] Storage.transaction -> Physical.mutation
+  -> int`. Returns the affected-row count synchronously; no
+  continuation, no `eval_result` variant. The body
+  evaluates the source plan through the existing `eval`,
+  iterates the resulting tuples, does `Storage.get` then
+  `Storage.put` per row, counts writes, and returns the
+  count. PK collision raises `Failure` with a clear
+  message. The existing `Eval.eval` keeps its current
+  signature.
 
 Tests:
 
-- Eval Insert sink tested by hand-constructing
-  `Physical.plan = Mutation (Insert {...})` and invoking
-  `Eval.eval_plan` inside `Storage.with_write_transaction`.
-  Happy path and PK-collision-against-storage.
+- Eval insert sink tested by hand-constructing a
+  `Physical.mutation` and invoking `Eval.eval_mutation`
+  inside `Storage.with_write_transaction`. Happy path and
+  PK-collision-against-storage.
 - `Row_codec.encode_row` round-trip tested against
   `decode_row` for the fixture schemas.
 - All existing tests stay green with zero changes.
 
-### Step 2b — Canonical entry-point swap
+### Step 2b — Plan wrapper at Physical and Translate, REPL dispatch
 
-Swap the canonical entry. The pattern-match-on-`eval_result`
-and the Mutation rendering land at the REPL here, alongside
-the corresponding Translate signature change. The work is
-mechanical fan-out across callers; isolating it in its own
-commit keeps the diff readable.
+Introduce the `Physical.plan` wrapper, have Translate
+return it, and have the REPL pattern-match the wrapper to
+dispatch between the read and write entry points. The
+Mutation rendering helper lands at the REPL alongside the
+dispatch.
 
-- **Eval:** delete the old `eval`. Rename `eval_plan` to
-  `eval` (signature is now `Physical.plan -> (eval_result
-  -> 'a) -> 'a`).
+- **Physical:** new `plan = Query of t | Mutation of
+  mutation`. `Physical.t` is unchanged.
 - **Translate:** signature becomes `Logical.t ->
   Physical.plan`; output is wrapped in `Physical.Query`.
   No Mutation arm yet — Logical is still flat.
-- **REPL:** pattern-matches `eval_result`. Query branch
-  uses the existing print path; Mutation branch
-  implements the affected-row status output (`inserted N
-  row` / `inserted N rows`, pluralised on `N = 1`).
-  Transaction dispatch remains hardcoded to
-  `with_read_transaction` for this step — no classifier
-  yet, and Mutation is unreachable from user input.
-- **Existing tests:** every caller of `Eval.eval` updates
-  to the new shape (either via thin test helpers that
-  wrap with `Physical.Query` and unwrap the result, or
-  inline). Translate tests that assert structurally on
-  the produced plan switch to a `plan_testable` and wrap
-  their expected with `Physical.Query`.
+- **REPL:** pattern-matches the `Physical.plan` returned
+  by Translate. The `Query` arm calls `Eval.eval` inside
+  `Storage.with_read_transaction` and prints the relation
+  as before. The `Mutation` arm calls `Eval.eval_mutation`
+  inside `Storage.with_write_transaction` and prints the
+  affected-row status (`inserted N row` / `inserted N
+  rows`, pluralised on `N = 1`). The dispatch decision and
+  the rendered verb both read off the `Physical.mutation`
+  constructor, so the classifier and the verb come from
+  the same source of truth.
+- **Existing tests:** translate tests that assert
+  structurally on the produced plan switch to a
+  `plan_testable` and wrap their expected with
+  `Physical.Query`. Pipeline-integration tests that build
+  through Parser→Lower→Translate→Eval thread the
+  `Physical.plan` to a small helper that unwraps `Query`
+  before calling `Eval.eval`. The existing `Eval.eval`
+  signature stays put — no churn there.
 
 Tests:
 
 - REPL Mutation rendering exercised via a small unit test
-  that feeds a Mutation `eval_result` through the
-  rendering helper directly (since no end-to-end path
-  reaches it yet).
+  that feeds a count through the rendering helper
+  directly (since no end-to-end path reaches it yet).
 - All existing query tests remain green after the
-  signature swap.
+  Translate signature change.
 
 ### Step 3 — Translate + Logical
 
