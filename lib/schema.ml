@@ -25,37 +25,31 @@ let fields_with_position_matching_name (schema : t) name =
   scan 0 schema.fields
 
 let find_field schema reference =
-  match reference with
-  | { qualifier = Some required_qualifier; name } -> (
-      let matching =
-        fields_with_position_matching_name schema name
-        |> List.filter (fun (_position, (field : field)) ->
+  let name_matches = fields_with_position_matching_name schema reference.name in
+  let matching =
+    match reference.qualifier with
+    | None -> name_matches
+    | Some required_qualifier ->
+        List.filter
+          (fun (_position, (field : field)) ->
             field.qualifier = Some required_qualifier)
-      in
-      match matching with
-      | [ result ] -> Ok result
-      | [] ->
-          Error
-            (Printf.sprintf "unknown column %S"
-               (format_column_reference reference))
-      | _ :: _ :: _ ->
-          (* A qualifier-plus-name combination should be unique within a
-             schema. If a future operator generates duplicates we'd want to
-             know about it; for now treat it as an internal invariant
-             violation. *)
-          Error
-            (Printf.sprintf
-               "internal error: column reference %S matches multiple fields"
-               (format_column_reference reference)))
-  | { qualifier = None; name } -> (
-      let matching = fields_with_position_matching_name schema name in
-      match matching with
-      | [ result ] -> Ok result
-      | [] ->
-          Error
-            (Printf.sprintf "unknown column %S"
-               (format_column_reference reference))
-      | _ :: _ :: _ ->
+          name_matches
+  in
+  match matching with
+  | [ result ] -> Ok result
+  | [] ->
+      Error
+        (Printf.sprintf "unknown column %S" (format_column_reference reference))
+  | _ :: _ :: _ -> (
+      match reference.qualifier with
+      | Some _ ->
+          (* A qualifier+name combination is unique within any schema we
+             construct: scans tag every field with the table's qualifier, and
+             cross-product/join preserve the input qualifiers. Hitting this
+             arm means an upstream operator produced a schema that breaks
+             that invariant. *)
+          assert false
+      | None ->
           let qualified_names =
             List.map
               (fun (_position, field) ->
@@ -63,7 +57,8 @@ let find_field schema reference =
               matching
           in
           Error
-            (Printf.sprintf "ambiguous column reference %S: matches %s" name
+            (Printf.sprintf "ambiguous column reference %S: matches %s"
+               reference.name
                (String.concat " and " qualified_names)))
 
 (* Look up the position of [primary_key_name] in [primary_key_names], so that
