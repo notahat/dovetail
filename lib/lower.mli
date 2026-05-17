@@ -3,10 +3,7 @@
     [lower] converts the surface AST into a logical plan: it strips away the
     syntactic layer and replaces each AST node with the relational-algebra
     operator it denotes. The result is independent of how the user wrote the
-    query, so later stages can reason in algebraic terms.
-
-    Slice 1 introduced [Relation_name]; slice 2 adds [Restrict]. Further nodes
-    arrive as later slices introduce them. *)
+    query, so later stages can reason in algebraic terms. *)
 
 val lower : Ast.plan -> Logical.plan
 (** [lower plan] rewrites [plan] into an equivalent logical plan.

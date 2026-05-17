@@ -6,10 +6,9 @@
     without committing to *how*. {!Translate} lowers logical operators into a
     physical plan that picks an execution strategy.
 
-    Slice 1 introduced [Scan]; slice 2 adds [Restrict] (the σ of relational
-    algebra; "restrict" rather than "select" to avoid future collision with
-    SQL's SELECT, which will eventually live in another front end). Further
-    logical operators arrive as later slices introduce them. *)
+    Constructor names follow relational-algebra terms (σ → [Restrict], π →
+    [Project], × → [CrossProduct]) rather than SQL keywords, leaving room for a
+    SQL front end to map its vocabulary onto the same IR. *)
 
 type t =
   | Scan of { table : string }

@@ -1,12 +1,9 @@
 (** Physical relational-algebra IR.
 
     The physical IR is what {!Eval} executes. Each constructor maps to a
-    concrete execution strategy: storage cursors, hash joins, sort-merge joins,
-    and so on. The earlier IRs ({!Logical}, {!Ast}) are progressively translated
-    down into this one.
-
-    Slice 1 introduced [FullScan]; slice 2 adds [Filter]. Further operators
-    arrive as later slices introduce them. *)
+    concrete execution strategy: storage cursors, nested-loop joins, index
+    lookups, and so on. The earlier IRs ({!Logical}, {!Ast}) are progressively
+    translated down into this one. *)
 
 type t =
   | FullScan of { table : string }

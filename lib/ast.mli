@@ -5,15 +5,10 @@
     typed, and nothing more. {!Lower} converts the AST into a logical plan,
     where the operators take their meaning from algebra rather than syntax.
 
-    Slice 1 introduced [Relation_name] (bare identifiers); slice 2 adds
-    [Restrict] (the `restrict` pipeline step). Operators (projection, joins) and
-    richer literals arrive as later slices introduce them.
-
-    Slice 11 adds the {!plan} wrapper sitting above {!t}: a top-level query is
-    either a {!Query} carrying a relation tree or a {!Mutation} carrying a sink
-    (today, [insert into <table>]). The wrapper enforces "a sink terminates a
-    pipeline" structurally — the only place a mutation can appear is at the top,
-    and its source field is a {!t}, not a {!plan}, so sinks cannot nest. *)
+    A top-level {!plan} is either a {!Query} carrying a relation tree or a
+    {!Mutation} carrying a sink. The wrapper enforces "a sink terminates a
+    pipeline" structurally: a mutation can only appear at the top, and its
+    source field is a {!t}, not a {!plan}, so sinks cannot nest. *)
 
 type t =
   | Relation_name of string

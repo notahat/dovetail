@@ -4,11 +4,7 @@
     relation. Both {!Logical.Project} and {!Physical.Project} carry a
     [Projection.t]; columns are referred to by name (and optional qualifier) so
     the IR stays human-readable for debugging. Mapping references to tuple
-    positions is an executor concern, handled by {!resolve}.
-
-    Slice 4 step 3 generalises the per-column representation from a bare string
-    to {!Schema.column_reference} so qualified-column refs flow from parser
-    through IR to executor. Expressions and aliases arrive in later slices. *)
+    positions is an executor concern, handled by {!resolve}. *)
 
 type t = Schema.column_reference list
 (** The ordered list of column references to project. Order is preserved in the

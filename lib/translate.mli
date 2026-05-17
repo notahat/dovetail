@@ -1,17 +1,14 @@
 (** Logical-to-physical translation.
 
     [translate] picks a physical execution strategy for each logical operator.
-    For slice 1 the choice is trivial — every {!Logical.Scan} becomes a
-    {!Physical.FullScan} — but the layer exists from day one so that index
-    scans, join algorithm choice, and operator-tree restructuring have a home
-    when later slices need them.
-
-    Slice 1-4 was a pure structural rewrite -- one logical constructor per
-    physical constructor. Slice 5 introduces the first proper rewrite rule:
-    [Restrict (CrossProduct (L, R), pred)] collapses into a single
-    {!Physical.NestedLoopJoin}. The translation is still trivial in aggregate,
-    but the door to a real optimiser is now open: future rewrite rules
-    (predicate pushdown, equi-join detection) will sit alongside this one. *)
+    Most operators map one-for-one (a {!Logical.Scan} becomes a
+    {!Physical.FullScan}, [Logical.Restrict] becomes [Physical.Filter], and so
+    on), but the layer also hosts the rewrite rules that recognise patterns
+    worth executing as something other than the literal translation: an equality
+    on a primary key becomes [IndexLookup], and a restrict over a cross product
+    becomes a [NestedLoopJoin] (further folded into [IndexedNestedLoopJoin] when
+    the join is on a primary key). Future rules -- predicate pushdown,
+    projection pushdown -- will sit alongside these. *)
 
 val translate :
   catalog:(string -> Schema.t option) -> Logical.plan -> Physical.plan
