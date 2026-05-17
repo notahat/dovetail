@@ -205,7 +205,16 @@ let column_reference =
    recurse into the full expression via parens. Top-level layering, from
    loosest to tightest precedence, is [or_expression], [and_expression],
    [not_expression], [comparison_expression], and the atomic [term]. Parens
-   around an expression appear in the atom position. *)
+   around an expression appear in the atom position.
+
+   The five tiers live as nested [let]s inside the single [fix] so the
+   precedence chain reads top-to-bottom in one place. Each tier could be
+   lifted to a top-level binding threading [~expression] -- the inner [fix]
+   body would shrink considerably -- but the trade-off (parameter
+   threading, five separate bindings to read in reverse precedence order
+   to follow the chain) doesn't earn its keep until another tier or two
+   of complexity arrives. The 35-line guideline is treated as a deliberate
+   exception here, matching the precedent set by {!Physical.format_at}. *)
 let expression =
   fix (fun expression ->
       (* A single atom: a literal, a column reference, or a parenthesised
