@@ -47,3 +47,10 @@ val delete :
     table" error message lives in the higher layer ({!Ddl.execute_write}) so it
     can share scope with the storage drop. Must be called inside a read-write
     transaction. *)
+
+val table_subdb_name : string -> string
+(** [table_subdb_name table_name] returns the name of the storage subDB that
+    holds the rows of [table_name]: the [table:] namespace convention
+    ([table:users] for [users], and so on). Single source of truth for the
+    convention -- {!Eval} and {!Ddl.execute_write} both ask here rather than
+    constructing the string locally. *)

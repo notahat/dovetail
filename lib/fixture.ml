@@ -41,19 +41,18 @@ let orders_rows : Schema.tuple list =
     [| Int64 6L; Int64 5L; String "Cookie"; Int64 2L |];
   ]
 
-let users_table_subdb_name = "table:users"
-let orders_table_subdb_name = "table:orders"
-
-(* Write [schema] to the catalog and [rows] to a fresh subDB named
-   [subdb_name], if [table_name] is not already present in the catalog. *)
-let populate_table environment transaction ~table_name ~subdb_name ~schema ~rows
-    =
+(* Write [schema] to the catalog and [rows] to a fresh storage subDB for
+   [table_name], if [table_name] is not already present in the catalog.
+   The subDB's name comes from {!Catalog.table_subdb_name}, the single
+   source of truth for the [table:] namespace convention. *)
+let populate_table environment transaction ~table_name ~schema ~rows =
   match Catalog.get environment transaction ~table_name with
   | Some _ -> ()
   | None ->
       Catalog.put environment transaction ~table_name schema;
       let table_map =
-        Storage.create_map environment transaction ~name:subdb_name
+        Storage.create_map environment transaction
+          ~name:(Catalog.table_subdb_name table_name)
       in
       List.iter
         (fun row ->
@@ -64,7 +63,6 @@ let populate_table environment transaction ~table_name ~subdb_name ~schema ~rows
 let populate_if_empty environment =
   Storage.with_write_transaction environment (fun transaction ->
       populate_table environment transaction ~table_name:"users"
-        ~subdb_name:users_table_subdb_name ~schema:users_schema ~rows:users_rows;
+        ~schema:users_schema ~rows:users_rows;
       populate_table environment transaction ~table_name:"orders"
-        ~subdb_name:orders_table_subdb_name ~schema:orders_schema
-        ~rows:orders_rows)
+        ~schema:orders_schema ~rows:orders_rows)

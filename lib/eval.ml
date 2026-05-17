@@ -1,5 +1,3 @@
-let table_subdb_name table = "table:" ^ table
-
 (* Look up the schema and storage handle for a table referenced in a plan.
    Raises [Failure] if the catalog has no schema for [table], or if the
    catalog has a schema but no storage subDB exists. *)
@@ -11,7 +9,8 @@ let lookup_table_resources environment transaction table =
   in
   let table_map =
     match
-      Storage.open_map environment transaction ~name:(table_subdb_name table)
+      Storage.open_map environment transaction
+        ~name:(Catalog.table_subdb_name table)
     with
     | Some map -> map
     | None ->

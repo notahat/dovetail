@@ -26,3 +26,5 @@ let delete environment transaction ~table_name =
   match Storage.open_map environment transaction ~name:map_name with
   | None -> ()
   | Some map -> Storage.delete map transaction ~key:table_name
+
+let table_subdb_name table_name = "table:" ^ table_name
