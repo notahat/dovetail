@@ -28,3 +28,10 @@ val put :
     [table_name], creating the catalog subDB if it does not yet exist.
     Overwrites any existing binding silently. Must be called inside a read-write
     transaction. *)
+
+val list_table_names :
+  Storage.environment -> [> `Read ] Storage.transaction -> string list
+(** [list_table_names environment transaction] returns the names of every table
+    bound in the catalog, in byte-sorted (cursor) order. Returns [] if the
+    catalog subDB has not yet been created. Safe to call inside a read-only
+    transaction. *)

@@ -72,6 +72,26 @@ let test_multiple_schemas_dont_collide () =
         "orders" (Some orders_schema)
         (Catalog.get environment transaction ~table_name:"orders"))
 
+let test_list_table_names_returns_byte_sorted_names () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      Catalog.put environment transaction ~table_name:"users" users_schema;
+      Catalog.put environment transaction ~table_name:"orders" orders_schema);
+  Storage.with_read_transaction environment (fun transaction ->
+      Alcotest.(check (list string))
+        "byte-sorted table names" [ "orders"; "users" ]
+        (Catalog.list_table_names environment transaction))
+
+let test_list_table_names_empty_catalog () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  (* Fresh environment -- catalog subDB has never been created. *)
+  Storage.with_read_transaction environment (fun transaction ->
+      Alcotest.(check (list string))
+        "no catalog yet returns empty list" []
+        (Catalog.list_table_names environment transaction))
+
 let () =
   Alcotest.run "catalog"
     [
@@ -84,5 +104,12 @@ let () =
             test_missing_catalog_returns_none;
           Alcotest.test_case "multiple schemas do not collide" `Quick
             test_multiple_schemas_dont_collide;
+        ] );
+      ( "list_table_names",
+        [
+          Alcotest.test_case "returns byte-sorted table names" `Quick
+            test_list_table_names_returns_byte_sorted_names;
+          Alcotest.test_case "returns empty list when catalog absent" `Quick
+            test_list_table_names_empty_catalog;
         ] );
     ]
