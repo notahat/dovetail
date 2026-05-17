@@ -30,4 +30,8 @@
   test_doctest
   test_documentation)
  (libraries alcotest dovetail unix)
- (deps ../bin/main.exe ../docs/query-language.md))
+ (deps
+  ../bin/main.exe
+  ../docs/query-language.md
+  ../docs/query-language-tutorial.md
+  ../docs/query-language-pipeline-operators.md))

@@ -11,7 +11,12 @@ open Test_helpers
     relative to the test runner's working directory under
     [_build/default/test/], and the corresponding [(deps)] entries in
     [test/dune] mirror each file into the build tree. *)
-let verified_files = [ "../docs/query-language.md" ]
+let verified_files =
+  [
+    "../docs/query-language.md";
+    "../docs/query-language-tutorial.md";
+    "../docs/query-language-pipeline-operators.md";
+  ]
 
 (** Verify one markdown file end to end: spin up a fresh environment, populate
     the fixture, hand both off to {!Doctest.verify_file}, fail with a
