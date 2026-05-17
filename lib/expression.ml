@@ -16,9 +16,13 @@ type t =
 
 (* Render an expression node for inclusion in kind-mismatch error messages.
    Columns and literals get source-flavoured descriptions matching the
-   existing error wording; compound nodes fall back to generic labels,
-   since the parser does not nest them inside a [Compare]'s operand
-   position today. *)
+   existing error wording; compound nodes fall back to generic labels.
+
+   Pre: the parser does not nest [Compare]/[And]/[Or]/[Not] inside a
+   [Compare]'s operand position, so the compound arms are never reached
+   from kind-mismatch reporting today. If a future grammar widens operand
+   shapes, revisit those arms to give them source-flavoured descriptions
+   too. *)
 let describe_expression = function
   | Column reference ->
       Printf.sprintf "column %S" (Schema.format_column_reference reference)

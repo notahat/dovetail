@@ -143,7 +143,7 @@ into the relevant sub-language modules: `Projection.format`,
 
 ## Naming and consistency
 
-### `Insert` field-order drift across IR layers — **[open]**
+### `Insert` field-order drift across IR layers — **[done]**
 
 - `Ast.mutation = Insert { source : t; table : string }` (ast.mli:60-61)
 - `Logical.mutation = Insert { table : string; source : t }` (logical.mli:46)
@@ -151,7 +151,7 @@ into the relevant sub-language modules: `Projection.format`,
 
 `Ast` is the odd one out. Realign to `{ table; source }` everywhere.
 
-### Error-message prefix convention is consistent but undocumented — **[open]**
+### Error-message prefix convention is consistent but undocumented — **[done]** (CLAUDE.md "Error messages" section; "failed:" dropped from Eval PK-collision)
 
 Every user-facing error string in the codebase starts with `Module:` or
 `Module: operation:`. `Translate: insert into %S: ...`, `Eval: insert
@@ -161,7 +161,7 @@ into %S failed: ...`, `Projection.resolve: ...`, `Schema.assemble_tuple:
 Small inconsistency: `Eval` uses `... failed: ...` for the PK-collision
 case; nobody else uses "failed". Drop it for consistency.
 
-### Abbreviations slipping into local bindings — **[open]**
+### Abbreviations slipping into local bindings — **[done]** (`schema.ml` renamed; `row_codec.ml` `pk_position` spots already deleted by TL;DR 6's refactor)
 
 The "spell things out" rule is well-followed in the public API but
 slips occasionally in locals:
@@ -324,7 +324,7 @@ Suggested change: replace each with a single forward-looking sentence
 about *what the module does today*, and let per-constructor doc comments
 carry the rest. Slice history lives in `git log` and `docs/plans/`.
 
-### Doc that's drifted from code — **[open]**
+### Doc that's drifted from code — **[done]**
 
 - `physical.mli:118-125` enumerates `Filter`, `Project`,
   `NestedLoopJoin` as examples of operators that "carry a parameter
@@ -396,7 +396,7 @@ Mostly good; one outlier:
   field names, inferred kinds, qualifier-and-PK absence, and tuple
   contents.
 
-### `test_dovetail.ml` discards subprocess exit status — **[open]**
+### `test_dovetail.ml` discards subprocess exit status — **[done]**
 
 `test_dovetail.ml:27` does `let _ = Unix.close_process_full ...` —
 masking a binary crash. Capture and assert `WEXITED 0`.
@@ -453,7 +453,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
 - `format_at` (lines 28-67) is 40 lines, a deliberate single dispatch
   over operators. The 35-line guideline says "if you can't, that's a
   signal to break it up". This one resists breakup — a comment naming
-  the function as a known exception would close the loop.
+  the function as a known exception would close the loop. **[done]**
 
 - `format_mutation_at` (lines 74-77) takes `indent` always-zero. Either
   inline `0` or commit to threading it through. Defer until update +
@@ -478,7 +478,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   duplicate the same shape. A small `unreachable_classification`
   helper, or just `assert false` with a comment, would be cleaner.
 
-## Cross-cutting captures for `CLAUDE.md` — **[open]** (partial: one `TODO(composite-pk)` marker placed during TL;DR 4)
+## Cross-cutting captures for `CLAUDE.md` — **[done]** (CLAUDE.md "Error messages" section now covers the prefix style, `failwith` vs `assert false`, and `TODO(slice-N)` marker conventions)
 
 A few project conventions are being followed consistently but aren't
 captured anywhere. Worth a brief paragraph in `CLAUDE.md`:

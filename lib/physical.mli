@@ -115,11 +115,15 @@ type plan =
 val format : Format.formatter -> t -> unit
 (** [format formatter plan] writes [plan] to [formatter] as an indented tree,
     one operator per line, with each operator's inputs indented two spaces
-    further than the operator itself. The leaf operator [FullScan] renders as
-    [FullScan(table)]; operators that carry a parameter render it inside
-    parentheses on the operator's line ([Filter(predicate)], [Project(columns)],
-    [NestedLoopJoin(predicate)]). The output is for EXPLAIN-style debug printing
-    -- the [--show-physical] flag on the binary is the primary consumer. *)
+    further than the operator itself. Every operator renders its name followed
+    by its distinguishing parameters inside parentheses ([FullScan(table)],
+    [Filter(predicate)], [Project(columns)], [IndexLookup(table, key=KEY)],
+    [NestedLoopJoin(predicate)],
+    [IndexedNestedLoopJoin(inner=..., outer_key=..., inner_position=...)],
+    [RelationLiteral(columns=..., rows=N)]). [CrossProduct] is the only operator
+    that renders bare, because its two children are themselves the interesting
+    information. The output is for EXPLAIN-style debug printing -- the
+    [--show-physical] flag on the binary is the primary consumer. *)
 
 val format_plan : Format.formatter -> plan -> unit
 (** [format_plan formatter plan] writes [plan] to [formatter]. For a {!Query},

@@ -340,7 +340,7 @@ let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
   | Some _ ->
       failwith
         (Printf.sprintf
-           "Eval: insert into %S failed: row with primary key %s already exists"
+           "Eval: insert into %S: row with primary key %s already exists"
            target_table
            (primary_key_value_text target_schema target_tuple)));
   Storage.put target_map write_transaction ~key:key_bytes ~value:value_bytes

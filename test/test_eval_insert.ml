@@ -76,8 +76,8 @@ let test_insert_with_existing_primary_key_raises () =
   in
   Alcotest.check_raises "primary-key collision"
     (Failure
-       "Eval: insert into \"orders\" failed: row with primary key 1 already \
-        exists") (fun () ->
+       "Eval: insert into \"orders\": row with primary key 1 already exists")
+    (fun () ->
       Storage.with_write_transaction environment (fun transaction ->
           Eval.eval_mutation environment transaction mutation (fun _ -> ())));
   (* The transaction aborted on the raised exception, so the table should

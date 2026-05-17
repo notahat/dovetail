@@ -108,19 +108,21 @@ let split_tuple (schema : t) tuple =
 
 let assemble_tuple schema ~primary_key_values ~non_primary_key_values =
   let primary_key_array = Array.of_list primary_key_values in
-  let expected_pk_count = List.length schema.primary_key in
-  if Array.length primary_key_array <> expected_pk_count then
+  let expected_primary_key_count = List.length schema.primary_key in
+  if Array.length primary_key_array <> expected_primary_key_count then
     invalid_arg
       (Printf.sprintf
          "Schema.assemble_tuple: expected %d primary-key value(s), got %d"
-         expected_pk_count
+         expected_primary_key_count
          (Array.length primary_key_array));
-  let expected_non_pk_count = List.length schema.fields - expected_pk_count in
-  if List.length non_primary_key_values <> expected_non_pk_count then
+  let expected_non_primary_key_count =
+    List.length schema.fields - expected_primary_key_count
+  in
+  if List.length non_primary_key_values <> expected_non_primary_key_count then
     invalid_arg
       (Printf.sprintf
          "Schema.assemble_tuple: expected %d non-primary-key value(s), got %d"
-         expected_non_pk_count
+         expected_non_primary_key_count
          (List.length non_primary_key_values));
   let non_primary_key_remaining = ref non_primary_key_values in
   let take_non_primary_key () =

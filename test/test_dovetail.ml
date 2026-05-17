@@ -13,8 +13,8 @@ let binary_path = "../bin/main.exe"
 
 (** Run [binary_path] with [environment_path] as its argument, sending
     [stdin_text] as standard input. Returns the captured stdout as a string.
-    Stderr is discarded; the binary doesn't write to it on success and we don't
-    depend on its content. *)
+    Asserts the binary exited cleanly (code 0); on non-zero, signal, or stop,
+    fails the test with stderr included so the failure mode is visible. *)
 let run_binary ~environment_path ~stdin_text =
   let environment_variables = Unix.environment () in
   let argv = [| binary_path; environment_path |] in
@@ -24,8 +24,19 @@ let run_binary ~environment_path ~stdin_text =
   output_string stdin_chan stdin_text;
   close_out stdin_chan;
   let stdout_text = In_channel.input_all stdout_chan in
-  let _ = In_channel.input_all stderr_chan in
-  let _ = Unix.close_process_full (stdout_chan, stdin_chan, stderr_chan) in
+  let stderr_text = In_channel.input_all stderr_chan in
+  let status = Unix.close_process_full (stdout_chan, stdin_chan, stderr_chan) in
+  (match status with
+  | Unix.WEXITED 0 -> ()
+  | Unix.WEXITED code ->
+      Alcotest.failf "binary exited with code %d\n--- stderr ---\n%s" code
+        stderr_text
+  | Unix.WSIGNALED signal ->
+      Alcotest.failf "binary killed by signal %d\n--- stderr ---\n%s" signal
+        stderr_text
+  | Unix.WSTOPPED signal ->
+      Alcotest.failf "binary stopped by signal %d\n--- stderr ---\n%s" signal
+        stderr_text);
   stdout_text
 
 let test_users_query_prints_fixture_rows () =

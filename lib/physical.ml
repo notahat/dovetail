@@ -24,7 +24,13 @@ let render_columns columns =
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
    its inputs at one more level of indent. The recursion terminates at
-   [FullScan], the only nullary operator. *)
+   [FullScan], the only nullary operator.
+
+   The 35-line guideline is treated as a deliberate exception here: this is
+   one dispatch over the [Physical.t] constructors, where each arm is a
+   single [fprintf] tailored to its operator's parameters. Splitting per
+   operator would add seven trivial helpers without making any individual
+   line clearer. Matches the precedent set by {!Parser.expression}. *)
 let rec format_at formatter indent plan =
   let prefix = String.make (indent * 2) ' ' in
   match plan with

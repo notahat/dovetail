@@ -53,8 +53,8 @@ type t =
           appear in column order. *)
 
 type mutation =
-  | Insert of { source : t; table : string }
-      (** [Insert { source; table }] is the surface form
+  | Insert of { table : string; source : t }
+      (** [Insert { table; source }] is the surface form
           [source | insert into <table>]. [source] is the upstream relation
           whose rows get written; [table] names the target. The constructor name
           follows the SQL verb the user typed. *)

@@ -47,6 +47,24 @@ If you find yourself wanting to add to this list, prefer spelling out
 unless the short form is genuinely conventional in OCaml or the
 underlying tool's vocabulary.
 
+## Error messages
+
+- Every user-facing error string starts with a module prefix:
+  `Module: detail` or `Module: operation: detail` when the operation is
+  worth naming (`Translate: insert into "orders": ...`,
+  `Eval: insert into "orders": ...`, `Projection.resolve: ...`,
+  `Schema.assemble_tuple: ...`).
+- Prefer `failwith` for user-reachable failures; reserve
+  `invalid_arg` for argument-shape precondition violations that callers
+  could and should have prevented (e.g. `assemble_tuple`'s length checks).
+- `assert false` (with a one-line comment naming the invariant) is the
+  right form for arms the layering upstream is supposed to guarantee.
+  These are not the same as user-reachable failures; treating them as
+  `failwith` makes them masquerade as recoverable errors.
+- A `(* TODO(slice-N) *)` or `(* TODO(composite-pk) *)`-style marker
+  beats prose for slice-1/slice-6 limitation notes — a searchable token
+  shortens the lift when the limitation is addressed.
+
 ## Tooling
 
 - OCaml 5.2 in a local opam switch at the project root.
