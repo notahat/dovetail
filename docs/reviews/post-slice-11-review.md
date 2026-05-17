@@ -251,7 +251,7 @@ in
 Why: a reader can list the states in two seconds rather than reasoning
 about two booleans' joint truth values.
 
-### `doctest.ml` extractor — heavily mutable — **[open]**
+### `doctest.ml` extractor — heavily mutable — **[done]**
 
 `parse_session_lines` (doctest.ml:64-93, 30 lines, 3 refs),
 `extract_sessions` (doctest.ml:100-128, four refs), `split_outputs`

@@ -57,87 +57,135 @@ let first_non_blank_starts_with_prompt lines =
   | None -> false
   | Some line -> starts_with prompt_marker line
 
-(** Walk a session's body lines, collecting [(source, expected_output_lines)]
-    pairs. Lines before the first prompt are dropped; once a prompt is seen,
-    subsequent lines accumulate as that query's expected output until the next
-    prompt or end of block. *)
+type pending_query = { source : string; output_lines_reversed : string list }
+(** A query whose expected-output lines are still being accumulated. The lines
+    are stored in reverse order; the fold reverses them at completion time. *)
+
+(** Close out [pending] (if any) by reversing its output lines and prepending
+    the finished {!query} to [queries]. *)
+let finish_pending_query pending queries =
+  match pending with
+  | None -> queries
+  | Some { source; output_lines_reversed } ->
+      let expected_output =
+        if output_lines_reversed = [] then ""
+        else String.concat "\n" (List.rev output_lines_reversed) ^ "\n"
+      in
+      { source; expected_output } :: queries
+
+(** Walk a session's body lines, collecting [(source, expected_output)] pairs.
+    Lines before the first prompt are dropped; once a prompt is seen, subsequent
+    lines accumulate as that query's expected output until the next prompt or
+    end of block. *)
 let parse_session_lines lines =
-  let queries = ref [] in
-  let current_source = ref None in
-  let current_output = ref [] in
-  let finish_current () =
-    match !current_source with
-    | None -> ()
-    | Some source ->
-        let expected_output =
-          if !current_output = [] then ""
-          else String.concat "\n" (List.rev !current_output) ^ "\n"
-        in
-        queries := { source; expected_output } :: !queries;
-        current_source := None;
-        current_output := []
+  let prompt_length = String.length prompt_marker in
+  let process_line (pending, queries) line =
+    if starts_with prompt_marker line then
+      let source =
+        String.sub line prompt_length (String.length line - prompt_length)
+      in
+      ( Some { source; output_lines_reversed = [] },
+        finish_pending_query pending queries )
+    else
+      match pending with
+      | None -> (None, queries)
+      | Some { source; output_lines_reversed } ->
+          ( Some
+              { source; output_lines_reversed = line :: output_lines_reversed },
+            queries )
   in
-  List.iter
-    (fun line ->
-      if starts_with prompt_marker line then begin
-        finish_current ();
-        let prompt_length = String.length prompt_marker in
-        current_source :=
-          Some
-            (String.sub line prompt_length (String.length line - prompt_length))
-      end
-      else if Option.is_some !current_source then
-        current_output := line :: !current_output)
-    lines;
-  finish_current ();
-  List.rev !queries
+  let final_pending, queries = List.fold_left process_line (None, []) lines in
+  List.rev (finish_pending_query final_pending queries)
 
 (** Split [text] into lines, preserving a trailing empty when [text] ends with a
     newline (so line numbering matches the source file). *)
 let split_lines text = String.split_on_char '\n' text
 
+(** Where the line-by-line walk is in its alternation between prose and fenced
+    blocks. [Inside_block] carries the source line at which the opening fence
+    appeared (so the session can report it) and the accumulated body lines in
+    reverse order. *)
+type extractor_state =
+  | Outside
+  | Inside_block of { block_starts_at_line : int; lines_reversed : string list }
+
+(** Close out the current block: if its body opens with a prompt, parse it as a
+    session and prepend; either way, return to [Outside]. *)
+let close_block ~block_starts_at_line ~lines_reversed sessions =
+  let body = List.rev lines_reversed in
+  if first_non_blank_starts_with_prompt body then
+    let queries = parse_session_lines body in
+    { block_starts_at_line; queries } :: sessions
+  else sessions
+
 (** Walk [markdown] line by line, alternating in/out of fenced blocks. On each
-    block close, if its body opens with a prompt, parse it as a session. *)
+    block close, if its body opens with a prompt, parse it as a session.
+    Unterminated final blocks are silently dropped -- mirroring markdown
+    rendering, which would do the same. *)
 let extract_sessions markdown =
-  let lines = split_lines markdown in
-  let sessions = ref [] in
-  let inside_block = ref false in
-  let block_start_line = ref 0 in
-  let block_lines = ref [] in
-  List.iteri
-    (fun line_index line ->
-      let line_number = line_index + 1 in
-      if is_fence line then
-        begin if !inside_block then begin
-          let body = List.rev !block_lines in
-          if first_non_blank_starts_with_prompt body then begin
-            let queries = parse_session_lines body in
-            sessions :=
-              { block_starts_at_line = !block_start_line; queries } :: !sessions
-          end;
-          inside_block := false;
-          block_lines := []
-        end
-        else begin
-          inside_block := true;
-          block_start_line := line_number;
-          block_lines := []
-        end
-        end
-      else if !inside_block then block_lines := line :: !block_lines)
-    lines;
-  List.rev !sessions
+  let process_line (state, sessions) (line_index, line) =
+    let line_number = line_index + 1 in
+    match (is_fence line, state) with
+    | true, Outside ->
+        ( Inside_block
+            { block_starts_at_line = line_number; lines_reversed = [] },
+          sessions )
+    | true, Inside_block { block_starts_at_line; lines_reversed } ->
+        (Outside, close_block ~block_starts_at_line ~lines_reversed sessions)
+    | false, Outside -> (Outside, sessions)
+    | false, Inside_block { block_starts_at_line; lines_reversed } ->
+        ( Inside_block
+            { block_starts_at_line; lines_reversed = line :: lines_reversed },
+          sessions )
+  in
+  let numbered_lines =
+    List.mapi (fun index line -> (index, line)) (split_lines markdown)
+  in
+  let _final_state, sessions =
+    List.fold_left process_line (Outside, []) numbered_lines
+  in
+  List.rev sessions
 
 (* === Verification === *)
 
 (** Feed every query's source line into {!Repl.run} against [environment],
     capturing all formatter output into a single string. *)
 let capture_repl_output environment queries =
-  let lines = List.map (fun query -> query.source) queries in
+  let lines = List.map (fun (query : query) -> query.source) queries in
   Test_helpers.with_captured_formatter @@ fun formatter ->
   Repl.run environment
     ~read_line:(Test_helpers.read_line_from_list lines)
     ~output:formatter
+
+(** [find_substring needle haystack ~from] returns the smallest index [>= from]
+    at which [needle] occurs in [haystack], or [None]. Used by {!split_outputs}
+    -- [String] doesn't expose a multi-character search and the split shape is
+    cleaner against an index helper than against a hand-rolled scanner. *)
+let find_substring needle haystack ~from =
+  let needle_length = String.length needle in
+  let haystack_length = String.length haystack in
+  let rec scan position =
+    if position + needle_length > haystack_length then None
+    else if String.sub haystack position needle_length = needle then
+      Some position
+    else scan (position + 1)
+  in
+  scan from
+
+(** Split [body] on every occurrence of [separator]. The result has one more
+    element than the number of separator occurrences; empty segments at the
+    boundaries are preserved. *)
+let split_on_substring ~separator body =
+  let separator_length = String.length separator in
+  let body_length = String.length body in
+  let rec collect start =
+    match find_substring separator body ~from:start with
+    | None -> [ String.sub body start (body_length - start) ]
+    | Some position ->
+        String.sub body start (position - start)
+        :: collect (position + separator_length)
+  in
+  collect 0
 
 (** Split a captured REPL stream into one segment per query.
 
@@ -165,32 +213,12 @@ let split_outputs captured =
       (Printf.sprintf
          "doctest: captured REPL output did not start with a prompt: %S"
          captured);
-  let trimmed =
+  let body =
     String.sub captured prompt_length (String.length captured - prompt_length)
   in
   let separator = "\n" ^ prompt_marker in
-  let separator_length = String.length separator in
-  let segments = ref [] in
-  let buffer = Buffer.create 256 in
-  let length = String.length trimmed in
-  let position = ref 0 in
-  while !position < length do
-    if
-      !position + separator_length <= length
-      && String.sub trimmed !position separator_length = separator
-    then begin
-      segments := Buffer.contents buffer :: !segments;
-      Buffer.clear buffer;
-      position := !position + separator_length
-    end
-    else begin
-      Buffer.add_char buffer trimmed.[!position];
-      incr position
-    end
-  done;
-  segments := Buffer.contents buffer :: !segments;
-  let in_order = List.rev !segments in
-  match List.rev in_order with "" :: rest -> List.rev rest | _ -> in_order
+  let segments = split_on_substring ~separator body in
+  match List.rev segments with "" :: rest -> List.rev rest | _ -> segments
 
 let truncation_marker = "..."
 
