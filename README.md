@@ -156,20 +156,16 @@ Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
 sub-steps; the ordering here is firm, but the scope of slices 11–13 will
 be pinned down when those slices start.
 
-1. **Slice 9 — Indexed nested-loop join over the primary key.** Makes
-   joins efficient when one side's join column is the primary key — one
-   full scan of the outer, one PK probe per row. No secondary indexes
-   yet; those wait for a workload that motivates them.
-2. **Slice 10 — Query-language documentation.** Short tutorial intro
+1. **Slice 10 — Query-language documentation.** Short tutorial intro
    followed by reference sections for each operator and for the
    expression and projection sublanguages. Covers only what exists.
-3. **Slice 11 — DML as an RA-language extension.** Statement-level
+2. **Slice 11 — DML as an RA-language extension.** Statement-level
    forms for inserting rows, alongside the existing pipeline syntax.
    Update and delete may land here or follow on. Exercised against the
    existing fixture.
-4. **Slice 12 — DDL as an RA-language extension.** Statement-level
+3. **Slice 12 — DDL as an RA-language extension.** Statement-level
    `create table` and `drop table`. Replaces the fixture-creation path.
-5. **Slice 13 — Minimal SQL frontend.** A second front-end — SQL
+4. **Slice 13 — Minimal SQL frontend.** A second front-end — SQL
    parser, SQL AST, SQL→logical lowering — feeding the existing logical
    and physical IRs. Deliberately limited (no NULLs, scope otherwise
    TBD): the focus is on how the architecture splits between two
