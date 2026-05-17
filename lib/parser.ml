@@ -89,13 +89,23 @@ let literal_value =
   | _ -> fail "expected a literal value (number, string, or bool)"
 
 (* A single key-value pair inside a relation literal: [identifier : value].
-   Whitespace around the colon is tolerated. The key is a bare identifier;
-   qualified keys (e.g. [users.id: 1]) are rejected because [identifier]
-   does not consume a dot. *)
+   Whitespace around the colon is tolerated. The key grammar accepts both
+   bare and qualified forms ([id] and [users.id]); the surface language
+   forbids qualified keys, but rejecting them here would happen inside an
+   angstrom [many], which backtracks on inner-parser failure and would
+   discard the useful message. Instead the pair returns the full key text
+   plus a flag, and {!relation_literal} validates after [many] has run --
+   the same shape as the duplicate-column check below. *)
 let relation_literal_pair =
-  identifier >>= fun column_name ->
+  identifier >>= fun first_segment ->
+  ( peek_char >>= function
+    | Some '.' ->
+        char '.' *> identifier >>| fun second_segment ->
+        (first_segment ^ "." ^ second_segment, true)
+    | _ -> return (first_segment, false) )
+  >>= fun (column_key, key_is_qualified) ->
   whitespace *> char ':' *> whitespace *> literal_value >>| fun value ->
-  (column_name, value)
+  (column_key, value, key_is_qualified)
 
 (* One or more pairs separated by commas, with whitespace tolerated around
    commas and an optional trailing comma. The list is non-empty: the empty
@@ -107,13 +117,31 @@ let relation_literal_pairs =
   whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
   first_pair :: more_pairs
 
+(* Raise a parse error if any pair carries a qualified key. The error
+   names the first offender in full ([users.id], not just [users]) so the
+   user can find what they typed. Runs after [many] has gathered the
+   pairs, sidestepping angstrom's backtracking on inner-parser failure. *)
+let check_for_qualified_keys pairs =
+  match
+    List.find_opt
+      (fun (_column_key, _value, key_is_qualified) -> key_is_qualified)
+      pairs
+  with
+  | None -> return ()
+  | Some (offending_key, _value, _flag) ->
+      fail
+        (Printf.sprintf
+           "qualified column key %S in relation literal: only bare column \
+            names are allowed"
+           offending_key)
+
 (* Raise a parse error if [pairs] contains the same column name twice. The
    error names the duplicate so the user can find it. *)
 let check_for_duplicate_columns pairs =
   let seen = Hashtbl.create 8 in
   let rec scan = function
     | [] -> return ()
-    | (column_name, _value) :: rest ->
+    | (column_name, _value, _key_is_qualified) :: rest ->
         if Hashtbl.mem seen column_name then
           fail
             (Printf.sprintf "duplicate column %S in relation literal"
@@ -130,9 +158,10 @@ let check_for_duplicate_columns pairs =
 let relation_literal =
   char '{' *> whitespace *> relation_literal_pairs <* whitespace <* char '}'
   >>= fun pairs ->
+  check_for_qualified_keys pairs >>= fun () ->
   check_for_duplicate_columns pairs >>| fun () ->
-  let columns = List.map fst pairs in
-  let values = List.map snd pairs in
+  let columns = List.map (fun (key, _value, _qualified) -> key) pairs in
+  let values = List.map (fun (_key, value, _qualified) -> value) pairs in
   Ast.RelationLiteral { columns; rows = [ values ] }
 
 (* The leading position of a pipeline: either a bare table reference or a

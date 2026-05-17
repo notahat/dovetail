@@ -24,6 +24,21 @@ let rejects input =
   | Ok _ -> Alcotest.failf "expected %S to be rejected, but it parsed" input
   | Error _ -> ()
 
+(* Stricter form of [rejects]: assert the parser fails AND that the error
+   message contains every fragment in [mentions]. Used by the slice-11
+   validation-polish tests, where the wording is part of the contract --
+   "names the offending column" is a guarantee tests should observe. *)
+let rejects_with_message input ~mentions =
+  match Parser.parse input with
+  | Ok _ -> Alcotest.failf "expected %S to be rejected, but it parsed" input
+  | Error message ->
+      List.iter
+        (fun fragment ->
+          if not (contains_substring message fragment) then
+            Alcotest.failf "expected %S's parse error to mention %S, got: %s"
+              input fragment message)
+        mentions
+
 let test_parses_bare_identifier () = parses "users" (Ast.Relation_name "users")
 
 let test_tolerates_leading_whitespace () =
@@ -279,8 +294,29 @@ let test_relation_literal_alone_is_a_valid_pipeline_head () =
 
 let test_relation_literal_rejects_empty () = rejects "{}"
 let test_relation_literal_rejects_leading_comma () = rejects "{, id: 7}"
-let test_relation_literal_rejects_duplicate_column () = rejects "{id: 1, id: 2}"
-let test_relation_literal_rejects_qualified_key () = rejects "{users.id: 7}"
+
+(* The error must name the duplicate so the user can find it; ["id"] in the
+   "mentions" list is the column name and "duplicate column" is the kind of
+   problem. *)
+let test_relation_literal_rejects_duplicate_column () =
+  rejects_with_message "{id: 1, id: 2}"
+    ~mentions:[ "duplicate column"; "\"id\"" ]
+
+(* The error must name the full qualified key ["users.id"] -- not just
+   "users" -- so the user sees exactly what they typed. The wording
+   "qualified column key" labels the kind of problem. *)
+let test_relation_literal_rejects_qualified_key () =
+  rejects_with_message "{users.id: 7}"
+    ~mentions:[ "qualified column key"; "\"users.id\"" ]
+
+(* The same check has to fire mid-literal, not just on the first pair --
+   the qualified-key detection sits inside [relation_literal_pair], which
+   runs once per pair, but the angstrom [many] wrapping is easy to get
+   wrong so we lock in the second-position case with a dedicated test. *)
+let test_relation_literal_rejects_qualified_key_in_second_position () =
+  rejects_with_message "{x: 1, orders.amount: 2}"
+    ~mentions:[ "qualified column key"; "\"orders.amount\"" ]
+
 let test_relation_literal_rejects_missing_colon () = rejects "{id 7}"
 let test_relation_literal_rejects_missing_value () = rejects "{id:}"
 
@@ -481,6 +517,9 @@ let () =
             test_relation_literal_rejects_duplicate_column;
           Alcotest.test_case "rejects a literal with a qualified key" `Quick
             test_relation_literal_rejects_qualified_key;
+          Alcotest.test_case
+            "rejects a literal with a qualified key in second position" `Quick
+            test_relation_literal_rejects_qualified_key_in_second_position;
           Alcotest.test_case "rejects a literal missing the colon" `Quick
             test_relation_literal_rejects_missing_colon;
           Alcotest.test_case "rejects a literal with a missing value" `Quick
