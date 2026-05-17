@@ -110,7 +110,7 @@ affected_rows` in the iter body. The future multi-row case still lands
 cleanly. Drops two parameters from `insert_one_row` and removes the
 "take a count, return count + 1" oddity.
 
-### IR triplication: live with it, but unify the kind-inference rule — **[open]**
+### IR triplication: live with it, but unify the kind-inference rule — **[done]**
 
 The `RelationLiteral { columns; rows }` record and the
 `plan = Query of t | Mutation of mutation` wrapper are now copy-pasted

@@ -80,10 +80,8 @@ type t =
           [CrossProduct]. *)
   | RelationLiteral of { columns : string list; rows : Value.t list list }
       (** [RelationLiteral { columns; rows }] yields a relation whose tuples are
-          the literal's [rows] -- no storage involved. The output schema names
-          the columns in order with no qualifier; each field's kind is inferred
-          from the first row's value at that position; the primary key is empty,
-          matching the convention for derived relations.
+          the literal's [rows] -- no storage involved. The output schema is
+          {!Relation_literal.schema_of} applied to [columns] and the first row.
 
           Each row in [rows] must have the same length as [columns]. Slice 11's
           parser produces single-row literals only, so [rows] always has length

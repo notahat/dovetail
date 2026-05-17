@@ -59,12 +59,11 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
   in
   continue ({ schema; tuples } : [ `Bag ] Relation.t)
 
-(* Materialise a [RelationLiteral] as a [Relation.t]. The schema's field
-   kinds come from the first row's values at each position; the primary
-   key is empty and qualifiers are absent, matching the convention for
-   derived relations and the design's "bare keys go in, bare names come
-   out" rule. The literal stays small enough that the tuples can be
-   produced eagerly via [List.to_seq] without any storage scope. *)
+(* Materialise a [RelationLiteral] as a [Relation.t]. The schema comes from
+   {!Relation_literal.schema_of} -- the kind-inference rule lives there so
+   {!Logical} and {!Physical}'s doc comments can point at it. The literal
+   stays small enough that the tuples can be produced eagerly via
+   [List.to_seq] without any storage scope. *)
 let evaluate_relation_literal ~columns ~rows continue =
   let first_row =
     match rows with
@@ -77,13 +76,7 @@ let evaluate_relation_literal ~columns ~rows continue =
          "Eval: relation literal row has %d value(s) but %d column(s) are \
           declared"
          (List.length first_row) (List.length columns));
-  let fields =
-    List.map2
-      (fun column_name row_value : Schema.field ->
-        { name = column_name; kind = Value.kind_of row_value; qualifier = None })
-      columns first_row
-  in
-  let schema : Schema.t = { fields; primary_key = [] } in
+  let schema = Relation_literal.schema_of ~columns ~first_row in
   let tuples = rows |> List.to_seq |> Seq.map Array.of_list in
   continue ({ schema; tuples } : [ `Bag ] Relation.t)
 
