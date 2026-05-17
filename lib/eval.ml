@@ -259,11 +259,9 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
   in
   continue { schema = combined_schema; tuples = combined_tuples }
 
-(* Slice 11 step 2a: insert sink + dedicated mutation entry point. The
-   read-only [eval] above is unchanged; mutations have their own entry
-   point below so the transaction perm and the return shape can each
-   match a mutation's natural cardinality without going through a
-   read-write-tolerant variant. *)
+(* The mutation entry below evaluates its [source] sub-plan through [eval]
+   inside its own write-transaction scope, then writes the resulting tuples
+   one per row. *)
 
 (* For each target field, find the position in [source_schema] that supplies
    its value. Raises [Failure] if a target field has no matching source

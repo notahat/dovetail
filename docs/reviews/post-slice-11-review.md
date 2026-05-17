@@ -11,12 +11,19 @@ Items are roughly ordered by leverage within each section.
 
 ## Status
 
-The ten items in the Ranked TL;DR have all shipped (commits `dede5b7`
-through `2d3131d`). Each subsection in the body below is annotated with
-its status: **[done]** for items that landed, **[open]** for items not
-yet actioned. The "Smaller items by file" section is mostly **[open]** —
-it was below the TL;DR cut. Cross-cutting captures for `CLAUDE.md` are
-also **[open]**.
+The review is closed. Every subsection below is marked **[done]** with
+the exception of two items deferred by design -- both wait on the slice
+that gives them a consumer:
+
+- `Relation.t`'s `'tag` phantom audit (relevant when set/bag/distinct
+  lands).
+- `Physical.format_mutation_at`'s always-zero `indent` parameter
+  (relevant when update + delete arrive in slice 12).
+
+The ten items in the Ranked TL;DR shipped first (commits `dede5b7`
+through `2d3131d`). The remainder shipped as themed follow-up commits
+through the post-review tail. Cross-cutting CLAUDE.md captures landed
+with the quick-wins bundle.
 
 ## Architecture-level themes
 
@@ -391,7 +398,7 @@ real one-line printer — `Value.to_string` of each element, joined —
 would make these failures self-diagnosing. (And `Value` arguably wants
 a `to_string` anyway; see below.)
 
-### A handful of plain-language test name nits — **[open]**
+### A handful of plain-language test name nits — **[done]**
 
 Mostly good; one outlier:
 
@@ -407,7 +414,7 @@ Mostly good; one outlier:
 `test_dovetail.ml:27` does `let _ = Unix.close_process_full ...` —
 masking a binary crash. Capture and assert `WEXITED 0`.
 
-## Smaller items by file — **[open]** (entire section below the TL;DR cut)
+## Smaller items by file — **[done]** (two items deferred by design: `Relation.t`'s `'tag` phantom audit and `Physical.format_mutation_at`'s always-zero `indent` -- both wait on the slice that gives them a consumer)
 
 ### `lib/value.ml` — **[done]**
 
@@ -417,7 +424,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   `Value.to_string` exposed from `Value` would centralise the
   decision-making about quoting strings, etc.
 
-### `lib/projection.ml`
+### `lib/projection.ml` — **[done]**
 
 - `check_no_duplicates` (lines 13-21) uses a `Hashtbl` for what's
   always going to be a handful of columns. An `O(n²)` list walk would
@@ -465,7 +472,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   inline `0` or commit to threading it through. Defer until update +
   delete arrive.
 
-### `lib/eval.ml`
+### `lib/eval.ml` — **[done]**
 
 - The slice-11 banner comment (eval.ml:269-273) reads like a commit
   message rather than module documentation. Trim or replace with one

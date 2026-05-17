@@ -9,16 +9,20 @@ let resolve_column input_schema reference =
   | Error message -> failwith ("Projection.resolve: " ^ message)
 
 (* Walk [columns] left to right, raising if the same column reference (in its
-   source form) appears twice. *)
+   source form) appears twice. [List.mem] is O(n^2) overall, which is fine
+   for projection sizes -- a handful of columns at most -- and lets the
+   function stay pure-functional. *)
 let check_no_duplicates columns =
-  let seen = Hashtbl.create (List.length columns) in
-  List.iter
-    (fun reference ->
-      let key = Schema.format_column_reference reference in
-      if Hashtbl.mem seen key then
-        failwith (Printf.sprintf "Projection.resolve: duplicate column %S" key);
-      Hashtbl.add seen key ())
-    columns
+  let rec walk seen = function
+    | [] -> ()
+    | reference :: rest ->
+        let key = Schema.format_column_reference reference in
+        if List.mem key seen then
+          failwith
+            (Printf.sprintf "Projection.resolve: duplicate column %S" key);
+        walk (key :: seen) rest
+  in
+  walk [] columns
 
 let format formatter columns =
   let rendered =
