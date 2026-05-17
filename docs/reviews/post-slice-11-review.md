@@ -472,7 +472,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
   line tying `eval_mutation` to `eval` ("the mutation entry evaluates
   its source through [eval] inside its own scope, then writes").
 
-### `lib/repl.ml`
+### `lib/repl.ml` — **[done]**
 
 - `evaluate_and_print` (lines 32-64) is 33 lines and contains two
   near-identical arms. Extract `print_query_result` and

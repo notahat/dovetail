@@ -18,48 +18,54 @@ let translate_in environment transaction ~output ~show_physical logical_plan =
   if show_physical then Physical.format_plan output physical_plan;
   physical_plan
 
+(* Inside a read transaction: translate the plan, evaluate the relation it
+   produces, and pretty-print the rows to [output]. The [Mutation] arm is
+   unreachable -- [Logical.classify] chose [`Read] and so [Translate.translate]
+   is contracted to return a [Physical.Query]. *)
+let print_query_result environment transaction ~output ~show_physical
+    logical_plan =
+  match
+    translate_in environment transaction ~output ~show_physical logical_plan
+  with
+  | Physical.Query physical ->
+      Eval.eval environment transaction physical (fun relation ->
+          Relation.print ~formatter:output relation)
+  | Physical.Mutation _ -> assert false
+
+(* Inside a write transaction: translate the plan, evaluate the mutation,
+   and emit the affected-rows status line to [output]. The [Query] arm is
+   unreachable for the symmetric reason -- [Logical.classify] chose [`Write]
+   and so [Translate.translate] is contracted to return a [Physical.Mutation].
+*)
+let print_mutation_result environment transaction ~output ~show_physical
+    logical_plan =
+  match
+    translate_in environment transaction ~output ~show_physical logical_plan
+  with
+  | Physical.Mutation mutation ->
+      Eval.eval_mutation environment transaction mutation (fun affected_rows ->
+          Format.fprintf output "%s@."
+            (format_mutation_status mutation affected_rows))
+  | Physical.Query _ -> assert false
+
 (* Run a single parsed query against [environment] and pretty-print the
-   result to [output]. The plan's classification picks the transaction kind:
-   a [Query] opens a read transaction, a [Mutation] opens a write transaction.
-   Translation happens inside the chosen transaction so the catalog lookup
-   shares scope with evaluation, and the Physical wrapper's constructor
-   re-decides the Eval entry point and the rendered verb at the dispatch
-   site. The two arms duplicate scaffolding because their transaction perms
-   differ -- with-with_*_transaction polymorphism would need a rank-2 type
-   trick that the gain doesn't justify. The [failwith] branches assert the
-   wrapper invariant ([Logical.Query] translates to [Physical.Query]; same
-   for [Mutation]) explicitly rather than via [assert false]. *)
+   result to [output]. The plan's classification picks the transaction kind
+   (read for queries, write for mutations); translation happens inside the
+   chosen transaction so the catalog lookup shares scope with evaluation.
+   Two helpers rather than one because [with_read_transaction] and
+   [with_write_transaction] carry different permission tags -- unifying them
+   would need a rank-2 type trick the gain doesn't justify. *)
 let evaluate_and_print environment ~output ~show_physical logical_plan =
   try
     match Logical.classify logical_plan with
     | `Read ->
         Storage.with_read_transaction environment (fun transaction ->
-            match
-              translate_in environment transaction ~output ~show_physical
-                logical_plan
-            with
-            | Physical.Query physical ->
-                Eval.eval environment transaction physical (fun relation ->
-                    Relation.print ~formatter:output relation)
-            | Physical.Mutation _ ->
-                failwith
-                  "internal error: Logical.Query translated to \
-                   Physical.Mutation")
+            print_query_result environment transaction ~output ~show_physical
+              logical_plan)
     | `Write ->
         Storage.with_write_transaction environment (fun transaction ->
-            match
-              translate_in environment transaction ~output ~show_physical
-                logical_plan
-            with
-            | Physical.Mutation mutation ->
-                Eval.eval_mutation environment transaction mutation
-                  (fun affected_rows ->
-                    Format.fprintf output "%s@."
-                      (format_mutation_status mutation affected_rows))
-            | Physical.Query _ ->
-                failwith
-                  "internal error: Logical.Mutation translated to \
-                   Physical.Query")
+            print_mutation_result environment transaction ~output ~show_physical
+              logical_plan)
   with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Process one input line: parse, lower, evaluate, print. Parse and eval
