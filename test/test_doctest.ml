@@ -86,6 +86,57 @@ Another paragraph, no fences.
   let _ = extract_expecting_count ~count:0 markdown in
   ()
 
+let test_trailing_ellipsis_accepts_extra_actual_rows () =
+  (* `users` prints a header, a separator, and five data rows. The doc
+     here shows only the first two data rows followed by `...`, which
+     should be treated as "anything that follows in actual output is
+     accepted without further checking." *)
+  let markdown =
+    {|```
+> users
+│ users.id │ users.name │ users.email       │ users.active │
+├──────────┼────────────┼───────────────────┼──────────────┤
+│        1 │ Alice      │ alice@example.com │ true         │
+│        2 │ Bob        │ bob@example.com   │ false        │
+...
+```
+|}
+  in
+  let sessions = Doctest.extract_sessions markdown in
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  match Doctest.verify_sessions environment sessions with
+  | Ok () -> ()
+  | Error error ->
+      Alcotest.failf
+        "expected truncation marker to accept trailing actual rows\n\
+         --- actual ---\n\
+         %s"
+        error.actual_output
+
+let test_ellipsis_only_recognised_on_its_own_line () =
+  (* `...` appearing inside a row (here, as a substring of a name)
+     must not be interpreted as the truncation marker. *)
+  let markdown =
+    {|```
+> users
+│ users.id │ users.name │ users.email       │ users.active │
+├──────────┼────────────┼───────────────────┼──────────────┤
+│        1 │ Alice ...  │ alice@example.com │ true         │
+```
+|}
+  in
+  let sessions = Doctest.extract_sessions markdown in
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Fixture.populate_if_empty environment;
+  match Doctest.verify_sessions environment sessions with
+  | Ok () ->
+      Alcotest.fail
+        "expected mismatch: '...' embedded in a row is not a truncation marker"
+  | Error _ -> ()
+
 let test_mismatch_reports_query_and_actual_output () =
   let markdown = {|```
 > users
@@ -130,5 +181,9 @@ let () =
           Alcotest.test_case
             "a mismatch is reported with its query and the actual output" `Quick
             test_mismatch_reports_query_and_actual_output;
+          Alcotest.test_case "a trailing ... line accepts extra actual rows"
+            `Quick test_trailing_ellipsis_accepts_extra_actual_rows;
+          Alcotest.test_case "... is only recognised on its own line" `Quick
+            test_ellipsis_only_recognised_on_its_own_line;
         ] );
     ]

@@ -16,7 +16,13 @@
     segment per query, and compares each segment to its documented expected
     output. The comparison ignores a single trailing newline on either side (the
     formatter emits one; copy-pasting into markdown doesn't always preserve it).
-*)
+
+    A line in expected output consisting of just [...] (after stripping
+    surrounding whitespace) is a truncation marker. When the last non-blank line
+    of expected output is the marker, the comparator only checks that actual
+    output begins with the lines preceding the marker -- anything that follows
+    in actual is accepted. This lets the doc show the first few rows of a long
+    table without committing to verify the whole thing. *)
 
 open Dovetail
 
@@ -194,15 +200,47 @@ let split_outputs captured =
   let in_order = List.rev !segments in
   match List.rev in_order with "" :: rest -> List.rev rest | _ -> in_order
 
-(** Byte-for-byte comparison, ignoring a single trailing newline on either side.
-*)
-let outputs_match actual expected =
-  let strip_trailing_newline text =
-    let length = String.length text in
-    if length > 0 && text.[length - 1] = '\n' then String.sub text 0 (length - 1)
-    else text
+let truncation_marker = "..."
+
+(** Detect a trailing truncation marker line in [expected]. Returns the prefix
+    of [expected] up to (but excluding) the marker line if the marker is
+    present, otherwise [None]. Whitespace-only lines after the marker are
+    ignored when locating it; the marker itself must be on its own line. *)
+let split_truncation_marker expected =
+  let lines = String.split_on_char '\n' expected in
+  let rec find_marker reversed_remaining =
+    match reversed_remaining with
+    | [] -> None
+    | line :: rest when String.trim line = "" -> find_marker rest
+    | line :: rest when String.trim line = truncation_marker -> Some rest
+    | _ -> None
   in
-  strip_trailing_newline actual = strip_trailing_newline expected
+  match find_marker (List.rev lines) with
+  | None -> None
+  | Some reversed_prefix_lines ->
+      let prefix_lines = List.rev reversed_prefix_lines in
+      let prefix = String.concat "\n" prefix_lines in
+      let prefix_with_newline = if prefix = "" then "" else prefix ^ "\n" in
+      Some prefix_with_newline
+
+(** Compare actual REPL output to documented expected output.
+
+    With no truncation marker: byte-for-byte equality after collapsing a single
+    trailing newline on either side.
+
+    With a trailing [...] marker: actual need only begin with the lines
+    preceding the marker. *)
+let outputs_match actual expected =
+  match split_truncation_marker expected with
+  | Some prefix -> starts_with prefix actual
+  | None ->
+      let strip_trailing_newline text =
+        let length = String.length text in
+        if length > 0 && text.[length - 1] = '\n' then
+          String.sub text 0 (length - 1)
+        else text
+      in
+      strip_trailing_newline actual = strip_trailing_newline expected
 
 (** Run one session and return the first mismatch, if any. *)
 let verify_session environment session =
