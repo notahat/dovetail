@@ -1,42 +1,19 @@
-(* Slice-1 entry point: parse argv, open the environment, populate the
-   fixture if needed, and hand off to the REPL. The bulk of the work lives
-   in [Dovetail.Repl] so the loop logic is testable without spawning a
+(* Entry point: parse argv via [Dovetail.Cli], open the environment,
+   populate the fixture if needed, and hand off to the REPL. The bulk of
+   the work lives in [Dovetail.*] so it's testable without spawning a
    subprocess. *)
-
-let default_environment_path = "./dovetail-data"
-let show_physical_flag = "--show-physical"
 
 let usage program_name =
   Printf.sprintf "usage: %s [%s] [environment-path]" program_name
-    show_physical_flag
+    Dovetail.Cli.show_physical_flag
 
-(* Hand-rolled argv split: [--show-physical] is a boolean flag that may
-   appear in any position; everything else is taken as the optional
-   environment path. Two paths or two flags both fail with the usage
-   message. The codebase doesn't take a CLI library dependency yet, and
-   one flag isn't enough motivation to add one. *)
-type cli_options = { show_physical : bool; environment_path : string }
-
-let parse_cli argv =
-  let usage_and_exit () =
-    Printf.eprintf "%s\n" (usage argv.(0));
-    exit 2
-  in
-  let rec walk ~show_physical ~environment_path = function
-    | [] ->
-        let environment_path =
-          Option.value environment_path ~default:default_environment_path
-        in
-        { show_physical; environment_path }
-    | argument :: rest when argument = show_physical_flag ->
-        if show_physical then usage_and_exit ()
-        else walk ~show_physical:true ~environment_path rest
-    | path :: rest ->
-        if Option.is_some environment_path then usage_and_exit ()
-        else walk ~show_physical ~environment_path:(Some path) rest
-  in
+let parse_argv_or_exit argv =
   let arguments = Array.to_list argv |> List.tl in
-  walk ~show_physical:false ~environment_path:None arguments
+  match Dovetail.Cli.parse arguments with
+  | Ok options -> options
+  | Error message ->
+      Printf.eprintf "%s\n%s\n" message (usage argv.(0));
+      exit 2
 
 (* Adapt [stdin] to [Repl.run]'s [read_line] callback: return [None] on
    EOF rather than raising. *)
@@ -46,7 +23,9 @@ let read_line_from_stdin () =
   | exception End_of_file -> None
 
 let () =
-  let { show_physical; environment_path } = parse_cli Sys.argv in
+  let { Dovetail.Cli.show_physical; environment_path } =
+    parse_argv_or_exit Sys.argv
+  in
   let environment = Dovetail.Storage.open_environment environment_path in
   Fun.protect
     ~finally:(fun () -> Dovetail.Storage.close_environment environment)

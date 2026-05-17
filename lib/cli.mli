@@ -1,0 +1,27 @@
+(** Command-line argument parsing for the dovetail binary.
+
+    The grammar is small enough that a hand-rolled walker is clearer than a CLI
+    library dependency: one boolean flag ([--show-physical]) that may appear in
+    any position, and an optional positional environment path. Two flags or two
+    paths is a usage error. *)
+
+type options = { show_physical : bool; environment_path : string }
+(** Parsed argument set. [environment_path] is the directory the LMDB
+    environment lives in; it defaults to {!default_environment_path} when no
+    positional argument is given. [show_physical] becomes [true] only when
+    [--show-physical] appears in the argument list. *)
+
+val default_environment_path : string
+(** Path used when no positional argument is supplied -- a sibling directory of
+    the binary's working directory, lazily created by [Storage]. *)
+
+val show_physical_flag : string
+(** The literal flag string [--show-physical], exposed so callers and tests
+    don't have to restate it. *)
+
+val parse : string list -> (options, string) result
+(** [parse arguments] walks [arguments] -- the argv list with the program name
+    already stripped -- and returns either the parsed {!options} or a short
+    error string naming the offending input. The caller is responsible for
+    rendering the usage message and choosing the exit code; this module only
+    decides what the arguments mean. *)

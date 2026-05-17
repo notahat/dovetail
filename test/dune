@@ -3,6 +3,7 @@
   test_dovetail
   test_storage
   test_catalog
+  test_cli
   test_encoding
   test_fixture
   test_schema
