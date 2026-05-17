@@ -328,9 +328,9 @@ let primary_key_value_text (target_schema : Schema.t) target_tuple =
   | _ -> "?"
 
 (* Encode one source row in target form, fail on PK collision, else write
-   it. Returns the row count incremented by one. *)
+   it. *)
 let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
-    ~position_map source_tuple affected_rows =
+    ~position_map source_tuple =
   let target_tuple = project_to_target_order ~position_map source_tuple in
   let key_bytes, value_bytes =
     Row_codec.encode_row target_schema target_tuple
@@ -343,14 +343,11 @@ let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
            "Eval: insert into %S failed: row with primary key %s already exists"
            target_table
            (primary_key_value_text target_schema target_tuple)));
-  Storage.put target_map write_transaction ~key:key_bytes ~value:value_bytes;
-  affected_rows + 1
+  Storage.put target_map write_transaction ~key:key_bytes ~value:value_bytes
 
 (* Evaluate the [source] sub-plan inside its own resource scope and write
    each tuple it produces into [target_table]. Returns the number of rows
-   written. The affected-row count is threaded imperatively through a ref
-   so a future multi-row literal lands without restructuring the
-   accumulator. *)
+   written via [continue]. *)
 let evaluate_insert environment transaction ~target_table ~source continue =
   let target_schema, target_map =
     lookup_table_resources environment transaction target_table
@@ -363,10 +360,9 @@ let evaluate_insert environment transaction ~target_table ~source continue =
       in
       Seq.iter
         (fun source_tuple ->
-          affected_rows :=
-            insert_one_row ~target_schema ~target_map ~target_table
-              ~write_transaction:transaction ~position_map source_tuple
-              !affected_rows)
+          insert_one_row ~target_schema ~target_map ~target_table
+            ~write_transaction:transaction ~position_map source_tuple;
+          incr affected_rows)
         source_relation.tuples);
   continue !affected_rows
 
