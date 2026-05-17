@@ -20,6 +20,9 @@ The guide is in several parts:
 - [Expression and projection reference](query-language-expressions.md)
   -- the sublanguages used inside `restrict`, `project`, and the
   `on` clause of `join`.
+- [Data definition reference](query-language-data-definition.md) --
+  the `:`-prefixed statements that inspect and modify the catalog
+  (`:list tables`, `:drop table <name>`).
 
 ## Running the REPL
 

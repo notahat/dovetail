@@ -16,6 +16,7 @@ let verified_files =
     "../docs/query-language-tutorial.md";
     "../docs/query-language-pipeline-operators.md";
     "../docs/query-language-expressions.md";
+    "../docs/query-language-data-definition.md";
     "../README.md";
   ]
 
