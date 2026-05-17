@@ -376,6 +376,29 @@ let test_mutation_with_unknown_column_raises () =
     (Failure "Translate: insert into \"orders\": unknown column(s): colour")
     (fun () -> ignore (Translate.translate ~catalog:orders_catalog plan))
 
+let test_mutation_with_row_arity_mismatch_raises () =
+  (* Built directly rather than via [insert_plan], because that helper
+     derives [columns] and [values] from the same list and so can't
+     produce a width mismatch between them. *)
+  let plan : Logical.plan =
+    Mutation
+      (Insert
+         {
+           table = "orders";
+           source =
+             RelationLiteral
+               {
+                 columns = [ "id"; "user_id"; "description"; "amount" ];
+                 rows = [ [ Value.Int64 9L; Value.Int64 1L; Value.Int64 9L ] ];
+               };
+         })
+  in
+  Alcotest.check_raises "row arity"
+    (Failure
+       "Translate: insert into \"orders\": row has 3 value(s) but 4 column(s) \
+        declared") (fun () ->
+      ignore (Translate.translate ~catalog:orders_catalog plan))
+
 let test_mutation_with_kind_mismatch_raises () =
   let plan =
     insert_plan ~table:"orders"
@@ -463,6 +486,10 @@ let () =
             "Insert with a column not in the target schema names it in the \
              error"
             `Quick test_mutation_with_unknown_column_raises;
+          Alcotest.test_case
+            "Insert whose row width disagrees with its declared columns names \
+             both counts in the error"
+            `Quick test_mutation_with_row_arity_mismatch_raises;
           Alcotest.test_case
             "Insert whose value kind disagrees with the target column names \
              both kinds in the error"

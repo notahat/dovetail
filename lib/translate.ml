@@ -323,14 +323,12 @@ let multiset_difference ~expected ~actual =
   let unknown = List.filter (fun name -> not (List.mem name expected)) actual in
   (missing, unknown)
 
-(* Validate that [literal_columns] is a permutation of [target_schema]'s
-   column names and that each value in [first_row] has the kind the target
-   schema declares for that column. Raises [Failure] with a message naming
-   the target table and the offending columns/kinds. The first-row kinds are
-   sufficient because slice 11's literal grammar is single-row; multi-row
-   literals would extend the check to every row. *)
-let validate_literal_against_target ~target_table ~(target_schema : Schema.t)
-    ~literal_columns ~first_row =
+(* Check that [literal_columns] is a permutation of [target_schema]'s
+   column names. Raises [Failure] naming the missing columns first, then
+   the unknown ones -- a single literal can hit both, and the missing-
+   columns message is the more directly actionable of the two. *)
+let check_columns_match ~target_table ~(target_schema : Schema.t)
+    ~literal_columns =
   let schema_column_names =
     List.map (fun (field : Schema.field) -> field.name) target_schema.fields
   in
@@ -346,14 +344,32 @@ let validate_literal_against_target ~target_table ~(target_schema : Schema.t)
     failwith
       (Printf.sprintf "Translate: insert into %S: unknown column(s): %s"
          target_table
-         (String.concat ", " unknown));
+         (String.concat ", " unknown))
+
+(* Check that [first_row] has one value per declared literal column.
+   Raises [Failure] naming both counts. This is structural agreement
+   between the literal's own columns and rows; the per-column kind check
+   below is what compares against the target schema. *)
+let check_row_arity ~target_table ~literal_columns ~first_row =
   if List.length first_row <> List.length literal_columns then
     failwith
       (Printf.sprintf
          "Translate: insert into %S: row has %d value(s) but %d column(s) \
           declared"
          target_table (List.length first_row)
-         (List.length literal_columns));
+         (List.length literal_columns))
+
+(* Check that each value in [first_row] has the kind the target schema
+   declares for the column named at the same position in [literal_columns].
+   Raises [Failure] naming the column and both kinds. The first-row kinds
+   are sufficient because slice 11's literal grammar is single-row;
+   multi-row literals would extend the check to every row.
+
+   Precondition: [check_columns_match] and [check_row_arity] have passed,
+   so every name in [literal_columns] resolves in [target_schema.fields]
+   and the lists are the same length. *)
+let check_value_kinds ~target_table ~(target_schema : Schema.t) ~literal_columns
+    ~first_row =
   List.iter2
     (fun column_name value ->
       let target_field =
@@ -370,6 +386,16 @@ let validate_literal_against_target ~target_table ~(target_schema : Schema.t)
              (Value.Kind.to_string target_field.kind)
              (Value.Kind.to_string actual_kind)))
     literal_columns first_row
+
+(* Run the three literal/target checks in the order the later ones depend
+   on the earlier ones: column-set agreement, then row arity, then per-
+   column kinds. Each helper raises [Failure] on its own contract; this
+   orchestrator just sequences them. *)
+let validate_literal_against_target ~target_table ~target_schema
+    ~literal_columns ~first_row =
+  check_columns_match ~target_table ~target_schema ~literal_columns;
+  check_row_arity ~target_table ~literal_columns ~first_row;
+  check_value_kinds ~target_table ~target_schema ~literal_columns ~first_row
 
 (* Run validation when the insert source is a [RelationLiteral]; pass through
    silently for any other source. Insert-from-query isn't a tested path in

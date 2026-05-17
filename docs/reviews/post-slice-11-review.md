@@ -224,7 +224,7 @@ Smaller: `term` (parser.ml:216-234) and `literal_value` (parser.ml:83-89)
 share the leading-character dispatch on `"`, `-`, digit, letter. A
 `literal_by_lookahead` helper would dry it up; not urgent.
 
-### `Translate.validate_literal_against_target` (translate.ml:307-347) — 41 lines, four invariants — **[open]**
+### `Translate.validate_literal_against_target` (translate.ml:307-347) — 41 lines, four invariants — **[done]**
 
 Four independent checks (missing columns, unknown columns, row arity,
 per-column kind), each its own `if ... failwith ...`. Splitting into
