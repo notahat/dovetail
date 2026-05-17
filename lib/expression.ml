@@ -33,16 +33,6 @@ let describe_expression = function
   | Or _ -> "or expression"
   | Not _ -> "not expression"
 
-(* Render a [Value.t] as a literal in source-like form: int64s as bare
-   digits, strings double-quoted with no escaping, bools as the keywords
-   [true] and [false]. Used by the pretty-printer; not intended to
-   round-trip through the parser (string escapes aren't handled). *)
-let render_literal = function
-  | Value.Int64 number -> Int64.to_string number
-  | Value.String text -> "\"" ^ text ^ "\""
-  | Value.Bool true -> "true"
-  | Value.Bool false -> "false"
-
 let render_op = function
   | Equal -> "="
   | NotEqual -> "<>"
@@ -92,7 +82,7 @@ let rec format_at min_precedence formatter expression =
     Format.fprintf formatter "(%a)" (format_at 0) expression
   else
     match expression with
-    | Literal value -> Format.pp_print_string formatter (render_literal value)
+    | Literal value -> Value.format formatter value
     | Column reference ->
         Format.pp_print_string formatter
           (Schema.format_column_reference reference)

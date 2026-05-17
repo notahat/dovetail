@@ -302,13 +302,6 @@ let project_to_target_order ~position_map source_tuple =
        (fun source_position -> source_tuple.(source_position))
        position_map)
 
-(* Render a [Value.t] inline for an error message. Strings are quoted so
-   the boundary is visible; numbers and booleans render bare. *)
-let render_value_for_error : Value.t -> string = function
-  | Int64 number -> Int64.to_string number
-  | String text -> Printf.sprintf "%S" text
-  | Bool flag -> string_of_bool flag
-
 (* Extract a human-readable string for the primary-key value of a tuple
    already projected to [target_schema]'s field order. Used only to build
    the PK-collision error message. *)
@@ -319,7 +312,7 @@ let primary_key_value_text (target_schema : Schema.t) target_tuple =
         Schema.find_field target_schema
           { qualifier = None; name = primary_key_name }
       with
-      | Ok (position, _field) -> render_value_for_error target_tuple.(position)
+      | Ok (position, _field) -> Value.to_string target_tuple.(position)
       (* Internal invariant: by the time we're rendering an error for a row
          we just encoded, the PK column is in the schema. *)
       | Error _ -> assert false)

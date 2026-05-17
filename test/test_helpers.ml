@@ -143,16 +143,39 @@ let expected_orders_rows : Schema.tuple list =
     [| Value.Int64 6L; Value.Int64 5L; Value.String "Cookie"; Value.Int64 2L |];
   ]
 
-(** Alcotest testable for a list of [Schema.tuple]s. Polymorphic-equality based;
-    the printer is a placeholder because tuples don't have a natural one-line
-    rendering and the diff machinery isn't worth the weight here. *)
+(** Format a tuple's values using {!Value.format}, comma-separated and wrapped
+    in brackets. So {[Alcotest]} failure diffs read as
+    [\[1, "Alice", true\]] -- the boundaries between values are visible, the
+    kinds are distinguishable at a glance. *)
+let format_tuple formatter tuple =
+  Format.fprintf formatter "[";
+  Array.iteri
+    (fun index value ->
+      if index > 0 then Format.fprintf formatter ", ";
+      Value.format formatter value)
+    tuple;
+  Format.fprintf formatter "]"
+
+(** Format a list of tuples one per line, in input order. Alcotest's diff
+    machinery does a line-oriented comparison of the rendered strings, so
+    per-row newlines mean a mismatch shows up as a single-row delta rather than
+    the whole list. *)
+let format_tuple_list formatter tuples =
+  List.iter
+    (fun tuple -> Format.fprintf formatter "%a@\n" format_tuple tuple)
+    tuples
+
+(** Alcotest testable for a list of [Schema.tuple]s. Polymorphic-equality based.
+    The printer renders one tuple per line using {!Value.format} so failure
+    diffs surface the offending row rather than [\<tuples\> vs \<tuples\>]. *)
 let tuple_list_testable : Schema.tuple list Alcotest.testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuples>")) ( = )
+  Alcotest.testable format_tuple_list ( = )
 
 (** Alcotest testable for a [Physical.t]. Polymorphic-equality based; the
-    printer is a placeholder. Same reasoning as {!tuple_list_testable}. *)
+    printer is {!Physical.format}, so failure diffs show the EXPLAIN-style
+    operator tree for both expected and actual plans. *)
 let physical_testable : Physical.t Alcotest.testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<physical>")) ( = )
+  Alcotest.testable Physical.format ( = )
 
 (** Extract the relation sub-plan from a [Physical.plan] that is known to be a
     [Query]. The translate tests use this to keep their assertions focused on

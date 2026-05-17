@@ -376,7 +376,7 @@ Three patterns are reinvented across multiple test files:
 - **a stdin-from-a-list `input_line` shim**: in `test_repl.ml:8-15`
   and inlined in `doctest.ml:138-145`. Move to `test_helpers`.
 
-### Placeholder testables hurt failure diffs — **[open]**
+### Placeholder testables hurt failure diffs — **[done]**
 
 `test_helpers.ml:110-116` defines `tuple_list_testable` and
 `physical_testable` with placeholder printers (`<tuples>`,
@@ -403,7 +403,7 @@ masking a binary crash. Capture and assert `WEXITED 0`.
 
 ## Smaller items by file — **[open]** (entire section below the TL;DR cut)
 
-### `lib/value.ml`
+### `lib/value.ml` — **[done]**
 
 - The codebase has multiple per-module value renderers
   (`Kind.to_string`, `eval.ml:307-311 render_value_for_error`,

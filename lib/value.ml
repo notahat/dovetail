@@ -13,3 +13,11 @@ let kind_of = function
   | Int64 _ -> Kind.Int64
   | String _ -> Kind.String
   | Bool _ -> Kind.Bool
+
+let format formatter = function
+  | Int64 number -> Format.pp_print_string formatter (Int64.to_string number)
+  | String text -> Format.fprintf formatter "\"%s\"" text
+  | Bool true -> Format.pp_print_string formatter "true"
+  | Bool false -> Format.pp_print_string formatter "false"
+
+let to_string value = Format.asprintf "%a" format value

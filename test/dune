@@ -7,6 +7,7 @@
   test_encoding
   test_fixture
   test_schema
+  test_value
   test_relation
   test_eval_full_scan
   test_eval_filter

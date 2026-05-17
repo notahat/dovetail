@@ -260,12 +260,12 @@ let orders_schema : Schema.t =
 let orders_catalog table_name =
   if table_name = "orders" then Some orders_schema else None
 
-(* Alcotest testable for a [Physical.plan]. Polymorphic-equality based with a
-   placeholder printer, matching the convention {!physical_testable} uses for
-   bare relation trees. Used by the Mutation arm tests, which assert at the
-   plan level rather than peeking past a [Physical.Query] wrapper. *)
+(* Alcotest testable for a [Physical.plan]. Polymorphic-equality based; the
+   printer is {!Physical.format_plan}, so failure diffs show the EXPLAIN-style
+   plan rendering. Used by the Mutation arm tests, which assert at the plan
+   level rather than peeking past a [Physical.Query] wrapper. *)
 let physical_plan_testable : Physical.plan Alcotest.testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<physical-plan>")) ( = )
+  Alcotest.testable Physical.format_plan ( = )
 
 (* Build a [Logical.plan] that inserts a single-row literal into [table].
    [pairs] gives the column/value pairs in the order the test wants written;
