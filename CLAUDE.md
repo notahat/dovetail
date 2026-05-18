@@ -97,22 +97,25 @@ prefixes, so the library-alias form is the default.
 - OCaml 5.2 in a local opam switch at the project root. The switch's
   `bin/` is already on `PATH` in the shell, so `dune` and friends can be
   invoked directly — no `opam exec --` prefix needed.
-- Build: `dune build`. Tests: `dune test`. Format:
+- Single-shot commands (only when no watcher is running): build with
+  `dune build`, run tests with `dune test`, format with
   `dune build @fmt --auto-promote`.
-- For an interactive session, run `dune runtest --watch` in a separate
-  terminal before opening the editor. Dune keeps `_build/` artifacts
-  fresh on every save (so merlin/ocaml-lsp resolves cross-module
-  references correctly) and exposes an RPC socket at `_build/.rpc/dune`
-  that `ocaml-lsp-server` connects to for live compiler diagnostics.
-  Without watch mode, the editor LSP runs on stale artifacts and reports
-  phantom errors until something rebuilds.
-- When the watcher is running, ad-hoc `dune test` / `dune build @fmt`
-  invocations from another terminal forward to the watcher daemon and
-  hang (the watcher only does what it's configured to do, not what the
-  one-shot caller asked). `dune runtest --watch` runs the suite on every
-  save, so the watcher's terminal is the source of truth for test
-  results; format with `ocamlformat --inplace <file>` directly when the
-  in-editor PostToolUse hook is unavailable.
+- **Watcher is the default test loop.** Start `dune runtest -w` (short
+  for `--watch`) once as a long-lived background task; it rebuilds and
+  re-runs the test suite on every file save. It also keeps `_build/`
+  artifacts fresh so merlin/ocaml-lsp gets live diagnostics through the
+  RPC socket at `_build/.rpc/dune`; without watch mode the editor LSP
+  runs on stale artifacts and reports phantom errors.
+- **Claude must never run `dune test` / `dune build` / `dune build @fmt`
+  while the watcher is up.** Those one-shots forward to the watcher
+  daemon and hang (the daemon only does what it was configured to do,
+  not what the one-shot asked). Read test results from the watcher's
+  output instead; format with `ocamlformat --inplace <file>` directly
+  (the PostToolUse hook does this automatically on `.ml` / `.mli`
+  edits).
+- If the watcher is missing or dies, restart it the same way: one
+  backgrounded `dune runtest -w`. Do not start a second watcher or fall
+  back to ad-hoc `dune test` runs.
 - Run the formatter before considering a step done; it has opinions and
   will adjust line breaks and comment wrapping.
 - Test framework: `alcotest`. Parser library: `angstrom` (arrives in
