@@ -11,6 +11,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Ddl = Dovetail_ddl
 
 let users_schema : Schema.t =
   {
@@ -35,7 +36,8 @@ let test_execute_read_list_tables_returns_byte_sorted_names () =
       Catalog.put environment transaction ~table_name:"orders" orders_schema);
   Storage.with_read_transaction environment (fun transaction ->
       match
-        Ddl_executor.execute_read environment transaction Statement.List_tables
+        Ddl_executor.execute_read environment transaction
+          Ddl.Statement.List_tables
       with
       | Listed names ->
           Alcotest.(check (list string))
@@ -46,7 +48,8 @@ let test_execute_read_list_tables_on_empty_catalog () =
   with_environment dir @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
       match
-        Ddl_executor.execute_read environment transaction Statement.List_tables
+        Ddl_executor.execute_read environment transaction
+          Ddl.Statement.List_tables
       with
       | Listed names ->
           Alcotest.(check (list string))
@@ -72,7 +75,7 @@ let test_execute_write_drop_table_removes_catalog_and_storage () =
   Storage.with_write_transaction environment (fun transaction ->
       match
         Ddl_executor.execute_write environment transaction
-          (Statement.Drop_table { table_name = "users" })
+          (Ddl.Statement.Drop_table { table_name = "users" })
       with
       | Dropped name ->
           Alcotest.(check string) "result names the dropped table" "users" name);
@@ -94,7 +97,7 @@ let test_execute_write_drop_table_leaves_sibling_tables_untouched () =
   Storage.with_write_transaction environment (fun transaction ->
       let _result =
         Ddl_executor.execute_write environment transaction
-          (Statement.Drop_table { table_name = "users" })
+          (Ddl.Statement.Drop_table { table_name = "users" })
       in
       ());
   Storage.with_read_transaction environment (fun transaction ->
@@ -116,7 +119,7 @@ let test_execute_write_drop_table_no_such_table_raises () =
       Storage.with_write_transaction environment (fun transaction ->
           let _result =
             Ddl_executor.execute_write environment transaction
-              (Statement.Drop_table { table_name = "nonexistent" })
+              (Ddl.Statement.Drop_table { table_name = "nonexistent" })
           in
           ()));
   (* The aborted transaction must not have touched the seeded table. *)

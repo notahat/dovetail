@@ -1,5 +1,6 @@
 module Value = Dovetail_core.Value
 module Expression = Dovetail_core.Expression
+module Ddl = Dovetail_ddl
 
 type t =
   | Relation_name of string
@@ -11,4 +12,4 @@ type t =
 
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation
-type program = Pipeline of plan | Ddl of Statement.t
+type program = Pipeline of plan | Ddl of Ddl.Statement.t

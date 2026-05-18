@@ -3,6 +3,7 @@ module StringSet = Set.Make (String)
 module Value = Dovetail_core.Value
 module Schema = Dovetail_core.Schema
 module Expression = Dovetail_core.Expression
+module Ddl = Dovetail_ddl
 
 type error = string
 
@@ -385,11 +386,11 @@ let pipeline_parser =
    productions ([describe], [create]) slot in alongside these. *)
 let ddl_list_tables =
   keyword "list" *> whitespace *> keyword "tables"
-  *> return Statement.List_tables
+  *> return Ddl.Statement.List_tables
 
 let ddl_drop_table =
   keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
-  >>| fun table_name -> Statement.Drop_table { table_name }
+  >>| fun table_name -> Ddl.Statement.Drop_table { table_name }
 
 let ddl_body = ddl_list_tables <|> ddl_drop_table
 

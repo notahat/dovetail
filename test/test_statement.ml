@@ -6,17 +6,18 @@
     file pins only the read/write routing decision that drives transaction
     selection in the REPL. *)
 
-open Dovetail
+module Ddl = Dovetail_ddl
 
 let test_list_tables_classifies_as_read () =
   Alcotest.(check bool)
     "List_tables classifies as Read" true
-    (Statement.classify Statement.List_tables = `Read)
+    (Ddl.Statement.classify Ddl.Statement.List_tables = `Read)
 
 let test_drop_table_classifies_as_write () =
   Alcotest.(check bool)
     "Drop_table classifies as Write" true
-    (Statement.classify (Statement.Drop_table { table_name = "users" }) = `Write)
+    (Ddl.Statement.classify (Ddl.Statement.Drop_table { table_name = "users" })
+    = `Write)
 
 let () =
   Alcotest.run "statement"

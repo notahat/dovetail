@@ -9,8 +9,8 @@
     pipeline -- query or mutation), or a {!Ddl} (a data-definition statement
     such as [:list tables]). The {!Pipeline} arm carries an {!plan}, which is
     itself either a {!Query} or a {!Mutation}; the {!Ddl} arm carries a
-    {!Statement.t}. The two universes meet only at this top-level wrapper: DDL
-    doesn't pass through {!Lower} / {!Translate} / {!Physical} / {!Eval}, so
+    {!Ddl.Statement.t}. The two universes meet only at this top-level wrapper:
+    DDL doesn't pass through {!Lower} / {!Translate} / {!Physical} / {!Eval}, so
     those layers see only the {!plan} that lives inside {!Pipeline}.
 
     The inner {!plan} wrapper enforces "a sink terminates a pipeline"
@@ -19,6 +19,7 @@
 
 module Value = Dovetail_core.Value
 module Expression = Dovetail_core.Expression
+module Ddl = Dovetail_ddl
 
 type t =
   | Relation_name of string
@@ -88,7 +89,7 @@ type program =
           surface language has accepted up to slice 11. Threaded through
           {!Lower.lower}, {!Translate.translate}, and {!Eval.eval} or
           {!Eval.eval_mutation} as appropriate. *)
-  | Ddl of Statement.t
+  | Ddl of Ddl.Statement.t
       (** [Ddl statement] is the data-definition universe, marked at the surface
           by the leading [:] sigil. {!Lower}, {!Translate}, and the physical
           layers know nothing of DDL; the REPL hands the statement straight to

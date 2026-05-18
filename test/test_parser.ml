@@ -3,6 +3,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Ddl = Dovetail_ddl
 
 let ast_program_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )
@@ -410,31 +411,31 @@ let test_pipeline_rejects_two_sinks () =
    parse error rather than an embedded DDL statement. *)
 
 let test_ddl_list_tables_parses () =
-  parses_program ":list tables" (Ast.Ddl Statement.List_tables)
+  parses_program ":list tables" (Ast.Ddl Ddl.Statement.List_tables)
 
 let test_ddl_list_tables_tolerates_leading_whitespace () =
-  parses_program "   :list tables" (Ast.Ddl Statement.List_tables)
+  parses_program "   :list tables" (Ast.Ddl Ddl.Statement.List_tables)
 
 let test_ddl_list_tables_tolerates_whitespace_after_sigil () =
-  parses_program ":   list tables" (Ast.Ddl Statement.List_tables)
+  parses_program ":   list tables" (Ast.Ddl Ddl.Statement.List_tables)
 
 let test_ddl_list_tables_tolerates_extra_whitespace_between_keywords () =
-  parses_program ":list    tables" (Ast.Ddl Statement.List_tables)
+  parses_program ":list    tables" (Ast.Ddl Ddl.Statement.List_tables)
 
 let test_ddl_list_tables_tolerates_trailing_whitespace () =
-  parses_program ":list tables    " (Ast.Ddl Statement.List_tables)
+  parses_program ":list tables    " (Ast.Ddl Ddl.Statement.List_tables)
 
 let test_ddl_drop_table_parses () =
   parses_program ":drop table users"
-    (Ast.Ddl (Statement.Drop_table { table_name = "users" }))
+    (Ast.Ddl (Ddl.Statement.Drop_table { table_name = "users" }))
 
 let test_ddl_drop_table_tolerates_extra_whitespace () =
   parses_program ":drop    table    users"
-    (Ast.Ddl (Statement.Drop_table { table_name = "users" }))
+    (Ast.Ddl (Ddl.Statement.Drop_table { table_name = "users" }))
 
 let test_ddl_drop_table_accepts_identifier_with_digits () =
   parses_program ":drop table users_2"
-    (Ast.Ddl (Statement.Drop_table { table_name = "users_2" }))
+    (Ast.Ddl (Ddl.Statement.Drop_table { table_name = "users_2" }))
 
 let test_ddl_drop_table_rejects_missing_target () = rejects ":drop table"
 let test_ddl_drop_table_rejects_missing_table_keyword () = rejects ":drop users"
