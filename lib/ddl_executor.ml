@@ -1,5 +1,16 @@
 module Ddl = Dovetail_ddl
 
+(* Look up [table_name] in the catalog and return its schema wrapped in
+   [Described]. The catalog-aware "no such table" check happens here so
+   the user-facing error names the operation they typed; the [DDL:
+   describe ...] prefix matches the slice-13 reframe convention. *)
+let describe_table environment transaction table_name :
+    Ddl.Statement.read_result =
+  match Catalog.get environment transaction ~table_name with
+  | Some schema -> Described { table_name; schema }
+  | None ->
+      failwith (Printf.sprintf "DDL: describe %S: no such table" table_name)
+
 let execute_read environment transaction :
     Ddl.Statement.t -> Ddl.Statement.read_result = function
   | List_tables -> Listed (Catalog.list_table_names environment transaction)
@@ -8,10 +19,7 @@ let execute_read environment transaction :
          statements; the REPL must classify and route them to
          execute_write. *)
       assert false
-  | Describe _ ->
-      (* Slice 14 step 4a fills this in. The parser does not admit
-         [:describe] until step 4b, so this arm is unreachable today. *)
-      assert false
+  | Describe { table_name } -> describe_table environment transaction table_name
 
 (* Drop both halves of [table_name] (catalog entry and storage subDB)
    inside the caller's write transaction. The catalog-aware "no such

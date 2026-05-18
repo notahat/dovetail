@@ -61,6 +61,37 @@ let test_execute_read_list_tables_on_empty_catalog () =
           (* List_tables produces Listed, never Described. *)
           assert false)
 
+let test_execute_read_describe_returns_stored_schema () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.with_write_transaction environment (fun transaction ->
+      Catalog.put environment transaction ~table_name:"users" users_schema);
+  Storage.with_read_transaction environment (fun transaction ->
+      match
+        Ddl_executor.execute_read environment transaction
+          (Ddl.Statement.Describe { table_name = "users" })
+      with
+      | Described { table_name; schema } ->
+          Alcotest.(check string)
+            "result names the described table" "users" table_name;
+          Alcotest.(check schema_testable)
+            "result carries the stored schema" users_schema schema
+      | Listed _ ->
+          (* Describe produces Described, never Listed. *)
+          assert false)
+
+let test_execute_read_describe_no_such_table_raises () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Alcotest.check_raises "no such table raises Failure with DDL: prefix"
+    (Failure "DDL: describe \"nonexistent\": no such table") (fun () ->
+      Storage.with_read_transaction environment (fun transaction ->
+          let _result =
+            Ddl_executor.execute_read environment transaction
+              (Ddl.Statement.Describe { table_name = "nonexistent" })
+          in
+          ()))
+
 (* Seed [environment] with a single table named [table_name]: a catalog
    entry under [schema] and a storage subDB with one row, so Drop_table
    has both halves to remove. The row contents are irrelevant -- the
@@ -146,6 +177,10 @@ let () =
             test_execute_read_list_tables_returns_byte_sorted_names;
           Alcotest.test_case "List_tables on empty catalog returns []" `Quick
             test_execute_read_list_tables_on_empty_catalog;
+          Alcotest.test_case "Describe returns the stored schema" `Quick
+            test_execute_read_describe_returns_stored_schema;
+          Alcotest.test_case "Describe on a missing table raises Failure" `Quick
+            test_execute_read_describe_no_such_table_raises;
         ] );
       ( "execute_write",
         [
