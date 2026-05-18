@@ -96,12 +96,20 @@ let print_ddl_write_result ~output = function
       assert false
 
 (* Execute a DDL statement against [environment] and write the rendered
-   result to [output]. The classifier picks the transaction kind, mirroring
-   the [Logical.classify] split above for pipelines; [Failure] raised
-   inside [execute_write] aborts the in-flight transaction and lands in
-   the [error: ...] line, sharing the contract used by pipelines. *)
+   result to [output]. Structural checks via [Statement.validate] run
+   before the transaction opens, so a failing validate never pays the
+   writer-lock cost for an error it could surface earlier. The classifier
+   then picks the transaction kind, mirroring the [Logical.classify] split
+   above for pipelines; [Failure] raised inside the validate step or
+   inside [execute_*] lands in the [error: ...] line through the shared
+   guard. *)
 let execute_and_print_ddl environment ~output statement =
   try
+    let () =
+      match Ddl.Statement.validate statement with
+      | Ok () -> ()
+      | Error message -> failwith message
+    in
     match Ddl.Statement.classify statement with
     | `Read ->
         Storage.with_read_transaction environment (fun transaction ->

@@ -206,6 +206,59 @@ let test_describe_nonexistent_table_reports_error_and_continues () =
   check_contains "loop continues after describe error" output "users";
   check_contains "loop continues after describe error" output "orders"
 
+(* Slice 14 step 6: [Statement.validate] runs between parse and the
+   transaction. Three of the five validate rules are reachable from the
+   REPL -- the other two (empty column list, empty primary key list) are
+   ungrammatical at the parser, so the validator's checks for them are
+   defensive only and stand covered by the per-rule tests in
+   [test/ddl/test_statement.ml]. Each REPL-level test feeds an offending
+   [:create table] line, asserts the rendered [error: DDL: ...] string
+   verbatim, and then runs [:list tables] to confirm the offending table
+   never reached the catalog. *)
+
+let test_create_table_duplicate_column_reports_validate_error () =
+  let output =
+    run_with_input
+      [
+        ":create table widgets (id: Int64, id: String) primary key (id)";
+        ":list tables";
+      ]
+  in
+  check_contains "duplicate-column validate error" output
+    "error: DDL: create table \"widgets\": column \"id\" appears twice";
+  Alcotest.(check bool)
+    "widgets not listed after validate error" false
+    (contains_substring output "\nwidgets\n")
+
+let test_create_table_primary_key_unknown_column_reports_validate_error () =
+  let output =
+    run_with_input
+      [
+        ":create table widgets (id: Int64, name: String) primary key (xyz)";
+        ":list tables";
+      ]
+  in
+  check_contains "unknown-pk-column validate error" output
+    "error: DDL: create table \"widgets\": primary key column \"xyz\" not in \
+     column list";
+  Alcotest.(check bool)
+    "widgets not listed after validate error" false
+    (contains_substring output "\nwidgets\n")
+
+let test_create_table_duplicate_primary_key_column_reports_validate_error () =
+  let output =
+    run_with_input
+      [
+        ":create table widgets (id: Int64) primary key (id, id)"; ":list tables";
+      ]
+  in
+  check_contains "duplicate-pk-column validate error" output
+    "error: DDL: create table \"widgets\": primary key column \"id\" appears \
+     twice";
+  Alcotest.(check bool)
+    "widgets not listed after validate error" false
+    (contains_substring output "\nwidgets\n")
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -257,6 +310,19 @@ let () =
           Alcotest.test_case
             ":describe on a missing table reports the error and continues"
             `Quick test_describe_nonexistent_table_reports_error_and_continues;
+          Alcotest.test_case
+            ":create table with a duplicate column reports a validate error"
+            `Quick test_create_table_duplicate_column_reports_validate_error;
+          Alcotest.test_case
+            ":create table whose primary key names an unknown column reports a \
+             validate error"
+            `Quick
+            test_create_table_primary_key_unknown_column_reports_validate_error;
+          Alcotest.test_case
+            ":create table whose primary key repeats a column reports a \
+             validate error"
+            `Quick
+            test_create_table_duplicate_primary_key_column_reports_validate_error;
         ] );
       ( "mutation rendering",
         [
