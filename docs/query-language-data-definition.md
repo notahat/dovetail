@@ -88,7 +88,8 @@ transaction: the catalog entry and the storage backing the rows
 are created together. On success the REPL prints a status line
 naming the created table. The example below creates `widgets`,
 inspects it via `:list tables` and `:describe widgets`, then drops
-it so subsequent sections see a fixture-only catalog:
+it so subsequent sections see the same example-table catalog the
+section started with:
 
 ```
 > :create table widgets (id: Int64, name: String) primary key (id)
@@ -159,11 +160,10 @@ continues, so a follow-up statement still runs:
 error: DDL: drop table "nonexistent": no such table
 ```
 
-The fixture re-seeds `users` and `orders` on the next REPL startup
-*only when the catalog entry is missing*. So a dropped fixture
-table reappears after a restart; but a user-created table that
-happens to share a fixture name (e.g. `:create table users (id:
-Int64) primary key (id)` after dropping the fixture `users`)
-survives, because the catalog entry is no longer missing. The
-fixture will retire entirely once a future slice replaces it with
-DDL-driven seeding.
+A dropped table stays dropped: restarting the REPL does not bring
+it back. Launching the REPL again with `--demo-data` re-seeds the
+example tables only when *both* `users` and `orders` are absent
+from the catalog -- the flag is a one-shot bootstrap rather than
+a per-table top-up. So after dropping a single example table, the
+way to get it back is `:create table` (and per-row inserts), not a
+relaunch with the flag.

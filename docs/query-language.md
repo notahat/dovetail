@@ -11,8 +11,8 @@ not assume you've read any of Dovetail's source.
 
 The guide is in several parts:
 
-- This file -- launching the REPL and the shape of the fixture
-  every example reads against.
+- This file -- launching the REPL and the shape of the example
+  tables every example reads against.
 - [Tutorial](query-language-tutorial.md) -- one query grown stage
   by stage, introducing each operator in turn.
 - [Pipeline operators reference](query-language-pipeline-operators.md)
@@ -30,13 +30,15 @@ The guide is in several parts:
 Build the binary, then launch it against a data directory:
 
 ```
-./dovetail dovetail-data
+./dovetail [--demo-data] dovetail-data
 ```
 
 The REPL prints a `> ` prompt, reads one query per line, and pretty-
 prints the resulting rows as a Unicode-bordered table. `Ctrl-D`
-exits. The data directory is created if it doesn't exist and is
-seeded with the fixture tables described below.
+exits. The data directory is created if it doesn't exist; pass
+`--demo-data` on first launch to seed the example tables described
+below. Re-running with `--demo-data` against an already-seeded data
+directory is a no-op, so it's safe to include in a shell alias.
 
 A first query: every row of the `users` table.
 
@@ -51,11 +53,13 @@ A first query: every row of the `users` table.
 │        5 │ Eve        │ eve@example.com   │ false        │
 ```
 
-## The fixture
+## The example tables
 
-The REPL boots with two small tables, used by every example in this
-guide. Knowing them up front saves jumping back and forth as you
-read later sections.
+The examples in this guide query against two small tables, `users`
+and `orders`, created by `--demo-data`. Knowing them up front saves
+jumping back and forth as you read later sections. The schemas and
+rows are documented here in prose; the `--demo-data` flag is what
+puts them in your data directory.
 
 ### `users`
 

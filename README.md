@@ -21,6 +21,7 @@ opam exec -- dune test               # run all alcotest suites
 opam exec -- dune build @fmt --auto-promote   # format
 ./dovetail                           # run the REPL (default env: ./dovetail-data)
 ./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
+./dovetail --demo-data /tmp/play     # ...or seed the example tables on first launch
 ```
 
 `./dovetail` is a small wrapper around `opam exec -- dune exec dovetail`
@@ -31,9 +32,10 @@ conventions.
 
 ## Query language
 
-The REPL queries a fixture with two tables, `users` and `orders`.
-Pipeline operators (`restrict`, `project`, `cross`, `join`) compose
-with `|`, and the canonical multi-operator query joins them and
+Launched with `--demo-data`, the REPL seeds two example tables,
+`users` and `orders`, for queries to read against. Pipeline
+operators (`restrict`, `project`, `cross`, `join`) compose with
+`|`, and the canonical multi-operator query joins them and
 projects:
 
 ```
@@ -91,9 +93,10 @@ The storage stack sits below it, used by `Eval` and the catalog.
                                                   LMDB
 ```
 
-`Fixture` sits beside `Catalog` and the storage stack, populating
-hardcoded `users` and `orders` tables on first run. Once DDL/DML
-lands in a later slice it goes away.
+`Demo_data` sits beside `Catalog` and the storage stack, seeding
+the example `users` and `orders` tables through the public DDL/DML
+surface when the binary is launched with `--demo-data`. Production
+runs ship no hardcoded rows; the seeder is opt-in.
 
 ## Layers
 
@@ -147,9 +150,12 @@ pinned down when that slice starts.
    Adds `Ddl.validate` (structural rules: empty column list,
    duplicate columns, PK references), the canonical-form printer,
    and the catalog write path for new tables.
-3. **Slice 15 — Fixture retirement.** Removes `lib/fixture.ml` and
-   migrates tests off the seeded `users`/`orders` tables. Held back
-   until `create table` exists to replace the fixture's role.
+3. **Slice 15 — Fixture retirement.** Retires `lib/fixture.ml`: the
+   REPL now boots empty by default, with a `--demo-data` flag that
+   seeds the example `users`/`orders` tables through the public
+   DDL/DML surface. The fixture relocates into `test/helpers/` for
+   unit tests that need a low-level seeder independent of DDL/DML
+   correctness.
 4. **Slice 16 — Full sub-library setup.** Extracts the remaining
    libraries — `storage`, `plan`, `surface_ra`, `execution`, `frontend` —
    completing the dune restructure designed in

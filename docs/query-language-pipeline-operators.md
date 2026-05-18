@@ -2,7 +2,8 @@
 
 Part of the [query-language guide](query-language.md). One
 subsection per pipeline operator: syntax, semantics, and a single
-worked example against the fixture. For a narrative introduction,
+worked example against the example tables. For a narrative
+introduction,
 see the [tutorial](query-language-tutorial.md); for the expression
 and projection sublanguages that appear inside `restrict`,
 `project`, and the `on` clause of `join`, see the

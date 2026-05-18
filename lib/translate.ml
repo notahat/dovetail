@@ -402,11 +402,9 @@ let validate_literal_against_target ~target_table ~target_schema
   check_value_kinds ~target_table ~target_schema ~literal_columns ~first_row
 
 (* Run validation when the insert source is a [RelationLiteral]; pass through
-   silently for any other source. Insert-from-query isn't a tested path in
-   slice 11 (no DDL means fixture PKs would always collide), but the design
-   keeps the sink source-agnostic, so non-literal sources translate without
-   shape-level checks here -- the sink itself enforces column coverage at
-   eval time. *)
+   silently for any other source. Non-literal sources aren't a tested path
+   yet, but the sink stays source-agnostic by design -- the sink itself
+   enforces column coverage at eval time. *)
 let validate_mutation_source ~target_table ~target_schema (source : Logical.t) =
   match source with
   | RelationLiteral { columns; rows } -> (

@@ -6,9 +6,9 @@ built the canonical multi-operator query -- a join with a trailing
 projection -- and seen enough of the pipeline shape to make the
 operator reference feel familiar.
 
-Every query reads against the fixture described in the
-[guide overview](query-language.md#the-fixture), so you can compare
-each transformation to what came before.
+Every query reads against the example tables described in the
+[guide overview](query-language.md#the-example-tables), so you can
+compare each transformation to what came before.
 
 ## Start with a table
 

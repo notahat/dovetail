@@ -42,12 +42,13 @@ let drop_table environment transaction table_name : Ddl.Statement.write_result =
 
 (* Build the [Schema.t] that a [Create_table] statement should write into
    the catalog. The DDL surface has no qualifier on its [field] type, so
-   the executor stamps [Some table_name] onto every field -- matching the
-   shape that fixture-seeded schemas carry, which the rest of the read
-   path expects. Field order and primary-key order are preserved exactly
-   as the user typed them; [Statement.validate] is responsible for the
-   structural checks (non-empty lists, no duplicates, PK columns drawn
-   from the field list) and is expected to have run already. *)
+   the executor stamps [Some table_name] onto every field -- this is the
+   shape the read path expects, and the rest of the catalog (including
+   tests' low-level seeders) matches it. Field order and primary-key
+   order are preserved exactly as the user typed them;
+   [Statement.validate] is responsible for the structural checks
+   (non-empty lists, no duplicates, PK columns drawn from the field
+   list) and is expected to have run already. *)
 let schema_of_create_fields ~table_name (fields : Ddl.Statement.field list)
     ~primary_key : Schema.t =
   let schema_fields =
