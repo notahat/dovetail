@@ -1,5 +1,16 @@
 #!/bin/sh
-# Convenience wrapper: build (as needed) and run the dovetail REPL via the
-# local opam switch. Forwards any arguments to the binary, so a custom
-# LMDB data directory can be passed: `./dovetail /tmp/dovetail-play`.
-exec opam exec -- dune exec dovetail -- "$@"
+# Convenience wrapper: exec the prebuilt dovetail REPL. Forwards any
+# arguments to the binary, so a custom LMDB data directory can be
+# passed: `./dovetail /tmp/dovetail-play`.
+#
+# The wrapper deliberately does NOT build: the dune watcher (`dune
+# runtest -w`) is the default test/build loop and keeps the artifact
+# fresh. A `dune exec` step here would forward to the watcher daemon
+# and hang. If you really have no watcher running, build first with
+# `dune build` then re-run.
+artifact="$(dirname "$0")"/_build/default/bin/main.exe
+if [ ! -x "$artifact" ]; then
+  echo "dovetail: $artifact not built. Start the watcher or run \`dune build\` first." >&2
+  exit 1
+fi
+exec "$artifact" "$@"
