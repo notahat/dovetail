@@ -4,8 +4,8 @@
     [execute_read] on [List_tables] (happy path and the empty-catalog edge), and
     [execute_write] on [Drop_table] (catalog and storage state after a
     successful drop, sibling tables untouched, and the catalog-aware "no such
-    table" error). [Ddl.execute_write] is reached directly here rather than
-    through the REPL so the failure-mode assertions can pin both the raised
+    table" error). [Ddl_executor.execute_write] is reached directly here rather
+    than through the REPL so the failure-mode assertions can pin both the raised
     wording and the post-abort state in one place. *)
 
 open Dovetail
@@ -43,7 +43,9 @@ let test_execute_read_list_tables_returns_byte_sorted_names () =
       Catalog.put environment transaction ~table_name:"users" users_schema;
       Catalog.put environment transaction ~table_name:"orders" orders_schema);
   Storage.with_read_transaction environment (fun transaction ->
-      match Ddl.execute_read environment transaction Statement.List_tables with
+      match
+        Ddl_executor.execute_read environment transaction Statement.List_tables
+      with
       | Listed names ->
           Alcotest.(check (list string))
             "byte-sorted table names" [ "orders"; "users" ] names)
@@ -52,7 +54,9 @@ let test_execute_read_list_tables_on_empty_catalog () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
-      match Ddl.execute_read environment transaction Statement.List_tables with
+      match
+        Ddl_executor.execute_read environment transaction Statement.List_tables
+      with
       | Listed names ->
           Alcotest.(check (list string))
             "empty list when catalog absent" [] names)
@@ -76,7 +80,7 @@ let test_execute_write_drop_table_removes_catalog_and_storage () =
   seed_table environment ~table_name:"users" users_schema;
   Storage.with_write_transaction environment (fun transaction ->
       match
-        Ddl.execute_write environment transaction
+        Ddl_executor.execute_write environment transaction
           (Statement.Drop_table { table_name = "users" })
       with
       | Dropped name ->
@@ -98,7 +102,7 @@ let test_execute_write_drop_table_leaves_sibling_tables_untouched () =
   seed_table environment ~table_name:"orders" orders_schema;
   Storage.with_write_transaction environment (fun transaction ->
       let _result =
-        Ddl.execute_write environment transaction
+        Ddl_executor.execute_write environment transaction
           (Statement.Drop_table { table_name = "users" })
       in
       ());
@@ -116,11 +120,11 @@ let test_execute_write_drop_table_no_such_table_raises () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   seed_table environment ~table_name:"users" users_schema;
-  Alcotest.check_raises "no such table raises Failure with module prefix"
-    (Failure "Ddl: drop table \"nonexistent\": no such table") (fun () ->
+  Alcotest.check_raises "no such table raises Failure with DDL: prefix"
+    (Failure "DDL: drop table \"nonexistent\": no such table") (fun () ->
       Storage.with_write_transaction environment (fun transaction ->
           let _result =
-            Ddl.execute_write environment transaction
+            Ddl_executor.execute_write environment transaction
               (Statement.Drop_table { table_name = "nonexistent" })
           in
           ()));

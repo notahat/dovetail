@@ -93,17 +93,17 @@ let execute_and_print_ddl environment ~output statement =
     | `Read ->
         Storage.with_read_transaction environment (fun transaction ->
             print_ddl_read_result ~output
-              (Ddl.execute_read environment transaction statement))
+              (Ddl_executor.execute_read environment transaction statement))
     | `Write ->
         Storage.with_write_transaction environment (fun transaction ->
             print_ddl_write_result ~output
-              (Ddl.execute_write environment transaction statement))
+              (Ddl_executor.execute_write environment transaction statement))
   with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Process one input line: parse, dispatch on the program universe (a
    relational pipeline goes through Lower / Translate / Eval; a DDL
-   statement goes straight to [Ddl.execute_*]), print. Parse and eval
-   errors land in [output]; nothing is raised. *)
+   statement goes straight to [Ddl_executor.execute_*]), print. Parse and
+   eval errors land in [output]; nothing is raised. *)
 let process_line environment ~output ~show_physical line =
   match Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message

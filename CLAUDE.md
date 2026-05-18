@@ -49,11 +49,17 @@ underlying tool's vocabulary.
 
 ## Error messages
 
-- Every user-facing error string starts with a module prefix:
-  `Module: detail` or `Module: operation: detail` when the operation is
-  worth naming (`Translate: insert into "orders": ...`,
+- Every user-facing error string starts with a prefix that names the
+  user-facing concept the error belongs to: `Prefix: detail` or
+  `Prefix: operation: detail` when the operation is worth naming
+  (`Translate: insert into "orders": ...`,
   `Eval: insert into "orders": ...`, `Projection.resolve: ...`,
-  `Schema.assemble_tuple: ...`).
+  `Schema.assemble_tuple: ...`, `DDL: drop table "orders": ...`). The
+  prefix usually matches a module name, since the user-facing concept
+  and the module that implements it usually line up. When they don't —
+  e.g. `Ddl_executor` is implementation detail, but the user typed a
+  `:` DDL statement and is in "DDL land" — the prefix names the
+  user-facing concept (`DDL:`), not the module.
 - Prefer `failwith` for user-reachable failures; reserve
   `invalid_arg` for argument-shape precondition violations that callers
   could and should have prevented (e.g. `assemble_tuple`'s length checks).

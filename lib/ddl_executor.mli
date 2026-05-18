@@ -1,10 +1,10 @@
 (** Executor for data-definition statements.
 
-    [Ddl] is the catalog-touching twin of {!Eval}: it takes a {!Statement.t} and
-    runs it against the {!Storage} environment, returning the matching
-    {!Statement.read_result} or {!Statement.write_result}. The AST it consumes
-    lives in {!Statement} — the split keeps the AST vocabulary free of any
-    storage dependency.
+    [Ddl_executor] is the catalog-touching twin of {!Eval}: it takes a
+    {!Statement.t} and runs it against the {!Storage} environment, returning the
+    matching {!Statement.read_result} or {!Statement.write_result}. The AST it
+    consumes lives in {!Statement} — the split keeps the AST vocabulary free of
+    any storage dependency.
 
     The REPL is responsible for routing: it asks {!Statement.classify} for the
     transaction permission, opens the corresponding transaction kind, and calls

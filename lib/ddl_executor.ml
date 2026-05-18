@@ -18,7 +18,7 @@ let drop_table environment transaction table_name : Statement.write_result =
   (match Catalog.get environment transaction ~table_name with
   | Some _ -> ()
   | None ->
-      failwith (Printf.sprintf "Ddl: drop table %S: no such table" table_name));
+      failwith (Printf.sprintf "DDL: drop table %S: no such table" table_name));
   Storage.drop_map environment transaction
     ~name:(Catalog.table_subdb_name table_name);
   Catalog.delete environment transaction ~table_name;

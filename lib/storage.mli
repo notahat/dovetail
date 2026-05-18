@@ -58,8 +58,9 @@ val drop_map :
 (** [drop_map environment transaction ~name] destroys the named subDB, including
     every key it holds. Raises [Invalid_argument] if no subDB by that name
     exists: this is a precondition the caller is expected to have enforced (e.g.
-    {!Ddl.execute_write}'s catalog-aware "no such table" check before reaching
-    the storage primitive). Must be called inside a read-write transaction. *)
+    {!Ddl_executor.execute_write}'s catalog-aware "no such table" check before
+    reaching the storage primitive). Must be called inside a read-write
+    transaction. *)
 
 val put :
   map -> [ `Read | `Write ] transaction -> key:string -> value:string -> unit
@@ -74,8 +75,8 @@ val delete : map -> [ `Read | `Write ] transaction -> key:string -> unit
 (** [delete map transaction ~key] removes [key] from [map]. A no-op if [key] is
     not bound, mirroring [get]'s tolerance of an absent key: callers that
     require an existence check are expected to perform it themselves (the
-    catalog-aware "no such table" check inside {!Ddl.execute_write} is the
-    motivating example). Must be called inside a read-write transaction. *)
+    catalog-aware "no such table" check inside {!Ddl_executor.execute_write} is
+    the motivating example). Must be called inside a read-write transaction. *)
 
 val with_iter_seq :
   map -> [> `Read ] transaction -> ((string * string) Seq.t -> 'a) -> 'a

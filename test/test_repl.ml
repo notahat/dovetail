@@ -125,8 +125,8 @@ let test_insert_into_orders_writes_row_and_reports_status () =
   check_contains "inserted row's id column" output " 9 "
 
 (* Slice 12 step 3: [:list tables] runs through Parser → REPL DDL
-   dispatch → Ddl.execute_read → Catalog.list_table_names and prints
-   each table name on its own line. The fixture seeds [users] and
+   dispatch → Ddl_executor.execute_read → Catalog.list_table_names and
+   prints each table name on its own line. The fixture seeds [users] and
    [orders]; cursor (byte-sorted) order puts [orders] first. *)
 let test_list_tables_prints_fixture_tables_in_byte_sorted_order () =
   let output = run_with_input [ ":list tables" ] in
@@ -170,13 +170,13 @@ let test_drop_table_removes_table_and_reports_status () =
     (contains_substring output "\nusers\n")
 
 (* The "no such table" error path: dropping an unseeded table raises in
-   [Ddl.execute_write], the REPL catches it via its generic error guard,
-   prints the failure with the [Ddl: drop table ...: no such table]
+   [Ddl_executor.execute_write], the REPL catches it via its generic error
+   guard, prints the failure with the [DDL: drop table ...: no such table]
    prefix, and continues so the follow-up query still executes. *)
 let test_drop_nonexistent_table_reports_error_and_continues () =
   let output = run_with_input [ ":drop table nonexistent"; ":list tables" ] in
   check_contains "no-such-table error" output
-    "Ddl: drop table \"nonexistent\": no such table";
+    "DDL: drop table \"nonexistent\": no such table";
   check_contains "loop continues after drop error" output "users";
   check_contains "loop continues after drop error" output "orders"
 

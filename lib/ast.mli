@@ -89,4 +89,4 @@ type program =
       (** [Ddl statement] is the data-definition universe, marked at the surface
           by the leading [:] sigil. {!Lower}, {!Translate}, and the physical
           layers know nothing of DDL; the REPL hands the statement straight to
-          {!Ddl.execute_read} or {!Ddl.execute_write}. *)
+          {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}. *)

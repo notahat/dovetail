@@ -55,7 +55,7 @@ continues, so a follow-up statement still runs:
 
 ```
 > :drop table nonexistent
-error: Ddl: drop table "nonexistent": no such table
+error: DDL: drop table "nonexistent": no such table
 ```
 
 The fixture re-seeds `users` and `orders` on the next REPL startup
