@@ -73,6 +73,78 @@ let test_of_schema_strips_qualifiers () =
     "of_schema produces Create_table with stripped qualifiers" true
     (Ddl.Statement.of_schema ~table_name:"users" users_schema = expected)
 
+(* Build a [Create_table] statement for [table_name] with the given [fields]
+   and [primary_key]. The fields default to the well-formed [(id: Int64,
+   name: String)] pair so per-test overrides only need to spell out the
+   shape they are exercising. *)
+let make_create_table ?(table_name = "widgets")
+    ?(fields : Ddl.Statement.field list =
+      [
+        { name = "id"; kind = Value.Kind.Int64 };
+        { name = "name"; kind = Value.Kind.String };
+      ]) ?(primary_key = [ "id" ]) () : Ddl.Statement.t =
+  Create_table { table_name; fields; primary_key }
+
+let validate_result = Alcotest.result Alcotest.unit Alcotest.string
+
+let test_validate_well_formed_create_table_returns_ok () =
+  Alcotest.(check validate_result)
+    "well-formed Create_table is Ok ()" (Ok ())
+    (Ddl.Statement.validate (make_create_table ()))
+
+let test_validate_rejects_empty_column_list () =
+  Alcotest.(check validate_result)
+    "empty column list is rejected"
+    (Error "DDL: create table \"widgets\": column list is empty")
+    (Ddl.Statement.validate
+       (make_create_table ~fields:[] ~primary_key:[ "id" ] ()))
+
+let test_validate_rejects_duplicate_column () =
+  Alcotest.(check validate_result)
+    "duplicate column is rejected"
+    (Error "DDL: create table \"widgets\": column \"email\" appears twice")
+    (Ddl.Statement.validate
+       (make_create_table
+          ~fields:
+            [
+              { name = "id"; kind = Value.Kind.Int64 };
+              { name = "email"; kind = Value.Kind.String };
+              { name = "email"; kind = Value.Kind.String };
+            ]
+          ~primary_key:[ "id" ] ()))
+
+let test_validate_rejects_empty_primary_key () =
+  Alcotest.(check validate_result)
+    "empty primary key is rejected"
+    (Error "DDL: create table \"widgets\": primary key is empty")
+    (Ddl.Statement.validate (make_create_table ~primary_key:[] ()))
+
+let test_validate_rejects_primary_key_column_not_in_fields () =
+  Alcotest.(check validate_result)
+    "primary key column missing from column list is rejected"
+    (Error
+       "DDL: create table \"widgets\": primary key column \"missing\" not in \
+        column list")
+    (Ddl.Statement.validate (make_create_table ~primary_key:[ "missing" ] ()))
+
+let test_validate_rejects_duplicate_primary_key_column () =
+  Alcotest.(check validate_result)
+    "duplicate primary key column is rejected"
+    (Error
+       "DDL: create table \"widgets\": primary key column \"id\" appears twice")
+    (Ddl.Statement.validate (make_create_table ~primary_key:[ "id"; "id" ] ()))
+
+let test_validate_passes_non_create_table_constructors () =
+  Alcotest.(check validate_result)
+    "List_tables is Ok ()" (Ok ())
+    (Ddl.Statement.validate Ddl.Statement.List_tables);
+  Alcotest.(check validate_result)
+    "Drop_table is Ok ()" (Ok ())
+    (Ddl.Statement.validate (Ddl.Statement.Drop_table { table_name = "users" }));
+  Alcotest.(check validate_result)
+    "Describe is Ok ()" (Ok ())
+    (Ddl.Statement.validate (Ddl.Statement.Describe { table_name = "users" }))
+
 let () =
   Alcotest.run "statement"
     [
@@ -92,5 +164,22 @@ let () =
           Alcotest.test_case
             "of_schema produces Create_table with stripped qualifiers" `Quick
             test_of_schema_strips_qualifiers;
+        ] );
+      ( "validate",
+        [
+          Alcotest.test_case "well-formed Create_table is Ok ()" `Quick
+            test_validate_well_formed_create_table_returns_ok;
+          Alcotest.test_case "empty column list is rejected" `Quick
+            test_validate_rejects_empty_column_list;
+          Alcotest.test_case "duplicate column in column list is rejected"
+            `Quick test_validate_rejects_duplicate_column;
+          Alcotest.test_case "empty primary key is rejected" `Quick
+            test_validate_rejects_empty_primary_key;
+          Alcotest.test_case "primary key column not in column list is rejected"
+            `Quick test_validate_rejects_primary_key_column_not_in_fields;
+          Alcotest.test_case "duplicate primary key column is rejected" `Quick
+            test_validate_rejects_duplicate_primary_key_column;
+          Alcotest.test_case "non-Create_table constructors are Ok ()" `Quick
+            test_validate_passes_non_create_table_constructors;
         ] );
     ]

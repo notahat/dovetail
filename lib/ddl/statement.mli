@@ -93,6 +93,23 @@ val classify : t -> [ `Read | `Write ]
     afterwards. The two dispatch decisions read off the same constructor, so
     they cannot drift. *)
 
+val validate : t -> (unit, string) result
+(** [validate statement] runs the structural checks that depend only on
+    [statement] itself: no catalog access, no transaction. For a [Create_table],
+    five rules are checked in order and the first failure short-circuits the
+    rest:
+
+    + the column list is non-empty;
+    + no column name is repeated in the column list;
+    + the primary-key list is non-empty;
+    + every primary-key column names a field in the column list;
+    + no primary-key column is repeated in the primary-key list.
+
+    All other constructors return [Ok ()]. Errors are formatted as
+    [DDL: create table "<name>": <detail>] and are intended to be raised at the
+    REPL between parse and transaction so structural failures do not pay the
+    cost of a writer-lock acquisition. *)
+
 val of_schema : table_name:string -> Schema.t -> t
 (** [of_schema ~table_name schema] adapts a stored [Schema.t] into a
     [Create_table]-shaped statement: per-field qualifiers are stripped, the
