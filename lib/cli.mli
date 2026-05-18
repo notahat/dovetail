@@ -5,11 +5,17 @@
     any position, and an optional positional environment path. Two flags or two
     paths is a usage error. *)
 
-type options = { show_physical : bool; environment_path : string }
+type options = {
+  show_physical : bool;
+  demo_data : bool;
+  environment_path : string;
+}
 (** Parsed argument set. [environment_path] is the directory the LMDB
     environment lives in; it defaults to {!default_environment_path} when no
     positional argument is given. [show_physical] becomes [true] only when
-    [--show-physical] appears in the argument list. *)
+    [--show-physical] appears in the argument list. [demo_data] becomes [true]
+    only when [--demo-data] appears in the argument list; the binary uses it to
+    decide whether to seed the example tables on boot. *)
 
 val default_environment_path : string
 (** Path used when no positional argument is supplied -- a sibling directory of
@@ -18,6 +24,10 @@ val default_environment_path : string
 val show_physical_flag : string
 (** The literal flag string [--show-physical], exposed so callers and tests
     don't have to restate it. *)
+
+val demo_data_flag : string
+(** The literal flag string [--demo-data], exposed so the binary's usage line
+    can render it without restating the spelling. *)
 
 val parse : string list -> (options, string) result
 (** [parse arguments] walks [arguments] -- the argv list with the program name

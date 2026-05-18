@@ -12,12 +12,14 @@ open Test_helpers
 let binary_path = "../bin/main.exe"
 
 (** Run [binary_path] with [environment_path] as its argument, sending
-    [stdin_text] as standard input. Returns the captured stdout as a string.
-    Asserts the binary exited cleanly (code 0); on non-zero, signal, or stop,
-    fails the test with stderr included so the failure mode is visible. *)
+    [stdin_text] as standard input. The [--demo-data] flag is passed so the
+    example tables are seeded before the REPL takes over -- this test fixes the
+    binary's read path against known rows. Returns the captured stdout as a
+    string. Asserts the binary exited cleanly (code 0); on non-zero, signal, or
+    stop, fails the test with stderr included so the failure mode is visible. *)
 let run_binary ~environment_path ~stdin_text =
   let environment_variables = Unix.environment () in
-  let argv = [| binary_path; environment_path |] in
+  let argv = [| binary_path; "--demo-data"; environment_path |] in
   let stdout_chan, stdin_chan, stderr_chan =
     Unix.open_process_args_full binary_path argv environment_variables
   in
