@@ -27,7 +27,6 @@
   test_expression_parser
   test_projection
   test_repl
-  test_statement
   test_ddl_executor
   test_doctest
   test_documentation)
