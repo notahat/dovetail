@@ -392,7 +392,11 @@ let ddl_drop_table =
   keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
   >>| fun table_name -> Ddl.Statement.Drop_table { table_name }
 
-let ddl_body = ddl_list_tables <|> ddl_drop_table
+let ddl_describe =
+  keyword "describe" *> whitespace *> identifier >>| fun table_name ->
+  Ddl.Statement.Describe { table_name }
+
+let ddl_body = ddl_list_tables <|> ddl_drop_table <|> ddl_describe
 
 (* The top-level grammar: optional leading whitespace, then dispatch on the
    first non-whitespace character. A leading [:] introduces a DDL statement

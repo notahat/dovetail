@@ -180,6 +180,32 @@ let test_drop_nonexistent_table_reports_error_and_continues () =
   check_contains "loop continues after drop error" output "users";
   check_contains "loop continues after drop error" output "orders"
 
+(* Slice 14 step 4b end-to-end: [:describe <name>] parses, classifies
+   as a read, looks the schema up in the catalog inside a read
+   transaction, and prints the canonical form via [Format.statement] on
+   the [Statement.of_schema] adapter. The fixture seeds [users] with
+   four fields and a single-column primary key, so the output matches
+   the design doc's canonical form verbatim. *)
+let test_describe_prints_canonical_form_for_fixture_table () =
+  let output = run_with_input [ ":describe users" ] in
+  check_contains ":describe canonical form" output
+    ":create table users (\n\
+    \  id: Int64,\n\
+    \  name: String,\n\
+    \  email: String,\n\
+    \  active: Bool,\n\
+     ) primary key (id)"
+
+(* The "no such table" error path for describe: the executor raises with
+   the [DDL: describe ...: no such table] prefix, the REPL catches it
+   via its generic error guard, and the loop continues. *)
+let test_describe_nonexistent_table_reports_error_and_continues () =
+  let output = run_with_input [ ":describe nonexistent"; ":list tables" ] in
+  check_contains "no-such-table error" output
+    "DDL: describe \"nonexistent\": no such table";
+  check_contains "loop continues after describe error" output "users";
+  check_contains "loop continues after describe error" output "orders"
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -225,6 +251,12 @@ let () =
           Alcotest.test_case
             ":drop table on a missing table reports the error and continues"
             `Quick test_drop_nonexistent_table_reports_error_and_continues;
+          Alcotest.test_case
+            ":describe prints the canonical form for a fixture table" `Quick
+            test_describe_prints_canonical_form_for_fixture_table;
+          Alcotest.test_case
+            ":describe on a missing table reports the error and continues"
+            `Quick test_describe_nonexistent_table_reports_error_and_continues;
         ] );
       ( "mutation rendering",
         [

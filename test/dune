@@ -28,6 +28,7 @@
   test_projection
   test_repl
   test_ddl_executor
+  test_ddl_roundtrip
   test_doctest
   test_documentation)
  (libraries alcotest dovetail dovetail.core dovetail.ddl test_helpers unix)

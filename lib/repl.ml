@@ -73,14 +73,16 @@ let evaluate_and_print environment ~output ~show_physical logical_plan =
 
 (* Render the result of a read-only DDL statement to [output]. [Listed] is
    one table name per line, in cursor order; an empty catalog produces no
-   output (the prompt that follows the call sits immediately after). *)
+   output (the prompt that follows the call sits immediately after).
+   [Described] prints the schema in canonical form via [Format.statement]
+   on the [Statement.of_schema] adapter -- the same canonical form a
+   future [:create table] takes, so the round-trip property holds. *)
 let print_ddl_read_result ~output = function
   | Ddl.Statement.Listed names ->
       List.iter (fun name -> Format.fprintf output "%s@." name) names
-  | Ddl.Statement.Described _ ->
-      (* Routing invariant: the parser does not admit [:describe] until
-         slice 14 step 4b wires the renderer in. *)
-      assert false
+  | Ddl.Statement.Described { table_name; schema } ->
+      Format.fprintf output "%s@."
+        (Ddl.Format.statement (Ddl.Statement.of_schema ~table_name schema))
 
 (* Render the result of a write DDL statement to [output]. [Dropped] is
    the single status line [dropped table "<name>"]; quoting is explicit so
