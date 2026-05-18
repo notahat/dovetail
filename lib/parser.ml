@@ -381,11 +381,12 @@ let pipeline_parser =
    body and the second branch tries from the same position. Future
    productions ([describe], [create]) slot in alongside these. *)
 let ddl_list_tables =
-  keyword "list" *> whitespace *> keyword "tables" *> return Ddl.List_tables
+  keyword "list" *> whitespace *> keyword "tables"
+  *> return Statement.List_tables
 
 let ddl_drop_table =
   keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
-  >>| fun table_name -> Ddl.Drop_table { table_name }
+  >>| fun table_name -> Statement.Drop_table { table_name }
 
 let ddl_body = ddl_list_tables <|> ddl_drop_table
 

@@ -1,10 +1,5 @@
-type statement = List_tables | Drop_table of { table_name : string }
-type read_result = Listed of string list
-type write_result = Dropped of string
-
-let classify = function List_tables -> `Read | Drop_table _ -> `Write
-
-let execute_read environment transaction = function
+let execute_read environment transaction : Statement.t -> Statement.read_result
+    = function
   | List_tables -> Listed (Catalog.list_table_names environment transaction)
   | Drop_table _ ->
       (* Routing invariant: Drop_table is a write statement; the REPL
@@ -19,7 +14,7 @@ let execute_read environment transaction = function
    behind under a still-present catalog binding -- LMDB makes the pair
    atomic in normal operation, but the ordering is defensive against any
    future code path that splits the commit boundary. *)
-let drop_table environment transaction table_name =
+let drop_table environment transaction table_name : Statement.write_result =
   (match Catalog.get environment transaction ~table_name with
   | Some _ -> ()
   | None ->
@@ -29,7 +24,8 @@ let drop_table environment transaction table_name =
   Catalog.delete environment transaction ~table_name;
   Dropped table_name
 
-let execute_write environment transaction = function
+let execute_write environment transaction :
+    Statement.t -> Statement.write_result = function
   | List_tables ->
       (* Routing invariant: List_tables is a read statement; the REPL
          must classify and route it to execute_read. *)

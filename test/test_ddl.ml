@@ -29,12 +29,12 @@ let schema_testable =
 let test_list_tables_classifies_as_read () =
   Alcotest.(check bool)
     "List_tables classifies as Read" true
-    (Ddl.classify Ddl.List_tables = `Read)
+    (Statement.classify Statement.List_tables = `Read)
 
 let test_drop_table_classifies_as_write () =
   Alcotest.(check bool)
     "Drop_table classifies as Write" true
-    (Ddl.classify (Ddl.Drop_table { table_name = "users" }) = `Write)
+    (Statement.classify (Statement.Drop_table { table_name = "users" }) = `Write)
 
 let test_execute_read_list_tables_returns_byte_sorted_names () =
   with_temp_dir @@ fun dir ->
@@ -43,7 +43,7 @@ let test_execute_read_list_tables_returns_byte_sorted_names () =
       Catalog.put environment transaction ~table_name:"users" users_schema;
       Catalog.put environment transaction ~table_name:"orders" orders_schema);
   Storage.with_read_transaction environment (fun transaction ->
-      match Ddl.execute_read environment transaction Ddl.List_tables with
+      match Ddl.execute_read environment transaction Statement.List_tables with
       | Listed names ->
           Alcotest.(check (list string))
             "byte-sorted table names" [ "orders"; "users" ] names)
@@ -52,7 +52,7 @@ let test_execute_read_list_tables_on_empty_catalog () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Storage.with_read_transaction environment (fun transaction ->
-      match Ddl.execute_read environment transaction Ddl.List_tables with
+      match Ddl.execute_read environment transaction Statement.List_tables with
       | Listed names ->
           Alcotest.(check (list string))
             "empty list when catalog absent" [] names)
@@ -77,7 +77,7 @@ let test_execute_write_drop_table_removes_catalog_and_storage () =
   Storage.with_write_transaction environment (fun transaction ->
       match
         Ddl.execute_write environment transaction
-          (Ddl.Drop_table { table_name = "users" })
+          (Statement.Drop_table { table_name = "users" })
       with
       | Dropped name ->
           Alcotest.(check string) "result names the dropped table" "users" name);
@@ -99,7 +99,7 @@ let test_execute_write_drop_table_leaves_sibling_tables_untouched () =
   Storage.with_write_transaction environment (fun transaction ->
       let _result =
         Ddl.execute_write environment transaction
-          (Ddl.Drop_table { table_name = "users" })
+          (Statement.Drop_table { table_name = "users" })
       in
       ());
   Storage.with_read_transaction environment (fun transaction ->
@@ -121,7 +121,7 @@ let test_execute_write_drop_table_no_such_table_raises () =
       Storage.with_write_transaction environment (fun transaction ->
           let _result =
             Ddl.execute_write environment transaction
-              (Ddl.Drop_table { table_name = "nonexistent" })
+              (Statement.Drop_table { table_name = "nonexistent" })
           in
           ()));
   (* The aborted transaction must not have touched the seeded table. *)

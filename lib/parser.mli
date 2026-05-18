@@ -23,7 +23,7 @@ type error = string
 val parse : string -> (Ast.program, error) result
 (** [parse input] parses [input] as a complete top-level program. The result is
     an {!Ast.program}: either an {!Ast.Pipeline} carrying an {!Ast.plan} (a
-    relational pipeline) or an {!Ast.Ddl} carrying a {!Ddl.statement} (a
+    relational pipeline) or an {!Ast.Ddl} carrying a {!Statement.t} (a
     data-definition statement introduced by the leading [:] sigil).
 
     The pipeline grammar enforces structurally that a sink terminates a pipeline

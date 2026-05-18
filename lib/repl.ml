@@ -72,14 +72,14 @@ let evaluate_and_print environment ~output ~show_physical logical_plan =
    one table name per line, in cursor order; an empty catalog produces no
    output (the prompt that follows the call sits immediately after). *)
 let print_ddl_read_result ~output = function
-  | Ddl.Listed names ->
+  | Statement.Listed names ->
       List.iter (fun name -> Format.fprintf output "%s@." name) names
 
 (* Render the result of a write DDL statement to [output]. [Dropped] is
    the single status line [dropped table "<name>"]; quoting is explicit so
    the wording matches the slice-12 spec regardless of identifier shape. *)
 let print_ddl_write_result ~output = function
-  | Ddl.Dropped table_name ->
+  | Statement.Dropped table_name ->
       Format.fprintf output "dropped table \"%s\"@." table_name
 
 (* Execute a DDL statement against [environment] and write the rendered
@@ -89,7 +89,7 @@ let print_ddl_write_result ~output = function
    the [error: ...] line, sharing the contract used by pipelines. *)
 let execute_and_print_ddl environment ~output statement =
   try
-    match Ddl.classify statement with
+    match Statement.classify statement with
     | `Read ->
         Storage.with_read_transaction environment (fun transaction ->
             print_ddl_read_result ~output

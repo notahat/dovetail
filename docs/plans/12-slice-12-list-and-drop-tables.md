@@ -97,7 +97,7 @@ Validation policy:
 - All other failures (malformed input, unknown statement, sigil
   mid-pipeline) are parse errors.
 - No structural validation in this slice — neither statement has a
-  body to check. `Ddl.validate` arrives in slice 13 with `create
+  body to check. `Ddl.validate` arrives in slice 14 with `create
   table`'s structural rules.
 
 ## Slice-12 architectural decisions
@@ -238,7 +238,7 @@ Rejected:
 ### Result types split, mirroring execute
 
 `read_result` and `write_result` are separate types rather than a
-single `Ddl.result` variant. Each grows additively in slice 13:
+single `Ddl.result` variant. Each grows additively in slice 14:
 `read_result` gains `Described of Schema.t`; `write_result` gains
 `Created of string`. The split keeps the renderers in the REPL
 shaped along the same axis as the execute entry points.
@@ -251,7 +251,7 @@ in the catalog" for drop — is catalog-aware, so it lives inside
 `execute_write` (where it shares scope with the mutation, ruling
 out TOCTOU races by sharing the write transaction).
 
-`Ddl.validate` arrives in slice 13 alongside `create table`, which
+`Ddl.validate` arrives in slice 14 alongside `create table`, which
 introduces real structural rules (empty column list, duplicate
 column names, PK references columns not in the list, etc.) that
 are catalog-independent and worth running before opening any
@@ -265,7 +265,7 @@ slice 11's `format_mutation_status` in `Repl`:
 - `Listed names` → one name per line via `Format.fprintf`.
 - `Dropped name` → `dropped table "<name>"`.
 
-When slice 13 lands `describe`, the canonical-form printer is part
+When slice 14 lands `describe`, the canonical-form printer is part
 of the DDL surface (not the REPL — its output is literally
 re-executable as `:create table ...`), so the formatters migrate
 to a `Ddl_format` module (or into `Ddl` directly). For slice 12
@@ -500,7 +500,7 @@ structure a doctest block that creates-then-drops within itself.
 Address when we get there.
 
 README — layer tables and roadmap update wait until the full DDL
-surface is in place to describe (end of slice 13 or 14).
+surface is in place to describe (end of slice 14 or 15).
 
 ## Verification
 
@@ -527,11 +527,11 @@ dune build @fmt --auto-promote` leaves the tree clean.
 
 ## Out of scope
 
-- **`describe` and `create table`.** Slice 13, paired so the
+- **`describe` and `create table`.** Slice 14, paired so the
   round-trip property `parse(format(s)) ≡ s` lands in one PR.
-- **`Ddl.validate`.** Arrives in slice 13 with `create table`'s
+- **`Ddl.validate`.** Arrives in slice 14 with `create table`'s
   structural rules.
-- **Fixture retirement.** Slice 14, once `create table` exists to
+- **Fixture retirement.** Slice 15, once `create table` exists to
   replace the seeded tables.
 - **`if exists` / `if not exists` idempotency clauses.** Pure
   ergonomics; additive when scripts become a real story.
@@ -539,7 +539,7 @@ dune build @fmt --auto-promote` leaves the tree clean.
   per the DDL design doc.
 - **`Ddl_format` module.** The canonical-form printer lives in the
   REPL for slice 12 because list/drop output is trivial; migrates
-  to its own module when slice 13's `describe` lands.
+  to its own module when slice 14's `describe` lands.
 - **Multi-statement input, explicit transactions.** Already on the
   Beyond list in the README.
 - **Update and delete (the slice-11 deferrals).** Currently on the

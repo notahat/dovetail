@@ -8,4 +8,4 @@ type t =
 
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation
-type program = Pipeline of plan | Ddl of Ddl.statement
+type program = Pipeline of plan | Ddl of Statement.t
