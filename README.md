@@ -133,23 +133,31 @@ lands in a later slice it goes away.
 ### Next up
 
 Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
-sub-steps; the ordering here is firm, but the scope of slice 15 will be
+sub-steps; the ordering here is firm, but the scope of slice 17 will be
 pinned down when that slice starts.
 
-1. **Slice 12 — DDL part 1: list and drop tables.** Introduces the
-   `:` sigil for DDL statements, the `Ast.program` wrapper, the `Ddl`
-   module, and the REPL dispatch arm. Ships `:list tables` and
-   `:drop table <name>`. Storage and catalog gain primitives for key
-   deletion, subDB deletion, and table-name enumeration.
-2. **Slice 13 — DDL part 2: describe and create table.** Paired so
+1. **Slice 13 — DDL and library prep.** Splits the current `lib/ddl.ml`
+   into `Statement` (AST + result types + classifier) and `Ddl_executor`
+   (the catalog-touching half), then extracts `core` and `ddl` as the
+   first two dune sub-libraries. Preparatory work for slice 14's growth
+   of the DDL surface and slice 16's full library restructure. See
+   [`docs/plans/library-structure.md`](docs/plans/library-structure.md).
+2. **Slice 14 — DDL part 2: describe and create table.** Paired so
    the round-trip property `parse(format(s)) ≡ s` lands in one PR.
    Adds `Ddl.validate` (structural rules: empty column list,
    duplicate columns, PK references), the canonical-form printer,
    and the catalog write path for new tables.
-3. **Slice 14 — Fixture retirement.** Removes `lib/fixture.ml` and
+3. **Slice 15 — Fixture retirement.** Removes `lib/fixture.ml` and
    migrates tests off the seeded `users`/`orders` tables. Held back
    until `create table` exists to replace the fixture's role.
-4. **Slice 15 — Minimal SQL frontend.** A second front-end — SQL
+4. **Slice 16 — Full sub-library setup.** Extracts the remaining
+   libraries — `storage`, `plan`, `surface_ra`, `execution`, `frontend` —
+   completing the dune restructure designed in
+   [`docs/plans/library-structure.md`](docs/plans/library-structure.md).
+   Lands ahead of the SQL frontend so the second surface slots into the
+   existing shape rather than forcing a restructure under feature
+   pressure.
+5. **Slice 17 — Minimal SQL frontend.** A second front-end — SQL
    parser, SQL AST, SQL→logical lowering — feeding the existing logical
    and physical IRs. Deliberately limited (no NULLs, scope otherwise
    TBD): the focus is on how the architecture splits between two
