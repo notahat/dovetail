@@ -115,6 +115,13 @@ prefixes, so the library-alias form is the default.
   output instead; format with `ocamlformat --inplace <file>` directly
   (the PostToolUse hook does this automatically on `.ml` / `.mli`
   edits).
+- **Running the binary while the watcher is up: bypass `dune exec`.**
+  The `./dovetail` wrapper script and any `dune exec dovetail` call
+  fail with `Program 'dovetail' not found!` because the watcher
+  already holds dune's instance lock. Run the artifact directly:
+  `_build/default/bin/main.exe [--demo-data] [<env-path>]`. The
+  watcher keeps it fresh on every save, so no separate build step
+  is needed.
 - **Waiting for the watcher to finish a rebuild.** The watcher ends
   every rebuild — green or red — with `Success, waiting for filesystem
   changes...` or `Had N errors, waiting for filesystem changes...`,
