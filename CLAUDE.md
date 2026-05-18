@@ -113,6 +113,22 @@ prefixes, so the library-alias form is the default.
   output instead; format with `ocamlformat --inplace <file>` directly
   (the PostToolUse hook does this automatically on `.ml` / `.mli`
   edits).
+- **Waiting for the watcher to finish a rebuild.** The watcher ends
+  every rebuild — green or red — with `Success, waiting for filesystem
+  changes...` or `Had N errors, waiting for filesystem changes...`.
+  The reliable signal that the rebuild triggered by an edit has settled
+  is that the count of `waiting for filesystem` lines in the watcher's
+  output file has advanced by one past a pre-edit baseline.
+  `scripts/wait-for-watcher.sh <log> <baseline>` does exactly that and
+  prints the tail of the log on completion. Capture the baseline
+  *before* the edit:
+
+      before=$(grep -c "waiting for filesystem" "$LOG")
+      # ... edits happen here ...
+      scripts/wait-for-watcher.sh "$LOG" "$before"   # run_in_background
+
+  Do not use generic `Monitor` timeouts or fixed `sleep`s for this --
+  the script returns the moment the watcher prints the sentinel.
 - If the watcher is missing or dies, restart it the same way: one
   backgrounded `dune runtest -w`. Do not start a second watcher or fall
   back to ad-hoc `dune test` runs.
