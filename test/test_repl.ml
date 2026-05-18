@@ -207,14 +207,36 @@ let test_describe_nonexistent_table_reports_error_and_continues () =
   check_contains "loop continues after describe error" output "orders"
 
 (* Slice 14 step 6: [Statement.validate] runs between parse and the
-   transaction. Three of the five validate rules are reachable from the
-   REPL -- the other two (empty column list, empty primary key list) are
-   ungrammatical at the parser, so the validator's checks for them are
-   defensive only and stand covered by the per-rule tests in
-   [test/ddl/test_statement.ml]. Each REPL-level test feeds an offending
-   [:create table] line, asserts the rendered [error: DDL: ...] string
-   verbatim, and then runs [:list tables] to confirm the offending table
-   never reached the catalog. *)
+   transaction. All five validate rules are reachable from the REPL --
+   the empty-list cases were promoted from "ungrammatical at the parser"
+   to "validate error" in a later step so the user sees the friendly
+   [DDL: create table ...] message rather than angstrom's raw [satisfy:
+   ')'] surface. Each REPL-level test feeds an offending [:create table]
+   line, asserts the rendered [error: DDL: ...] string verbatim, and
+   then runs [:list tables] to confirm the offending table never reached
+   the catalog. *)
+
+let test_create_table_empty_column_list_reports_validate_error () =
+  let output =
+    run_with_input
+      [ ":create table widgets () primary key (id)"; ":list tables" ]
+  in
+  check_contains "empty-column-list validate error" output
+    "error: DDL: create table \"widgets\": column list is empty";
+  Alcotest.(check bool)
+    "widgets not listed after validate error" false
+    (contains_substring output "\nwidgets\n")
+
+let test_create_table_empty_primary_key_list_reports_validate_error () =
+  let output =
+    run_with_input
+      [ ":create table widgets (id: Int64) primary key ()"; ":list tables" ]
+  in
+  check_contains "empty-primary-key-list validate error" output
+    "error: DDL: create table \"widgets\": primary key is empty";
+  Alcotest.(check bool)
+    "widgets not listed after validate error" false
+    (contains_substring output "\nwidgets\n")
 
 let test_create_table_duplicate_column_reports_validate_error () =
   let output =
@@ -357,6 +379,14 @@ let () =
           Alcotest.test_case
             ":describe on a missing table reports the error and continues"
             `Quick test_describe_nonexistent_table_reports_error_and_continues;
+          Alcotest.test_case
+            ":create table with an empty column list reports a validate error"
+            `Quick test_create_table_empty_column_list_reports_validate_error;
+          Alcotest.test_case
+            ":create table with an empty primary key list reports a validate \
+             error"
+            `Quick
+            test_create_table_empty_primary_key_list_reports_validate_error;
           Alcotest.test_case
             ":create table with a duplicate column reports a validate error"
             `Quick test_create_table_duplicate_column_reports_validate_error;

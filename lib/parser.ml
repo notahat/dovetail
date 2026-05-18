@@ -418,29 +418,36 @@ let create_table_field =
   ({ name = field_name; kind = field_kind } : Ddl.Statement.field)
 
 (* A comma-separated list of column declarations with an optional trailing
-   comma. At least one column is required -- the empty list is a parse
-   error rather than a validate error, so the grammar rules it out
-   without needing the post-parse check. Trailing commas line up with
-   how the canonical printer emits the column list (one comma per
-   field, including the last), so [parse (format s) = Ok (Ddl s)] holds
-   for [Create_table] values straight out of [Format.statement]. *)
+   comma. The empty list parses to [[]] -- the validator surfaces it as
+   [DDL: create table ...: column list is empty], which is friendlier
+   than angstrom's raw [satisfy: ')'] surface would be. Trailing commas
+   line up with how the canonical printer emits the column list (one
+   comma per field, including the last), so [parse (format s) = Ok (Ddl s)]
+   holds for [Create_table] values straight out of [Format.statement]. *)
 let create_table_field_list =
-  create_table_field >>= fun first_field ->
-  many (whitespace *> char ',' *> whitespace *> create_table_field)
-  >>= fun more_fields ->
-  whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
-  first_field :: more_fields
+  let nonempty =
+    create_table_field >>= fun first_field ->
+    many (whitespace *> char ',' *> whitespace *> create_table_field)
+    >>= fun more_fields ->
+    whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
+    first_field :: more_fields
+  in
+  nonempty <|> return []
 
 (* A comma-separated list of primary key column names with an optional
-   trailing comma. Shape mirrors {!create_table_field_list}: at least one
-   identifier required, trailing comma tolerated. The validator checks
-   that each name appears in the column list and that none repeats. *)
+   trailing comma. Shape mirrors {!create_table_field_list}: the empty
+   list parses to [[]] and the validator surfaces the friendly [DDL:
+   ...: primary key is empty] message. The validator also checks that
+   each name appears in the column list and that none repeats. *)
 let create_table_primary_key_list =
-  identifier >>= fun first_column ->
-  many (whitespace *> char ',' *> whitespace *> identifier)
-  >>= fun more_columns ->
-  whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
-  first_column :: more_columns
+  let nonempty =
+    identifier >>= fun first_column ->
+    many (whitespace *> char ',' *> whitespace *> identifier)
+    >>= fun more_columns ->
+    whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
+    first_column :: more_columns
+  in
+  nonempty <|> return []
 
 let ddl_create_table =
   keyword "create" *> whitespace *> keyword "table" *> whitespace *> identifier

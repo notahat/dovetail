@@ -589,11 +589,30 @@ let test_ddl_create_table_multiline_canonical_form_parses () =
 let test_ddl_create_table_rejects_unknown_kind () =
   rejects ":create table widgets (id: Int32) primary key (id)"
 
-let test_ddl_create_table_rejects_empty_column_list () =
-  rejects ":create table widgets () primary key (id)"
+(* An empty column list parses to a [Create_table] with [fields = []].
+   The grammar accepts it so the validator can produce a friendly
+   [DDL: create table ...: column list is empty] error rather than a
+   raw [parse error: satisfy: ...] from the angstrom field combinator. *)
+let test_ddl_create_table_empty_column_list_parses_with_empty_fields () =
+  parses_program ":create table widgets () primary key (id)"
+    (Ast.Ddl
+       (Ddl.Statement.Create_table
+          { table_name = "widgets"; fields = []; primary_key = [ "id" ] }))
 
-let test_ddl_create_table_rejects_empty_primary_key_list () =
-  rejects ":create table widgets (id: Int64) primary key ()"
+(* An empty primary-key list parses to a [Create_table] with
+   [primary_key = []]. Same rationale as the empty column list: the
+   validator's [primary key is empty] message is the user-friendly
+   path for this shape. *)
+let test_ddl_create_table_empty_primary_key_list_parses_with_empty_primary_key
+    () =
+  parses_program ":create table widgets (id: Int64) primary key ()"
+    (Ast.Ddl
+       (Ddl.Statement.Create_table
+          {
+            table_name = "widgets";
+            fields = [ { name = "id"; kind = Int64 } ];
+            primary_key = [];
+          }))
 
 let test_ddl_create_table_rejects_missing_primary_key_clause () =
   rejects ":create table widgets (id: Int64)"
@@ -867,11 +886,15 @@ let () =
             test_ddl_create_table_multiline_canonical_form_parses;
           Alcotest.test_case ":create table with an unknown kind rejects" `Quick
             test_ddl_create_table_rejects_unknown_kind;
-          Alcotest.test_case ":create table with an empty column list rejects"
-            `Quick test_ddl_create_table_rejects_empty_column_list;
           Alcotest.test_case
-            ":create table with an empty primary key list rejects" `Quick
-            test_ddl_create_table_rejects_empty_primary_key_list;
+            ":create table with an empty column list parses to fields = []"
+            `Quick
+            test_ddl_create_table_empty_column_list_parses_with_empty_fields;
+          Alcotest.test_case
+            ":create table with an empty primary key list parses to \
+             primary_key = []"
+            `Quick
+            test_ddl_create_table_empty_primary_key_list_parses_with_empty_primary_key;
           Alcotest.test_case
             ":create table without a primary key clause rejects" `Quick
             test_ddl_create_table_rejects_missing_primary_key_clause;

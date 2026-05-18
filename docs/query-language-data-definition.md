@@ -106,14 +106,18 @@ widgets
 dropped table "widgets"
 ```
 
-Structural checks run before any transaction opens. A duplicate
-column name, a primary-key column not in the field list, and a
-duplicate primary-key column each raise before the writer lock is
-acquired:
+Structural checks run before any transaction opens. An empty
+column list, a duplicate column name, an empty primary-key list,
+a primary-key column not in the field list, and a duplicate
+primary-key column each raise before the writer lock is acquired:
 
 ```
+> :create table widgets () primary key (id)
+error: DDL: create table "widgets": column list is empty
 > :create table widgets (id: Int64, id: String) primary key (id)
 error: DDL: create table "widgets": column "id" appears twice
+> :create table widgets (id: Int64) primary key ()
+error: DDL: create table "widgets": primary key is empty
 > :create table widgets (id: Int64, name: String) primary key (xyz)
 error: DDL: create table "widgets": primary key column "xyz" not in column list
 > :create table widgets (id: Int64) primary key (id, id)
