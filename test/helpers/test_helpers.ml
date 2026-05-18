@@ -67,6 +67,18 @@ let with_fixture_environment f =
   Fixture.populate_if_empty environment;
   f environment
 
+(** [with_demo_seeded_environment f] creates a temp directory, opens an LMDB
+    environment in it, seeds the demo tables through the surface DDL/DML path
+    via {!Demo_data.run}, runs [f environment], and tears everything down on
+    exit. Mirrors {!with_fixture_environment} but exercises the documentation
+    doctests through the same path users hit at the REPL with [--demo-data], so
+    a DDL or DML regression shows up in the doctest suite immediately. *)
+let with_demo_seeded_environment f =
+  with_temp_dir @@ fun directory ->
+  with_environment directory @@ fun environment ->
+  Demo_data.run environment;
+  f environment
+
 (** [with_captured_formatter write_to_formatter] runs [write_to_formatter]
     against a fresh buffered formatter, flushes it, and returns the captured
     string. The shape every test that compares formatted output (REPL

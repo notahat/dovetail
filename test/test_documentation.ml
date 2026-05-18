@@ -1,8 +1,11 @@
 (** End-to-end doctest verification for project markdown.
 
     Each markdown path in [verified_files] is parsed for REPL sessions, run
-    through {!Repl.run} against a fresh fixture-populated environment, and
-    asserted to match its documented expected output. *)
+    through {!Repl.run} against a fresh demo-data-seeded environment, and
+    asserted to match its documented expected output. The seeding goes through
+    the public DDL/DML surface (the same path the [--demo-data] flag exercises
+    at the binary), so a regression in DDL or DML lands as a doctest failure
+    here rather than passing silently against a low-level-seeded fixture. *)
 
 open Test_helpers
 
@@ -20,11 +23,11 @@ let verified_files =
     "../README.md";
   ]
 
-(** Verify one markdown file end to end: spin up a fresh environment, populate
-    the fixture, hand both off to {!Doctest.verify_file}, fail with a
+(** Verify one markdown file end to end: spin up a fresh environment, seed the
+    demo tables, hand both off to {!Doctest.verify_file}, fail with a
     descriptive error on any mismatch. *)
 let verify_one markdown_path () =
-  with_fixture_environment @@ fun environment ->
+  with_demo_seeded_environment @@ fun environment ->
   match Doctest.verify_file environment ~markdown_path with
   | Ok () -> ()
   | Error error -> Alcotest.fail (Doctest.format_error ~markdown_path error)
@@ -34,7 +37,8 @@ let () =
     List.map
       (fun markdown_path ->
         Alcotest.test_case
-          (Printf.sprintf "%s verifies clean against the fixture" markdown_path)
+          (Printf.sprintf "%s verifies clean against the demo-seeded env"
+             markdown_path)
           `Slow (verify_one markdown_path))
       verified_files
   in
