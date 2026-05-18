@@ -77,6 +77,10 @@ let evaluate_and_print environment ~output ~show_physical logical_plan =
 let print_ddl_read_result ~output = function
   | Ddl.Statement.Listed names ->
       List.iter (fun name -> Format.fprintf output "%s@." name) names
+  | Ddl.Statement.Described _ ->
+      (* Routing invariant: the parser does not admit [:describe] until
+         slice 14 step 4b wires the renderer in. *)
+      assert false
 
 (* Render the result of a write DDL statement to [output]. [Dropped] is
    the single status line [dropped table "<name>"]; quoting is explicit so
@@ -84,6 +88,10 @@ let print_ddl_read_result ~output = function
 let print_ddl_write_result ~output = function
   | Ddl.Statement.Dropped table_name ->
       Format.fprintf output "dropped table \"%s\"@." table_name
+  | Ddl.Statement.Created _ ->
+      (* Routing invariant: the parser does not admit [:create table] until
+         slice 14 step 5, and the renderer wires in at step 7b. *)
+      assert false
 
 (* Execute a DDL statement against [environment] and write the rendered
    result to [output]. The classifier picks the transaction kind, mirroring

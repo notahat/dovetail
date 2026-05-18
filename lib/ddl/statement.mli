@@ -13,14 +13,25 @@
     a future surface (SQL, scripting) can build {!t} values without pulling the
     executor in.
 
-    Slice 12 lands [List_tables] and [Drop_table] only. The remaining statements
-    ([Describe], [Create_table]) arrive in slice 14, paired so the round-trip
-    property [parse(format(s)) = s] lands in one PR.
+    Slice 12 landed [List_tables] and [Drop_table]. Slice 14 adds [Describe] and
+    [Create_table], paired so the round-trip property [parse(format(s)) = s]
+    lands in one PR; the canonical-form printer that pairs with the parser lives
+    in {!Dovetail_ddl.Format}.
 
     DDL does not pass through [Lower] / [Translate] / [Physical] / [Eval] —
     those layers carry no knowledge of DDL. The REPL classifies a statement,
     opens the matching transaction kind, and hands the statement straight to
     {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}. *)
+
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+
+type field = { name : string; kind : Value.Kind.t }
+(** A single column declaration in a [Create_table] statement. Deliberately
+    distinct from {!Schema.field}: the DDL surface has no notion of qualified
+    columns, so the qualifier is absent here. The parser resolves the kind name
+    ([Int64], [String], [Bool]) to a {!Value.Kind.t} at parse time, so every
+    [field] value already carries a real kind. *)
 
 type t =
   | List_tables
@@ -33,19 +44,45 @@ type t =
           single write transaction. The catalog-aware "no such table" check
           lives inside {!Ddl_executor.execute_write}, where it shares scope with
           the writes it guards. *)
+  | Describe of { table_name : string }
+      (** [Describe { table_name }] is the surface form [:describe <name>].
+          Reads the named table's schema from the catalog and returns it as a
+          {!read_result}. The REPL renders the result through
+          {!Dovetail_ddl.Format.statement} so the output round-trips through the
+          parser. The catalog-aware "no such table" check lives inside
+          {!Ddl_executor.execute_read}, where it shares scope with the read. *)
+  | Create_table of {
+      table_name : string;
+      fields : field list;
+      primary_key : string list;
+    }
+      (** [Create_table { table_name; fields; primary_key }] is the surface form
+          [:create table <name> (col: kind, ...) primary key (col, ...)].
+          Declares a new table: creates its storage subDB and writes its
+          [Schema.t] into the catalog, all inside a single write transaction.
+          The fields appear in declaration order; [primary_key] names columns
+          drawn from [fields], in key order. The catalog-aware "table already
+          exists" check lives inside {!Ddl_executor.execute_write}. *)
 
 type read_result =
   | Listed of string list
       (** A read DDL statement's outcome. [Listed names] is the result of
           [List_tables]: every table name from the catalog, in cursor
-          (byte-sorted) order. Slice 14 will add [Described of Schema.t] when
-          [:describe] lands. *)
+          (byte-sorted) order. *)
+  | Described of { table_name : string; schema : Schema.t }
+      (** [Described { table_name; schema }] is the result of [Describe]: the
+          schema bound to [table_name] in the catalog, returned alongside the
+          name itself. The name is carried explicitly so the renderer does not
+          have to recover it from per-field qualifiers — a recovery that would
+          be fragile if the catalog ever stored qualifier-less schemas. *)
 
 type write_result =
   | Dropped of string
       (** A write DDL statement's outcome. [Dropped table_name] is the result of
-          [Drop_table]: the name of the table that was removed. Slice 14 will
-          add [Created of string] when [:create table] lands. *)
+          [Drop_table]: the name of the table that was removed. *)
+  | Created of string
+      (** [Created table_name] is the result of [Create_table]: the name of the
+          table that was created. *)
 
 val classify : t -> [ `Read | `Write ]
 (** [classify statement] returns the transaction permission the REPL should open
@@ -55,3 +92,11 @@ val classify : t -> [ `Read | `Write ]
     to dispatch to {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}
     afterwards. The two dispatch decisions read off the same constructor, so
     they cannot drift. *)
+
+val of_schema : table_name:string -> Schema.t -> t
+(** [of_schema ~table_name schema] adapts a stored [Schema.t] into a
+    [Create_table]-shaped statement: per-field qualifiers are stripped, the
+    field order and primary-key order are preserved exactly, and [table_name] is
+    carried on the result. Used by the REPL renderer for [Described] to feed the
+    canonical-form printer, so that [:describe <name>] output is the
+    [:create table <name> (...)] that would reproduce the schema. *)

@@ -3,9 +3,14 @@ module Ddl = Dovetail_ddl
 let execute_read environment transaction :
     Ddl.Statement.t -> Ddl.Statement.read_result = function
   | List_tables -> Listed (Catalog.list_table_names environment transaction)
-  | Drop_table _ ->
-      (* Routing invariant: Drop_table is a write statement; the REPL
-         must classify and route it to execute_write. *)
+  | Drop_table _ | Create_table _ ->
+      (* Routing invariant: Drop_table and Create_table are write
+         statements; the REPL must classify and route them to
+         execute_write. *)
+      assert false
+  | Describe _ ->
+      (* Slice 14 step 4a fills this in. The parser does not admit
+         [:describe] until step 4b, so this arm is unreachable today. *)
       assert false
 
 (* Drop both halves of [table_name] (catalog entry and storage subDB)
@@ -28,8 +33,12 @@ let drop_table environment transaction table_name : Ddl.Statement.write_result =
 
 let execute_write environment transaction :
     Ddl.Statement.t -> Ddl.Statement.write_result = function
-  | List_tables ->
-      (* Routing invariant: List_tables is a read statement; the REPL
-         must classify and route it to execute_read. *)
+  | List_tables | Describe _ ->
+      (* Routing invariant: List_tables and Describe are read statements;
+         the REPL must classify and route them to execute_read. *)
       assert false
   | Drop_table { table_name } -> drop_table environment transaction table_name
+  | Create_table _ ->
+      (* Slice 14 step 7a fills this in. The parser does not admit
+         [:create table] until step 5, so this arm is unreachable today. *)
+      assert false

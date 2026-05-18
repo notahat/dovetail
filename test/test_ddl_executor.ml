@@ -41,7 +41,10 @@ let test_execute_read_list_tables_returns_byte_sorted_names () =
       with
       | Listed names ->
           Alcotest.(check (list string))
-            "byte-sorted table names" [ "orders"; "users" ] names)
+            "byte-sorted table names" [ "orders"; "users" ] names
+      | Described _ ->
+          (* List_tables produces Listed, never Described. *)
+          assert false)
 
 let test_execute_read_list_tables_on_empty_catalog () =
   with_temp_dir @@ fun dir ->
@@ -53,7 +56,10 @@ let test_execute_read_list_tables_on_empty_catalog () =
       with
       | Listed names ->
           Alcotest.(check (list string))
-            "empty list when catalog absent" [] names)
+            "empty list when catalog absent" [] names
+      | Described _ ->
+          (* List_tables produces Listed, never Described. *)
+          assert false)
 
 (* Seed [environment] with a single table named [table_name]: a catalog
    entry under [schema] and a storage subDB with one row, so Drop_table
@@ -78,7 +84,10 @@ let test_execute_write_drop_table_removes_catalog_and_storage () =
           (Ddl.Statement.Drop_table { table_name = "users" })
       with
       | Dropped name ->
-          Alcotest.(check string) "result names the dropped table" "users" name);
+          Alcotest.(check string) "result names the dropped table" "users" name
+      | Created _ ->
+          (* Drop_table produces Dropped, never Created. *)
+          assert false);
   Storage.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "catalog entry gone" None
