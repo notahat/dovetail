@@ -1,12 +1,12 @@
-(** Tests for [Ddl].
+(** Tests for [Ddl_executor].
 
-    Covers the slice-12 universe: [classify] for both statement constructors,
-    [execute_read] on [List_tables] (happy path and the empty-catalog edge), and
-    [execute_write] on [Drop_table] (catalog and storage state after a
-    successful drop, sibling tables untouched, and the catalog-aware "no such
-    table" error). [Ddl_executor.execute_write] is reached directly here rather
-    than through the REPL so the failure-mode assertions can pin both the raised
-    wording and the post-abort state in one place. *)
+    Covers the slice-12 universe: [execute_read] on [List_tables] (happy path
+    and the empty-catalog edge), and [execute_write] on [Drop_table] (catalog
+    and storage state after a successful drop, sibling tables untouched, and the
+    catalog-aware "no such table" error). [Ddl_executor.execute_write] is
+    reached directly here rather than through the REPL so the failure-mode
+    assertions can pin both the raised wording and the post-abort state in one
+    place. *)
 
 open Dovetail
 open Test_helpers
@@ -25,16 +25,6 @@ let orders_schema : Schema.t =
 
 let schema_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<schema>")) ( = )
-
-let test_list_tables_classifies_as_read () =
-  Alcotest.(check bool)
-    "List_tables classifies as Read" true
-    (Statement.classify Statement.List_tables = `Read)
-
-let test_drop_table_classifies_as_write () =
-  Alcotest.(check bool)
-    "Drop_table classifies as Write" true
-    (Statement.classify (Statement.Drop_table { table_name = "users" }) = `Write)
 
 let test_execute_read_list_tables_returns_byte_sorted_names () =
   with_temp_dir @@ fun dir ->
@@ -135,15 +125,8 @@ let test_execute_write_drop_table_no_such_table_raises () =
         (Catalog.get environment transaction ~table_name:"users"))
 
 let () =
-  Alcotest.run "ddl"
+  Alcotest.run "ddl_executor"
     [
-      ( "classify",
-        [
-          Alcotest.test_case "List_tables classifies as Read" `Quick
-            test_list_tables_classifies_as_read;
-          Alcotest.test_case "Drop_table classifies as Write" `Quick
-            test_drop_table_classifies_as_write;
-        ] );
       ( "execute_read",
         [
           Alcotest.test_case "List_tables returns byte-sorted names" `Quick
