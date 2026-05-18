@@ -3,4 +3,5 @@ _opam/
 *.install
 .merlin
 .claude/settings.local.json
+.claude/*.lock
 dovetail-data/

@@ -1,91 +1,131 @@
 #!/usr/bin/env bash
-# Wait for the dune watcher to finish its next rebuild cycle, then
-# print the tail of the watcher log so the caller can read the result.
-#
-# The watcher prints "waiting for filesystem changes" at the end of
-# every rebuild -- green or red -- so a fresh occurrence past a
-# pre-edit baseline marks "the rebuild this edit triggered is done."
+# Wait for the dune watcher to finish the rebuild triggered by a
+# preceding edit, then print the new output so the caller can read
+# the result. Designed to be invoked with `run_in_background` so a
+# single notification fires the moment the rebuild settles.
 #
 # Usage:
 #   before=$(grep -c "waiting for filesystem" "$LOG")
-#   # ... make file edits ...
+#   # ... edit a file ...
 #   scripts/wait-for-watcher.sh "$LOG" "$before"
 #
-# Intended for Claude to run with run_in_background so a single
-# notification fires when the rebuild settles -- no fixed sleep, no
-# generic Monitor timeout.
+# Two-phase, two-counter strategy. See docs/dune-watcher.md for the
+# full rationale, empirical findings, and rejected alternatives.
 #
-# Two corner cases the script handles, both with a clear note so the
-# caller knows what happened:
+# Phase 1 (<= 2 s): wait for evidence that dune decided to rebuild.
+#   Evidence is either:
+#     (a) the sentinel count already advanced past the caller's
+#         baseline -- we lost a race; the rebuild settled before we
+#         started polling.
+#     (b) a new `********** NEW BUILD` line appeared past the
+#         script's own baseline -- a rebuild is in flight; go to
+#         Phase 2.
+#   If neither happens within 2 s, the watcher chose not to rebuild
+#   (`touch` with same content, edit to a non-build file, or
+#   coalesced into an earlier rebuild that has already settled).
+#   Exit 0 with a note.
 #
-# 1. Baseline captured *after* the rebuild already finished. The
-#    sentinel count is already past where the caller thought it was;
-#    no future advance will arrive until a fresh edit. The script
-#    detects this by watching the log file's byte size: if the log
-#    doesn't grow for a few seconds *and* the sentinel hasn't moved,
-#    the rebuild we're waiting on is already in the past, so exit 0
-#    rather than hang on a deadline.
-#
-# 2. Dune watch mode skips a rebuild when the file's content hash is
-#    unchanged (a `touch` alone, for instance). The same idle-bail
-#    path covers this: the log won't grow, and we exit 0 with a note.
-#
-# Hard ceiling stays at 60 seconds so a genuinely stuck watcher still
-# surfaces quickly rather than holding the foreground for minutes.
+# Phase 2 (hard ceiling 120 s): poll for the sentinel count to
+#   advance. No idle-bail -- once Phase 1 saw the start marker we
+#   know dune is working, and a real rebuild can have multi-second
+#   quiet gaps inside it (compile phases produce no output). On
+#   timeout, exit 1.
 
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "usage: $0 <watcher-log-path> <baseline-sentinel-count>" >&2
+  echo "usage: $0 <watcher-log-path> <sentinel-baseline>" >&2
   exit 2
 fi
 
 log="$1"
-baseline="$2"
+sentinel_baseline="$2"
 
 if [ ! -f "$log" ]; then
-  echo "watcher log not found: $log" >&2
+  echo "wait-for-watcher: log not found: $log" >&2
   exit 1
 fi
 
-hard_deadline=$(($(date +%s) + 60))
-idle_threshold_seconds=5
+# Phrases dune watch emits verbatim. Both are stable across recent
+# dune releases but not part of any documented interface; a future
+# dune that reworks watcher output will need these updated.
+sentinel_pattern="waiting for filesystem"
+start_marker_pattern="********** NEW BUILD"
 
-count_sentinel() {
-  grep -c "waiting for filesystem" "$log" 2>/dev/null || echo 0
+# Tunables. Phase 1 is short because dune's measured reaction to an
+# fs event is 17-47 ms; 2 s is generous. Phase 2 needs headroom for
+# real test work (~22 s observed in this repo, likely to grow).
+phase_1_max_wait_seconds=2
+phase_1_poll_interval=0.1
+phase_2_max_wait_seconds=120
+phase_2_poll_interval=0.5
+
+# `grep -c` always prints a number to stdout (the count, including 0)
+# but exits 1 when there are no matches; `|| true` keeps the pipeline
+# alive under `set -e` without injecting a second "0". `-F` treats the
+# pattern as a fixed string so the asterisks in the start marker
+# don't need regex-escaping.
+count_matches() {
+  grep -cF "$1" "$log" 2>/dev/null || true
 }
 
-log_size() { wc -c < "$log" | tr -d ' '; }
+# Print exactly the output of the rebuild we waited on: everything
+# from the most recent `NEW BUILD` marker onward. Falls back to a
+# generic tail if no marker exists yet (initial-build case).
+print_rebuild_output() {
+  if grep -qF "$start_marker_pattern" "$log"; then
+    awk -v marker="$start_marker_pattern" '
+      index($0, marker) == 1 { buffer = ""; capture = 1 }
+      capture { buffer = buffer $0 "\n" }
+      END { printf "%s", buffer }
+    ' "$log"
+  else
+    tail -100 "$log"
+  fi
+}
 
-previous_size=$(log_size)
-last_growth_at=$(date +%s)
+new_build_baseline=$(count_matches "$start_marker_pattern")
+
+# ---- Phase 1: did the watcher decide to rebuild? ----
+
+phase_1_deadline=$(($(date +%s) + phase_1_max_wait_seconds))
 
 while :; do
-  current=$(count_sentinel)
-  if [ "$current" -gt "$baseline" ]; then
-    tail -100 "$log"
+  current_sentinel=$(count_matches "$sentinel_pattern")
+  if [ "$current_sentinel" -gt "$sentinel_baseline" ]; then
+    print_rebuild_output
     exit 0
   fi
 
-  now=$(date +%s)
-  if [ "$now" -ge "$hard_deadline" ]; then
-    echo "wait-for-watcher: timed out after 60s (baseline=$baseline current=$current log=$log)" >&2
-    tail -50 "$log" >&2
+  current_new_build=$(count_matches "$start_marker_pattern")
+  if [ "$current_new_build" -gt "$new_build_baseline" ]; then
+    break
+  fi
+
+  if [ "$(date +%s)" -ge "$phase_1_deadline" ]; then
+    echo "wait-for-watcher: no rebuild triggered (touch / non-build file / hash unchanged). Continuing." >&2
+    exit 0
+  fi
+
+  sleep "$phase_1_poll_interval"
+done
+
+# ---- Phase 2: wait for the rebuild to finish. ----
+
+phase_2_deadline=$(($(date +%s) + phase_2_max_wait_seconds))
+
+while :; do
+  current_sentinel=$(count_matches "$sentinel_pattern")
+  if [ "$current_sentinel" -gt "$sentinel_baseline" ]; then
+    print_rebuild_output
+    exit 0
+  fi
+
+  if [ "$(date +%s)" -ge "$phase_2_deadline" ]; then
+    echo "wait-for-watcher: rebuild did not settle within ${phase_2_max_wait_seconds}s. Watcher may be stuck." >&2
+    tail -100 "$log" >&2
     exit 1
   fi
 
-  current_size=$(log_size)
-  if [ "$current_size" != "$previous_size" ]; then
-    previous_size=$current_size
-    last_growth_at=$now
-  else
-    idle_for=$((now - last_growth_at))
-    if [ "$idle_for" -ge "$idle_threshold_seconds" ]; then
-      echo "wait-for-watcher: log idle for ${idle_for}s and sentinel still at ${current} (baseline=${baseline}). Likely a no-op rebuild (content hash unchanged) or baseline captured post-rebuild. Exiting 0." >&2
-      tail -50 "$log"
-      exit 0
-    fi
-  fi
-
-  sleep 0.5
+  sleep "$phase_2_poll_interval"
 done

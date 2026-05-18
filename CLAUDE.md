@@ -101,8 +101,10 @@ prefixes, so the library-alias form is the default.
   `dune build`, run tests with `dune test`, format with
   `dune build @fmt --auto-promote`.
 - **Watcher is the default test loop.** Start `dune runtest -w` (short
-  for `--watch`) once as a long-lived background task; it rebuilds and
-  re-runs the test suite on every file save. It also keeps `_build/`
+  for `--watch`) once as a long-lived background task (via
+  `run_in_background` — the harness's returned output path is the
+  `$LOG` used in the wait protocol below). It rebuilds and re-runs
+  the test suite on every file save. It also keeps `_build/`
   artifacts fresh so merlin/ocaml-lsp gets live diagnostics through the
   RPC socket at `_build/.rpc/dune`; without watch mode the editor LSP
   runs on stale artifacts and reports phantom errors.
@@ -115,20 +117,27 @@ prefixes, so the library-alias form is the default.
   edits).
 - **Waiting for the watcher to finish a rebuild.** The watcher ends
   every rebuild — green or red — with `Success, waiting for filesystem
-  changes...` or `Had N errors, waiting for filesystem changes...`.
-  The reliable signal that the rebuild triggered by an edit has settled
-  is that the count of `waiting for filesystem` lines in the watcher's
-  output file has advanced by one past a pre-edit baseline.
-  `scripts/wait-for-watcher.sh <log> <baseline>` does exactly that and
-  prints the tail of the log on completion. Capture the baseline
-  *before* the edit:
+  changes...` or `Had N errors, waiting for filesystem changes...`,
+  and starts each rebuild with `********** NEW BUILD (<file>
+  changed) **********`. `scripts/wait-for-watcher.sh <log> <baseline>`
+  uses both markers in a two-phase strategy: a short window to see
+  whether dune decided to rebuild (so a no-op edit like a `touch`
+  exits cleanly), then a longer wait for the sentinel without an
+  idle-bail (so a slow rebuild with quiet compile phases doesn't
+  trigger a false timeout). Full strategy and empirical findings in
+  `docs/dune-watcher.md`. Capture the baseline *before* the edit:
 
       before=$(grep -c "waiting for filesystem" "$LOG")
       # ... edits happen here ...
       scripts/wait-for-watcher.sh "$LOG" "$before"   # run_in_background
 
-  Do not use generic `Monitor` timeouts or fixed `sleep`s for this --
-  the script returns the moment the watcher prints the sentinel.
+  The script prints the rebuild's output (from the most recent
+  `NEW BUILD` marker onward) on completion. Exit codes: 0 for both
+  "rebuild settled" and "no rebuild was triggered" (the latter
+  prints a note on stderr — that's normal, not a failure); 1 only
+  when the 120 s ceiling fires. Do not use generic `Monitor`
+  timeouts or fixed `sleep`s for this — they were the earlier
+  failed approaches; the script supersedes them.
 - If the watcher is missing or dies, restart it the same way: one
   backgrounded `dune runtest -w`. Do not start a second watcher or fall
   back to ad-hoc `dune test` runs.
