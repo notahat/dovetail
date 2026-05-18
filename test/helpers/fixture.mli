@@ -1,0 +1,27 @@
+(** Hardcoded fixture data populated lazily into a fresh database, for unit
+    tests that need a known set of rows to query against.
+
+    Slice 15 moved this from the production library into the test helpers: the
+    REPL no longer seeds these on boot, and the only callers are the unit-test
+    suites that need data without paying the DDL/DML correctness dependency. The
+    {!Demo_data} module in [lib/] serves the same shape through the surface for
+    the [--demo-data] REPL flag and the doctest harness; the two are
+    deliberately decoupled and free to drift. *)
+
+module Schema = Dovetail_core.Schema
+
+val users_rows : Schema.tuple list
+(** The five [users] rows, in primary-key order. Exposed so tests that compare
+    pipeline output against the fixture have a single source of truth. *)
+
+val orders_rows : Schema.tuple list
+(** The six [orders] rows, in primary-key order. Dave (user id 4) deliberately
+    has no orders; Alice (id 1) and Carol (id 3) each have two. *)
+
+val populate_if_empty : Dovetail.Storage.environment -> unit
+(** [populate_if_empty environment] writes the [users] and [orders] schemas and
+    their fixture rows in a single write transaction. Each table is written only
+    if the catalog has no entry for it, so the call is idempotent: running it on
+    an already-populated environment is a no-op, and adding a new fixture table
+    to an environment that already has the earlier ones populates only the new
+    table. *)

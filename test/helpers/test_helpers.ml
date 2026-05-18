@@ -20,6 +20,12 @@
 open Dovetail
 open Dovetail_core
 
+(* Re-export the sibling [Fixture] module so callers that [open Test_helpers]
+   can write [Fixture.populate_if_empty] without qualifying the path. The
+   library's main-module shape (this file matches the library name) means
+   sub-modules are not lifted into the main module's scope automatically. *)
+module Fixture = Fixture
+
 (** Recursively remove [path]. Uses [lstat] so symlinks are unlinked rather than
     followed. Raises through any underlying [Unix] error. *)
 let rec remove_recursive path =
@@ -103,58 +109,16 @@ let read_line_from_list lines =
         remaining := rest;
         Some head
 
-(** The five [users] fixture rows as [Schema.tuple]s, in primary-key order.
-    Mirrors [Fixture.users_rows] but lives here so tests can compare pipeline
-    output against a single shared expectation. *)
-let expected_users_rows : Schema.tuple list =
-  [
-    [|
-      Value.Int64 1L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
-    |];
-    [|
-      Value.Int64 2L;
-      Value.String "Bob";
-      Value.String "bob@example.com";
-      Value.Bool false;
-    |];
-    [|
-      Value.Int64 3L;
-      Value.String "Carol";
-      Value.String "carol@example.com";
-      Value.Bool true;
-    |];
-    [|
-      Value.Int64 4L;
-      Value.String "Dave";
-      Value.String "dave@example.com";
-      Value.Bool true;
-    |];
-    [|
-      Value.Int64 5L;
-      Value.String "Eve";
-      Value.String "eve@example.com";
-      Value.Bool false;
-    |];
-  ]
+(** The five [users] fixture rows. Re-binding of [Fixture.users_rows] so the ~22
+    call sites that say [expected_users_rows] don't have to chase the module
+    rename. *)
+let expected_users_rows = Fixture.users_rows
 
-(** The six [orders] fixture rows as [Schema.tuple]s, in primary-key order.
-    Mirrors [Fixture.orders_rows] but lives here so tests can compare pipeline
-    output against a single shared expectation. Dave (user id 4) deliberately
-    has no orders; Alice (id 1) and Carol (id 3) each have two. *)
-let expected_orders_rows : Schema.tuple list =
-  [
-    [| Value.Int64 1L; Value.Int64 1L; Value.String "Coffee"; Value.Int64 5L |];
-    [| Value.Int64 2L; Value.Int64 1L; Value.String "Bagel"; Value.Int64 4L |];
-    [| Value.Int64 3L; Value.Int64 2L; Value.String "Tea"; Value.Int64 3L |];
-    [|
-      Value.Int64 4L; Value.Int64 3L; Value.String "Sandwich"; Value.Int64 8L;
-    |];
-    [| Value.Int64 5L; Value.Int64 3L; Value.String "Cake"; Value.Int64 6L |];
-    [| Value.Int64 6L; Value.Int64 5L; Value.String "Cookie"; Value.Int64 2L |];
-  ]
+(** The six [orders] fixture rows. Re-binding of [Fixture.orders_rows] so the
+    ~22 call sites that say [expected_orders_rows] don't have to chase the
+    module rename. Dave (user id 4) deliberately has no orders; Alice (id 1) and
+    Carol (id 3) each have two. *)
+let expected_orders_rows = Fixture.orders_rows
 
 (** Format a tuple's values using {!Value.format}, comma-separated and wrapped
     in brackets. So {[Alcotest]} failure diffs read as

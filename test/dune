@@ -5,7 +5,6 @@
   test_catalog
   test_cli
   test_encoding
-  test_fixture
   test_eval_full_scan
   test_eval_filter
   test_eval_project

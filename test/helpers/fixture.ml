@@ -1,4 +1,7 @@
 module Schema = Dovetail_core.Schema
+module Catalog = Dovetail.Catalog
+module Storage = Dovetail.Storage
+module Row_codec = Dovetail.Row_codec
 
 let users_schema : Schema.t =
   {
