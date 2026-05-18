@@ -1,4 +1,5 @@
 module Ddl = Dovetail_ddl
+module Schema = Dovetail_core.Schema
 
 (* Look up [table_name] in the catalog and return its schema wrapped in
    [Described]. The catalog-aware "no such table" check happens here so
@@ -39,6 +40,45 @@ let drop_table environment transaction table_name : Ddl.Statement.write_result =
   Catalog.delete environment transaction ~table_name;
   Dropped table_name
 
+(* Build the [Schema.t] that a [Create_table] statement should write into
+   the catalog. The DDL surface has no qualifier on its [field] type, so
+   the executor stamps [Some table_name] onto every field -- matching the
+   shape that fixture-seeded schemas carry, which the rest of the read
+   path expects. Field order and primary-key order are preserved exactly
+   as the user typed them; [Statement.validate] is responsible for the
+   structural checks (non-empty lists, no duplicates, PK columns drawn
+   from the field list) and is expected to have run already. *)
+let schema_of_create_fields ~table_name (fields : Ddl.Statement.field list)
+    ~primary_key : Schema.t =
+  let schema_fields =
+    List.map
+      (fun (field : Ddl.Statement.field) : Schema.field ->
+        { name = field.name; kind = field.kind; qualifier = Some table_name })
+      fields
+  in
+  { fields = schema_fields; primary_key }
+
+(* Create both halves of [table_name] (catalog entry and storage subDB)
+   inside the caller's write transaction. The catalog-aware "table
+   already exists" check happens here, sharing the write transaction so
+   it cannot race against a concurrent create. The storage subDB is
+   created before the catalog entry; if anything raises in between, the
+   transaction aborts and rolls both halves back. *)
+let create_table environment transaction ~table_name ~fields ~primary_key :
+    Ddl.Statement.write_result =
+  (match Catalog.get environment transaction ~table_name with
+  | None -> ()
+  | Some _ ->
+      failwith
+        (Printf.sprintf "DDL: create table %S: table already exists" table_name));
+  let schema = schema_of_create_fields ~table_name fields ~primary_key in
+  let _map =
+    Storage.create_map environment transaction
+      ~name:(Catalog.table_subdb_name table_name)
+  in
+  Catalog.put environment transaction ~table_name schema;
+  Created table_name
+
 let execute_write environment transaction :
     Ddl.Statement.t -> Ddl.Statement.write_result = function
   | List_tables | Describe _ ->
@@ -46,7 +86,5 @@ let execute_write environment transaction :
          the REPL must classify and route them to execute_read. *)
       assert false
   | Drop_table { table_name } -> drop_table environment transaction table_name
-  | Create_table _ ->
-      (* Slice 14 step 7a fills this in. The parser does not admit
-         [:create table] until step 5, so this arm is unreachable today. *)
-      assert false
+  | Create_table { table_name; fields; primary_key } ->
+      create_table environment transaction ~table_name ~fields ~primary_key
