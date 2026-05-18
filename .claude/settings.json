@@ -3,5 +3,18 @@
     "allow": [
       "Bash(dune *)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(jq -r '.tool_input.file_path // empty'); case \"$file\" in *.ml|*.mli) ocamlformat --inplace \"$file\" 2>&1 ;; esac"
+          }
+        ]
+      }
+    ]
   }
 }
