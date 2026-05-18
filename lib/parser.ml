@@ -396,7 +396,66 @@ let ddl_describe =
   keyword "describe" *> whitespace *> identifier >>| fun table_name ->
   Ddl.Statement.Describe { table_name }
 
-let ddl_body = ddl_list_tables <|> ddl_drop_table <|> ddl_describe
+(* Resolve a [:create table] column kind at parse time. Per the slice-14
+   design, the surface kind position carries an identifier ([Int64],
+   [String], [Bool]) and the parser maps it to {!Value.Kind.t} directly --
+   downstream code never sees a raw kind string. An unknown identifier
+   here raises a parse error rather than deferring the diagnostic to
+   validate, so [Statement.t] values never carry a phantom kind. *)
+let create_table_kind =
+  identifier >>= function
+  | "Int64" -> return Value.Kind.Int64
+  | "String" -> return Value.Kind.String
+  | "Bool" -> return Value.Kind.Bool
+  | other -> fail (Printf.sprintf "unknown kind %S" other)
+
+(* A single column declaration: [<identifier> : <kind>]. Whitespace
+   around the colon is tolerated; both halves are required. *)
+let create_table_field =
+  identifier >>= fun field_name ->
+  whitespace *> char ':' *> whitespace *> create_table_kind
+  >>| fun field_kind ->
+  ({ name = field_name; kind = field_kind } : Ddl.Statement.field)
+
+(* A comma-separated list of column declarations with an optional trailing
+   comma. At least one column is required -- the empty list is a parse
+   error rather than a validate error, so the grammar rules it out
+   without needing the post-parse check. Trailing commas line up with
+   how the canonical printer emits the column list (one comma per
+   field, including the last), so [parse (format s) = Ok (Ddl s)] holds
+   for [Create_table] values straight out of [Format.statement]. *)
+let create_table_field_list =
+  create_table_field >>= fun first_field ->
+  many (whitespace *> char ',' *> whitespace *> create_table_field)
+  >>= fun more_fields ->
+  whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
+  first_field :: more_fields
+
+(* A comma-separated list of primary key column names with an optional
+   trailing comma. Shape mirrors {!create_table_field_list}: at least one
+   identifier required, trailing comma tolerated. The validator checks
+   that each name appears in the column list and that none repeats. *)
+let create_table_primary_key_list =
+  identifier >>= fun first_column ->
+  many (whitespace *> char ',' *> whitespace *> identifier)
+  >>= fun more_columns ->
+  whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
+  first_column :: more_columns
+
+let ddl_create_table =
+  keyword "create" *> whitespace *> keyword "table" *> whitespace *> identifier
+  >>= fun table_name ->
+  whitespace *> char '(' *> whitespace *> create_table_field_list
+  >>= fun fields ->
+  whitespace *> char ')' *> whitespace *> keyword "primary" *> whitespace
+  *> keyword "key" *> whitespace *> char '(' *> whitespace
+  *> create_table_primary_key_list
+  >>= fun primary_key ->
+  whitespace *> char ')'
+  *> return (Ddl.Statement.Create_table { table_name; fields; primary_key })
+
+let ddl_body =
+  ddl_list_tables <|> ddl_drop_table <|> ddl_describe <|> ddl_create_table
 
 (* The top-level grammar: optional leading whitespace, then dispatch on the
    first non-whitespace character. A leading [:] introduces a DDL statement

@@ -7,10 +7,10 @@
     the corpus below. If a future parser or printer change breaks the property,
     the test fails before the change reaches downstream code.
 
-    The corpus is hand-rolled (no [qcheck]) and covers one case per
-    non-[Create_table] constructor today. [Create_table] cases are populated as
-    dormant stubs in {!pending_create_table_corpus}; slice 14 step 5 (parser for
-    [:create table]) turns them on by moving them into the active corpus. *)
+    The corpus is hand-rolled (no [qcheck]) and covers one case per constructor:
+    [List_tables], [Drop_table], [Describe] for the one-liners, and a small set
+    of [Create_table] shapes (each value kind in turn, a compound primary key,
+    plus the design doc's [users] and [order_items] canonical examples). *)
 
 open Dovetail
 module Ddl = Dovetail_ddl
@@ -58,51 +58,107 @@ let test_round_trip_drop_table () =
 let test_round_trip_describe () =
   check_round_trip (Ddl.Statement.Describe { table_name = "widgets" })
 
-(* Dormant corpus for [:create table]. Slice 14 step 5 admits these
-   shapes at the parser level, at which point the cases here move into
-   active [test_round_trip_create_table_*] functions below. Kept as a
-   bound value (rather than a comment) so the corpus stays in code form
-   -- step 5's change is "promote entries", not "transcribe a comment." *)
-let _pending_create_table_corpus : Ddl.Statement.t list =
-  [
-    Ddl.Statement.Create_table
-      {
-        table_name = "widgets";
-        fields = [ { name = "id"; kind = Value.Kind.Int64 } ];
-        primary_key = [ "id" ];
-      };
-    Ddl.Statement.Create_table
-      {
-        table_name = "users";
-        fields =
-          [
-            { name = "id"; kind = Value.Kind.Int64 };
-            { name = "name"; kind = Value.Kind.String };
-            { name = "email"; kind = Value.Kind.String };
-            { name = "active"; kind = Value.Kind.Bool };
-          ];
-        primary_key = [ "id" ];
-      };
-    Ddl.Statement.Create_table
-      {
-        table_name = "order_items";
-        fields =
-          [
-            { name = "order_id"; kind = Value.Kind.Int64 };
-            { name = "product_id"; kind = Value.Kind.Int64 };
-            { name = "quantity"; kind = Value.Kind.Int64 };
-          ];
-        primary_key = [ "order_id"; "product_id" ];
-      };
-  ]
+let test_round_trip_create_table_int64_pk () =
+  check_round_trip
+    (Ddl.Statement.Create_table
+       {
+         table_name = "widgets";
+         fields = [ { name = "id"; kind = Value.Kind.Int64 } ];
+         primary_key = [ "id" ];
+       })
+
+let test_round_trip_create_table_string_pk () =
+  check_round_trip
+    (Ddl.Statement.Create_table
+       {
+         table_name = "widgets";
+         fields = [ { name = "name"; kind = Value.Kind.String } ];
+         primary_key = [ "name" ];
+       })
+
+let test_round_trip_create_table_bool_pk () =
+  check_round_trip
+    (Ddl.Statement.Create_table
+       {
+         table_name = "widgets";
+         fields = [ { name = "active"; kind = Value.Kind.Bool } ];
+         primary_key = [ "active" ];
+       })
+
+let test_round_trip_create_table_compound_pk () =
+  check_round_trip
+    (Ddl.Statement.Create_table
+       {
+         table_name = "pairs";
+         fields =
+           [
+             { name = "left"; kind = Value.Kind.Int64 };
+             { name = "right"; kind = Value.Kind.Int64 };
+           ];
+         primary_key = [ "left"; "right" ];
+       })
+
+(* The [users] example from [docs/plans/ddl-design.md]. Same shape as
+   the [test_format_create_table_users_example] entry in
+   [test/ddl/test_format.ml]; carrying it through the round-trip pins
+   the design doc's canonical form against the parser as well as the
+   printer. *)
+let test_round_trip_create_table_users_example () =
+  check_round_trip
+    (Ddl.Statement.Create_table
+       {
+         table_name = "users";
+         fields =
+           [
+             { name = "id"; kind = Value.Kind.Int64 };
+             { name = "name"; kind = Value.Kind.String };
+             { name = "email"; kind = Value.Kind.String };
+             { name = "active"; kind = Value.Kind.Bool };
+           ];
+         primary_key = [ "id" ];
+       })
+
+(* The [order_items] example from [docs/plans/ddl-design.md]: compound
+   primary key. *)
+let test_round_trip_create_table_order_items_example () =
+  check_round_trip
+    (Ddl.Statement.Create_table
+       {
+         table_name = "order_items";
+         fields =
+           [
+             { name = "order_id"; kind = Value.Kind.Int64 };
+             { name = "product_id"; kind = Value.Kind.Int64 };
+             { name = "quantity"; kind = Value.Kind.Int64 };
+           ];
+         primary_key = [ "order_id"; "product_id" ];
+       })
 
 let () =
   Alcotest.run "ddl_roundtrip"
     [
-      ( "supported constructors",
+      ( "one-liners",
         [
           Alcotest.test_case "List_tables" `Quick test_round_trip_list_tables;
           Alcotest.test_case "Drop_table" `Quick test_round_trip_drop_table;
           Alcotest.test_case "Describe" `Quick test_round_trip_describe;
+        ] );
+      ( "create table",
+        [
+          Alcotest.test_case "single Int64 PK" `Quick
+            test_round_trip_create_table_int64_pk;
+          Alcotest.test_case "single String PK" `Quick
+            test_round_trip_create_table_string_pk;
+          Alcotest.test_case "single Bool PK" `Quick
+            test_round_trip_create_table_bool_pk;
+          Alcotest.test_case "compound primary key" `Quick
+            test_round_trip_create_table_compound_pk;
+        ] );
+      ( "design doc examples",
+        [
+          Alcotest.test_case "users" `Quick
+            test_round_trip_create_table_users_example;
+          Alcotest.test_case "order_items" `Quick
+            test_round_trip_create_table_order_items_example;
         ] );
     ]
