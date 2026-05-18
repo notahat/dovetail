@@ -6,9 +6,6 @@
   test_cli
   test_encoding
   test_fixture
-  test_schema
-  test_value
-  test_relation
   test_eval_full_scan
   test_eval_filter
   test_eval_project
@@ -16,7 +13,6 @@
   test_eval_nested_loop_join
   test_eval_index_lookup
   test_eval_indexed_nested_loop_join
-  test_relation_literal
   test_eval_relation_literal
   test_eval_insert
   test_row_codec
@@ -28,8 +24,6 @@
   test_parser
   test_physical
   test_pipeline
-  test_expression
-  test_expression_format
   test_expression_parser
   test_projection
   test_repl

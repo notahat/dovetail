@@ -1,0 +1,9 @@
+(tests
+ (names
+  test_value
+  test_schema
+  test_expression
+  test_expression_format
+  test_relation
+  test_relation_literal)
+ (libraries alcotest dovetail.core test_helpers))
