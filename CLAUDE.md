@@ -94,13 +94,18 @@ prefixes, so the library-alias form is the default.
 
 ## Tooling
 
-- OCaml 5.2 in a local opam switch at the project root.
-- Run dune commands via `opam exec -- dune ...` so the local switch's
-  environment is set up for that one command. Avoid the
-  `eval $(opam env) && dune ...` form: it works, but it interferes with
-  Claude Code's per-command permission allowlist.
-- Build: `opam exec -- dune build`. Tests: `opam exec -- dune test`.
-  Format: `opam exec -- dune build @fmt --auto-promote`.
+- OCaml 5.2 in a local opam switch at the project root. The switch's
+  `bin/` is already on `PATH` in the shell, so `dune` and friends can be
+  invoked directly — no `opam exec --` prefix needed.
+- Build: `dune build`. Tests: `dune test`. Format:
+  `dune build @fmt --auto-promote`.
+- For an interactive session, run `dune build --watch` in a separate
+  terminal before opening the editor. Dune keeps `_build/` artifacts
+  fresh on every save (so merlin/ocaml-lsp resolves cross-module
+  references correctly) and exposes an RPC socket at `_build/.rpc/dune`
+  that `ocaml-lsp-server` connects to for live compiler diagnostics.
+  Without watch mode, the editor LSP runs on stale artifacts and reports
+  phantom errors until something rebuilds.
 - Run the formatter before considering a step done; it has opinions and
   will adjust line breaks and comment wrapping.
 - Test framework: `alcotest`. Parser library: `angstrom` (arrives in
