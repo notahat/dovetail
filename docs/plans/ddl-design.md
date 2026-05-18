@@ -299,9 +299,9 @@ Error message format follows the project convention from
 names the operation, e.g.
 
 ```
-Ddl: create table "users": column "email" appears twice
-Ddl: drop table "orders": no such table
-Ddl.validate: primary key column "id" not in column list
+DDL: create table "users": column "email" appears twice
+DDL: drop table "orders": no such table
+DDL: create table "widgets": primary key column "id" not in column list
 ```
 
 ## IR shape

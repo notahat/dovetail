@@ -778,8 +778,12 @@ End-of-slice manual smoke (in the REPL against the fixture):
   re-seeds; `widgets` is gone (we dropped it, and even if
   it weren't, the fixture wouldn't re-create it). If the
   user had instead left a `widgets` table behind, it would
-  persist across restart — only fixture-seeded names get
-  re-seeded.
+  persist across restart — the fixture only seeds names
+  that are absent from the catalog, and it only owns
+  `users` and `orders`. (Corollary: a user-driven
+  `:create table users (...)` after dropping the fixture
+  `users` survives restart too, because the catalog entry
+  is no longer missing.)
 
 Plus the usual: `dune test` is green; `dune build @fmt
 --auto-promote` leaves the tree clean.

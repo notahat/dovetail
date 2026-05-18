@@ -115,11 +115,12 @@ than insert/update/delete were:
   then adds the first DDL write path (storage primitives, catalog
   delete) without needing the structural validator or canonical
   printer that create/describe will introduce.
-- **Slice 13: describe + create table.** Paired because the
+- **Slice 14: describe + create table.** Paired because the
   round-trip property `parse(format(s)) ≡ s` is the design's
   strongest correctness anchor and lands cleanest when both ends
-  are in one PR.
-- **Slice 14: fixture retirement.** Removes `lib/fixture.ml` and
+  are in one PR. (Slice 13 is the DDL sub-library extraction
+  that preceded it; see `13-slice-13-ddl-and-library-prep.md`.)
+- **Slice 15: fixture retirement.** Removes `lib/fixture.ml` and
   migrates tests to construct tables via DDL. Held back until
   create exists.
 
@@ -341,7 +342,8 @@ Per `CLAUDE.md`, user-facing errors start with a module prefix:
 Ddl: drop table "<name>": no such table
 ```
 
-(Slice 13 adds `Ddl: create table "<name>": ...`-shaped errors.)
+(Slice 14 adds `Ddl: create table "<name>": ...`-shaped errors.
+The `Ddl:` prefix was later reframed as `DDL:` in slice 13.)
 
 Parse errors retain the existing `parse error: ...` shape — the
 parser doesn't know it's parsing a DDL statement vs a pipeline at
