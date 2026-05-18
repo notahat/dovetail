@@ -5,7 +5,7 @@
     point at it without each of them re-implementing the wording. These tests
     pin the rule's behaviour at the source level. *)
 
-open Dovetail
+open Dovetail_core
 
 let test_schema_of_infers_kinds_from_first_row () =
   let schema =

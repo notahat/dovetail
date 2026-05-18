@@ -1,6 +1,6 @@
 (** Tests for [Relation]. *)
 
-open Dovetail
+open Dovetail_core
 
 (* The fixture's [users] schema, with qualifiers set just like {!Fixture}
    writes them, so the rendered headers show [users.<column>]. *)

@@ -1,7 +1,7 @@
 (** Tests for [Value.format] and [Value.to_string], the canonical source-like
     renderer for runtime values. *)
 
-open Dovetail
+open Dovetail_core
 
 (* Render via [Value.format] into a string so the tests can compare against
    the expected source text. *)

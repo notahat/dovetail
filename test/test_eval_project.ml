@@ -3,6 +3,7 @@
     with filter resolution. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* Build a Project wrapping [input_plan] over the users fixture, evaluate

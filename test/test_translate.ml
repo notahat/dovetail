@@ -3,6 +3,7 @@
     [IndexLookup] rewrite lives in [test_translate_index_lookup.ml]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let test_scan_lowers_to_full_scan () =

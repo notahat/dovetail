@@ -13,6 +13,8 @@
     at O(1) memory per cursor; joins still materialise their right input because
     the outer loop re-iterates it. *)
 
+module Relation = Dovetail_core.Relation
+
 val eval :
   Storage.environment ->
   [> `Read ] Storage.transaction ->

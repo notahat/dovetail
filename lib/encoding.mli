@@ -9,6 +9,8 @@
     OCaml's runtime representation is accepted for now and replaced with
     hand-rolled binary in slice 6, alongside composite-key encoding. *)
 
+module Value = Dovetail_core.Value
+
 val encode_int64_key : int64 -> string
 (** Encode an [int64] as 8 bytes, big-endian with the sign bit flipped, so that
     lexicographic comparison of two encoded keys agrees with [Int64.compare] on

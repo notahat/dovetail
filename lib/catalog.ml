@@ -1,3 +1,5 @@
+module Schema = Dovetail_core.Schema
+
 let map_name = "catalog"
 
 let get environment transaction ~table_name =

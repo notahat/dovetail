@@ -1,3 +1,6 @@
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+
 (* Encode [primary_key_values] as the storage key bytes. Slice 1 only
    handles a single-column [Int64] primary key; any other shape raises
    [Failure]. The [Schema.split_tuple] / [Schema.assemble_tuple] pair

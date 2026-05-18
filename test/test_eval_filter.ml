@@ -1,6 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.Filter]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* Build a Filter wrapping a FullScan over the users fixture, evaluate it,

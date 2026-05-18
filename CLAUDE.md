@@ -71,6 +71,27 @@ underlying tool's vocabulary.
   beats prose for slice-1/slice-6 limitation notes — a searchable token
   shortens the lift when the limitation is addressed.
 
+## Cross-library aliases
+
+The sub-library layout means lib-internal files reach across library
+boundaries to use modules from sibling sub-libraries. Two styles:
+
+- **Library alias.** `module Ddl = Dovetail_ddl` at the top of the file;
+  references become `Ddl.Statement.t`. The prefix keeps group membership
+  visible at the call site — "this is the DDL vocabulary" — which is
+  worth signal when the sibling library names a localised concern.
+- **Per-module alias.** `module Value = Dovetail_core.Value` for each
+  used module; references stay unqualified (`Value.t`). Smaller per-file
+  diff and no prefix noise at every type signature and pattern match.
+
+**Rule of thumb:** library alias by default; per-module alias for
+`core` (and any future library where the prefix would be noise rather
+than signal). `core` types — `Value`, `Schema`, `Relation`,
+`Expression`, `Relation_literal` — are pervasive enough that a `Core.`
+prefix on every reference would add noise without signal. Localised
+sublibraries (`ddl`, future `storage`/`plan`/...) carry meaningful
+prefixes, so the library-alias form is the default.
+
 ## Tooling
 
 - OCaml 5.2 in a local opam switch at the project root.

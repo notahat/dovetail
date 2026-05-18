@@ -7,6 +7,7 @@
 *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* The expected matched (user, order) pairs from an inner equi-join on

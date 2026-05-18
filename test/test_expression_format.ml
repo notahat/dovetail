@@ -4,7 +4,7 @@
     paren-insertion case. The resolver-behaviour and resolver-error tests for
     the same module live in [test_expression.ml]. *)
 
-open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* Render an [Expression.t] to a string via [Expression.format]. *)

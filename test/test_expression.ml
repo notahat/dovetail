@@ -5,7 +5,7 @@
     parser tests for the expression sublanguage live in
     [test_expression_parser.ml]. *)
 
-open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* The fixture's [users] schema, repeated here so the predicate tests are

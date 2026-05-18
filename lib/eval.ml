@@ -1,3 +1,9 @@
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Expression = Dovetail_core.Expression
+module Relation = Dovetail_core.Relation
+module Relation_literal = Dovetail_core.Relation_literal
+
 (* Look up the schema and storage handle for a table referenced in a plan.
    Raises [Failure] if the catalog has no schema for [table], or if the
    catalog has a schema but no storage subDB exists. *)

@@ -1,3 +1,6 @@
+module Value = Dovetail_core.Value
+module Expression = Dovetail_core.Expression
+
 type t =
   | Scan of { table : string }
   | Restrict of { input : t; predicate : Expression.t }

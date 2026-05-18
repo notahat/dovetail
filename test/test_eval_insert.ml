@@ -7,6 +7,7 @@
     transaction. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]

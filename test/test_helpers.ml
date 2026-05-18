@@ -18,6 +18,7 @@
       tests don't have to restate the boilerplate. *)
 
 open Dovetail
+open Dovetail_core
 
 (** Recursively remove [path]. Uses [lstat] so symlinks are unlinked rather than
     followed. Raises through any underlying [Unix] error. *)

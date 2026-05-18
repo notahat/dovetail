@@ -1,3 +1,5 @@
+module Relation = Dovetail_core.Relation
+
 let prompt = "> "
 
 (* Render the affected-row status line for a completed mutation. The verb is

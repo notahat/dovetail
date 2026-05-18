@@ -9,6 +9,7 @@
     place. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let users_schema : Schema.t =

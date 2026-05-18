@@ -1,3 +1,5 @@
+module Value = Dovetail_core.Value
+
 (* Map an int64 between signed-comparison order and unsigned-comparison
    order. Big-endian bytes of an unsigned 64-bit value sort under memcmp the
    same as the value itself; signed int64s do not, because two's-complement

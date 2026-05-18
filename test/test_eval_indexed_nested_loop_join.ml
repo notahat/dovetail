@@ -1,6 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.IndexedNestedLoopJoin]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* The matched (user, order) pairs that the canonical indexed join --

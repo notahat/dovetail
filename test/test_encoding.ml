@@ -1,6 +1,7 @@
 (** Tests for [Encoding]. *)
 
 open Dovetail
+open Dovetail_core
 
 let test_int64_key_round_trip () =
   let inputs =

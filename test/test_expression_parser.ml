@@ -6,6 +6,7 @@
     [test_parser.ml]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let predicate_testable =

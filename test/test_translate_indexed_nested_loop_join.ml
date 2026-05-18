@@ -16,6 +16,7 @@
     [test_pipeline.ml]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* A users schema with a single int64 primary key, identical to

@@ -16,6 +16,8 @@
     exists now so callers can already speak in terms of [Parser.error] rather
     than coupling to [string]. *)
 
+module Expression = Dovetail_core.Expression
+
 type error = string
 (** Slice-1 placeholder for parser errors. The string is whatever angstrom
     produced. *)

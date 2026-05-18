@@ -17,6 +17,9 @@
     structurally: a mutation can only appear at the top of a pipeline, and its
     source field is a {!t}, not a {!plan}, so sinks cannot nest. *)
 
+module Value = Dovetail_core.Value
+module Expression = Dovetail_core.Expression
+
 type t =
   | Relation_name of string
       (** [Relation_name name] is a reference to the base relation called [name]

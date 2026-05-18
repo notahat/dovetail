@@ -1,3 +1,7 @@
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Expression = Dovetail_core.Expression
+
 type t =
   | FullScan of { table : string }
   | Filter of { input : t; predicate : Expression.t }

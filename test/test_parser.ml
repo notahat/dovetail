@@ -1,6 +1,7 @@
 (** Tests for [Parser]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let ast_program_testable =

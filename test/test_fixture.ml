@@ -1,6 +1,7 @@
 (** Tests for [Fixture]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let users_table_subdb_name = "table:users"

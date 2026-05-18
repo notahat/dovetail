@@ -10,6 +10,9 @@
     [Project], × → [CrossProduct]) rather than SQL keywords, leaving room for a
     SQL front end to map its vocabulary onto the same IR. *)
 
+module Value = Dovetail_core.Value
+module Expression = Dovetail_core.Expression
+
 type t =
   | Scan of { table : string }
       (** [Scan { table }] reads every row of [table]. The logical operator
@@ -35,8 +38,8 @@ type t =
       (** [RelationLiteral { columns; rows }] is a relation given directly by
           its contents, with no scan or storage involved. Each row in [rows] is
           a list of values, one per declared column, in column order. The output
-          schema is {!Relation_literal.schema_of} applied to [columns] and the
-          first row.
+          schema is {!Dovetail_core.Relation_literal.schema_of} applied to
+          [columns] and the first row.
 
           Slice 11's parser produces single-row literals only; the IR shape
           leaves room for a future multi-row literal grammar. *)

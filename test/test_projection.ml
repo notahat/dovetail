@@ -1,6 +1,7 @@
 (** Tests for [Projection]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* The fixture's [users] schema, repeated here so the projection tests are

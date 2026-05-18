@@ -5,6 +5,10 @@
     lookups, and so on. The earlier IRs ({!Logical}, {!Ast}) are progressively
     translated down into this one. *)
 
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Expression = Dovetail_core.Expression
+
 type t =
   | FullScan of { table : string }
       (** [FullScan { table }] reads every row of [table] in primary-key order
@@ -81,7 +85,8 @@ type t =
   | RelationLiteral of { columns : string list; rows : Value.t list list }
       (** [RelationLiteral { columns; rows }] yields a relation whose tuples are
           the literal's [rows] -- no storage involved. The output schema is
-          {!Relation_literal.schema_of} applied to [columns] and the first row.
+          {!Dovetail_core.Relation_literal.schema_of} applied to [columns] and
+          the first row.
 
           Each row in [rows] must have the same length as [columns]. Slice 11's
           parser produces single-row literals only, so [rows] always has length

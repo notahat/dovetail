@@ -1,6 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.RelationLiteral]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* Build a single-row [Physical.RelationLiteral] plan and pass the materialised

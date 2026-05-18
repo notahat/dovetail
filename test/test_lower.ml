@@ -1,6 +1,7 @@
 (** Tests for [Lower]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let logical_plan_testable : Logical.plan Alcotest.testable =

@@ -1,6 +1,7 @@
 (** Tests for [Row_codec]: schema-driven decoding of stored rows. *)
 
 open Dovetail
+open Dovetail_core
 
 (* A schema with an int64 primary key column [id] and three non-PK columns,
    matching the [users] fixture's shape. *)

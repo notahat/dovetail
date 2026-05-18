@@ -1,3 +1,5 @@
+module Schema = Dovetail_core.Schema
+
 let users_schema : Schema.t =
   {
     fields =

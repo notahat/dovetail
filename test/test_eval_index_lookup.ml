@@ -1,6 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.IndexLookup]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 (* Build an [IndexLookup] over [table] with [key], evaluate it against the

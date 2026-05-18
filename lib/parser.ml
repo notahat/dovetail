@@ -1,5 +1,8 @@
 open Angstrom
 module StringSet = Set.Make (String)
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Expression = Dovetail_core.Expression
 
 type error = string
 

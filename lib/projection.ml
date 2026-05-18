@@ -1,3 +1,5 @@
+module Schema = Dovetail_core.Schema
+
 type t = Schema.column_reference list
 
 (* Look up [reference] in [input_schema] and return its (position, field).

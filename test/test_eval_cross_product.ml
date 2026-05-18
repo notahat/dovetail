@@ -1,6 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.CrossProduct]. *)
 
 open Dovetail
+open Dovetail_core
 open Test_helpers
 
 let users_cross_orders_plan : Physical.t =

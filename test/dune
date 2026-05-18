@@ -37,7 +37,7 @@
   test_ddl_executor
   test_doctest
   test_documentation)
- (libraries alcotest dovetail unix)
+ (libraries alcotest dovetail dovetail.core unix)
  (deps
   ../bin/main.exe
   ../docs/query-language.md

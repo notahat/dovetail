@@ -12,6 +12,8 @@
     other key kinds arrive in later slices alongside the hand-rolled binary
     encoding. *)
 
+module Schema = Dovetail_core.Schema
+
 val decode_row : Schema.t -> string * string -> Schema.tuple
 (** [decode_row schema (key_bytes, value_bytes)] reconstructs a tuple in field
     order, drawing primary-key columns from [key_bytes] and the remaining

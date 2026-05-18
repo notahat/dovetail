@@ -1,3 +1,7 @@
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Expression = Dovetail_core.Expression
+
 (* Match a column reference against the scanned table's primary-key column.
    A bare reference ([{ qualifier = None; name }]) matches if [name] is the
    PK column's name; a qualified reference ([{ qualifier = Some q; name }])

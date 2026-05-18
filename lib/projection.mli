@@ -6,6 +6,8 @@
     the IR stays human-readable for debugging. Mapping references to tuple
     positions is an executor concern, handled by {!resolve}. *)
 
+module Schema = Dovetail_core.Schema
+
 type t = Schema.column_reference list
 (** The ordered list of column references to project. Order is preserved in the
     output schema and tuples. *)

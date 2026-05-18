@@ -8,6 +8,8 @@
     The Marshal coupling to OCaml's runtime representation is accepted for slice
     1 and revisited in slice 6 alongside composite-key encoding. *)
 
+module Schema = Dovetail_core.Schema
+
 val get :
   Storage.environment ->
   [> `Read ] Storage.transaction ->
