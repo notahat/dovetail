@@ -86,14 +86,13 @@ let print_ddl_read_result ~output = function
 
 (* Render the result of a write DDL statement to [output]. [Dropped] is
    the single status line [dropped table "<name>"]; quoting is explicit so
-   the wording matches the slice-12 spec regardless of identifier shape. *)
+   the wording matches the slice-12 spec regardless of identifier shape.
+   [Created] mirrors that shape: [created table "<name>"]. *)
 let print_ddl_write_result ~output = function
   | Ddl.Statement.Dropped table_name ->
       Format.fprintf output "dropped table \"%s\"@." table_name
-  | Ddl.Statement.Created _ ->
-      (* Routing invariant: the parser does not admit [:create table] until
-         slice 14 step 5, and the renderer wires in at step 7b. *)
-      assert false
+  | Ddl.Statement.Created table_name ->
+      Format.fprintf output "created table \"%s\"@." table_name
 
 (* Execute a DDL statement against [environment] and write the rendered
    result to [output]. Structural checks via [Statement.validate] run

@@ -259,6 +259,53 @@ let test_create_table_duplicate_primary_key_column_reports_validate_error () =
     "widgets not listed after validate error" false
     (contains_substring output "\nwidgets\n")
 
+(* Slice 14 step 7b: the [Created] renderer plus the end-to-end
+   exercise of [:create table]. The sequence creates [widgets], lists
+   the catalog (the new table appears alongside the fixture tables),
+   describes [widgets] (the canonical form matches the input the user
+   typed verbatim), drops it, and lists again (it is gone). The fixture
+   tables (orders, users) remain present throughout so the test also
+   sees that the create did not disturb the sibling tables. *)
+let test_create_table_end_to_end_sequence () =
+  let output =
+    run_with_input
+      [
+        ":create table widgets (id: Int64, name: String) primary key (id)";
+        ":list tables";
+        ":describe widgets";
+        ":drop table widgets";
+        ":list tables";
+      ]
+  in
+  check_contains "create status line" output "created table \"widgets\"";
+  check_contains ":describe widgets canonical form" output
+    ":create table widgets (\n  id: Int64,\n  name: String,\n) primary key (id)";
+  check_contains "drop status line" output "dropped table \"widgets\"";
+  (* The substring [\nwidgets\n] is the listing-line shape: a table name
+     on its own line in a [:list tables] block. It appears exactly once
+     -- in the first listing, between the create and the drop. The
+     second listing comes after the drop and must not contain it. *)
+  Alcotest.(check int)
+    "widgets appears in the first listing but not the second" 1
+    (count_substring output "\nwidgets\n");
+  check_contains "fixture tables survive create+drop" output "orders";
+  check_contains "fixture tables survive create+drop" output "users"
+
+(* The catalog-aware "table already exists" check lives in the executor
+   and raises with a [DDL: create table ...] prefix; the REPL's generic
+   error guard turns the raise into an [error: ...] line and the loop
+   continues. Creating [users] (a fixture table) is the simplest way
+   to exercise this without pre-populating any extra state. *)
+let test_create_table_already_exists_reports_error_and_continues () =
+  let output =
+    run_with_input
+      [ ":create table users (id: Int64) primary key (id)"; ":list tables" ]
+  in
+  check_contains "already-exists error" output
+    "error: DDL: create table \"users\": table already exists";
+  check_contains "loop continues after create error" output "orders";
+  check_contains "loop continues after create error" output "users"
+
 let test_relation_literal_alone_prints_one_row () =
   let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
   (* Bare column headers, no qualifier prefix. *)
@@ -323,6 +370,12 @@ let () =
              validate error"
             `Quick
             test_create_table_duplicate_primary_key_column_reports_validate_error;
+          Alcotest.test_case
+            ":create table followed by list/describe/drop/list round-trips"
+            `Quick test_create_table_end_to_end_sequence;
+          Alcotest.test_case
+            ":create table on an existing table reports the error and continues"
+            `Quick test_create_table_already_exists_reports_error_and_continues;
         ] );
       ( "mutation rendering",
         [

@@ -313,3 +313,22 @@ let contains_substring haystack needle =
       else scan (position + 1)
     in
     scan 0
+
+(** [count_substring haystack needle] is the number of (possibly overlapping)
+    occurrences of [needle] in [haystack]. Returns [0] when [needle] is empty or
+    longer than [haystack]. Useful when an assertion needs to count occurrences
+    rather than test for presence -- e.g. checking that a table name appears in
+    exactly one listing block of a REPL transcript. *)
+let count_substring haystack needle =
+  let needle_length = String.length needle in
+  let haystack_length = String.length haystack in
+  if needle_length = 0 || needle_length > haystack_length then 0
+  else
+    let limit = haystack_length - needle_length in
+    let rec scan position count =
+      if position > limit then count
+      else if String.sub haystack position needle_length = needle then
+        scan (position + 1) (count + 1)
+      else scan (position + 1) count
+    in
+    scan 0 0
