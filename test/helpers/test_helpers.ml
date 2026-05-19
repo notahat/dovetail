@@ -21,6 +21,7 @@ open Dovetail
 open Dovetail_core
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
+module Surface_ra = Dovetail_surface_ra
 
 (* Re-export the sibling [Fixture] module so callers that [open Test_helpers]
    can write [Fixture.populate_if_empty] without qualifying the path. The
@@ -233,14 +234,14 @@ let with_query_result query check_rows =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
-        match Parser.parse query with
-        | Ok (Ast.Pipeline plan) -> plan
-        | Ok (Ast.Ddl _) ->
+        match Surface_ra.Parser.parse query with
+        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+        | Ok (Surface_ra.Ast.Ddl _) ->
             Alcotest.failf "expected a pipeline but got a DDL statement: %s"
               query
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
-      let logical = Lower.lower ast in
+      let logical = Surface_ra.Lower.lower ast in
       let catalog = make_catalog environment transaction in
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
       Eval.eval environment transaction physical (fun relation ->
@@ -253,14 +254,14 @@ let with_query_failure ~label ~expected query =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
-        match Parser.parse query with
-        | Ok (Ast.Pipeline plan) -> plan
-        | Ok (Ast.Ddl _) ->
+        match Surface_ra.Parser.parse query with
+        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+        | Ok (Surface_ra.Ast.Ddl _) ->
             Alcotest.failf "expected a pipeline but got a DDL statement: %s"
               query
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
-      let logical = Lower.lower ast in
+      let logical = Surface_ra.Lower.lower ast in
       let catalog = make_catalog environment transaction in
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
       Alcotest.check_raises label expected (fun () ->

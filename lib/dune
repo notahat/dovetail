@@ -1,3 +1,4 @@
 (library
  (name dovetail)
- (libraries dovetail.core dovetail.ddl dovetail.storage dovetail.plan angstrom))
+ (libraries dovetail.core dovetail.ddl dovetail.storage dovetail.plan
+            dovetail.surface_ra))

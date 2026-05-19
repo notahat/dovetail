@@ -1,7 +1,7 @@
 (** Tests for [Parser]. *)
 
-open Dovetail
 open Dovetail_core
+open Dovetail_surface_ra
 open Test_helpers
 module Ddl = Dovetail_ddl
 

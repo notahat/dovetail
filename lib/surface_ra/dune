@@ -1,0 +1,4 @@
+(library
+ (name dovetail_surface_ra)
+ (public_name dovetail.surface_ra)
+ (libraries dovetail.core dovetail.plan dovetail.ddl angstrom))

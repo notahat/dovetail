@@ -5,8 +5,8 @@
     grammar (pipeline operators, integration with lower/translate/eval) lives in
     [test_parser.ml]. *)
 
-open Dovetail
 open Dovetail_core
+open Dovetail_surface_ra
 open Test_helpers
 
 let predicate_testable =

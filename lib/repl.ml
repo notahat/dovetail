@@ -2,6 +2,7 @@ module Relation = Dovetail_core.Relation
 module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
+module Surface_ra = Dovetail_surface_ra
 
 let prompt = "> "
 
@@ -129,12 +130,12 @@ let execute_and_print_ddl environment ~output statement =
    statement goes straight to [Ddl_executor.execute_*]), print. Parse and
    eval errors land in [output]; nothing is raised. *)
 let process_line environment ~output ~show_physical line =
-  match Parser.parse line with
+  match Surface_ra.Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message
-  | Ok (Ast.Pipeline plan) ->
-      let logical_plan = Lower.lower plan in
+  | Ok (Surface_ra.Ast.Pipeline plan) ->
+      let logical_plan = Surface_ra.Lower.lower plan in
       evaluate_and_print environment ~output ~show_physical logical_plan
-  | Ok (Ast.Ddl statement) ->
+  | Ok (Surface_ra.Ast.Ddl statement) ->
       execute_and_print_ddl environment ~output statement
 
 let run ?(show_physical = false) environment ~read_line ~output =

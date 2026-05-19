@@ -12,7 +12,7 @@
     of [Create_table] shapes (each value kind in turn, a compound primary key,
     plus the design doc's [users] and [order_items] canonical examples). *)
 
-open Dovetail
+open Dovetail_surface_ra
 module Ddl = Dovetail_ddl
 module Value = Dovetail_core.Value
 
