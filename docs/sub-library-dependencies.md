@@ -10,6 +10,7 @@ rather than repeating the edge seven times.
 ```mermaid
 graph TD
   subgraph upper [ ]
+    direction TB
     storage[storage]
     plan[plan]
     ddl[ddl]
