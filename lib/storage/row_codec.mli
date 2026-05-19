@@ -26,7 +26,7 @@ val encode_row : Schema.t -> Schema.tuple -> string * string
 (** [encode_row schema tuple] is the inverse of {!decode_row}: it splits [tuple]
     into its primary-key and non-primary-key values according to [schema] and
     encodes each side with {!Encoding}. The returned pair is suitable for
-    passing as [~key] and [~value] to {!Storage.put}.
+    passing as [~key] and [~value] to {!Engine.put}.
 
     Raises [Failure] if [schema] declares a composite or non-[int64] primary
     key, mirroring {!decode_row}'s slice 1 limitation. Raises [Invalid_argument]

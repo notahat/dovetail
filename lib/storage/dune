@@ -1,0 +1,4 @@
+(library
+ (name dovetail_storage)
+ (public_name dovetail.storage)
+ (libraries dovetail.core lmdb unix))

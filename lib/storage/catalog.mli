@@ -11,8 +11,8 @@
 module Schema = Dovetail_core.Schema
 
 val get :
-  Storage.environment ->
-  [> `Read ] Storage.transaction ->
+  Engine.environment ->
+  [> `Read ] Engine.transaction ->
   table_name:string ->
   Schema.t option
 (** [get environment transaction ~table_name] returns the schema bound to
@@ -21,8 +21,8 @@ val get :
     transaction. *)
 
 val put :
-  Storage.environment ->
-  [ `Read | `Write ] Storage.transaction ->
+  Engine.environment ->
+  [ `Read | `Write ] Engine.transaction ->
   table_name:string ->
   Schema.t ->
   unit
@@ -32,15 +32,15 @@ val put :
     transaction. *)
 
 val list_table_names :
-  Storage.environment -> [> `Read ] Storage.transaction -> string list
+  Engine.environment -> [> `Read ] Engine.transaction -> string list
 (** [list_table_names environment transaction] returns the names of every table
     bound in the catalog, in byte-sorted (cursor) order. Returns [] if the
     catalog subDB has not yet been created. Safe to call inside a read-only
     transaction. *)
 
 val delete :
-  Storage.environment ->
-  [ `Read | `Write ] Storage.transaction ->
+  Engine.environment ->
+  [ `Read | `Write ] Engine.transaction ->
   table_name:string ->
   unit
 (** [delete environment transaction ~table_name] removes the catalog binding for
