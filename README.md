@@ -4,12 +4,7 @@ A small relational database in OCaml, built on top of LMDB. Two query
 languages (a pipeline-style relational-algebra language, and SQL on top)
 sit over a Volcano-style executor and a hand-rolled storage layer.
 
-This is a learning vehicle, not production software. The plan deliberately
-delivers the system as thin vertical slices — each slice adds one
-operator's worth of code at every layer, end to end. See
-[`docs/plans/00-initial-plan.md`](docs/plans/00-initial-plan.md) for the
-foundational design and the slice plans (`02-...`, `03-...`) for the work
-in flight.
+This is a learning vehicle, not production software.
 
 ## Building and running
 
@@ -24,8 +19,10 @@ opam exec -- dune build @fmt --auto-promote   # format
 ./dovetail --demo-data /tmp/play     # ...or seed the example tables on first launch
 ```
 
-`./dovetail` is a small wrapper around `opam exec -- dune exec dovetail`
-so the REPL can be launched with a single command.
+`./dovetail` is a small wrapper that execs the prebuilt
+`_build/default/bin/main.exe`, forwarding any arguments. It does not
+build — run `dune build` first (or keep the `dune runtest -w` watcher
+up, which keeps the artifact fresh).
 
 See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling
 conventions.
@@ -54,99 +51,21 @@ See [`docs/query-language.md`](docs/query-language.md) for the full
 guide -- tutorial, per-operator reference, and the expression and
 projection sublanguages.
 
-## Layer diagram
+## Architecture
 
-The query pipeline runs top-to-bottom from text to tuples and back to text.
-The storage stack sits below it, used by `Eval` and the catalog.
-
-```
-  Query pipeline                                  Storage stack
-  ──────────────                                  ─────────────
-
-  "users | join orders on users.id = orders.user_id"
-         │
-         │  Parser   (angstrom)
-         ▼
-       Ast.t        — surface AST; mirrors syntax
-         │
-         │  Lower
-         ▼
-     Logical.t      — relational algebra; what the query computes
-         │
-         │  Translate
-         ▼
-     Physical.t     — physical operators; how to compute it
-         │
-         │  Eval ────────────────────────────►  Catalog       — name → Schema.t
-         ▼                                          │
-     Relation.t     — schema + Seq.t of tuples      │  uses
-         │                                          ▼
-         │  Relation.print                      Encoding      — keys (byte-
-         ▼                                          │          comparable),
-       output                                       │          tuple values
-                                                    │          (Marshal)
-                                                    │  uses
-                                                    ▼
-                                                Storage       — LMDB env, txns,
-                                                    │          byte-keyed maps
-                                                    ▼
-                                                  LMDB
-```
-
-`Demo_data` sits beside `Catalog` and the storage stack, seeding
-the example `users` and `orders` tables through the public DDL/DML
-surface when the binary is launched with `--demo-data`. Production
-runs ship no hardcoded rows; the seeder is opt-in.
-
-## Layers
-
-### Query pipeline
-
-| Layer       | Type                                     | Role                                                                                                                       |
-| ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `Parser`    | `string -> (Ast.t, error) result`              | Surface syntax → AST, built on `angstrom`. Bare identifiers and `\|`-separated `restrict`, `project`, `cross`, and `join ... on` pipeline steps so far. |
-| `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| Join \| ...` | What the user typed, structured. No semantics yet.                                                                                |
-| `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes. `Ast.Join` desugars to `Logical.Restrict (Logical.CrossProduct ..., predicate)`. |
-| `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×.                  |
-| `Translate` | `catalog:(string -> Schema.t option) -> Logical.t -> Physical.t` | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; folds `Restrict (Scan, pk = literal)` into an `IndexLookup` when the catalog says the PK matches. Future home of further optimisation. |
-| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| IndexLookup \| NestedLoopJoin \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, primary-key point lookups, future hash joins, etc. |
-| `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
-| `Projection`| `t = Schema.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
-| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |
-| `Relation`  | `'tag t = { schema; tuples }`            | Schema-tagged stream of tuples. Phantom `'tag` distinguishes set vs bag semantics.                                         |
-
-### Storage stack
-
-| Layer      | Role                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| `Storage`  | Thin wrapper over LMDB. Env, scope-bound read/write transactions, byte-keyed sub-databases. |
-| `Encoding` | Byte-comparable key encoding (sign-flipped BE for `int64`); `Marshal` for tuple values.     |
-| `Catalog`  | Persistent table-name → `Schema.t` map, backed by a single `catalog` subDB.                 |
-
-### Data types
-
-| Module   | What it carries                                                                                    |
-| -------- | -------------------------------------------------------------------------------------------------- |
-| `Value`  | `Int64 \| String \| Bool` runtime values, plus a parallel `Kind.t` for static schema declarations. |
-| `Schema` | Ordered field list + primary-key column names. `Schema.tuple = Value.t array`.                     |
-| `Relation` | (See above.) Phantom-typed for set/bag semantics.                                                |
+See [`docs/architecture.md`](docs/architecture.md) for the layer
+diagram, per-layer reference for the query pipeline and storage stack,
+and the sub-library dependency graph under `lib/`.
 
 ## Roadmap
 
 ### Next up
 
-Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`) with
-sub-steps; the ordering here is firm, but the scope of slice 17 will be
-pinned down when that slice starts.
+Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`)
+with sub-steps; the ordering here is firm, but the scope of slice 17
+will be pinned down when that slice starts.
 
-1. **Slice 16 — Full sub-library setup.** Extracts the remaining
-   libraries — `storage`, `plan`, `surface_ra`, `execution`, `frontend` —
-   completing the dune restructure designed in
-   [`docs/plans/library-structure.md`](docs/plans/library-structure.md).
-   Lands ahead of the SQL frontend so the second surface slots into the
-   existing shape rather than forcing a restructure under feature
-   pressure.
-2. **Slice 17 — Minimal SQL frontend.** A second front-end — SQL
+1. **Slice 17 — Minimal SQL frontend.** A second front-end — SQL
    parser, SQL AST, SQL→logical lowering — feeding the existing logical
    and physical IRs. Deliberately limited (no NULLs, scope otherwise
    TBD): the focus is on how the architecture splits between two
