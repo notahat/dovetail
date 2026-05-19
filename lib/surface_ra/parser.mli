@@ -2,25 +2,25 @@
 
     Built on [angstrom]. A top-level input is one of two universes, decided by
     the first non-whitespace character: a leading [:] introduces a DDL statement
-    (slice 12 admits [:list tables] and [:drop table <name>]); anything else is
-    a relational pipeline -- a base relation reference followed by zero or more
-    pipe-separated steps: [restrict <predicate>], [project <columns>],
-    [cross <relation>], [join <relation> on <predicate>], and optionally a
-    terminal sink ([insert into <table>]). Whitespace surrounding tokens is
-    tolerated; anything else (extra tokens, malformed identifiers, empty input,
-    a [:] mid-pipeline) is rejected.
+    ([:list tables], [:drop table <name>], [:describe <name>],
+    [:create table ...]); anything else is a relational pipeline -- a base
+    relation reference followed by zero or more pipe-separated steps:
+    [restrict <predicate>], [project <columns>], [cross <relation>],
+    [join <relation> on <predicate>], and optionally a terminal sink
+    ([insert into <table>]). Whitespace surrounding tokens is tolerated;
+    anything else (extra tokens, malformed identifiers, empty input, a [:]
+    mid-pipeline) is rejected.
 
-    The error type is currently a string passed straight from angstrom. When a
-    later slice produces user-visible errors with location information or
-    structured cases, this becomes a proper variant; the {!type-error} alias
-    exists now so callers can already speak in terms of [Parser.error] rather
-    than coupling to [string]. *)
+    The error type is currently a string passed straight from angstrom. When
+    user-visible errors gain location information or structured cases this
+    becomes a proper variant; the {!type-error} alias exists now so callers can
+    already speak in terms of [Parser.error] rather than coupling to [string].
+*)
 
 module Expression = Dovetail_core.Expression
 
 type error = string
-(** Slice-1 placeholder for parser errors. The string is whatever angstrom
-    produced. *)
+(** Placeholder for parser errors. The string is whatever angstrom produced. *)
 
 val parse : string -> (Ast.program, error) result
 (** [parse input] parses [input] as a complete top-level program. The result is
@@ -29,10 +29,9 @@ val parse : string -> (Ast.program, error) result
     data-definition statement introduced by the leading [:] sigil).
 
     The pipeline grammar enforces structurally that a sink terminates a pipeline
-    -- a query operator after [| insert into ...] is a parse error. The DDL
-    grammar admits only the slice-12 statements; the [:] sigil is recognised
-    only at the very top of the input, so a [:] inside a pipeline or expression
-    is a parse error rather than a DDL statement.
+    -- a query operator after [| insert into ...] is a parse error. The [:]
+    sigil is recognised only at the very top of the input, so a [:] inside a
+    pipeline or expression is a parse error rather than a DDL statement.
 
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)

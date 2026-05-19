@@ -33,8 +33,8 @@ let expected_matched_user_order_rows : Schema.tuple list =
   ]
 
 (* Always-true and always-false predicates over int64 literals. The
-   predicate grammar in slice 4 doesn't have a bare boolean predicate, but
-   [1 = 1] and [1 <> 1] do the same job and parse fine through the existing
+   predicate grammar has no bare boolean predicate, but [1 = 1] and
+   [1 <> 1] do the same job and parse fine through the existing
    resolver. *)
 let always_true_predicate =
   expression_compare

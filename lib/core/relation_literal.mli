@@ -12,8 +12,8 @@ val schema_of : columns:string list -> first_row:Value.t list -> Schema.t
     [first_row]; every field has [qualifier = None]; the schema's [primary_key]
     is empty, matching the convention for derived relations.
 
-    Inferring kinds from only the first row is sufficient because slice 11's
-    literal grammar is single-row. Multi-row literals will need to verify the
+    Inferring kinds from only the first row is sufficient because the literal
+    grammar is currently single-row. Multi-row literals will need to verify the
     later rows agree with the first; that check belongs upstream of this helper,
     which sees only one row.
 

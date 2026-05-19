@@ -8,9 +8,8 @@
     owns that composition so {!Eval} -- and any future inserter or index reader
     -- can stay focused on its own concerns.
 
-    Slice 1 only handles a single int64 primary-key column. Composite keys and
-    other key kinds arrive in later slices alongside the hand-rolled binary
-    encoding. *)
+    Currently only handles a single int64 primary-key column. Composite keys and
+    other key kinds will arrive alongside the hand-rolled binary encoding. *)
 
 module Schema = Dovetail_core.Schema
 
@@ -20,7 +19,7 @@ val decode_row : Schema.t -> string * string -> Schema.tuple
     columns from [value_bytes].
 
     Raises [Failure] if [schema] declares a composite or non-[int64] primary key
-    (slice 1 limitation). *)
+    (current limitation). *)
 
 val encode_row : Schema.t -> Schema.tuple -> string * string
 (** [encode_row schema tuple] is the inverse of {!decode_row}: it splits [tuple]
@@ -29,5 +28,5 @@ val encode_row : Schema.t -> Schema.tuple -> string * string
     passing as [~key] and [~value] to {!Engine.put}.
 
     Raises [Failure] if [schema] declares a composite or non-[int64] primary
-    key, mirroring {!decode_row}'s slice 1 limitation. Raises [Invalid_argument]
-    if [tuple] is not the right length for [schema]. *)
+    key, mirroring {!decode_row}'s limitation. Raises [Invalid_argument] if
+    [tuple] is not the right length for [schema]. *)

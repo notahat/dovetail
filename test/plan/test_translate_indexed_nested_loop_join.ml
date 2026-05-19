@@ -5,11 +5,11 @@
     bare [Scan] whose catalog schema has a single-column [Int64] primary key,
     and the predicate contains a cross-side equality naming that PK column on
     exactly one side, translate emits an [IndexedNestedLoopJoin] streaming the
-    other side. Step 3 generalises step 2's bare-[Compare] match to a conjunct
-    walk: the [predicate] is flattened, the first PK-equality conjunct is folded
-    into the indexed join, and any remaining conjuncts become a wrapping
-    [Filter]. Every other shape (no matching PK, non-bare scans, no PK-equality
-    conjunct) falls through to today's {!Physical.NestedLoopJoin}.
+    other side. The predicate is flattened into a conjunct list; the first
+    PK-equality conjunct is folded into the indexed join, and any remaining
+    conjuncts become a wrapping [Filter]. Every other shape (no matching PK,
+    non-bare scans, no PK-equality conjunct) falls through to
+    {!Physical.NestedLoopJoin}.
 
     Each test builds its own in-test catalog so the unit tests don't need a live
     LMDB environment; pipeline-level integration tests live in
@@ -567,9 +567,9 @@ let test_pk_equality_with_residual_conjunct_folds_and_wraps_in_filter () =
     physical
 
 let test_on_clause_and_trailing_restrict_produce_the_same_plan () =
-  (* Slice-9 invariant: a conjunct lives in the same physical plan
-     whether the user spells it on the [on]-clause or in a trailing
-     [| restrict]. Building both as logical plans:
+  (* Syntactic-equivalence invariant: a conjunct lives in the same
+     physical plan whether the user spells it on the [on]-clause or in
+     a trailing [| restrict]. Building both as logical plans:
 
        (a) Restrict(CrossProduct, pk_eq and amount_gt)
        (b) Restrict(Restrict(CrossProduct, pk_eq), amount_gt)
@@ -671,7 +671,8 @@ let test_conjunction_with_no_pk_equality_falls_back () =
 
 let test_inner_table_catalog_miss_falls_back () =
   (* If the catalog doesn't know about either base table, no
-     candidate qualifies. Mirrors slice 8's catalog-miss behaviour. *)
+     candidate qualifies. Mirrors [IndexLookup]'s catalog-miss
+     behaviour. *)
   let physical =
     unwrap_query
     @@ Translate.translate ~catalog:noop_catalog

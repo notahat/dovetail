@@ -108,10 +108,10 @@ let test_format_mutation_status_many_rows_pluralises () =
     "many rows use the plural noun" "inserted 5 rows"
     (Repl.format_mutation_status example_insert 5)
 
-(* Slice 11 step 4 end-to-end: a user-typed insert pipeline runs through
-   parse / lower / translate / eval, commits the row inside a write
-   transaction, and prints the affected-row status line. The follow-up
-   restrict query confirms the row landed in storage and is readable. *)
+(* End-to-end: a user-typed insert pipeline runs through parse / lower /
+   translate / eval, commits the row inside a write transaction, and
+   prints the affected-row status line. The follow-up restrict query
+   confirms the row landed in storage and is readable. *)
 let test_insert_into_orders_writes_row_and_reports_status () =
   let output =
     run_with_input
@@ -125,7 +125,7 @@ let test_insert_into_orders_writes_row_and_reports_status () =
   check_contains "inserted row's description" output "Pretzel";
   check_contains "inserted row's id column" output " 9 "
 
-(* Slice 12 step 3: [:list tables] runs through Parser → REPL DDL
+(* [:list tables] runs through Parser → REPL DDL
    dispatch → Ddl_executor.execute_read → Catalog.list_table_names and
    prints each table name on its own line. The fixture seeds [users] and
    [orders]; cursor (byte-sorted) order puts [orders] first. *)
@@ -153,7 +153,7 @@ let test_list_tables_prints_fixture_tables_in_byte_sorted_order () =
     "orders precedes users (byte-sorted)" true
     (orders_position < users_position)
 
-(* Slice 12 step 5b end-to-end: [:drop table <name>] parses, classifies
+(* End-to-end: [:drop table <name>] parses, classifies
    as a write, removes the catalog entry and storage subDB inside a
    write transaction, and prints the [dropped table "<name>"] status.
    The follow-up [:list tables] confirms the table is gone while its
@@ -181,7 +181,7 @@ let test_drop_nonexistent_table_reports_error_and_continues () =
   check_contains "loop continues after drop error" output "users";
   check_contains "loop continues after drop error" output "orders"
 
-(* Slice 14 step 4b end-to-end: [:describe <name>] parses, classifies
+(* End-to-end: [:describe <name>] parses, classifies
    as a read, looks the schema up in the catalog inside a read
    transaction, and prints the canonical form via [Format.statement] on
    the [Statement.of_schema] adapter. The fixture seeds [users] with
@@ -207,10 +207,9 @@ let test_describe_nonexistent_table_reports_error_and_continues () =
   check_contains "loop continues after describe error" output "users";
   check_contains "loop continues after describe error" output "orders"
 
-(* Slice 14 step 6: [Statement.validate] runs between parse and the
-   transaction. All five validate rules are reachable from the REPL --
-   the empty-list cases were promoted from "ungrammatical at the parser"
-   to "validate error" in a later step so the user sees the friendly
+(* [Statement.validate] runs between parse and the transaction. All five
+   validate rules are reachable from the REPL -- the empty-list cases
+   surface as validate errors so the user sees the friendly
    [DDL: create table ...] message rather than angstrom's raw [satisfy:
    ')'] surface. Each REPL-level test feeds an offending [:create table]
    line, asserts the rendered [error: DDL: ...] string verbatim, and
@@ -282,7 +281,7 @@ let test_create_table_duplicate_primary_key_column_reports_validate_error () =
     "widgets not listed after validate error" false
     (contains_substring output "\nwidgets\n")
 
-(* Slice 14 step 7b: the [Created] renderer plus the end-to-end
+(* The [Created] renderer plus the end-to-end
    exercise of [:create table]. The sequence creates [widgets], lists
    the catalog (the new table appears alongside the fixture tables),
    describes [widgets] (the canonical form matches the input the user

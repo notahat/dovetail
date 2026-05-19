@@ -2,7 +2,7 @@
 
     The inverse of the DDL parser: for every {!Statement.t} value [s],
     [Parser.parse (statement s)] parses back to a wrapper around the same [s]
-    (the round-trip property the slice 14 corpus pins). The three one-liner
+    (the round-trip property pinned by the test corpus). The three one-liner
     statements ([:list tables], [:drop table <name>], [:describe <name>]) print
     as a single line; [:create table <name> ...] prints in the design doc's
     canonical multi-line form with one column per indented line, a trailing

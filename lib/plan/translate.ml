@@ -16,7 +16,7 @@ let column_is_primary_key ~table ~primary_key_name
 
 (* If [schema] has a single-column [Int64] primary key, return the PK column's
    name. Composite keys, missing keys, and non-[Int64] keys all yield [None] --
-   the conditions under which slice 8 declines to fold. *)
+   the conditions under which IndexLookup folding declines. *)
 let single_int64_primary_key (schema : Schema.t) =
   match schema.primary_key with
   | [ primary_key_name ] -> (
@@ -32,8 +32,7 @@ let single_int64_primary_key (schema : Schema.t) =
 (* Recognise [predicate] as a PK-equality with an [Int64] literal and pull
    the literal out. Both [pk = K] and [K = pk] match. The column reference
    may be bare or qualified to the scanned table; any other qualifier is a
-   non-match. Step 2 only handles the bare [Compare] shape -- conjunction
-   walking arrives in step 3. *)
+   non-match. *)
 let try_primary_key_equality_literal ~table ~primary_key_name
     (predicate : Expression.t) =
   match predicate with
@@ -207,8 +206,8 @@ let try_match_conjunct ~left ~right ~left_candidate ~right_candidate conjunct =
 (* Walk [conjuncts] left-to-right; the first conjunct that matches a
    candidate's PK is folded into the indexed join, with the remaining
    conjuncts becoming the residual (order otherwise preserved). Sibling
-   to slice 8's [partition_primary_key_conjunct] -- the structure is
-   identical; only the per-conjunct match predicate differs. *)
+   to [partition_primary_key_conjunct] -- the structure is identical;
+   only the per-conjunct match predicate differs. *)
 let partition_join_pk_conjunct ~left ~right ~left_candidate ~right_candidate
     conjuncts =
   let rec walk before = function
@@ -366,7 +365,7 @@ let check_row_arity ~target_table ~literal_columns ~first_row =
 (* Check that each value in [first_row] has the kind the target schema
    declares for the column named at the same position in [literal_columns].
    Raises [Failure] naming the column and both kinds. The first-row kinds
-   are sufficient because slice 11's literal grammar is single-row;
+   are sufficient because the literal grammar is currently single-row;
    multi-row literals would extend the check to every row.
 
    Precondition: [check_columns_match] and [check_row_arity] have passed,

@@ -13,10 +13,10 @@
     a future surface (SQL, scripting) can build {!t} values without pulling the
     executor in.
 
-    Slice 12 landed [List_tables] and [Drop_table]. Slice 14 adds [Describe] and
-    [Create_table], paired so the round-trip property [parse(format(s)) = s]
-    lands in one PR; the canonical-form printer that pairs with the parser lives
-    in {!Dovetail_ddl.Format}.
+    The constructors are [List_tables], [Drop_table], [Describe], and
+    [Create_table]. The canonical-form printer that pairs with the parser lives
+    in {!Dovetail_ddl.Format} and satisfies the round-trip property
+    [parse(format(s)) = s].
 
     DDL does not pass through [Lower] / [Translate] / [Physical] / [Eval] —
     those layers carry no knowledge of DDL. The REPL classifies a statement,

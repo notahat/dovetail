@@ -214,9 +214,9 @@ let test_string_less_than_orders_lexicographically () =
     matched
 
 let test_bare_bool_column_resolves_as_predicate () =
-  (* Slice 7 step 2 generalises the IR so a standalone column is a valid
-     expression. A Bool-kinded column resolves directly as a predicate;
-     each row's verdict equals its [active] flag. *)
+  (* A standalone column is a valid expression. A Bool-kinded column
+     resolves directly as a predicate; each row's verdict equals its
+     [active] flag. *)
   let evaluator =
     Expression.resolve users_schema (expression_column "active")
   in

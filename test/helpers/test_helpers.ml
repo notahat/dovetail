@@ -165,8 +165,7 @@ let physical_testable : Plan.Physical.t Alcotest.testable =
     the rewrite-recognised inner plan; [Physical.plan]'s wrapper shape is pinned
     by [Translate.translate]'s type signature, so no value-level check of the
     wrapper is needed. A [Mutation] reaching this helper would be a
-    translate-side bug -- the parser path for mutations doesn't land until step
-    4 -- so we abort the test loudly. *)
+    translate-side bug, so we abort the test loudly. *)
 let unwrap_query (plan : Plan.Physical.plan) : Plan.Physical.t =
   match plan with
   | Query plan -> plan
@@ -176,8 +175,8 @@ let unwrap_query (plan : Plan.Physical.plan) : Plan.Physical.t =
     [Query]. Sibling to {!unwrap_query} for the Logical side: the Lower tests
     use this to keep their structural assertions aimed at the relation tree
     while [Lower.lower]'s wrapper shape is pinned by its type signature. A
-    [Mutation] reaching this helper would mean the Ast somehow produced one,
-    which is impossible until slice 11 step 4 wires the sink production. *)
+    [Mutation] reaching this helper would mean the Ast somehow produced one
+    where the test expected a query. *)
 let unwrap_logical_query (plan : Plan.Logical.plan) : Plan.Logical.t =
   match plan with
   | Query plan -> plan
@@ -219,7 +218,7 @@ let expression_not operand : Expression.t = Not operand
 (** A catalog callback that knows about no tables. Use in [Translate]-level unit
     tests that don't exercise schema-dependent rewrites; the catalog is
     consulted only for [IndexLookup] recognition, so a [None]-everywhere
-    callback yields the same translation as the slice-5 era did. *)
+    callback yields a catalog-free translation. *)
 let noop_catalog : string -> Schema.t option = fun _table_name -> None
 
 (** Build a catalog callback bound to [environment] and [transaction] so that

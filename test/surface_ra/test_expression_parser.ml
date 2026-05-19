@@ -87,8 +87,7 @@ let test_tolerates_extra_whitespace () =
        ~right:(expression_literal (Value.Int64 3L)))
 
 let test_literal_on_the_left () =
-  (* Slice 4 step 2 lifts the slice-2 restriction that the right side must
-     be a literal -- either side can now be a column or a literal. *)
+  (* Either side of the comparison can be a column or a literal. *)
   parses_predicate "3 = id"
     (expression_compare
        ~left:(expression_literal (Value.Int64 3L))
@@ -105,9 +104,8 @@ let test_column_inequality_column () =
        ~right:(expression_column "user_id"))
 
 let test_bare_column () =
-  (* Slice 7 step 2: a standalone column reference is a valid predicate at
-     the parser level. Whether it resolves to a Bool is a resolve-time
-     concern. *)
+  (* A standalone column reference is a valid predicate at the parser
+     level. Whether it resolves to a Bool is a resolve-time concern. *)
   parses_predicate "active" (expression_column "active")
 
 let test_bare_qualified_column () =
@@ -206,9 +204,9 @@ let test_comparison_binds_tighter_than_and () =
        ~right:(expression_column "active"))
 
 let test_mixed_and_or_with_comparison () =
-  (* Worked through in the slice plan: [id = 1 or id = 2 and active]
-     parses as [id = 1 or (id = 2 and active)] because [and] binds
-     tighter than [or]. *)
+  (* [id = 1 or id = 2 and active] parses as
+     [id = 1 or (id = 2 and active)] because [and] binds tighter than
+     [or]. *)
   parses_predicate "id = 1 or id = 2 and active"
     (expression_or
        ~left:

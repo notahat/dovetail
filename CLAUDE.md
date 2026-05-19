@@ -53,6 +53,15 @@ If you find yourself wanting to add to this list, prefer spelling out
 unless the short form is genuinely conventional in OCaml or the
 underlying tool's vocabulary.
 
+## Comments
+
+- Don't reference slices or steps in code or comments. The plan
+  scaffolding is for `docs/plans/`, not the code — "when things were
+  added isn't relevant to someone reading the code." Describe current
+  limitations or future directions in their own terms ("currently only
+  supports X", "multi-row literals will…"), not by citing the slice
+  that introduced or will introduce them.
+
 ## Error messages
 
 - Every user-facing error string starts with a prefix that names the

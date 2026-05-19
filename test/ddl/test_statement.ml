@@ -42,7 +42,7 @@ let test_create_table_classifies_as_write () =
     = `Write)
 
 (* A fixture-shaped schema for [users]: every field carries
-   [qualifier = Some "users"], matching how [Fixture] and the slice 14
+   [qualifier = Some "users"], matching how [Fixture] and the
    [Create_table] executor store schemas. *)
 let users_schema : Schema.t =
   {

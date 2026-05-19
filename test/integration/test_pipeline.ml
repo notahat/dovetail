@@ -219,8 +219,8 @@ let test_indexed_join_yields_expected_rows_and_column_order () =
         expected_join_rows rows)
 
 let test_indexed_join_then_project_matches_readme_example () =
-  (* The README example query. Pins the project's row order against
-     the rendered table in the slice's Goal section. *)
+  (* The README example query. Pins the project's row order against the
+     rendered table in the README's example. *)
   with_query_result
     "users | join orders on users.id = orders.user_id | project name, \
      description, amount" (fun rows ->
@@ -263,9 +263,9 @@ let test_indexed_join_with_on_clause_residual_yields_filtered_rows () =
         expected_join_rows_with_amount_at_least_five rows)
 
 let test_indexed_join_with_trailing_restrict_yields_same_rows () =
-  (* The trailing [| restrict] form. The slice-9 syntactic-equivalence
-     invariant says this must produce the same physical plan -- and so
-     the same rows -- as the on-clause [and] form above. *)
+  (* The trailing [| restrict] form. The syntactic-equivalence invariant
+     says this must produce the same physical plan -- and so the same
+     rows -- as the on-clause [and] form above. *)
   with_query_result
     "users | join orders on users.id = orders.user_id | restrict orders.amount \
      >= 5" (fun rows ->
@@ -277,7 +277,7 @@ let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
   (* Regression: the indexed rewrite only fires for column-on-column
      equalities that name an inner's PK. An ordering predicate like
      [users.id < orders.user_id] doesn't match, so this query keeps
-     running through the slice-5 NestedLoopJoin path. We don't assert
+     running through the NestedLoopJoin path. We don't assert
      the plan shape directly here (test_translate_indexed_nested_loop_join
      does), only that the end-to-end behaviour is unchanged. *)
   with_query_result "users | cross orders | restrict users.id < orders.user_id"
@@ -290,7 +290,7 @@ let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
 (* Evaluate [plan] against the populated fixture and render the result
    the way Repl does, returning the rendered string for substring
    assertions. Used by the IndexedNestedLoopJoin pipeline test, which
-   has no parser path yet (Translate support arrives in step 2). *)
+   has no parser path yet. *)
 let render_plan_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
@@ -300,10 +300,10 @@ let render_plan_against_fixture plan =
 
 let test_indexed_nested_loop_join_renders_matched_pairs () =
   (* Hand-built plan: stream [orders], probe [users] by
-     [orders.user_id]. Step 1 doesn't add Translate support, so this
-     test exercises Eval + Relation.print without going through the
-     parser. The assertions cover the rendered column headers and
-     every (user, order) pair the join should produce. *)
+     [orders.user_id]. No parser path yet, so this test exercises Eval
+     + Relation.print without going through the parser. The assertions
+     cover the rendered column headers and every (user, order) pair
+     the join should produce. *)
   let plan : Plan.Physical.t =
     Plan.Physical.IndexedNestedLoopJoin
       {

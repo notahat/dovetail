@@ -2,12 +2,12 @@
 
     Key encoding is hand-rolled and byte-comparable: comparing two encoded keys
     with [String.compare] (or [memcmp]) yields the same ordering as comparing
-    the original values. Slice 1 only exercises [int64] keys; further key types
-    arrive when later slices need them.
+    the original values. Only [int64] keys are currently supported; further key
+    types will arrive when needed.
 
-    Tuple value encoding is [Marshal]-based for slice 1. The Marshal coupling to
-    OCaml's runtime representation is accepted for now and replaced with
-    hand-rolled binary in slice 6, alongside composite-key encoding. *)
+    Tuple value encoding is currently [Marshal]-based. The Marshal coupling to
+    OCaml's runtime representation is accepted for now and will be replaced with
+    hand-rolled binary alongside composite-key encoding. *)
 
 module Value = Dovetail_core.Value
 

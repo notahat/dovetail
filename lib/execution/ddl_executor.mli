@@ -23,10 +23,10 @@ val execute_read :
     transaction so [:list tables] doesn't unnecessarily serialise against LMDB's
     writer lock.
 
-    Slice 12 implements only [List_tables]. Passing a write-only DDL constructor
-    (e.g. [Drop_table]) is a contract violation: the REPL is required to call
-    {!Ddl.Statement.classify} first and route write statements to
-    {!execute_write}, so reaching this with a write statement would be a
+    Currently implements only [List_tables]. Passing a write-only DDL
+    constructor (e.g. [Drop_table]) is a contract violation: the REPL is
+    required to call {!Ddl.Statement.classify} first and route write statements
+    to {!execute_write}, so reaching this with a write statement would be a
     layering bug. *)
 
 val execute_write :

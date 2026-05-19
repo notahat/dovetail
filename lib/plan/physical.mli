@@ -31,8 +31,8 @@ type t =
           qualifiers preserved; the [primary_key] is empty. Cross product
           preserves the multiplicity tag, since pairing two rows can only
           duplicate values that the inputs already had. The dedicated [Join]
-          operator (with multiple strategies on the roadmap -- hash, merge)
-          ships in a later slice. *)
+          operator with multiple strategies (hash, merge) is a future addition.
+      *)
   | IndexLookup of { table : string; key : int64 }
       (** [IndexLookup { table; key }] fetches the single row in [table] whose
           primary key equals [key], by encoding [key] and calling
@@ -89,9 +89,9 @@ type t =
           {!Dovetail_core.Relation_literal.schema_of} applied to [columns] and
           the first row.
 
-          Each row in [rows] must have the same length as [columns]. Slice 11's
-          parser produces single-row literals only, so [rows] always has length
-          one in user-driven plans; the IR shape leaves room for a future
+          Each row in [rows] must have the same length as [columns]. The parser
+          currently produces single-row literals only, so [rows] always has
+          length one in user-driven plans; the IR shape leaves room for a future
           multi-row literal grammar. *)
 
 type mutation =
@@ -102,9 +102,8 @@ type mutation =
 
           The {!plan} wrapper below sits above this type so the REPL can
           dispatch on plan kind between {!Eval.eval} (for queries) and
-          {!Eval.eval_mutation} (for mutations). The constructor is part of the
-          slice 11 DML surface; further mutations (update, delete) land
-          additively in slice 12. *)
+          {!Eval.eval_mutation} (for mutations). Further mutations (update,
+          delete) will land additively. *)
 
 type plan =
   | Query of t

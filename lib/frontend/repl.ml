@@ -93,8 +93,8 @@ let print_ddl_read_result ~output = function
 
 (* Render the result of a write DDL statement to [output]. [Dropped] is
    the single status line [dropped table "<name>"]; quoting is explicit so
-   the wording matches the slice-12 spec regardless of identifier shape.
-   [Created] mirrors that shape: [created table "<name>"]. *)
+   the wording is consistent regardless of identifier shape. [Created]
+   mirrors that shape: [created table "<name>"]. *)
 let print_ddl_write_result ~output = function
   | Ddl.Statement.Dropped table_name ->
       Format.fprintf output "dropped table \"%s\"@." table_name
@@ -106,9 +106,8 @@ let print_ddl_write_result ~output = function
    before the transaction opens, so a failing validate never pays the
    writer-lock cost for an error it could surface earlier. The classifier
    then picks the transaction kind, mirroring the [Logical.classify] split
-   above for pipelines; [Failure] raised inside the validate step or
-   inside [execute_*] lands in the [error: ...] line through the shared
-   guard. *)
+   above for pipelines; [Failure] raised inside validate or inside
+   [execute_*] lands in the [error: ...] line through the shared guard. *)
 let execute_and_print_ddl environment ~output statement =
   try
     let () =

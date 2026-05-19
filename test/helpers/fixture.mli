@@ -1,12 +1,10 @@
 (** Hardcoded fixture data populated lazily into a fresh database, for unit
     tests that need a known set of rows to query against.
 
-    Slice 15 moved this from the production library into the test helpers: the
-    REPL no longer seeds these on boot, and the only callers are the unit-test
-    suites that need data without paying the DDL/DML correctness dependency. The
-    {!Demo_data} module in [lib/] serves the same shape through the surface for
-    the [--demo-data] REPL flag and the doctest harness; the two are
-    deliberately decoupled and free to drift. *)
+    The only callers are the unit-test suites that need data without paying the
+    DDL/DML correctness dependency. The {!Demo_data} module in [lib/] serves the
+    same shape through the surface for the [--demo-data] REPL flag and the
+    doctest harness; the two are deliberately decoupled and free to drift. *)
 
 module Schema = Dovetail_core.Schema
 module Storage = Dovetail_storage

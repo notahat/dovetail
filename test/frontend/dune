@@ -1,4 +1,10 @@
 (tests
  (names test_cli test_repl test_demo_data)
- (libraries alcotest dovetail.core dovetail.storage dovetail.ddl
-            dovetail.plan dovetail.frontend test_helpers))
+ (libraries
+  alcotest
+  dovetail.core
+  dovetail.storage
+  dovetail.ddl
+  dovetail.plan
+  dovetail.frontend
+  test_helpers))

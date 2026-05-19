@@ -54,10 +54,10 @@ type t =
   | RelationLiteral of { columns : string list; rows : Value.t list list }
       (** [RelationLiteral { columns; rows }] is the surface form
           [{col: val, col: val, ...}] -- a relation whose contents the user gave
-          directly, instead of a reference to a stored table. Slice 11's parser
-          accepts the single-row named-pair form only, so [rows] always has
-          length one; the IR shape leaves room for a future multi-row literal
-          grammar.
+          directly, instead of a reference to a stored table. The parser
+          currently accepts the single-row named-pair form only, so [rows]
+          always has length one; the IR shape leaves room for a future multi-row
+          literal grammar.
 
           Column names are bare identifiers (the parser rejects qualified keys)
           and must be unique within the literal (the parser rejects duplicates).
@@ -86,10 +86,10 @@ type plan =
 
 type program =
   | Pipeline of plan
-      (** [Pipeline plan] is the relational pipeline universe: every input the
-          surface language has accepted up to slice 11. Threaded through
-          {!Lower.lower}, {!Translate.translate}, and {!Eval.eval} or
-          {!Eval.eval_mutation} as appropriate. *)
+      (** [Pipeline plan] is the relational pipeline universe: every non-DDL
+          input the surface language accepts. Threaded through {!Lower.lower},
+          {!Translate.translate}, and {!Eval.eval} or {!Eval.eval_mutation} as
+          appropriate. *)
   | Ddl of Ddl.Statement.t
       (** [Ddl statement] is the data-definition universe, marked at the surface
           by the leading [:] sigil. {!Lower}, {!Translate}, and the physical

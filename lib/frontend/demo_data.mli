@@ -2,9 +2,8 @@
     flag and the documentation doctest harness consume.
 
     The script lives as an OCaml [string list] of surface-form REPL statements
-    rather than a resource file. When a future slice introduces a "load DDL/DML
-    from a file" story the script can move there; today's surface doesn't need
-    it.
+    rather than a resource file. If a "load DDL/DML from a file" story arrives
+    the script can move there; today's surface doesn't need it.
 
     The shape seeded today happens to match what [Fixture] populates in the test
     layer, but the two are deliberately decoupled: either is free to evolve

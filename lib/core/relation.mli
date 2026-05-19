@@ -4,13 +4,13 @@
     results: a schema describing the row shape, paired with a lazy [Seq.t] of
     tuples in that shape. The phantom [`Set] / [`Bag] tag declares whether the
     relation has duplicate-elimination semantics, allowing the type system to
-    reject combinations that would silently change those semantics. Slice 1's
-    only producer (full table scan) emits [[`Bag] t].
+    reject combinations that would silently change those semantics. The full
+    table scan -- currently the only producer -- emits [[`Bag] t].
 
     Relations are tied to the transaction that produced their [tuples] sequence.
     The sequence must be consumed before the transaction's callback returns;
     using a relation outside its originating transaction's scope is undefined
-    behaviour and not statically prevented in slice 1. *)
+    behaviour and not statically prevented. *)
 
 type 'tag t = {
   schema : Schema.t;

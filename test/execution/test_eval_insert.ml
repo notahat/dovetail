@@ -1,10 +1,8 @@
 (** End-to-end tests for [Eval.eval_mutation] on [Physical.Insert].
 
-    Slice 11 step 2a introduces the insert sink behind a dedicated entry point;
-    Translate and the REPL still go only through the read-only [Eval.eval], so
-    there is no parser path that reaches a [Physical.mutation] yet. Tests
-    construct the mutation by hand and call [Eval.eval_mutation] inside a write
-    transaction. *)
+    The insert sink has a dedicated entry point separate from the read-only
+    [Eval.eval]. These tests construct the mutation by hand and call
+    [Eval.eval_mutation] inside a write transaction. *)
 
 open Dovetail_execution
 open Test_helpers
@@ -16,8 +14,8 @@ module Storage = Dovetail_storage
 (* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]
    with the given column/value pairs. The pairs are in target schema order;
    this keeps the tests focused on the sink itself and not on column
-   reordering (Step 3 introduces Translate-level permutation validation
-   that lets the sink trust its input). *)
+   reordering (Translate-level permutation validation lets the sink trust
+   its input). *)
 let insert_mutation ~table ~pairs : Plan.Physical.mutation =
   let columns = List.map fst pairs in
   let values = List.map snd pairs in

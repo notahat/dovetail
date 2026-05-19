@@ -5,7 +5,7 @@ type 'tag t = {
   constraint 'tag = [< `Set | `Bag ]
 
 (* Render a single value as the cell text that will appear in a table. No
-   quoting, no escaping; slice 1's pretty-print is illustrative. This is
+   quoting, no escaping; the pretty-print is illustrative. This is
    deliberately distinct from {!Value.format}, which quotes strings so the
    value boundary is visible -- a presentational choice that fits an
    error message or a debug log but is wrong for cells laid out in a

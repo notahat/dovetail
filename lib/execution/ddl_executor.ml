@@ -4,8 +4,8 @@ module Storage = Dovetail_storage
 
 (* Look up [table_name] in the catalog and return its schema wrapped in
    [Described]. The catalog-aware "no such table" check happens here so
-   the user-facing error names the operation they typed; the [DDL:
-   describe ...] prefix matches the slice-13 reframe convention. *)
+   the user-facing error names the operation they typed with the
+   [DDL: describe ...] prefix. *)
 let describe_table environment transaction table_name :
     Ddl.Statement.read_result =
   match Storage.Catalog.get environment transaction ~table_name with

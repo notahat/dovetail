@@ -1,5 +1,10 @@
 (library
  (name dovetail_frontend)
  (public_name dovetail.frontend)
- (libraries dovetail.core dovetail.storage dovetail.plan dovetail.ddl
-            dovetail.surface_ra dovetail.execution))
+ (libraries
+  dovetail.core
+  dovetail.storage
+  dovetail.plan
+  dovetail.ddl
+  dovetail.surface_ra
+  dovetail.execution))

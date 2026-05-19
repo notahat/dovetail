@@ -276,7 +276,7 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
 
 (* For each target field, find the position in [source_schema] that supplies
    its value. Raises [Failure] if a target field has no matching source
-   column. Source columns absent from the target are tolerated here; Step 3's
+   column. Source columns absent from the target are tolerated here;
    Translate-level validation rejects them upstream. *)
 let build_source_position_map ~source_schema ~(target_schema : Schema.t) =
   List.map

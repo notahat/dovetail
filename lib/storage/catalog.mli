@@ -5,8 +5,8 @@
     lazily on the first {!put}; reads against an environment that has never been
     written return [None] rather than raising.
 
-    The Marshal coupling to OCaml's runtime representation is accepted for slice
-    1 and revisited in slice 6 alongside composite-key encoding. *)
+    The Marshal coupling to OCaml's runtime representation is accepted for now
+    and will be revisited alongside composite-key encoding. *)
 
 module Schema = Dovetail_core.Schema
 

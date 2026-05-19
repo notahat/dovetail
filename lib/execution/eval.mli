@@ -54,8 +54,8 @@ val eval_mutation :
     The continuation shape mirrors {!eval} so the two entry points dispatch
     uniformly at the call site. The affected-row count is itself a plain value
     with no scoped resource attached, but threading it through a continuation
-    keeps slice-12-onwards mutation outputs (e.g. RETURNING-style row streams)
-    able to slot in without a second signature break.
+    keeps future mutation outputs (e.g. RETURNING-style row streams) able to
+    slot in without a second signature break.
 
     Raises [Failure] under the same conditions as {!eval}, plus on a primary-key
     collision against an existing row in the target table. A raise aborts the

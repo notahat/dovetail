@@ -50,8 +50,7 @@ let test_decode_row_raises_for_composite_primary_key () =
     }
   in
   Alcotest.check_raises "composite primary key"
-    (Failure
-       "Row_codec: only single-column primary keys are supported in slice 1")
+    (Failure "Row_codec: only single-column primary keys are supported")
     (fun () ->
       ignore
         (Storage.Row_codec.decode_row composite_schema ("ignored", "ignored")))
@@ -64,8 +63,7 @@ let test_decode_row_raises_for_non_int64_primary_key () =
     }
   in
   Alcotest.check_raises "string primary key"
-    (Failure
-       "Row_codec: only int64 primary-key columns are supported in slice 1")
+    (Failure "Row_codec: only int64 primary-key columns are supported")
     (fun () ->
       ignore
         (Storage.Row_codec.decode_row string_pk_schema ("ignored", "ignored")))
@@ -99,8 +97,7 @@ let test_encode_row_raises_for_composite_primary_key () =
     }
   in
   Alcotest.check_raises "composite primary key"
-    (Failure
-       "Row_codec: only single-column primary keys are supported in slice 1")
+    (Failure "Row_codec: only single-column primary keys are supported")
     (fun () ->
       ignore
         (Storage.Row_codec.encode_row composite_schema

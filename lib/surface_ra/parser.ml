@@ -83,8 +83,8 @@ let string_literal =
    [term] parser inside [expression]; bare identifiers (column references)
    are deliberately not accepted here -- the design doc reserves the
    value position for expressions, but in insert context columns have no
-   row to resolve against, so until a future slice introduces an
-   expression IR for the value position the surface form is "literal." *)
+   row to resolve against, so until an expression IR is wired into the
+   value position the surface form is "literal." *)
 let literal_value =
   peek_char >>= function
   | Some '"' -> string_literal
@@ -164,7 +164,7 @@ let check_for_duplicate_columns pairs =
 
 (* A relation literal: [{column: value, column: value, ...}]. Single-row
    named-pair form only -- the multi-row literal grammar is a separate
-   production deferred to a future slice. *)
+   production deferred for later. *)
 let relation_literal =
   char '{' *> whitespace *> relation_literal_pairs <* whitespace <* char '}'
   >>= fun pairs ->
@@ -294,7 +294,7 @@ let expression =
         (fun accumulator next -> Expression.Or (accumulator, next))
         first rest)
 
-(* The slice-3 projection grammar: one column reference followed by zero or
+(* The projection grammar: one column reference followed by zero or
    more [, column-reference] tails. Whitespace is flexible around the comma.
    At least one column is required; the [column_reference] before [many]
    ensures that. Leading and trailing commas are rejected because we only
@@ -318,7 +318,7 @@ let project_step =
 
 (* A cross-product pipeline step: [| cross <relation>]. The right-hand side
    is a relation reference (a base table for now); nesting and
-   sub-pipelines on the right are out of scope for slice 4. *)
+   sub-pipelines on the right are out of scope. *)
 let cross_step =
   keyword "cross" *> whitespace *> identifier >>| fun right_table input ->
   Ast.CrossProduct { left = input; right = Ast.Relation_name right_table }
@@ -364,8 +364,8 @@ let insert_sink =
   keyword "insert" *> whitespace *> keyword "into" *> whitespace *> identifier
   >>| fun target_table source -> Ast.Insert { source; table = target_table }
 
-(* The slice-11 pipeline grammar: a query pipeline, optionally terminated
-   by a single sink step. A sink lifts the result into [Ast.Mutation];
+(* The pipeline grammar: a query pipeline, optionally terminated by a
+   single sink step. A sink lifts the result into [Ast.Mutation];
    absent a sink the result is an [Ast.Query]. The "at most one sink, in
    terminal position" rule is enforced by [program_parser]'s trailing
    [end_of_input], which rejects any further input after the pipeline. *)
@@ -378,12 +378,12 @@ let pipeline_parser =
   let without_sink = return (Ast.Query upstream) in
   with_sink <|> without_sink
 
-(* The slice-12 DDL body grammar: the productions admitted after the [:]
+(* The DDL body grammar: the productions admitted after the [:]
    sigil has been consumed. The disjunction relies on [<|>]'s backtracking
    on inner failure: each branch starts with a distinct keyword
-   ([list]/[drop]), so a failed first branch rewinds to the start of the
-   body and the second branch tries from the same position. Future
-   productions ([describe], [create]) slot in alongside these. *)
+   ([list]/[drop]/[describe]/[create]), so a failed first branch rewinds to
+   the start of the body and the next branch tries from the same
+   position. *)
 let ddl_list_tables =
   keyword "list" *> whitespace *> keyword "tables"
   *> return Ddl.Statement.List_tables
@@ -396,12 +396,12 @@ let ddl_describe =
   keyword "describe" *> whitespace *> identifier >>| fun table_name ->
   Ddl.Statement.Describe { table_name }
 
-(* Resolve a [:create table] column kind at parse time. Per the slice-14
-   design, the surface kind position carries an identifier ([Int64],
-   [String], [Bool]) and the parser maps it to {!Value.Kind.t} directly --
-   downstream code never sees a raw kind string. An unknown identifier
-   here raises a parse error rather than deferring the diagnostic to
-   validate, so [Statement.t] values never carry a phantom kind. *)
+(* Resolve a [:create table] column kind at parse time. The surface kind
+   position carries an identifier ([Int64], [String], [Bool]) and the
+   parser maps it to {!Value.Kind.t} directly -- downstream code never
+   sees a raw kind string. An unknown identifier here raises a parse
+   error rather than deferring the diagnostic to validate, so
+   [Statement.t] values never carry a phantom kind. *)
 let create_table_kind =
   identifier >>= function
   | "Int64" -> return Value.Kind.Int64

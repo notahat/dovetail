@@ -1,6 +1,6 @@
 (** Tests for [Translate]'s structural rewrites: one logical constructor maps to
-    one physical constructor, plus the slice-5 inner-join collapse. The
-    [IndexLookup] rewrite lives in [test_translate_index_lookup.ml]. *)
+    one physical constructor, plus the inner-join collapse. The [IndexLookup]
+    rewrite lives in [test_translate_index_lookup.ml]. *)
 
 open Dovetail_plan
 open Test_helpers

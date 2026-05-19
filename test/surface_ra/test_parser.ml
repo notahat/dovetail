@@ -28,7 +28,7 @@ let rejects input =
   | Error _ -> ()
 
 (* Stricter form of [rejects]: assert the parser fails AND that the error
-   message contains every fragment in [mentions]. Used by the slice-11
+   message contains every fragment in [mentions]. Used by the
    validation-polish tests, where the wording is part of the contract --
    "names the offending column" is a guarantee tests should observe. *)
 let rejects_with_message input ~mentions =
@@ -62,8 +62,8 @@ let test_rejects_identifier_starting_with_digit () = rejects "1users"
 let test_rejects_identifier_starting_with_underscore () = rejects "_users"
 
 let test_rejects_two_identifiers () =
-  (* Multiple tokens are out of scope for slice 1's grammar; the parser must
-     refuse them now so we don't accidentally start accepting them later. *)
+  (* Multiple tokens are out of scope for the grammar; the parser must
+     refuse them so we don't accidentally start accepting them later. *)
   rejects "users orders"
 
 let id_equals_three =
@@ -326,11 +326,9 @@ let test_relation_literal_rejects_missing_value () = rejects "{id:}"
 let test_relation_literal_rejects_column_reference_in_value_position () =
   rejects "{id: x}"
 
-(* Slice 11 step 4: the sink production. A pipeline that ends in [| insert
-   into <table>] parses as an [Ast.Mutation], with everything before the
-   sink as the upstream relation. Pipelines without a sink parse as
-   [Ast.Query]. The wrapper is the parser's only structural change at this
-   step. *)
+(* The sink production. A pipeline that ends in [| insert into <table>]
+   parses as an [Ast.Mutation], with everything before the sink as the
+   upstream relation. Pipelines without a sink parse as [Ast.Query]. *)
 
 let parses_plan input expected_plan =
   match Parser.parse input with
@@ -404,11 +402,10 @@ let test_pipeline_rejects_sink_without_into_keyword () =
 let test_pipeline_rejects_two_sinks () =
   rejects "users | insert into orders | insert into orders"
 
-(* Slice 12 step 3: the DDL sigil. A leading [:] (after any optional
-   whitespace) marks a DDL statement; slice 12 admits [:list tables] only
-   at this step, with [:drop table <name>] arriving in step 5b. The sigil
-   is recognised only at the top of input -- a [:] inside a pipeline is a
-   parse error rather than an embedded DDL statement. *)
+(* The DDL sigil. A leading [:] (after any optional whitespace) marks a
+   DDL statement. The sigil is recognised only at the top of input -- a
+   [:] inside a pipeline is a parse error rather than an embedded DDL
+   statement. *)
 
 let test_ddl_list_tables_parses () =
   parses_program ":list tables" (Ast.Ddl Ddl.Statement.List_tables)
@@ -486,7 +483,7 @@ let test_ddl_describe_rejects_trailing_garbage () =
 let test_pipeline_keyword_describe_is_a_relation_name () =
   parses "describe" (Ast.Relation_name "describe")
 
-(* Slice 14 step 5: [:create table <name> (col: kind, ...) primary key
+(* [:create table <name> (col: kind, ...) primary key
    (col, ...)] parses to [Statement.Create_table { table_name; fields;
    primary_key }]. Kind names are resolved at parse time to
    [Value.Kind.t]; unknown kind names raise a parse error. Whitespace

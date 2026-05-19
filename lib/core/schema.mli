@@ -4,10 +4,10 @@
     columns that form the primary key. Schemas describe shape; tuples
     ({!type-tuple}) carry the actual row values, in field order.
 
-    Slice 4 step 3 adds a per-field [qualifier] so multi-relation results
-    (cross-product, future joins) can disambiguate same-named columns coming
-    from different inputs, and a {!type-column_reference} type that captures the
-    parser-level form of a column reference -- bare or dotted. *)
+    Fields carry an optional [qualifier] so multi-relation results
+    (cross-product, joins) can disambiguate same-named columns coming from
+    different inputs. A {!type-column_reference} type captures the parser-level
+    form of a column reference -- bare or dotted. *)
 
 type field = { name : string; kind : Value.Kind.t; qualifier : string option }
 (** A single column declaration. [qualifier] is set to [Some table_name] for
@@ -16,8 +16,8 @@ type field = { name : string; kind : Value.Kind.t; qualifier : string option }
 
 type t = { fields : field list; primary_key : string list }
 (** Table schema. [primary_key] names columns drawn from [fields], in key order.
-    Multi-column keys are supported even though slice 1 only exercises
-    single-column keys. *)
+    Multi-column keys are supported even though only single-column keys are
+    currently exercised. *)
 
 type tuple = Value.t array
 (** A row's values, in field order. An array (rather than a list) so

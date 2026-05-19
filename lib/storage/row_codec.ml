@@ -1,7 +1,7 @@
 module Value = Dovetail_core.Value
 module Schema = Dovetail_core.Schema
 
-(* Encode [primary_key_values] as the storage key bytes. Slice 1 only
+(* Encode [primary_key_values] as the storage key bytes. Currently only
    handles a single-column [Int64] primary key; any other shape raises
    [Failure]. The [Schema.split_tuple] / [Schema.assemble_tuple] pair
    already supports composite keys, so this restriction is purely about
@@ -9,15 +9,12 @@ module Schema = Dovetail_core.Schema
 let encode_primary_key = function
   | [ Value.Int64 key ] -> Encoding.encode_int64_key key
   | [ (Value.String _ | Value.Bool _) ] ->
-      failwith
-        "Row_codec: only int64 primary-key columns are supported in slice 1"
-  | _ ->
-      failwith
-        "Row_codec: only single-column primary keys are supported in slice 1"
+      failwith "Row_codec: only int64 primary-key columns are supported"
+  | _ -> failwith "Row_codec: only single-column primary keys are supported"
 
 (* Inverse of [encode_primary_key]: decode the storage key bytes into the
-   primary-key values list, in primary-key order. Same slice-1 shape
-   restrictions apply. *)
+   primary-key values list, in primary-key order. Same shape restrictions
+   apply. *)
 let decode_primary_key (schema : Schema.t) key_bytes =
   match schema.primary_key with
   | [ primary_key_name ] -> (
@@ -29,12 +26,8 @@ let decode_primary_key (schema : Schema.t) key_bytes =
       match primary_key_field.kind with
       | Int64 -> [ Value.Int64 (Encoding.decode_int64_key key_bytes) ]
       | String | Bool ->
-          failwith
-            "Row_codec: only int64 primary-key columns are supported in slice 1"
-      )
-  | _ ->
-      failwith
-        "Row_codec: only single-column primary keys are supported in slice 1"
+          failwith "Row_codec: only int64 primary-key columns are supported")
+  | _ -> failwith "Row_codec: only single-column primary keys are supported"
 
 let decode_row schema (key_bytes, value_bytes) =
   let primary_key_values = decode_primary_key schema key_bytes in

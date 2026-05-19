@@ -1,4 +1,11 @@
 (library
  (name test_helpers)
- (libraries alcotest dovetail.core dovetail.storage dovetail.plan
-            dovetail.surface_ra dovetail.execution dovetail.frontend unix))
+ (libraries
+  alcotest
+  dovetail.core
+  dovetail.storage
+  dovetail.plan
+  dovetail.surface_ra
+  dovetail.execution
+  dovetail.frontend
+  unix))

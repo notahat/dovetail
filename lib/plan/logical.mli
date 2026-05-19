@@ -41,7 +41,7 @@ type t =
           schema is {!Dovetail_core.Relation_literal.schema_of} applied to
           [columns] and the first row.
 
-          Slice 11's parser produces single-row literals only; the IR shape
+          The parser currently produces single-row literals only; the IR shape
           leaves room for a future multi-row literal grammar. *)
 
 type mutation =
@@ -50,8 +50,8 @@ type mutation =
           rows are what get written to [table]. The {!plan} wrapper below sits
           above this type so the REPL can dispatch on plan kind: queries open a
           read transaction and call {!Eval.eval}; mutations open a write
-          transaction and call {!Eval.eval_mutation}. Update and delete are
-          deferred to slice 12. *)
+          transaction and call {!Eval.eval_mutation}. Update and delete are not
+          yet supported. *)
 
 type plan =
   | Query of t
