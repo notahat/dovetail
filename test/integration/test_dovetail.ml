@@ -8,8 +8,8 @@
 open Test_helpers
 
 (** Path to the built dovetail binary, relative to the test runner's working
-    directory under [_build/default/test/]. *)
-let binary_path = "../bin/main.exe"
+    directory under [_build/default/test/integration/]. *)
+let binary_path = "../../bin/main.exe"
 
 (** Run [binary_path] with [environment_path] as its argument, sending
     [stdin_text] as standard input. The [--demo-data] flag is passed so the

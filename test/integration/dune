@@ -1,0 +1,14 @@
+(tests
+ (names test_pipeline test_dovetail test_documentation test_doctest
+        test_ddl_roundtrip)
+ (libraries alcotest dovetail.core dovetail.storage dovetail.ddl
+            dovetail.plan dovetail.surface_ra dovetail.execution
+            dovetail.frontend test_helpers)
+ (deps
+  ../../bin/main.exe
+  ../../docs/query-language.md
+  ../../docs/query-language-tutorial.md
+  ../../docs/query-language-pipeline-operators.md
+  ../../docs/query-language-expressions.md
+  ../../docs/query-language-data-definition.md
+  ../../README.md))

@@ -11,16 +11,16 @@ open Test_helpers
 
 (** Markdown files that participate in doctest verification. Paths are resolved
     relative to the test runner's working directory under
-    [_build/default/test/], and the corresponding [(deps)] entries in
-    [test/dune] mirror each file into the build tree. *)
+    [_build/default/test/integration/], and the corresponding [(deps)] entries
+    in [test/integration/dune] mirror each file into the build tree. *)
 let verified_files =
   [
-    "../docs/query-language.md";
-    "../docs/query-language-tutorial.md";
-    "../docs/query-language-pipeline-operators.md";
-    "../docs/query-language-expressions.md";
-    "../docs/query-language-data-definition.md";
-    "../README.md";
+    "../../docs/query-language.md";
+    "../../docs/query-language-tutorial.md";
+    "../../docs/query-language-pipeline-operators.md";
+    "../../docs/query-language-expressions.md";
+    "../../docs/query-language-data-definition.md";
+    "../../README.md";
   ]
 
 (** Verify one markdown file end to end: spin up a fresh environment, seed the
