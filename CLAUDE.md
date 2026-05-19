@@ -10,7 +10,13 @@ still settling — refine this file as cases come up.
   the foundational document; slice plans accumulate as `01-...`, `02-...`
   and so on, with the file number matching the slice number. Read the
   relevant slice plan before writing code for it.
-- `lib/` for library code, `bin/` for the executable, `test/` for tests.
+- `lib/` for library code, organised into seven sub-libraries under
+  their own dune libraries: `core`, `storage`, `plan`, `ddl`,
+  `surface_ra`, `execution`, `frontend`. `bin/` for the executable.
+  `test/` mirrors `lib/` (`test/core/`, `test/storage/`, …), plus
+  `test/helpers/` for shared test infrastructure and
+  `test/integration/` for end-to-end tests that cross library
+  boundaries.
 - Every module in `lib/` has both a `.ml` and a `.mli`. The `.mli` is the
   public-API documentation: module-level overview at the top, header
   comment per `val`. Doc comments live in the `.mli` only.
@@ -89,8 +95,26 @@ boundaries to use modules from sibling sub-libraries. Two styles:
 than signal). `core` types — `Value`, `Schema`, `Relation`,
 `Expression`, `Relation_literal` — are pervasive enough that a `Core.`
 prefix on every reference would add noise without signal. Localised
-sublibraries (`ddl`, future `storage`/`plan`/...) carry meaningful
-prefixes, so the library-alias form is the default.
+sublibraries (`storage`, `plan`, `ddl`, `surface_ra`, `execution`,
+`frontend`) carry meaningful prefixes, so the library-alias form is
+the default — `Storage.Engine.X`, `Plan.Logical.X`,
+`Execution.Eval.X`, `Frontend.Cli.X`.
+
+**Tests open the library under test; everything else gets the
+normal aliases.** A test that exercises `Logical.classify` opens
+`Dovetail_plan` and refers to `Logical.classify` unqualified. Other
+libraries the test happens to mention — say `Execution.Eval` for a
+pipeline subtest inside a translate test, or `Plan.Physical.t` from
+a `surface_ra` test — get the same `module X = Dovetail_X` library
+aliases that lib code uses, and the call sites pay the prefix.
+`core` types stay on per-module aliases everywhere
+(`module Value = Dovetail_core.Value`) for the same noise-vs-signal
+reason lib code uses them. Integration tests in `test/integration/`
+have no single SUT, so all libraries get the `module X = …`
+treatment there.
+
+`test/helpers/` is library-shaped (a helpers library), so it
+follows lib code's convention straight through — no opens.
 
 ## Tooling
 
