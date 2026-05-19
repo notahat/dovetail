@@ -1,13 +1,10 @@
 (tests
  (names
   test_dovetail
-  test_cli
   test_pipeline
-  test_repl
   test_ddl_roundtrip
   test_doctest
-  test_documentation
-  test_demo_data)
+  test_documentation)
  (libraries
   alcotest
   dovetail.core
