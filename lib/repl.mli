@@ -13,8 +13,9 @@
     the loop in-process. *)
 
 module Storage = Dovetail_storage
+module Plan = Dovetail_plan
 
-val format_mutation_status : Physical.mutation -> int -> string
+val format_mutation_status : Plan.Physical.mutation -> int -> string
 (** [format_mutation_status mutation affected_rows] renders the one-line status
     the REPL prints after a successful mutation, e.g. ["inserted 1 row"] or
     ["inserted 5 rows"]. The verb is chosen by the [mutation] constructor (so

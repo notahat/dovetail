@@ -1,6 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.FullScan]. *)
 
 open Dovetail
+open Dovetail_plan
 open Test_helpers
 module Storage = Dovetail_storage
 

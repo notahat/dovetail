@@ -33,6 +33,7 @@
   dovetail.core
   dovetail.ddl
   dovetail.storage
+  dovetail.plan
   test_helpers
   unix)
  (deps

@@ -1,6 +1,7 @@
 module Relation = Dovetail_core.Relation
 module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
+module Plan = Dovetail_plan
 
 let prompt = "> "
 
@@ -9,7 +10,7 @@ let prompt = "> "
    word come from the same source of truth: a future [Update]/[Delete] adds
    one constructor and one verb here and the rest of the renderer reuses. *)
 let format_mutation_status mutation affected_rows =
-  let verb = match mutation with Physical.Insert _ -> "inserted" in
+  let verb = match mutation with Plan.Physical.Insert _ -> "inserted" in
   let noun = if affected_rows = 1 then "row" else "rows" in
   Printf.sprintf "%s %d %s" verb affected_rows noun
 
@@ -20,8 +21,8 @@ let translate_in environment transaction ~output ~show_physical logical_plan =
   let catalog table_name =
     Storage.Catalog.get environment transaction ~table_name
   in
-  let physical_plan = Translate.translate ~catalog logical_plan in
-  if show_physical then Physical.format_plan output physical_plan;
+  let physical_plan = Plan.Translate.translate ~catalog logical_plan in
+  if show_physical then Plan.Physical.format_plan output physical_plan;
   physical_plan
 
 (* Inside a read transaction: translate the plan, evaluate the relation it
@@ -33,10 +34,10 @@ let print_query_result environment transaction ~output ~show_physical
   match
     translate_in environment transaction ~output ~show_physical logical_plan
   with
-  | Physical.Query physical ->
+  | Plan.Physical.Query physical ->
       Eval.eval environment transaction physical (fun relation ->
           Relation.print ~formatter:output relation)
-  | Physical.Mutation _ -> assert false
+  | Plan.Physical.Mutation _ -> assert false
 
 (* Inside a write transaction: translate the plan, evaluate the mutation,
    and emit the affected-rows status line to [output]. The [Query] arm is
@@ -48,11 +49,11 @@ let print_mutation_result environment transaction ~output ~show_physical
   match
     translate_in environment transaction ~output ~show_physical logical_plan
   with
-  | Physical.Mutation mutation ->
+  | Plan.Physical.Mutation mutation ->
       Eval.eval_mutation environment transaction mutation (fun affected_rows ->
           Format.fprintf output "%s@."
             (format_mutation_status mutation affected_rows))
-  | Physical.Query _ -> assert false
+  | Plan.Physical.Query _ -> assert false
 
 (* Run a single parsed query against [environment] and pretty-print the
    result to [output]. The plan's classification picks the transaction kind
@@ -63,7 +64,7 @@ let print_mutation_result environment transaction ~output ~show_physical
    would need a rank-2 type trick the gain doesn't justify. *)
 let evaluate_and_print environment ~output ~show_physical logical_plan =
   try
-    match Logical.classify logical_plan with
+    match Plan.Logical.classify logical_plan with
     | `Read ->
         Storage.Engine.with_read_transaction environment (fun transaction ->
             print_query_result environment transaction ~output ~show_physical

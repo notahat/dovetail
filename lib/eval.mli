@@ -15,11 +15,12 @@
 
 module Relation = Dovetail_core.Relation
 module Storage = Dovetail_storage
+module Plan = Dovetail_plan
 
 val eval :
   Storage.Engine.environment ->
   [> `Read ] Storage.Engine.transaction ->
-  Physical.t ->
+  Plan.Physical.t ->
   ([ `Bag ] Relation.t -> 'a) ->
   'a
 (** [eval environment transaction plan continue] runs [plan] against the
@@ -37,7 +38,7 @@ val eval :
 val eval_mutation :
   Storage.Engine.environment ->
   [ `Read | `Write ] Storage.Engine.transaction ->
-  Physical.mutation ->
+  Plan.Physical.mutation ->
   (int -> 'a) ->
   'a
 (** [eval_mutation environment transaction mutation continue] runs [mutation]

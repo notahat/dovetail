@@ -5,7 +5,9 @@
     operator it denotes. The result is independent of how the user wrote the
     query, so later stages can reason in algebraic terms. *)
 
-val lower : Ast.plan -> Logical.plan
+module Plan = Dovetail_plan
+
+val lower : Ast.plan -> Plan.Logical.plan
 (** [lower plan] rewrites [plan] into an equivalent logical plan.
 
     The [Query] arm rewrites the relation tree: [Relation_name] becomes [Scan];

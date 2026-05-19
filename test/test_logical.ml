@@ -4,8 +4,8 @@
     the transaction permission the REPL should open. The function has two arms
     and no inner inspection; the tests exercise both arms with minimal plans. *)
 
-open Dovetail
 open Dovetail_core
+open Dovetail_plan
 
 let test_query_plan_classifies_as_read () =
   let plan : Logical.plan = Query (Scan { table = "users" }) in

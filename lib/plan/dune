@@ -1,0 +1,4 @@
+(library
+ (name dovetail_plan)
+ (public_name dovetail.plan)
+ (libraries dovetail.core))

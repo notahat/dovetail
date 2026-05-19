@@ -5,8 +5,8 @@
     in isolation, plus a couple of nested combinations to confirm indentation
     composes the way readers will expect. *)
 
-open Dovetail
 open Dovetail_core
+open Dovetail_plan
 open Test_helpers
 
 let format_to_string plan =

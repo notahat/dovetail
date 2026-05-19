@@ -4,6 +4,7 @@
 
 open Dovetail
 open Dovetail_core
+open Dovetail_plan
 open Test_helpers
 module Storage = Dovetail_storage
 

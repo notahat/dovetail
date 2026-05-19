@@ -4,6 +4,7 @@ module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Relation_literal = Dovetail_core.Relation_literal
 module Storage = Dovetail_storage
+module Plan = Dovetail_plan
 
 (* Look up the schema and storage handle for a table referenced in a plan.
    Raises [Failure] if the catalog has no schema for [table], or if the
@@ -92,7 +93,7 @@ let evaluate_relation_literal ~columns ~rows continue =
    scopes the plan opens, letting tuples stream directly from live
    cursors rather than being eagerly materialised. *)
 let rec eval environment transaction plan continue =
-  match (plan : Physical.t) with
+  match (plan : Plan.Physical.t) with
   | FullScan { table } ->
       evaluate_full_scan environment transaction table continue
   | Filter { input; predicate } ->
@@ -133,7 +134,7 @@ and evaluate_filter environment transaction ~input ~predicate continue =
 and evaluate_project environment transaction ~input ~columns continue =
   let* input_relation = eval environment transaction input in
   let projected_schema, project_tuple =
-    Projection.resolve input_relation.schema columns
+    Plan.Projection.resolve input_relation.schema columns
   in
   continue
     {
@@ -362,7 +363,7 @@ let evaluate_insert environment transaction ~target_table ~source continue =
   continue !affected_rows
 
 let eval_mutation environment transaction mutation continue =
-  match (mutation : Physical.mutation) with
+  match (mutation : Plan.Physical.mutation) with
   | Insert { table; source } ->
       evaluate_insert environment transaction ~target_table:table ~source
         continue
