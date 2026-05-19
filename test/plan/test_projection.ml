@@ -1,8 +1,9 @@
 (** Tests for [Projection]. *)
 
-open Dovetail_core
 open Dovetail_plan
 open Test_helpers
+module Schema = Dovetail_core.Schema
+module Value = Dovetail_core.Value
 
 (* The fixture's [users] schema, repeated here so the projection tests are
    self-contained and don't need to spin up an LMDB environment. The

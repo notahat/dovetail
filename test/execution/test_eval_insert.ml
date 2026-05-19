@@ -6,10 +6,11 @@
     construct the mutation by hand and call [Eval.eval_mutation] inside a write
     transaction. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]
@@ -17,7 +18,7 @@ module Storage = Dovetail_storage
    this keeps the tests focused on the sink itself and not on column
    reordering (Step 3 introduces Translate-level permutation validation
    that lets the sink trust its input). *)
-let insert_mutation ~table ~pairs : Physical.mutation =
+let insert_mutation ~table ~pairs : Plan.Physical.mutation =
   let columns = List.map fst pairs in
   let values = List.map snd pairs in
   Insert { table; source = RelationLiteral { columns; rows = [ values ] } }
@@ -41,7 +42,7 @@ let test_insert_writes_row_and_reports_one_affected () =
      the write committed rather than just being visible to the writer. *)
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
-        (Physical.FullScan { table = "orders" })
+        (Plan.Physical.FullScan { table = "orders" })
         (fun relation ->
           let rows = List.of_seq relation.tuples in
           let inserted =
@@ -87,7 +88,7 @@ let test_insert_with_existing_primary_key_raises () =
      be unchanged. *)
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
-        (Physical.FullScan { table = "orders" })
+        (Plan.Physical.FullScan { table = "orders" })
         (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)

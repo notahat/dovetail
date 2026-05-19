@@ -6,10 +6,12 @@
     rejection cases -- live in [test_parser.ml] and [test_expression_parser.ml].
 *)
 
-open Dovetail_core
-open Dovetail_plan
-open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
+module Plan = Dovetail_plan
+module Execution = Dovetail_execution
 module Storage = Dovetail_storage
 
 (* The expected matched (user, order) pairs from an inner equi-join on
@@ -292,7 +294,7 @@ let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
 let render_plan_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      Eval.eval environment transaction plan (fun relation ->
+      Execution.Eval.eval environment transaction plan (fun relation ->
           with_captured_formatter @@ fun formatter ->
           Relation.print ~formatter relation))
 
@@ -302,10 +304,10 @@ let test_indexed_nested_loop_join_renders_matched_pairs () =
      test exercises Eval + Relation.print without going through the
      parser. The assertions cover the rendered column headers and
      every (user, order) pair the join should produce. *)
-  let plan : Physical.t =
-    IndexedNestedLoopJoin
+  let plan : Plan.Physical.t =
+    Plan.Physical.IndexedNestedLoopJoin
       {
-        outer = FullScan { table = "orders" };
+        outer = Plan.Physical.FullScan { table = "orders" };
         inner_table = "users";
         outer_key_column =
           qualified_column_reference ~qualifier:"orders" ~name:"user_id";

@@ -15,9 +15,10 @@
     LMDB environment; pipeline-level integration tests live in
     [test_pipeline.ml]. *)
 
-open Dovetail_core
 open Dovetail_plan
 open Test_helpers
+module Schema = Dovetail_core.Schema
+module Value = Dovetail_core.Value
 
 (* A users schema with a single int64 primary key, identical to
    [Fixture.users_schema] but rebuilt in-test so unit tests don't need

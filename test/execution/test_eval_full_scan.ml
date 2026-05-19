@@ -1,8 +1,8 @@
 (** End-to-end tests for [Eval] on [Physical.FullScan]. *)
 
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 let test_full_scan_yields_fixture_rows () =
@@ -11,7 +11,7 @@ let test_full_scan_yields_fixture_rows () =
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
-        (Physical.FullScan { table = "users" })
+        (Plan.Physical.FullScan { table = "users" })
         (fun relation ->
           Alcotest.(check string)
             "schema primary key" "id"
@@ -28,7 +28,7 @@ let test_full_scan_raises_for_missing_table () =
       Alcotest.check_raises "missing table"
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           Eval.eval environment transaction
-            (Physical.FullScan { table = "nonexistent_table" })
+            (Plan.Physical.FullScan { table = "nonexistent_table" })
             (fun _relation -> ())))
 
 let () =

@@ -1,9 +1,9 @@
 (** Tests for [Parser]. *)
 
-open Dovetail_core
 open Dovetail_surface_ra
 open Test_helpers
 module Ddl = Dovetail_ddl
+module Value = Dovetail_core.Value
 
 let ast_program_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )

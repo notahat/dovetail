@@ -1,9 +1,10 @@
 (** End-to-end tests for [Eval] on [Physical.IndexLookup]. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build an [IndexLookup] over [table] with [key], evaluate it against the
@@ -13,7 +14,7 @@ let evaluate_index_lookup ~table ~key =
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      let plan = Physical.IndexLookup { table; key } in
+      let plan = Plan.Physical.IndexLookup { table; key } in
       Eval.eval environment transaction plan (fun relation ->
           (relation.schema, List.of_seq relation.tuples)))
 
@@ -60,7 +61,7 @@ let test_index_lookup_raises_for_missing_table () =
       Alcotest.check_raises "missing table"
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           Eval.eval environment transaction
-            (Physical.IndexLookup { table = "nonexistent_table"; key = 1L })
+            (Plan.Physical.IndexLookup { table = "nonexistent_table"; key = 1L })
             (fun _relation -> ())))
 
 let () =

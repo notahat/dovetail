@@ -17,7 +17,9 @@
       that run a query through parse / lower / translate / eval, so end-to-end
       tests don't have to restate the boilerplate. *)
 
-open Dovetail_core
+module Schema = Dovetail_core.Schema
+module Expression = Dovetail_core.Expression
+module Value = Dovetail_core.Value
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra

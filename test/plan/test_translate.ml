@@ -2,11 +2,12 @@
     one physical constructor, plus the slice-5 inner-join collapse. The
     [IndexLookup] rewrite lives in [test_translate_index_lookup.ml]. *)
 
-open Dovetail_core
 open Dovetail_plan
-open Dovetail_execution
 open Test_helpers
+module Execution = Dovetail_execution
+module Schema = Dovetail_core.Schema
 module Storage = Dovetail_storage
+module Value = Dovetail_core.Value
 
 let test_scan_lowers_to_full_scan () =
   let logical = Logical.Scan { table = "users" } in
@@ -29,7 +30,7 @@ let test_pipeline_yields_fixture_rows () =
       let physical =
         unwrap_query (Translate.translate ~catalog (Logical.Query logical))
       in
-      Eval.eval environment transaction physical (fun relation ->
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "five rows from logical scan" expected_users_rows rows))
@@ -75,7 +76,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
       let physical =
         unwrap_query (Translate.translate ~catalog (Logical.Query logical))
       in
-      Eval.eval environment transaction physical (fun relation ->
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "Carol's row from logical Restrict"
@@ -116,7 +117,7 @@ let test_project_pipeline_yields_projected_rows () =
       let physical =
         unwrap_query (Translate.translate ~catalog (Logical.Query logical))
       in
-      Eval.eval environment transaction physical (fun relation ->
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =
             [

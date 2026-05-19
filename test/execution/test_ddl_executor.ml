@@ -8,21 +8,24 @@
     assertions can pin both the raised wording and the post-abort state in one
     place. *)
 
-open Dovetail_core
 open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
 module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
 
 let users_schema : Schema.t =
   {
-    fields = [ { name = "id"; kind = Int64; qualifier = Some "users" } ];
+    fields =
+      [ { name = "id"; kind = Value.Kind.Int64; qualifier = Some "users" } ];
     primary_key = [ "id" ];
   }
 
 let orders_schema : Schema.t =
   {
-    fields = [ { name = "id"; kind = Int64; qualifier = Some "orders" } ];
+    fields =
+      [ { name = "id"; kind = Value.Kind.Int64; qualifier = Some "orders" } ];
     primary_key = [ "id" ];
   }
 
@@ -180,7 +183,7 @@ let widgets_create_statement : Ddl.Statement.t =
   Create_table
     {
       table_name = "widgets";
-      fields = [ { name = "id"; kind = Int64 } ];
+      fields = [ { name = "id"; kind = Value.Kind.Int64 } ];
       primary_key = [ "id" ];
     }
 
@@ -189,7 +192,8 @@ let widgets_create_statement : Ddl.Statement.t =
    treat it the same as any fixture-seeded schema. *)
 let widgets_expected_schema : Schema.t =
   {
-    fields = [ { name = "id"; kind = Int64; qualifier = Some "widgets" } ];
+    fields =
+      [ { name = "id"; kind = Value.Kind.Int64; qualifier = Some "widgets" } ];
     primary_key = [ "id" ];
   }
 
@@ -227,9 +231,9 @@ let test_execute_write_create_table_qualifier_per_field () =
         table_name = "widgets";
         fields =
           [
-            { name = "id"; kind = Int64 };
-            { name = "name"; kind = String };
-            { name = "active"; kind = Bool };
+            { name = "id"; kind = Value.Kind.Int64 };
+            { name = "name"; kind = Value.Kind.String };
+            { name = "active"; kind = Value.Kind.Bool };
           ];
         primary_key = [ "id" ];
       }
@@ -238,9 +242,17 @@ let test_execute_write_create_table_qualifier_per_field () =
     {
       fields =
         [
-          { name = "id"; kind = Int64; qualifier = Some "widgets" };
-          { name = "name"; kind = String; qualifier = Some "widgets" };
-          { name = "active"; kind = Bool; qualifier = Some "widgets" };
+          { name = "id"; kind = Value.Kind.Int64; qualifier = Some "widgets" };
+          {
+            name = "name";
+            kind = Value.Kind.String;
+            qualifier = Some "widgets";
+          };
+          {
+            name = "active";
+            kind = Value.Kind.Bool;
+            qualifier = Some "widgets";
+          };
         ];
       primary_key = [ "id" ];
     }

@@ -1,9 +1,9 @@
 (** End-to-end tests for [Eval] on [Physical.IndexedNestedLoopJoin]. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* The matched (user, order) pairs that the canonical indexed join --
@@ -46,7 +46,7 @@ let orders_user_id_column =
 
 let orders_id_column = qualified_column_reference ~qualifier:"orders" ~name:"id"
 
-let canonical_indexed_join_plan inner_position : Physical.t =
+let canonical_indexed_join_plan inner_position : Plan.Physical.t =
   IndexedNestedLoopJoin
     {
       outer = FullScan { table = "orders" };
@@ -118,7 +118,7 @@ let test_indexed_join_right_schema_has_outer_then_inner_fields () =
    has ids 1..5, so order 6 (Cookie) misses and the result has five
    rows instead of six. *)
 let test_indexed_join_drops_outer_tuples_whose_probe_misses () =
-  let plan : Physical.t =
+  let plan : Plan.Physical.t =
     IndexedNestedLoopJoin
       {
         outer = FullScan { table = "orders" };
@@ -131,7 +131,7 @@ let test_indexed_join_drops_outer_tuples_whose_probe_misses () =
   Alcotest.(check int) "five rows -- order 6 misses" 5 (List.length rows)
 
 let test_indexed_join_raises_when_outer_key_column_is_not_int64 () =
-  let plan : Physical.t =
+  let plan : Plan.Physical.t =
     IndexedNestedLoopJoin
       {
         outer = FullScan { table = "orders" };

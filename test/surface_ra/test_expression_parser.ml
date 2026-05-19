@@ -5,9 +5,10 @@
     grammar (pipeline operators, integration with lower/translate/eval) lives in
     [test_parser.ml]. *)
 
-open Dovetail_core
 open Dovetail_surface_ra
 open Test_helpers
+module Expression = Dovetail_core.Expression
+module Value = Dovetail_core.Value
 
 let predicate_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<predicate>")) ( = )

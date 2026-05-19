@@ -5,9 +5,9 @@
     in isolation, plus a couple of nested combinations to confirm indentation
     composes the way readers will expect. *)
 
-open Dovetail_core
 open Dovetail_plan
 open Test_helpers
+module Value = Dovetail_core.Value
 
 let format_to_string plan =
   let buffer = Buffer.create 128 in

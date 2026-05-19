@@ -24,7 +24,7 @@
     in actual is accepted. This lets the doc show the first few rows of a long
     table without committing to verify the whole thing. *)
 
-open Dovetail_frontend
+module Frontend = Dovetail_frontend
 
 type query = { source : string; expected_output : string }
 type session = { block_starts_at_line : int; queries : query list }
@@ -153,7 +153,7 @@ let extract_sessions markdown =
 let capture_repl_output environment queries =
   let lines = List.map (fun (query : query) -> query.source) queries in
   Test_helpers.with_captured_formatter @@ fun formatter ->
-  Repl.run environment
+  Frontend.Repl.run environment
     ~read_line:(Test_helpers.read_line_from_list lines)
     ~output:formatter
 

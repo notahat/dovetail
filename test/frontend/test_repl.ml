@@ -1,8 +1,8 @@
 (** Tests for [Repl]. *)
 
-open Dovetail_plan
 open Dovetail_frontend
 open Test_helpers
+module Plan = Dovetail_plan
 
 (** Run the REPL against a populated environment with [lines] as input,
     capturing all formatter output as a string. [show_physical] defaults to
@@ -86,11 +86,11 @@ let test_show_physical_prints_plan_before_results () =
 (* A hand-built insert mutation used only as a constructor witness for the
    render-status tests below. The source plan is irrelevant -- the renderer
    keys off the mutation constructor for the verb and never touches [source]. *)
-let example_insert : Physical.mutation =
+let example_insert : Plan.Physical.mutation =
   Insert
     {
       table = "orders";
-      source = Physical.RelationLiteral { columns = []; rows = [ [] ] };
+      source = Plan.Physical.RelationLiteral { columns = []; rows = [ [] ] };
     }
 
 let test_format_mutation_status_singular_row () =

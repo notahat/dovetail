@@ -1,8 +1,9 @@
 (** End-to-end tests for [Eval] on [Physical.NestedLoopJoin]. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 
 (* The matched (user, order) pairs that a join on
    [users.id = orders.user_id] should produce, built by concatenating the
@@ -53,7 +54,7 @@ let users_join_orders_on_id_predicate =
     ~op:Equal
     ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id")
 
-let nested_loop_join_plan predicate : Physical.t =
+let nested_loop_join_plan predicate : Plan.Physical.t =
   NestedLoopJoin
     {
       left = FullScan { table = "users" };

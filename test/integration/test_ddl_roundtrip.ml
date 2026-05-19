@@ -12,7 +12,7 @@
     of [Create_table] shapes (each value kind in turn, a compound primary key,
     plus the design doc's [users] and [order_items] canonical examples). *)
 
-open Dovetail_surface_ra
+module Surface_ra = Dovetail_surface_ra
 module Ddl = Dovetail_ddl
 module Value = Dovetail_core.Value
 
@@ -32,13 +32,13 @@ let statement_testable =
    text in the failure message so the offending shape is visible. *)
 let check_round_trip (statement : Ddl.Statement.t) =
   let formatted = Ddl.Format.statement statement in
-  match Parser.parse formatted with
-  | Ok (Ast.Ddl parsed_statement) ->
+  match Surface_ra.Parser.parse formatted with
+  | Ok (Surface_ra.Ast.Ddl parsed_statement) ->
       Alcotest.check statement_testable
         (Printf.sprintf
            "round-trip preserves the statement value (formatted: %S)" formatted)
         statement parsed_statement
-  | Ok (Ast.Pipeline _) ->
+  | Ok (Surface_ra.Ast.Pipeline _) ->
       Alcotest.failf
         "round-trip produced a pipeline, expected a DDL statement\n\
          formatted text: %S"

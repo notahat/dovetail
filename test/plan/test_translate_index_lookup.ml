@@ -11,11 +11,12 @@
     fixture catalog to confirm the rewrite plus eval produce the expected row.
 *)
 
-open Dovetail_core
 open Dovetail_plan
-open Dovetail_execution
 open Test_helpers
+module Execution = Dovetail_execution
+module Schema = Dovetail_core.Schema
 module Storage = Dovetail_storage
+module Value = Dovetail_core.Value
 
 (* A users schema with a single int64 primary key. Matches what
    [Fixture.users_schema] writes, but rebuilt in-test so the unit tests
@@ -435,7 +436,7 @@ let test_index_lookup_pipeline_yields_one_row () =
         "translates through the real catalog to IndexLookup"
         (Physical.IndexLookup { table = "users"; key = 1L })
         physical;
-      Eval.eval environment transaction physical (fun relation ->
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "Alice's row from the lookup"

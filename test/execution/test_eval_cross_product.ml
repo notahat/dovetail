@@ -1,10 +1,11 @@
 (** End-to-end tests for [Eval] on [Physical.CrossProduct]. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 
-let users_cross_orders_plan : Physical.t =
+let users_cross_orders_plan : Plan.Physical.t =
   CrossProduct
     {
       left = FullScan { table = "users" };
@@ -45,7 +46,7 @@ let test_cross_product_then_filter_yields_matched_pairs () =
   (* The plan: users x orders, filtered to rows where users.id = orders.user_id.
      The orders fixture has six rows that point at users 1, 1, 2, 3, 3, 5 -- so
      we expect six matched pairs. *)
-  let plan : Physical.t =
+  let plan : Plan.Physical.t =
     Filter
       {
         input = users_cross_orders_plan;
@@ -63,7 +64,7 @@ let test_cross_product_then_filter_yields_matched_pairs () =
 let test_cross_product_with_ambiguous_unqualified_filter_raises () =
   (* Both inputs have an [id] column, so an unqualified [id = 3] predicate
      can't pick one. Resolution should fail with the ambiguity message. *)
-  let plan : Physical.t =
+  let plan : Plan.Physical.t =
     Filter
       {
         input = users_cross_orders_plan;

@@ -2,10 +2,11 @@
     project/filter combinations, since they exercise projection's interaction
     with filter resolution. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build a Project wrapping [input_plan] over the users fixture, evaluate
@@ -22,11 +23,11 @@ let evaluate_users_project ~input_plan column_names =
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      let plan = Physical.Project { input = input_plan; columns } in
+      let plan = Plan.Physical.Project { input = input_plan; columns } in
       Eval.eval environment transaction plan (fun relation ->
           List.of_seq relation.tuples))
 
-let users_full_scan = Physical.FullScan { table = "users" }
+let users_full_scan = Plan.Physical.FullScan { table = "users" }
 
 let test_project_single_column () =
   let rows = evaluate_users_project ~input_plan:users_full_scan [ "name" ] in
@@ -79,10 +80,10 @@ let test_project_then_filter () =
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan =
-        Physical.Filter
+        Plan.Physical.Filter
           {
             input =
-              Physical.Project
+              Plan.Physical.Project
                 {
                   input = users_full_scan;
                   columns =
@@ -112,7 +113,7 @@ let test_project_then_filter () =
 
 let test_filter_then_project () =
   let filter_active_true =
-    Physical.Filter
+    Plan.Physical.Filter
       {
         input = users_full_scan;
         predicate =

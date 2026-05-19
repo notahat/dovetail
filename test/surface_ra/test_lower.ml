@@ -1,13 +1,13 @@
 (** Tests for [Lower]. *)
 
-open Dovetail_core
-open Dovetail_plan
-open Dovetail_execution
 open Dovetail_surface_ra
 open Test_helpers
+module Execution = Dovetail_execution
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
+module Value = Dovetail_core.Value
 
-let logical_plan_testable : Logical.plan Alcotest.testable =
+let logical_plan_testable : Plan.Logical.plan Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical-plan>")) ( = )
 
 let test_relation_name_lowers_to_scan () =
@@ -15,7 +15,7 @@ let test_relation_name_lowers_to_scan () =
   let logical = Lower.lower (Ast.Query ast) in
   Alcotest.(check logical_plan_testable)
     "Relation_name -> Scan"
-    (Logical.Query (Scan { table = "users" }))
+    (Plan.Logical.Query (Scan { table = "users" }))
     logical
 
 let test_pipeline_yields_fixture_rows () =
@@ -26,8 +26,8 @@ let test_pipeline_yields_fixture_rows () =
       let ast = Ast.Relation_name "users" in
       let logical = Lower.lower (Ast.Query ast) in
       let catalog = make_catalog environment transaction in
-      let physical = unwrap_query (Translate.translate ~catalog logical) in
-      Eval.eval environment transaction physical (fun relation ->
+      let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "five rows from AST" expected_users_rows rows))
@@ -44,7 +44,7 @@ let test_restrict_lowers_to_logical_restrict () =
   let logical = Lower.lower (Ast.Query ast) in
   Alcotest.(check logical_plan_testable)
     "Ast.Restrict -> Logical.Restrict wrapping Scan"
-    (Logical.Query
+    (Plan.Logical.Query
        (Restrict
           { input = Scan { table = "users" }; predicate = id_equals_three }))
     logical
@@ -60,15 +60,15 @@ let test_restrict_pipeline_yields_filtered_rows () =
       in
       let logical = Lower.lower (Ast.Query ast) in
       let catalog = make_catalog environment transaction in
-      let physical = unwrap_query (Translate.translate ~catalog logical) in
-      Eval.eval environment transaction physical (fun relation ->
+      let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           Alcotest.(check tuple_list_testable)
             "Carol's row from Ast.Restrict"
             [ List.nth expected_users_rows 2 ]
             rows))
 
-let name_then_email : Projection.t =
+let name_then_email : Plan.Projection.t =
   [ column_reference "name"; column_reference "email" ]
 
 let test_project_lowers_to_logical_project () =
@@ -78,7 +78,7 @@ let test_project_lowers_to_logical_project () =
   let logical = Lower.lower (Ast.Query ast) in
   Alcotest.(check logical_plan_testable)
     "Ast.Project -> Logical.Project wrapping Scan"
-    (Logical.Query
+    (Plan.Logical.Query
        (Project { input = Scan { table = "users" }; columns = name_then_email }))
     logical
 
@@ -93,8 +93,8 @@ let test_project_pipeline_yields_projected_rows () =
       in
       let logical = Lower.lower (Ast.Query ast) in
       let catalog = make_catalog environment transaction in
-      let physical = unwrap_query (Translate.translate ~catalog logical) in
-      Eval.eval environment transaction physical (fun relation ->
+      let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
+      Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.tuples in
           let expected =
             [
@@ -116,7 +116,7 @@ let test_cross_product_lowers_to_logical_cross_product () =
   let logical = Lower.lower (Ast.Query ast) in
   Alcotest.(check logical_plan_testable)
     "Ast.CrossProduct -> Logical.CrossProduct wrapping Scans"
-    (Logical.Query
+    (Plan.Logical.Query
        (CrossProduct
           { left = Scan { table = "users" }; right = Scan { table = "orders" } }))
     logical
@@ -139,7 +139,7 @@ let test_join_lowers_to_restrict_over_cross_product () =
   let logical = Lower.lower (Ast.Query ast) in
   Alcotest.(check logical_plan_testable)
     "Ast.Join -> Logical.Restrict wrapping Logical.CrossProduct"
-    (Logical.Query
+    (Plan.Logical.Query
        (Restrict
           {
             input =
@@ -172,7 +172,7 @@ let test_insert_mutation_lowers_through () =
   let logical = Lower.lower plan in
   Alcotest.(check logical_plan_testable)
     "Ast.Mutation(Insert) -> Logical.Mutation(Insert) with the source lowered"
-    (Logical.Mutation
+    (Plan.Logical.Mutation
        (Insert
           {
             table = "orders";
@@ -211,7 +211,7 @@ let test_insert_mutation_lowers_relational_source () =
   let logical = Lower.lower plan in
   Alcotest.(check logical_plan_testable)
     "Insert source's relation tree is lowered in place"
-    (Logical.Mutation
+    (Plan.Logical.Mutation
        (Insert
           {
             table = "orders";
@@ -237,7 +237,7 @@ let test_relation_literal_lowers_through () =
   let logical = Lower.lower (Ast.Query ast) in
   Alcotest.(check logical_plan_testable)
     "Ast.RelationLiteral -> Logical.RelationLiteral with same payload"
-    (Logical.Query
+    (Plan.Logical.Query
        (RelationLiteral
           {
             columns = [ "id"; "name" ];

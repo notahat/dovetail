@@ -1,6 +1,5 @@
 (** Tests for [Catalog]. *)
 
-open Dovetail_core
 open Test_helpers
 module Storage = Dovetail_storage
 

@@ -1,9 +1,10 @@
 (** End-to-end tests for [Eval] on [Physical.RelationLiteral]. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Schema = Dovetail_core.Schema
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build a single-row [Physical.RelationLiteral] plan and pass the materialised
@@ -13,7 +14,7 @@ let with_literal_relation f =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      let plan : Physical.t =
+      let plan : Plan.Physical.t =
         RelationLiteral
           {
             columns = [ "id"; "name"; "active" ];

@@ -1,9 +1,9 @@
 (** End-to-end tests for [Eval] on [Physical.Filter]. *)
 
-open Dovetail_core
-open Dovetail_plan
 open Dovetail_execution
 open Test_helpers
+module Value = Dovetail_core.Value
+module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build a Filter wrapping a FullScan over the users fixture, evaluate it,
@@ -14,8 +14,8 @@ let evaluate_users_filter predicate =
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan =
-        Physical.Filter
-          { input = Physical.FullScan { table = "users" }; predicate }
+        Plan.Physical.Filter
+          { input = Plan.Physical.FullScan { table = "users" }; predicate }
       in
       Eval.eval environment transaction plan (fun relation ->
           List.of_seq relation.tuples))
