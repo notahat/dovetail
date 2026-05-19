@@ -6,9 +6,9 @@
     construct the mutation by hand and call [Eval.eval_mutation] inside a write
     transaction. *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Test_helpers
 module Storage = Dovetail_storage
 

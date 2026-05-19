@@ -3,6 +3,7 @@ module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
+module Execution = Dovetail_execution
 
 let prompt = "> "
 
@@ -36,7 +37,7 @@ let print_query_result environment transaction ~output ~show_physical
     translate_in environment transaction ~output ~show_physical logical_plan
   with
   | Plan.Physical.Query physical ->
-      Eval.eval environment transaction physical (fun relation ->
+      Execution.Eval.eval environment transaction physical (fun relation ->
           Relation.print ~formatter:output relation)
   | Plan.Physical.Mutation _ -> assert false
 
@@ -51,7 +52,8 @@ let print_mutation_result environment transaction ~output ~show_physical
     translate_in environment transaction ~output ~show_physical logical_plan
   with
   | Plan.Physical.Mutation mutation ->
-      Eval.eval_mutation environment transaction mutation (fun affected_rows ->
+      Execution.Eval.eval_mutation environment transaction mutation
+        (fun affected_rows ->
           Format.fprintf output "%s@."
             (format_mutation_status mutation affected_rows))
   | Plan.Physical.Query _ -> assert false
@@ -118,11 +120,13 @@ let execute_and_print_ddl environment ~output statement =
     | `Read ->
         Storage.Engine.with_read_transaction environment (fun transaction ->
             print_ddl_read_result ~output
-              (Ddl_executor.execute_read environment transaction statement))
+              (Execution.Ddl_executor.execute_read environment transaction
+                 statement))
     | `Write ->
         Storage.Engine.with_write_transaction environment (fun transaction ->
             print_ddl_write_result ~output
-              (Ddl_executor.execute_write environment transaction statement))
+              (Execution.Ddl_executor.execute_write environment transaction
+                 statement))
   with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Process one input line: parse, dispatch on the program universe (a

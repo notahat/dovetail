@@ -8,8 +8,8 @@
     assertions can pin both the raised wording and the post-abort state in one
     place. *)
 
-open Dovetail
 open Dovetail_core
+open Dovetail_execution
 open Test_helpers
 module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage

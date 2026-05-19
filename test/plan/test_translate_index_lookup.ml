@@ -11,9 +11,9 @@
     fixture catalog to confirm the rewrite plus eval produce the expected row.
 *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Test_helpers
 module Storage = Dovetail_storage
 

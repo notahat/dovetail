@@ -2,9 +2,9 @@
     one physical constructor, plus the slice-5 inner-join collapse. The
     [IndexLookup] rewrite lives in [test_translate_index_lookup.ml]. *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Test_helpers
 module Storage = Dovetail_storage
 

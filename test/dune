@@ -26,6 +26,7 @@
   dovetail.storage
   dovetail.plan
   dovetail.surface_ra
+  dovetail.execution
   test_helpers
   unix)
  (deps

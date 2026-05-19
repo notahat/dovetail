@@ -6,9 +6,9 @@
     rejection cases -- live in [test_parser.ml] and [test_expression_parser.ml].
 *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Test_helpers
 module Storage = Dovetail_storage
 

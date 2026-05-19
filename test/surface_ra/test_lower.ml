@@ -1,8 +1,8 @@
 (** Tests for [Lower]. *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Dovetail_surface_ra
 open Test_helpers
 module Storage = Dovetail_storage

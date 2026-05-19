@@ -22,6 +22,7 @@ open Dovetail_core
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
+module Execution = Dovetail_execution
 
 (* Re-export the sibling [Fixture] module so callers that [open Test_helpers]
    can write [Fixture.populate_if_empty] without qualifying the path. The
@@ -244,7 +245,7 @@ let with_query_result query check_rows =
       let logical = Surface_ra.Lower.lower ast in
       let catalog = make_catalog environment transaction in
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
-      Eval.eval environment transaction physical (fun relation ->
+      Execution.Eval.eval environment transaction physical (fun relation ->
           check_rows (List.of_seq relation.tuples)))
 
 (** [with_query_failure ~label ~expected query] runs [query] through the same
@@ -265,7 +266,8 @@ let with_query_failure ~label ~expected query =
       let catalog = make_catalog environment transaction in
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
       Alcotest.check_raises label expected (fun () ->
-          Eval.eval environment transaction physical (fun _relation -> ())))
+          Execution.Eval.eval environment transaction physical (fun _relation ->
+              ())))
 
 (** [evaluate_against_fixture plan] populates the standard fixture and evaluates
     [plan] inside a read transaction, returning the resulting schema and tuples.
@@ -274,7 +276,7 @@ let with_query_failure ~label ~expected query =
 let evaluate_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      Eval.eval environment transaction plan (fun relation ->
+      Execution.Eval.eval environment transaction plan (fun relation ->
           (relation.schema, List.of_seq relation.tuples)))
 
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere

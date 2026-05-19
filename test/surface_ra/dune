@@ -1,4 +1,5 @@
 (tests
  (names test_parser test_expression_parser test_lower)
- (libraries alcotest dovetail dovetail.core dovetail.ddl dovetail.plan
-            dovetail.storage dovetail.surface_ra test_helpers))
+ (libraries alcotest dovetail.core dovetail.ddl dovetail.plan
+            dovetail.storage dovetail.surface_ra dovetail.execution
+            test_helpers))

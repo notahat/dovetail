@@ -2,9 +2,9 @@
     project/filter combinations, since they exercise projection's interaction
     with filter resolution. *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Test_helpers
 module Storage = Dovetail_storage
 

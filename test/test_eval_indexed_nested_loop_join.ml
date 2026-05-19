@@ -1,8 +1,8 @@
 (** End-to-end tests for [Eval] on [Physical.IndexedNestedLoopJoin]. *)
 
-open Dovetail
 open Dovetail_core
 open Dovetail_plan
+open Dovetail_execution
 open Test_helpers
 module Storage = Dovetail_storage
 
