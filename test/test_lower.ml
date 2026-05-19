@@ -3,6 +3,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 let logical_plan_testable : Logical.plan Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical-plan>")) ( = )
@@ -19,7 +20,7 @@ let test_pipeline_yields_fixture_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast = Ast.Relation_name "users" in
       let logical = Lower.lower (Ast.Query ast) in
       let catalog = make_catalog environment transaction in
@@ -50,7 +51,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         Ast.Restrict
           { input = Ast.Relation_name "users"; predicate = id_equals_three }
@@ -83,7 +84,7 @@ let test_project_pipeline_yields_projected_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         Ast.Project
           { input = Ast.Relation_name "users"; columns = name_then_email }

@@ -3,6 +3,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* The matched (user, order) pairs that the canonical indexed join --
    stream [orders], probe [users] by [orders.user_id] -- should produce.
@@ -142,7 +143,7 @@ let test_indexed_join_raises_when_outer_key_column_is_not_int64 () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "non-Int64 outer key column"
         (Failure
            "Eval: IndexedNestedLoopJoin requires Int64 outer key column, got \

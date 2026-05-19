@@ -3,20 +3,21 @@ module Schema = Dovetail_core.Schema
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Relation_literal = Dovetail_core.Relation_literal
+module Storage = Dovetail_storage
 
 (* Look up the schema and storage handle for a table referenced in a plan.
    Raises [Failure] if the catalog has no schema for [table], or if the
    catalog has a schema but no storage subDB exists. *)
 let lookup_table_resources environment transaction table =
   let schema =
-    match Catalog.get environment transaction ~table_name:table with
+    match Storage.Catalog.get environment transaction ~table_name:table with
     | Some schema -> schema
     | None -> failwith (Printf.sprintf "Eval: unknown table %S" table)
   in
   let table_map =
     match
-      Storage.open_map environment transaction
-        ~name:(Catalog.table_subdb_name table)
+      Storage.Engine.open_map environment transaction
+        ~name:(Storage.Catalog.table_subdb_name table)
     with
     | Some map -> map
     | None ->
@@ -30,7 +31,7 @@ let lookup_table_resources environment transaction table =
    desugars to [( let* ) action (fun x -> body)], which here is just
    [action (fun x -> body)] -- the operator is the identity. It exists
    purely to flatten the nested continuations: every [eval ...] and
-   [Storage.with_iter_seq ...] in this module takes a final continuation
+   [Storage.Engine.with_iter_seq ...] in this module takes a final continuation
    argument, so partially applying everything except that argument yields
    exactly the [(value -> 'a) -> 'a] shape that [let*] binds. *)
 let ( let* ) action continue = action continue
@@ -41,11 +42,11 @@ let evaluate_full_scan environment transaction table continue =
   let schema, table_map =
     lookup_table_resources environment transaction table
   in
-  let* pairs = Storage.with_iter_seq table_map transaction in
-  let tuples = Seq.map (Row_codec.decode_row schema) pairs in
+  let* pairs = Storage.Engine.with_iter_seq table_map transaction in
+  let tuples = Seq.map (Storage.Row_codec.decode_row schema) pairs in
   continue ({ schema; tuples } : [ `Bag ] Relation.t)
 
-(* Encode [key], probe the table's storage subDB with [Storage.get], and
+(* Encode [key], probe the table's storage subDB with [Storage.Engine.get], and
    hand [continue] a relation whose [tuples] seq has either one element
    (the decoded row) or zero (no row at that key). The seq is [Seq.empty]
    or [Seq.return _] -- a regular OCaml seq, not a live cursor -- so there
@@ -55,12 +56,13 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
   let schema, table_map =
     lookup_table_resources environment transaction table
   in
-  let encoded_key = Encoding.encode_int64_key key in
+  let encoded_key = Storage.Encoding.encode_int64_key key in
   let tuples =
-    match Storage.get table_map transaction ~key:encoded_key with
+    match Storage.Engine.get table_map transaction ~key:encoded_key with
     | None -> Seq.empty
     | Some value_bytes ->
-        Seq.return (Row_codec.decode_row schema (encoded_key, value_bytes))
+        Seq.return
+          (Storage.Row_codec.decode_row schema (encoded_key, value_bytes))
   in
   continue ({ schema; tuples } : [ `Bag ] Relation.t)
 
@@ -217,12 +219,15 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
   let probe_outer_tuple outer_tuple =
     match outer_tuple.(outer_key_position) with
     | Value.Int64 key -> (
-        let encoded_key = Encoding.encode_int64_key key in
-        match Storage.get inner_table_map transaction ~key:encoded_key with
+        let encoded_key = Storage.Encoding.encode_int64_key key in
+        match
+          Storage.Engine.get inner_table_map transaction ~key:encoded_key
+        with
         | None -> None
         | Some value_bytes ->
             let inner_tuple =
-              Row_codec.decode_row inner_schema (encoded_key, value_bytes)
+              Storage.Row_codec.decode_row inner_schema
+                (encoded_key, value_bytes)
             in
             Some (combine_tuples ~inner_tuple ~outer_tuple))
     | _ ->
@@ -322,9 +327,9 @@ let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
     ~position_map source_tuple =
   let target_tuple = project_to_target_order ~position_map source_tuple in
   let key_bytes, value_bytes =
-    Row_codec.encode_row target_schema target_tuple
+    Storage.Row_codec.encode_row target_schema target_tuple
   in
-  (match Storage.get target_map write_transaction ~key:key_bytes with
+  (match Storage.Engine.get target_map write_transaction ~key:key_bytes with
   | None -> ()
   | Some _ ->
       failwith
@@ -332,7 +337,8 @@ let insert_one_row ~target_schema ~target_map ~target_table ~write_transaction
            "Eval: insert into %S: row with primary key %s already exists"
            target_table
            (primary_key_value_text target_schema target_tuple)));
-  Storage.put target_map write_transaction ~key:key_bytes ~value:value_bytes
+  Storage.Engine.put target_map write_transaction ~key:key_bytes
+    ~value:value_bytes
 
 (* Evaluate the [source] sub-plan inside its own resource scope and write
    each tuple it produces into [target_table]. Returns the number of rows

@@ -10,12 +10,14 @@
     layer, but the two are deliberately decoupled: either is free to evolve
     without touching the other. *)
 
+module Storage = Dovetail_storage
+
 val script : string list
 (** The example-table creation and row-insertion statements, one per element, in
     the order they must execute. Each element is a single REPL line: a
     [:create table] statement or a [\{...\} | insert into <table>] pipeline. *)
 
-val run : Storage.environment -> unit
+val run : Storage.Engine.environment -> unit
 (** [run environment] seeds the example tables into [environment] by feeding
     {!script} through {!Repl.run} with a discarding formatter. Idempotent at the
     table level: if every table named in {!script} is already in the catalog,

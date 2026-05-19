@@ -14,6 +14,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* A users schema with a single int64 primary key. Matches what
    [Fixture.users_schema] writes, but rebuilt in-test so the unit tests
@@ -423,7 +424,7 @@ let test_index_lookup_pipeline_yields_one_row () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let logical = scan_users_restricted_by (id_equals_int64_literal 1L) in
       let catalog = make_catalog environment transaction in
       let physical =

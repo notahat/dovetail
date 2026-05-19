@@ -5,6 +5,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* Build a Project wrapping [input_plan] over the users fixture, evaluate
    it, and return the resulting tuples. [column_names] is a list of bare
@@ -19,7 +20,7 @@ let evaluate_users_project ~input_plan column_names =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan = Physical.Project { input = input_plan; columns } in
       Eval.eval environment transaction plan (fun relation ->
           List.of_seq relation.tuples))
@@ -75,7 +76,7 @@ let test_project_then_filter () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan =
         Physical.Filter
           {

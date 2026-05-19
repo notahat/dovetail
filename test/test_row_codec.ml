@@ -1,7 +1,7 @@
 (** Tests for [Row_codec]: schema-driven decoding of stored rows. *)
 
-open Dovetail
 open Dovetail_core
+module Storage = Dovetail_storage
 
 (* A schema with an int64 primary key column [id] and three non-PK columns,
    matching the [users] fixture's shape. *)
@@ -18,14 +18,16 @@ let users_schema : Schema.t =
   }
 
 let test_decode_row_round_trips_a_users_row () =
-  let key_bytes = Encoding.encode_int64_key 7L in
+  let key_bytes = Storage.Encoding.encode_int64_key 7L in
   let value_bytes =
-    Encoding.encode_tuple_value
+    Storage.Encoding.encode_tuple_value
       [
         Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true;
       ]
   in
-  let tuple = Row_codec.decode_row users_schema (key_bytes, value_bytes) in
+  let tuple =
+    Storage.Row_codec.decode_row users_schema (key_bytes, value_bytes)
+  in
   let expected : Schema.tuple =
     [|
       Value.Int64 7L;
@@ -51,7 +53,8 @@ let test_decode_row_raises_for_composite_primary_key () =
     (Failure
        "Row_codec: only single-column primary keys are supported in slice 1")
     (fun () ->
-      ignore (Row_codec.decode_row composite_schema ("ignored", "ignored")))
+      ignore
+        (Storage.Row_codec.decode_row composite_schema ("ignored", "ignored")))
 
 let test_decode_row_raises_for_non_int64_primary_key () =
   let string_pk_schema : Schema.t =
@@ -64,7 +67,8 @@ let test_decode_row_raises_for_non_int64_primary_key () =
     (Failure
        "Row_codec: only int64 primary-key columns are supported in slice 1")
     (fun () ->
-      ignore (Row_codec.decode_row string_pk_schema ("ignored", "ignored")))
+      ignore
+        (Storage.Row_codec.decode_row string_pk_schema ("ignored", "ignored")))
 
 let test_encode_row_round_trips_through_decode_row () =
   let tuple : Schema.tuple =
@@ -75,8 +79,12 @@ let test_encode_row_round_trips_through_decode_row () =
       Value.Bool true;
     |]
   in
-  let key_bytes, value_bytes = Row_codec.encode_row users_schema tuple in
-  let decoded = Row_codec.decode_row users_schema (key_bytes, value_bytes) in
+  let key_bytes, value_bytes =
+    Storage.Row_codec.encode_row users_schema tuple
+  in
+  let decoded =
+    Storage.Row_codec.decode_row users_schema (key_bytes, value_bytes)
+  in
   Alcotest.(check bool) "round-trip matches original" true (decoded = tuple)
 
 let test_encode_row_raises_for_composite_primary_key () =
@@ -95,7 +103,7 @@ let test_encode_row_raises_for_composite_primary_key () =
        "Row_codec: only single-column primary keys are supported in slice 1")
     (fun () ->
       ignore
-        (Row_codec.encode_row composite_schema
+        (Storage.Row_codec.encode_row composite_schema
            [| Value.Int64 1L; Value.Int64 2L |]))
 
 let test_encode_row_raises_for_wrong_arity_tuple () =
@@ -104,7 +112,7 @@ let test_encode_row_raises_for_wrong_arity_tuple () =
        "Schema.split_tuple: tuple has 2 value(s) but schema declares 4 field(s)")
     (fun () ->
       ignore
-        (Row_codec.encode_row users_schema
+        (Storage.Row_codec.encode_row users_schema
            [| Value.Int64 7L; Value.String "Alice" |]))
 
 let () =

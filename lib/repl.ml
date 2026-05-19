@@ -1,5 +1,6 @@
 module Relation = Dovetail_core.Relation
 module Ddl = Dovetail_ddl
+module Storage = Dovetail_storage
 
 let prompt = "> "
 
@@ -16,7 +17,9 @@ let format_mutation_status mutation affected_rows =
    true, dump the chosen physical plan to [output] before returning it. Pure
    helper threaded through both transaction arms below. *)
 let translate_in environment transaction ~output ~show_physical logical_plan =
-  let catalog table_name = Catalog.get environment transaction ~table_name in
+  let catalog table_name =
+    Storage.Catalog.get environment transaction ~table_name
+  in
   let physical_plan = Translate.translate ~catalog logical_plan in
   if show_physical then Physical.format_plan output physical_plan;
   physical_plan
@@ -62,11 +65,11 @@ let evaluate_and_print environment ~output ~show_physical logical_plan =
   try
     match Logical.classify logical_plan with
     | `Read ->
-        Storage.with_read_transaction environment (fun transaction ->
+        Storage.Engine.with_read_transaction environment (fun transaction ->
             print_query_result environment transaction ~output ~show_physical
               logical_plan)
     | `Write ->
-        Storage.with_write_transaction environment (fun transaction ->
+        Storage.Engine.with_write_transaction environment (fun transaction ->
             print_mutation_result environment transaction ~output ~show_physical
               logical_plan)
   with Failure message -> Format.fprintf output "error: %s@." message
@@ -111,11 +114,11 @@ let execute_and_print_ddl environment ~output statement =
     in
     match Ddl.Statement.classify statement with
     | `Read ->
-        Storage.with_read_transaction environment (fun transaction ->
+        Storage.Engine.with_read_transaction environment (fun transaction ->
             print_ddl_read_result ~output
               (Ddl_executor.execute_read environment transaction statement))
     | `Write ->
-        Storage.with_write_transaction environment (fun transaction ->
+        Storage.Engine.with_write_transaction environment (fun transaction ->
             print_ddl_write_result ~output
               (Ddl_executor.execute_write environment transaction statement))
   with Failure message -> Format.fprintf output "error: %s@." message

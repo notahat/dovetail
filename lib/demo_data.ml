@@ -1,3 +1,5 @@
+module Storage = Dovetail_storage
+
 (* The catalog tables that {!script} populates. Hardcoded alongside the
    script so the idempotency check can short-circuit without parsing
    the statements; if [script] grows to add a third table this list
@@ -38,10 +40,11 @@ let script =
    fails on whichever table already exists, surfacing the partial
    state rather than silently leaving it. *)
 let already_seeded environment =
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       List.for_all
         (fun table_name ->
-          Option.is_some (Catalog.get environment transaction ~table_name))
+          Option.is_some
+            (Storage.Catalog.get environment transaction ~table_name))
         demo_tables)
 
 (* A [unit -> string option] callback that yields successive entries

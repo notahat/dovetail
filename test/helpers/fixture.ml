@@ -1,7 +1,5 @@
 module Schema = Dovetail_core.Schema
-module Catalog = Dovetail.Catalog
-module Storage = Dovetail.Storage
-module Row_codec = Dovetail.Row_codec
+module Storage = Dovetail_storage
 
 let users_schema : Schema.t =
   {
@@ -48,25 +46,25 @@ let orders_rows : Schema.tuple list =
 
 (* Write [schema] to the catalog and [rows] to a fresh storage subDB for
    [table_name], if [table_name] is not already present in the catalog.
-   The subDB's name comes from {!Catalog.table_subdb_name}, the single
+   The subDB's name comes from {!Storage.Catalog.table_subdb_name}, the single
    source of truth for the [table:] namespace convention. *)
 let populate_table environment transaction ~table_name ~schema ~rows =
-  match Catalog.get environment transaction ~table_name with
+  match Storage.Catalog.get environment transaction ~table_name with
   | Some _ -> ()
   | None ->
-      Catalog.put environment transaction ~table_name schema;
+      Storage.Catalog.put environment transaction ~table_name schema;
       let table_map =
-        Storage.create_map environment transaction
-          ~name:(Catalog.table_subdb_name table_name)
+        Storage.Engine.create_map environment transaction
+          ~name:(Storage.Catalog.table_subdb_name table_name)
       in
       List.iter
         (fun row ->
-          let key, value = Row_codec.encode_row schema row in
-          Storage.put table_map transaction ~key ~value)
+          let key, value = Storage.Row_codec.encode_row schema row in
+          Storage.Engine.put table_map transaction ~key ~value)
         rows
 
 let populate_if_empty environment =
-  Storage.with_write_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       populate_table environment transaction ~table_name:"users"
         ~schema:users_schema ~rows:users_rows;
       populate_table environment transaction ~table_name:"orders"

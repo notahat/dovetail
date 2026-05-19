@@ -67,6 +67,7 @@ val classify : plan -> [ `Read | `Write ]
     [plan]: [`Read] for a query, [`Write] for a mutation. The wrapper
     constructor is the only thing inspected -- the inner relation tree or
     mutation isn't walked. The REPL uses this to choose between
-    {!Storage.with_read_transaction} and {!Storage.with_write_transaction}
-    before translation, so a read-only query isn't unnecessarily serialised
-    against LMDB's writer lock. *)
+    {!Dovetail_storage.Engine.with_read_transaction} and
+    {!Dovetail_storage.Engine.with_write_transaction} before translation, so a
+    read-only query isn't unnecessarily serialised against LMDB's writer lock.
+*)

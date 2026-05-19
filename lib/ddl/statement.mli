@@ -88,10 +88,11 @@ val classify : t -> [ `Read | `Write ]
 (** [classify statement] returns the transaction permission the REPL should open
     for [statement]: [`Read] for a statement that only inspects the catalog,
     [`Write] for one that mutates it. The REPL uses this to pick between
-    {!Storage.with_read_transaction} and {!Storage.with_write_transaction}, and
-    to dispatch to {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}
-    afterwards. The two dispatch decisions read off the same constructor, so
-    they cannot drift. *)
+    {!Dovetail_storage.Engine.with_read_transaction} and
+    {!Dovetail_storage.Engine.with_write_transaction}, and to dispatch to
+    {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write} afterwards.
+    The two dispatch decisions read off the same constructor, so they cannot
+    drift. *)
 
 val validate : t -> (unit, string) result
 (** [validate statement] runs the structural checks that depend only on

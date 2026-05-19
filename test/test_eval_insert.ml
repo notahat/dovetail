@@ -9,6 +9,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]
    with the given column/value pairs. The pairs are in target schema order;
@@ -32,12 +33,12 @@ let test_insert_writes_row_and_reports_one_affected () =
           ("amount", Value.Int64 9L);
         ]
   in
-  Storage.with_write_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval_mutation environment transaction mutation (fun affected_rows ->
           Alcotest.(check int) "one row affected" 1 affected_rows));
   (* The row should now be present in a fresh read transaction, so we know
      the write committed rather than just being visible to the writer. *)
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
         (Physical.FullScan { table = "orders" })
         (fun relation ->
@@ -79,11 +80,11 @@ let test_insert_with_existing_primary_key_raises () =
     (Failure
        "Eval: insert into \"orders\": row with primary key 1 already exists")
     (fun () ->
-      Storage.with_write_transaction environment (fun transaction ->
+      Storage.Engine.with_write_transaction environment (fun transaction ->
           Eval.eval_mutation environment transaction mutation (fun _ -> ())));
   (* The transaction aborted on the raised exception, so the table should
      be unchanged. *)
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
         (Physical.FullScan { table = "orders" })
         (fun relation ->

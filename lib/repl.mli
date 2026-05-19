@@ -12,6 +12,8 @@
     streams, while tests pass list-backed and buffer-backed adapters to drive
     the loop in-process. *)
 
+module Storage = Dovetail_storage
+
 val format_mutation_status : Physical.mutation -> int -> string
 (** [format_mutation_status mutation affected_rows] renders the one-line status
     the REPL prints after a successful mutation, e.g. ["inserted 1 row"] or
@@ -23,7 +25,7 @@ val format_mutation_status : Physical.mutation -> int -> string
 
 val run :
   ?show_physical:bool ->
-  Storage.environment ->
+  Storage.Engine.environment ->
   read_line:(unit -> string option) ->
   output:Format.formatter ->
   unit

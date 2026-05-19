@@ -4,6 +4,8 @@
    work lives in [Dovetail.*] so it's testable without spawning a
    subprocess. *)
 
+module Storage = Dovetail_storage
+
 let usage program_name =
   Printf.sprintf "usage: %s [%s] [%s] [environment-path]" program_name
     Dovetail.Cli.show_physical_flag Dovetail.Cli.demo_data_flag
@@ -27,9 +29,9 @@ let () =
   let { Dovetail.Cli.show_physical; demo_data; environment_path } =
     parse_argv_or_exit Sys.argv
   in
-  let environment = Dovetail.Storage.open_environment environment_path in
+  let environment = Storage.Engine.open_environment environment_path in
   Fun.protect
-    ~finally:(fun () -> Dovetail.Storage.close_environment environment)
+    ~finally:(fun () -> Storage.Engine.close_environment environment)
     (fun () ->
       if demo_data then Dovetail.Demo_data.run environment;
       Dovetail.Repl.run ~show_physical environment

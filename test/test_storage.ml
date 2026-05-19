@@ -1,59 +1,66 @@
 (** Tests for [Storage]. *)
 
-open Dovetail
 open Test_helpers
+module Storage = Dovetail_storage
 
 let test_round_trip () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let map = Storage.create_map environment transaction ~name:"test" in
-      Storage.put map transaction ~key:"hello" ~value:"world";
-      Storage.put map transaction ~key:"foo" ~value:"bar");
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       let map =
-        match Storage.open_map environment transaction ~name:"test" with
+        Storage.Engine.create_map environment transaction ~name:"test"
+      in
+      Storage.Engine.put map transaction ~key:"hello" ~value:"world";
+      Storage.Engine.put map transaction ~key:"foo" ~value:"bar");
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let map =
+        match Storage.Engine.open_map environment transaction ~name:"test" with
         | Some m -> m
         | None -> Alcotest.fail "expected map to exist"
       in
       Alcotest.(check (option string))
         "hello" (Some "world")
-        (Storage.get map transaction ~key:"hello");
+        (Storage.Engine.get map transaction ~key:"hello");
       Alcotest.(check (option string))
         "foo" (Some "bar")
-        (Storage.get map transaction ~key:"foo");
+        (Storage.Engine.get map transaction ~key:"foo");
       Alcotest.(check (option string))
         "missing key" None
-        (Storage.get map transaction ~key:"nope"))
+        (Storage.Engine.get map transaction ~key:"nope"))
 
 let test_open_map_returns_none_when_missing () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check bool)
         "absent map" true
-        (Storage.open_map environment transaction ~name:"never-created" = None))
+        (Storage.Engine.open_map environment transaction ~name:"never-created"
+        = None))
 
 (* Populate a fresh map with the three pairs used across the [with_iter_seq]
    tests, then run [body] with a read transaction and the map. *)
 let with_streaming_fixture body =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let map = Storage.create_map environment transaction ~name:"test" in
-      List.iter
-        (fun (k, v) -> Storage.put map transaction ~key:k ~value:v)
-        [ ("c", "3"); ("a", "1"); ("b", "2") ]);
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       let map =
-        Option.get (Storage.open_map environment transaction ~name:"test")
+        Storage.Engine.create_map environment transaction ~name:"test"
+      in
+      List.iter
+        (fun (k, v) -> Storage.Engine.put map transaction ~key:k ~value:v)
+        [ ("c", "3"); ("a", "1"); ("b", "2") ]);
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let map =
+        Option.get
+          (Storage.Engine.open_map environment transaction ~name:"test")
       in
       body transaction map)
 
 let test_with_iter_seq_streams_in_key_order () =
   with_streaming_fixture @@ fun transaction map ->
   let pairs =
-    Storage.with_iter_seq map transaction (fun sequence -> List.of_seq sequence)
+    Storage.Engine.with_iter_seq map transaction (fun sequence ->
+        List.of_seq sequence)
   in
   Alcotest.(check (list (pair string string)))
     "pairs in ascending key order"
@@ -62,7 +69,7 @@ let test_with_iter_seq_streams_in_key_order () =
 
 let test_with_iter_seq_is_one_shot () =
   with_streaming_fixture @@ fun transaction map ->
-  Storage.with_iter_seq map transaction (fun sequence ->
+  Storage.Engine.with_iter_seq map transaction (fun sequence ->
       let first_pass = List.of_seq sequence in
       let second_pass = List.of_seq sequence in
       Alcotest.(check (list (pair string string)))
@@ -75,7 +82,7 @@ let test_with_iter_seq_is_one_shot () =
 let test_with_iter_seq_partial_consumption_is_safe () =
   with_streaming_fixture @@ fun transaction map ->
   let first_pair =
-    Storage.with_iter_seq map transaction (fun sequence ->
+    Storage.Engine.with_iter_seq map transaction (fun sequence ->
         match sequence () with
         | Seq.Nil -> Alcotest.fail "expected at least one pair"
         | Seq.Cons (pair, _rest) -> pair)
@@ -85,7 +92,8 @@ let test_with_iter_seq_partial_consumption_is_safe () =
   (* Subsequent reads against the same transaction must still succeed --
      leaving the cursor partly consumed should not poison the transaction. *)
   let pairs_after =
-    Storage.with_iter_seq map transaction (fun sequence -> List.of_seq sequence)
+    Storage.Engine.with_iter_seq map transaction (fun sequence ->
+        List.of_seq sequence)
   in
   Alcotest.(check (list (pair string string)))
     "fresh cursor still streams every pair"
@@ -95,15 +103,16 @@ let test_with_iter_seq_partial_consumption_is_safe () =
 let test_with_iter_seq_yields_empty_for_empty_map () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let _ = Storage.create_map environment transaction ~name:"empty" in
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      let _ = Storage.Engine.create_map environment transaction ~name:"empty" in
       ());
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let map =
-        Option.get (Storage.open_map environment transaction ~name:"empty")
+        Option.get
+          (Storage.Engine.open_map environment transaction ~name:"empty")
       in
       let pairs =
-        Storage.with_iter_seq map transaction (fun sequence ->
+        Storage.Engine.with_iter_seq map transaction (fun sequence ->
             List.of_seq sequence)
       in
       Alcotest.(check (list (pair string string)))
@@ -112,42 +121,49 @@ let test_with_iter_seq_yields_empty_for_empty_map () =
 let test_delete_removes_key () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let map = Storage.create_map environment transaction ~name:"test" in
-      Storage.put map transaction ~key:"hello" ~value:"world";
-      Storage.delete map transaction ~key:"hello");
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       let map =
-        Option.get (Storage.open_map environment transaction ~name:"test")
+        Storage.Engine.create_map environment transaction ~name:"test"
+      in
+      Storage.Engine.put map transaction ~key:"hello" ~value:"world";
+      Storage.Engine.delete map transaction ~key:"hello");
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let map =
+        Option.get
+          (Storage.Engine.open_map environment transaction ~name:"test")
       in
       Alcotest.(check (option string))
         "deleted key returns None" None
-        (Storage.get map transaction ~key:"hello"))
+        (Storage.Engine.get map transaction ~key:"hello"))
 
 let test_delete_is_no_op_on_absent_key () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let map = Storage.create_map environment transaction ~name:"test" in
-      Storage.put map transaction ~key:"kept" ~value:"value";
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      let map =
+        Storage.Engine.create_map environment transaction ~name:"test"
+      in
+      Storage.Engine.put map transaction ~key:"kept" ~value:"value";
       (* The absent-key delete must not raise. *)
-      Storage.delete map transaction ~key:"never-there";
+      Storage.Engine.delete map transaction ~key:"never-there";
       (* Sibling keys must remain untouched. *)
       Alcotest.(check (option string))
         "sibling key untouched" (Some "value")
-        (Storage.get map transaction ~key:"kept"))
+        (Storage.Engine.get map transaction ~key:"kept"))
 
 let test_drop_map_removes_subdb_and_contents () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      let map = Storage.create_map environment transaction ~name:"doomed" in
-      Storage.put map transaction ~key:"a" ~value:"1";
-      Storage.drop_map environment transaction ~name:"doomed");
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      let map =
+        Storage.Engine.create_map environment transaction ~name:"doomed"
+      in
+      Storage.Engine.put map transaction ~key:"a" ~value:"1";
+      Storage.Engine.drop_map environment transaction ~name:"doomed");
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check bool)
         "subDB no longer exists" true
-        (Storage.open_map environment transaction ~name:"doomed" = None))
+        (Storage.Engine.open_map environment transaction ~name:"doomed" = None))
 
 let test_drop_map_raises_on_missing_subdb () =
   with_temp_dir @@ fun dir ->
@@ -155,28 +171,30 @@ let test_drop_map_raises_on_missing_subdb () =
   Alcotest.check_raises "missing subDB raises Invalid_argument"
     (Invalid_argument "Storage.drop_map: subDB \"never-there\" does not exist")
     (fun () ->
-      Storage.with_write_transaction environment (fun transaction ->
-          Storage.drop_map environment transaction ~name:"never-there"))
+      Storage.Engine.with_write_transaction environment (fun transaction ->
+          Storage.Engine.drop_map environment transaction ~name:"never-there"))
 
 let test_exception_aborts_write_transaction () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   (* Write transaction body raises after a put -- the put must not persist. *)
   (try
-     Storage.with_write_transaction environment (fun transaction ->
-         let map = Storage.create_map environment transaction ~name:"test" in
-         Storage.put map transaction ~key:"hello" ~value:"world";
+     Storage.Engine.with_write_transaction environment (fun transaction ->
+         let map =
+           Storage.Engine.create_map environment transaction ~name:"test"
+         in
+         Storage.Engine.put map transaction ~key:"hello" ~value:"world";
          failwith "boom")
    with Failure _ -> ());
-  Storage.with_read_transaction environment (fun transaction ->
-      match Storage.open_map environment transaction ~name:"test" with
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      match Storage.Engine.open_map environment transaction ~name:"test" with
       | None ->
           (* The map was never committed -- the abort rolled it back. *)
           ()
       | Some map ->
           Alcotest.(check (option string))
             "no hello" None
-            (Storage.get map transaction ~key:"hello"))
+            (Storage.Engine.get map transaction ~key:"hello"))
 
 let () =
   Alcotest.run "storage"

@@ -5,6 +5,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 let test_scan_lowers_to_full_scan () =
   let logical = Logical.Scan { table = "users" } in
@@ -21,7 +22,7 @@ let test_pipeline_yields_fixture_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let logical = Logical.Scan { table = "users" } in
       let catalog = make_catalog environment transaction in
       let physical =
@@ -61,7 +62,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let logical =
         Logical.Restrict
           {
@@ -102,7 +103,7 @@ let test_project_pipeline_yields_projected_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let logical =
         Logical.Project
           {

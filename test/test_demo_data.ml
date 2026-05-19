@@ -6,14 +6,15 @@
 
 open Dovetail
 open Test_helpers
+module Storage = Dovetail_storage
 
 let test_populates_expected_tables () =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
   Demo_data.run environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let has_table table_name =
-        Option.is_some (Catalog.get environment transaction ~table_name)
+        Option.is_some (Storage.Catalog.get environment transaction ~table_name)
       in
       Alcotest.(check bool) "users in catalog" true (has_table "users");
       Alcotest.(check bool) "orders in catalog" true (has_table "orders"))
@@ -23,9 +24,9 @@ let test_is_idempotent () =
   with_environment directory @@ fun environment ->
   Demo_data.run environment;
   Demo_data.run environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let has_table table_name =
-        Option.is_some (Catalog.get environment transaction ~table_name)
+        Option.is_some (Storage.Catalog.get environment transaction ~table_name)
       in
       Alcotest.(check bool) "users still present" true (has_table "users");
       Alcotest.(check bool) "orders still present" true (has_table "orders"))

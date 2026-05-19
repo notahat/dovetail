@@ -3,6 +3,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* Build a Filter wrapping a FullScan over the users fixture, evaluate it,
    and return the resulting tuples. *)
@@ -10,7 +11,7 @@ let evaluate_users_filter predicate =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan =
         Physical.Filter
           { input = Physical.FullScan { table = "users" }; predicate }

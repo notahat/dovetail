@@ -1,5 +1,6 @@
 module Ddl = Dovetail_ddl
 module Schema = Dovetail_core.Schema
+module Storage = Dovetail_storage
 
 (* Look up [table_name] in the catalog and return its schema wrapped in
    [Described]. The catalog-aware "no such table" check happens here so
@@ -7,14 +8,15 @@ module Schema = Dovetail_core.Schema
    describe ...] prefix matches the slice-13 reframe convention. *)
 let describe_table environment transaction table_name :
     Ddl.Statement.read_result =
-  match Catalog.get environment transaction ~table_name with
+  match Storage.Catalog.get environment transaction ~table_name with
   | Some schema -> Described { table_name; schema }
   | None ->
       failwith (Printf.sprintf "DDL: describe %S: no such table" table_name)
 
 let execute_read environment transaction :
     Ddl.Statement.t -> Ddl.Statement.read_result = function
-  | List_tables -> Listed (Catalog.list_table_names environment transaction)
+  | List_tables ->
+      Listed (Storage.Catalog.list_table_names environment transaction)
   | Drop_table _ | Create_table _ ->
       (* Routing invariant: Drop_table and Create_table are write
          statements; the REPL must classify and route them to
@@ -31,13 +33,13 @@ let execute_read environment transaction :
    atomic in normal operation, but the ordering is defensive against any
    future code path that splits the commit boundary. *)
 let drop_table environment transaction table_name : Ddl.Statement.write_result =
-  (match Catalog.get environment transaction ~table_name with
+  (match Storage.Catalog.get environment transaction ~table_name with
   | Some _ -> ()
   | None ->
       failwith (Printf.sprintf "DDL: drop table %S: no such table" table_name));
-  Storage.drop_map environment transaction
-    ~name:(Catalog.table_subdb_name table_name);
-  Catalog.delete environment transaction ~table_name;
+  Storage.Engine.drop_map environment transaction
+    ~name:(Storage.Catalog.table_subdb_name table_name);
+  Storage.Catalog.delete environment transaction ~table_name;
   Dropped table_name
 
 (* Build the [Schema.t] that a [Create_table] statement should write into
@@ -67,17 +69,17 @@ let schema_of_create_fields ~table_name (fields : Ddl.Statement.field list)
    transaction aborts and rolls both halves back. *)
 let create_table environment transaction ~table_name ~fields ~primary_key :
     Ddl.Statement.write_result =
-  (match Catalog.get environment transaction ~table_name with
+  (match Storage.Catalog.get environment transaction ~table_name with
   | None -> ()
   | Some _ ->
       failwith
         (Printf.sprintf "DDL: create table %S: table already exists" table_name));
   let schema = schema_of_create_fields ~table_name fields ~primary_key in
   let _map =
-    Storage.create_map environment transaction
-      ~name:(Catalog.table_subdb_name table_name)
+    Storage.Engine.create_map environment transaction
+      ~name:(Storage.Catalog.table_subdb_name table_name)
   in
-  Catalog.put environment transaction ~table_name schema;
+  Storage.Catalog.put environment transaction ~table_name schema;
   Created table_name
 
 let execute_write environment transaction :

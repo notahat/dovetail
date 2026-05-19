@@ -1,7 +1,7 @@
 (** Tests for [Encoding]. *)
 
-open Dovetail
 open Dovetail_core
+module Storage = Dovetail_storage
 
 let test_int64_key_round_trip () =
   let inputs =
@@ -9,8 +9,8 @@ let test_int64_key_round_trip () =
   in
   List.iter
     (fun original ->
-      let encoded = Encoding.encode_int64_key original in
-      let decoded = Encoding.decode_int64_key encoded in
+      let encoded = Storage.Encoding.encode_int64_key original in
+      let decoded = Storage.Encoding.decode_int64_key encoded in
       Alcotest.(check int64)
         (Printf.sprintf "%Ld round-trips" original)
         original decoded)
@@ -29,8 +29,8 @@ let test_int64_key_is_byte_comparable () =
   in
   List.iter
     (fun (smaller, larger) ->
-      let encoded_smaller = Encoding.encode_int64_key smaller in
-      let encoded_larger = Encoding.encode_int64_key larger in
+      let encoded_smaller = Storage.Encoding.encode_int64_key smaller in
+      let encoded_larger = Storage.Encoding.encode_int64_key larger in
       Alcotest.(check bool)
         (Printf.sprintf "encoded %Ld < encoded %Ld" smaller larger)
         true
@@ -40,24 +40,24 @@ let test_int64_key_is_byte_comparable () =
 let test_int64_key_is_eight_bytes () =
   Alcotest.(check int)
     "eight bytes" 8
-    (String.length (Encoding.encode_int64_key 0L))
+    (String.length (Storage.Encoding.encode_int64_key 0L))
 
 let test_decode_int64_key_rejects_wrong_length () =
   Alcotest.check_raises "seven bytes"
     (Invalid_argument "Encoding.decode_int64_key: expected 8 bytes, got 7")
-    (fun () -> ignore (Encoding.decode_int64_key "1234567"))
+    (fun () -> ignore (Storage.Encoding.decode_int64_key "1234567"))
 
 let test_tuple_value_round_trip () =
   let values : Value.t list =
     [ Int64 42L; String "hello"; Bool true; Int64 (-1L); Bool false ]
   in
-  let encoded = Encoding.encode_tuple_value values in
-  let decoded = Encoding.decode_tuple_value encoded in
+  let encoded = Storage.Encoding.encode_tuple_value values in
+  let decoded = Storage.Encoding.decode_tuple_value encoded in
   Alcotest.(check bool) "decoded equals original" true (decoded = values)
 
 let test_tuple_value_round_trip_empty () =
-  let encoded = Encoding.encode_tuple_value [] in
-  let decoded = Encoding.decode_tuple_value encoded in
+  let encoded = Storage.Encoding.encode_tuple_value [] in
+  let decoded = Storage.Encoding.decode_tuple_value encoded in
   Alcotest.(check bool) "empty list round-trips" true (decoded = [])
 
 let () =

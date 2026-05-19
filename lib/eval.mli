@@ -14,10 +14,11 @@
     the outer loop re-iterates it. *)
 
 module Relation = Dovetail_core.Relation
+module Storage = Dovetail_storage
 
 val eval :
-  Storage.environment ->
-  [> `Read ] Storage.transaction ->
+  Storage.Engine.environment ->
+  [> `Read ] Storage.Engine.transaction ->
   Physical.t ->
   ([ `Bag ] Relation.t -> 'a) ->
   'a
@@ -34,8 +35,8 @@ val eval :
     most failure modes surface before [continue] is called. *)
 
 val eval_mutation :
-  Storage.environment ->
-  [ `Read | `Write ] Storage.transaction ->
+  Storage.Engine.environment ->
+  [ `Read | `Write ] Storage.Engine.transaction ->
   Physical.mutation ->
   (int -> 'a) ->
   'a
@@ -45,9 +46,9 @@ val eval_mutation :
 
     For [Insert { table; source }], the sink evaluates [source] as a relation
     via {!eval} (inside the same write [transaction]), then for each source
-    tuple performs a [Storage.get] to detect a primary-key collision against an
-    existing row, and a [Storage.put] to write the row otherwise. The count
-    handed to [continue] is the number of [put]s performed.
+    tuple performs a [Storage.Engine.get] to detect a primary-key collision
+    against an existing row, and a [Storage.Engine.put] to write the row
+    otherwise. The count handed to [continue] is the number of [put]s performed.
 
     The continuation shape mirrors {!eval} so the two entry points dispatch
     uniformly at the call site. The affected-row count is itself a plain value
@@ -58,7 +59,7 @@ val eval_mutation :
     Raises [Failure] under the same conditions as {!eval}, plus on a primary-key
     collision against an existing row in the target table. A raise aborts the
     in-flight write transaction via the standard exception path of
-    {!Storage.with_write_transaction}, so any earlier writes in the same
+    {!Storage.Engine.with_write_transaction}, so any earlier writes in the same
     mutation are discarded -- multi-row inserts (once the multi-row literal
     grammar lands) commit all-or-nothing.
 

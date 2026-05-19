@@ -2,12 +2,13 @@
 
 open Dovetail
 open Test_helpers
+module Storage = Dovetail_storage
 
 let test_full_scan_yields_fixture_rows () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
         (Physical.FullScan { table = "users" })
         (fun relation ->
@@ -22,7 +23,7 @@ let test_full_scan_raises_for_missing_table () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "missing table"
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           Eval.eval environment transaction

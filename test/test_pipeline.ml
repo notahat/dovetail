@@ -9,6 +9,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* The expected matched (user, order) pairs from an inner equi-join on
    [users.id = orders.user_id]. The fixture has six orders; each names a
@@ -289,7 +290,7 @@ let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
    has no parser path yet (Translate support arrives in step 2). *)
 let render_plan_against_fixture plan =
   with_fixture_environment @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction plan (fun relation ->
           with_captured_formatter @@ fun formatter ->
           Relation.print ~formatter relation))

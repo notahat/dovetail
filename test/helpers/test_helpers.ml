@@ -19,6 +19,7 @@
 
 open Dovetail
 open Dovetail_core
+module Storage = Dovetail_storage
 
 (* Re-export the sibling [Fixture] module so callers that [open Test_helpers]
    can write [Fixture.populate_if_empty] without qualifying the path. The
@@ -56,9 +57,9 @@ let with_temp_dir f =
 (** [with_environment path f] opens an LMDB environment at [path], runs
     [f environment], and closes the environment on exit. *)
 let with_environment path f =
-  let environment = Storage.open_environment path in
+  let environment = Storage.Engine.open_environment path in
   Fun.protect
-    ~finally:(fun () -> Storage.close_environment environment)
+    ~finally:(fun () -> Storage.Engine.close_environment environment)
     (fun () -> f environment)
 
 (** [with_fixture_environment f] creates a temp directory, opens an LMDB
@@ -220,7 +221,7 @@ let noop_catalog : string -> Schema.t option = fun _table_name -> None
     [Translate] sees the real fixture schemas. Used by the pipeline-integration
     helpers below and any other test that wants the catalog wired up. *)
 let make_catalog environment transaction table_name =
-  Catalog.get environment transaction ~table_name
+  Storage.Catalog.get environment transaction ~table_name
 
 (** [with_query_result query check_rows] runs [query] through the full parse /
     lower / translate / eval pipeline against the standard fixture and calls
@@ -229,7 +230,7 @@ let make_catalog environment transaction table_name =
     torn down around the call. *)
 let with_query_result query check_rows =
   with_fixture_environment @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Parser.parse query with
         | Ok (Ast.Pipeline plan) -> plan
@@ -249,7 +250,7 @@ let with_query_result query check_rows =
     [expected]. [label] is the description shown in test output. *)
 let with_query_failure ~label ~expected query =
   with_fixture_environment @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Parser.parse query with
         | Ok (Ast.Pipeline plan) -> plan
@@ -270,7 +271,7 @@ let with_query_failure ~label ~expected query =
     transaction are all set up and torn down around the call. *)
 let evaluate_against_fixture plan =
   with_fixture_environment @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction plan (fun relation ->
           (relation.schema, List.of_seq relation.tuples)))
 

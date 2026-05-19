@@ -3,6 +3,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* Build a single-row [Physical.RelationLiteral] plan and pass the materialised
    relation into [f]. Each per-attribute test below uses this so the eval
@@ -10,7 +11,7 @@ open Test_helpers
 let with_literal_relation f =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan : Physical.t =
         RelationLiteral
           {

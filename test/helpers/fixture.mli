@@ -9,6 +9,7 @@
     deliberately decoupled and free to drift. *)
 
 module Schema = Dovetail_core.Schema
+module Storage = Dovetail_storage
 
 val users_rows : Schema.tuple list
 (** The five [users] rows, in primary-key order. Exposed so tests that compare
@@ -18,7 +19,7 @@ val orders_rows : Schema.tuple list
 (** The six [orders] rows, in primary-key order. Dave (user id 4) deliberately
     has no orders; Alice (id 1) and Carol (id 3) each have two. *)
 
-val populate_if_empty : Dovetail.Storage.environment -> unit
+val populate_if_empty : Storage.Engine.environment -> unit
 (** [populate_if_empty environment] writes the [users] and [orders] schemas and
     their fixture rows in a single write transaction. Each table is written only
     if the catalog has no entry for it, so the call is idempotent: running it on

@@ -31,7 +31,14 @@
   test_doctest
   test_documentation
   test_demo_data)
- (libraries alcotest dovetail dovetail.core dovetail.ddl test_helpers unix)
+ (libraries
+  alcotest
+  dovetail
+  dovetail.core
+  dovetail.ddl
+  dovetail.storage
+  test_helpers
+  unix)
  (deps
   ../bin/main.exe
   ../docs/query-language.md

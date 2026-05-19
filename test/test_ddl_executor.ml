@@ -12,6 +12,7 @@ open Dovetail
 open Dovetail_core
 open Test_helpers
 module Ddl = Dovetail_ddl
+module Storage = Dovetail_storage
 
 let users_schema : Schema.t =
   {
@@ -31,10 +32,12 @@ let schema_testable =
 let test_execute_read_list_tables_returns_byte_sorted_names () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      Catalog.put environment transaction ~table_name:"users" users_schema;
-      Catalog.put environment transaction ~table_name:"orders" orders_schema);
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      Storage.Catalog.put environment transaction ~table_name:"users"
+        users_schema;
+      Storage.Catalog.put environment transaction ~table_name:"orders"
+        orders_schema);
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       match
         Ddl_executor.execute_read environment transaction
           Ddl.Statement.List_tables
@@ -49,7 +52,7 @@ let test_execute_read_list_tables_returns_byte_sorted_names () =
 let test_execute_read_list_tables_on_empty_catalog () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       match
         Ddl_executor.execute_read environment transaction
           Ddl.Statement.List_tables
@@ -64,9 +67,10 @@ let test_execute_read_list_tables_on_empty_catalog () =
 let test_execute_read_describe_returns_stored_schema () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
-      Catalog.put environment transaction ~table_name:"users" users_schema);
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      Storage.Catalog.put environment transaction ~table_name:"users"
+        users_schema);
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       match
         Ddl_executor.execute_read environment transaction
           (Ddl.Statement.Describe { table_name = "users" })
@@ -85,7 +89,7 @@ let test_execute_read_describe_no_such_table_raises () =
   with_environment dir @@ fun environment ->
   Alcotest.check_raises "no such table raises Failure with DDL: prefix"
     (Failure "DDL: describe \"nonexistent\": no such table") (fun () ->
-      Storage.with_read_transaction environment (fun transaction ->
+      Storage.Engine.with_read_transaction environment (fun transaction ->
           let _result =
             Ddl_executor.execute_read environment transaction
               (Ddl.Statement.Describe { table_name = "nonexistent" })
@@ -97,19 +101,19 @@ let test_execute_read_describe_no_such_table_raises () =
    has both halves to remove. The row contents are irrelevant -- the
    storage drop empties the subDB whether it has rows or not. *)
 let seed_table environment ~table_name schema =
-  Storage.with_write_transaction environment (fun transaction ->
-      Catalog.put environment transaction ~table_name schema;
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      Storage.Catalog.put environment transaction ~table_name schema;
       let map =
-        Storage.create_map environment transaction
-          ~name:(Catalog.table_subdb_name table_name)
+        Storage.Engine.create_map environment transaction
+          ~name:(Storage.Catalog.table_subdb_name table_name)
       in
-      Storage.put map transaction ~key:"any-key" ~value:"any-value")
+      Storage.Engine.put map transaction ~key:"any-key" ~value:"any-value")
 
 let test_execute_write_drop_table_removes_catalog_and_storage () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   seed_table environment ~table_name:"users" users_schema;
-  Storage.with_write_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       match
         Ddl_executor.execute_write environment transaction
           (Ddl.Statement.Drop_table { table_name = "users" })
@@ -119,14 +123,14 @@ let test_execute_write_drop_table_removes_catalog_and_storage () =
       | Created _ ->
           (* Drop_table produces Dropped, never Created. *)
           assert false);
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "catalog entry gone" None
-        (Catalog.get environment transaction ~table_name:"users");
+        (Storage.Catalog.get environment transaction ~table_name:"users");
       Alcotest.(check bool)
         "storage subDB gone" true
-        (Storage.open_map environment transaction
-           ~name:(Catalog.table_subdb_name "users")
+        (Storage.Engine.open_map environment transaction
+           ~name:(Storage.Catalog.table_subdb_name "users")
         = None))
 
 let test_execute_write_drop_table_leaves_sibling_tables_untouched () =
@@ -134,20 +138,20 @@ let test_execute_write_drop_table_leaves_sibling_tables_untouched () =
   with_environment dir @@ fun environment ->
   seed_table environment ~table_name:"users" users_schema;
   seed_table environment ~table_name:"orders" orders_schema;
-  Storage.with_write_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       let _result =
         Ddl_executor.execute_write environment transaction
           (Ddl.Statement.Drop_table { table_name = "users" })
       in
       ());
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "orders catalog entry preserved" (Some orders_schema)
-        (Catalog.get environment transaction ~table_name:"orders");
+        (Storage.Catalog.get environment transaction ~table_name:"orders");
       Alcotest.(check bool)
         "orders storage subDB preserved" true
-        (Storage.open_map environment transaction
-           ~name:(Catalog.table_subdb_name "orders")
+        (Storage.Engine.open_map environment transaction
+           ~name:(Storage.Catalog.table_subdb_name "orders")
         <> None))
 
 let test_execute_write_drop_table_no_such_table_raises () =
@@ -156,17 +160,17 @@ let test_execute_write_drop_table_no_such_table_raises () =
   seed_table environment ~table_name:"users" users_schema;
   Alcotest.check_raises "no such table raises Failure with DDL: prefix"
     (Failure "DDL: drop table \"nonexistent\": no such table") (fun () ->
-      Storage.with_write_transaction environment (fun transaction ->
+      Storage.Engine.with_write_transaction environment (fun transaction ->
           let _result =
             Ddl_executor.execute_write environment transaction
               (Ddl.Statement.Drop_table { table_name = "nonexistent" })
           in
           ()));
   (* The aborted transaction must not have touched the seeded table. *)
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "users still present after aborted drop" (Some users_schema)
-        (Catalog.get environment transaction ~table_name:"users"))
+        (Storage.Catalog.get environment transaction ~table_name:"users"))
 
 (* The canonical [widgets] statement reused by the [Create_table] cases:
    a single Int64 primary key with no other columns. Hand-built so the
@@ -192,7 +196,7 @@ let widgets_expected_schema : Schema.t =
 let test_execute_write_create_table_writes_catalog_and_storage () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       match
         Ddl_executor.execute_write environment transaction
           widgets_create_statement
@@ -203,15 +207,15 @@ let test_execute_write_create_table_writes_catalog_and_storage () =
       | Dropped _ ->
           (* Create_table produces Created, never Dropped. *)
           assert false);
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "catalog entry written with qualifier set"
         (Some widgets_expected_schema)
-        (Catalog.get environment transaction ~table_name:"widgets");
+        (Storage.Catalog.get environment transaction ~table_name:"widgets");
       Alcotest.(check bool)
         "storage subDB created" true
-        (Storage.open_map environment transaction
-           ~name:(Catalog.table_subdb_name "widgets")
+        (Storage.Engine.open_map environment transaction
+           ~name:(Storage.Catalog.table_subdb_name "widgets")
         <> None))
 
 let test_execute_write_create_table_qualifier_per_field () =
@@ -243,13 +247,13 @@ let test_execute_write_create_table_qualifier_per_field () =
   in
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
-  Storage.with_write_transaction environment (fun transaction ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
       let _ = Ddl_executor.execute_write environment transaction statement in
       ());
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "qualifier set on every field" (Some expected_schema)
-        (Catalog.get environment transaction ~table_name:"widgets"))
+        (Storage.Catalog.get environment transaction ~table_name:"widgets"))
 
 let test_execute_write_create_table_already_exists_raises () =
   with_temp_dir @@ fun dir ->
@@ -257,7 +261,7 @@ let test_execute_write_create_table_already_exists_raises () =
   seed_table environment ~table_name:"widgets" widgets_expected_schema;
   Alcotest.check_raises "table already exists raises Failure with DDL: prefix"
     (Failure "DDL: create table \"widgets\": table already exists") (fun () ->
-      Storage.with_write_transaction environment (fun transaction ->
+      Storage.Engine.with_write_transaction environment (fun transaction ->
           let _result =
             Ddl_executor.execute_write environment transaction
               widgets_create_statement
@@ -269,7 +273,7 @@ let test_execute_write_create_table_rollback_on_raise () =
   with_environment dir @@ fun environment ->
   seed_table environment ~table_name:"widgets" widgets_expected_schema;
   (try
-     Storage.with_write_transaction environment (fun transaction ->
+     Storage.Engine.with_write_transaction environment (fun transaction ->
          let _result =
            Ddl_executor.execute_write environment transaction
              widgets_create_statement
@@ -278,13 +282,13 @@ let test_execute_write_create_table_rollback_on_raise () =
    with Failure _ -> ());
   (* The aborted transaction must leave the pre-call state intact: the
      seeded schema is still bound, the seeded row is still readable. *)
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option schema_testable))
         "seeded schema preserved" (Some widgets_expected_schema)
-        (Catalog.get environment transaction ~table_name:"widgets");
+        (Storage.Catalog.get environment transaction ~table_name:"widgets");
       match
-        Storage.open_map environment transaction
-          ~name:(Catalog.table_subdb_name "widgets")
+        Storage.Engine.open_map environment transaction
+          ~name:(Storage.Catalog.table_subdb_name "widgets")
       with
       | None ->
           Alcotest.fail
@@ -292,7 +296,7 @@ let test_execute_write_create_table_rollback_on_raise () =
       | Some map ->
           Alcotest.(check (option string))
             "seeded row preserved" (Some "any-value")
-            (Storage.get map transaction ~key:"any-key"))
+            (Storage.Engine.get map transaction ~key:"any-key"))
 
 let () =
   Alcotest.run "ddl_executor"

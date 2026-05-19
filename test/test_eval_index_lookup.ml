@@ -3,6 +3,7 @@
 open Dovetail
 open Dovetail_core
 open Test_helpers
+module Storage = Dovetail_storage
 
 (* Build an [IndexLookup] over [table] with [key], evaluate it against the
    populated fixture, and return the resulting tuples. *)
@@ -10,7 +11,7 @@ let evaluate_index_lookup ~table ~key =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan = Physical.IndexLookup { table; key } in
       Eval.eval environment transaction plan (fun relation ->
           (relation.schema, List.of_seq relation.tuples)))
@@ -54,7 +55,7 @@ let test_index_lookup_raises_for_missing_table () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
   Fixture.populate_if_empty environment;
-  Storage.with_read_transaction environment (fun transaction ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "missing table"
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           Eval.eval environment transaction
