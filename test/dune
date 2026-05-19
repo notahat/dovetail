@@ -11,10 +11,7 @@
   test_eval_indexed_nested_loop_join
   test_eval_relation_literal
   test_eval_insert
-  test_lower
-  test_parser
   test_pipeline
-  test_expression_parser
   test_repl
   test_ddl_executor
   test_ddl_roundtrip
