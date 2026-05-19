@@ -17,7 +17,14 @@ opam exec -- dune build @fmt --auto-promote   # format
 ./dovetail                           # run the REPL (default env: ./dovetail-data)
 ./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
 ./dovetail --demo-data /tmp/play     # ...or seed the example tables on first launch
+./dovetail --show-logical            # ...or print each query's logical plan
+./dovetail --show-physical           # ...or print each query's physical plan
 ```
+
+`--show-logical` and `--show-physical` are dev-facing EXPLAIN-style
+debug flags: each prints the relevant plan to stdout before the
+query's result rows. Combine them and both plans render in pipeline
+order — logical first, then physical.
 
 `./dovetail` is a small wrapper that execs the prebuilt
 `_build/default/bin/main.exe`, forwarding any arguments. It does not
