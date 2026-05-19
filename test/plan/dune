@@ -1,0 +1,5 @@
+(tests
+ (names test_logical test_physical test_projection test_translate
+        test_translate_index_lookup test_translate_indexed_nested_loop_join)
+ (libraries alcotest dovetail dovetail.core dovetail.storage dovetail.plan
+            test_helpers))
