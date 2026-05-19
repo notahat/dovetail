@@ -16,10 +16,14 @@ let format_mutation_status mutation affected_rows =
   let noun = if affected_rows = 1 then "row" else "rows" in
   Printf.sprintf "%s %d %s" verb affected_rows noun
 
-(* Translate [logical_plan] inside [transaction] and, when [show_physical] is
-   true, dump the chosen physical plan to [output] before returning it. Pure
-   helper threaded through both transaction arms below. *)
-let translate_in environment transaction ~output ~show_physical logical_plan =
+(* Translate [logical_plan] inside [transaction] and, when the matching
+   [show_*] flag is true, dump the logical and/or chosen physical plan to
+   [output] around the translate call. Both plans share one helper so the
+   ordering (logical before physical, matching pipeline direction) lives in
+   one place. *)
+let translate_in environment transaction ~output ~show_logical ~show_physical
+    logical_plan =
+  if show_logical then Plan.Logical.format_plan output logical_plan;
   let catalog table_name =
     Storage.Catalog.get environment transaction ~table_name
   in
@@ -31,10 +35,11 @@ let translate_in environment transaction ~output ~show_physical logical_plan =
    produces, and pretty-print the rows to [output]. The [Mutation] arm is
    unreachable -- [Logical.classify] chose [`Read] and so [Translate.translate]
    is contracted to return a [Physical.Query]. *)
-let print_query_result environment transaction ~output ~show_physical
-    logical_plan =
+let print_query_result environment transaction ~output ~show_logical
+    ~show_physical logical_plan =
   match
-    translate_in environment transaction ~output ~show_physical logical_plan
+    translate_in environment transaction ~output ~show_logical ~show_physical
+      logical_plan
   with
   | Plan.Physical.Query physical ->
       Execution.Eval.eval environment transaction physical (fun relation ->
@@ -46,10 +51,11 @@ let print_query_result environment transaction ~output ~show_physical
    unreachable for the symmetric reason -- [Logical.classify] chose [`Write]
    and so [Translate.translate] is contracted to return a [Physical.Mutation].
 *)
-let print_mutation_result environment transaction ~output ~show_physical
-    logical_plan =
+let print_mutation_result environment transaction ~output ~show_logical
+    ~show_physical logical_plan =
   match
-    translate_in environment transaction ~output ~show_physical logical_plan
+    translate_in environment transaction ~output ~show_logical ~show_physical
+      logical_plan
   with
   | Plan.Physical.Mutation mutation ->
       Execution.Eval.eval_mutation environment transaction mutation
@@ -65,17 +71,18 @@ let print_mutation_result environment transaction ~output ~show_physical
    Two helpers rather than one because [with_read_transaction] and
    [with_write_transaction] carry different permission tags -- unifying them
    would need a rank-2 type trick the gain doesn't justify. *)
-let evaluate_and_print environment ~output ~show_physical logical_plan =
+let evaluate_and_print environment ~output ~show_logical ~show_physical
+    logical_plan =
   try
     match Plan.Logical.classify logical_plan with
     | `Read ->
         Storage.Engine.with_read_transaction environment (fun transaction ->
-            print_query_result environment transaction ~output ~show_physical
-              logical_plan)
+            print_query_result environment transaction ~output ~show_logical
+              ~show_physical logical_plan)
     | `Write ->
         Storage.Engine.with_write_transaction environment (fun transaction ->
-            print_mutation_result environment transaction ~output ~show_physical
-              logical_plan)
+            print_mutation_result environment transaction ~output ~show_logical
+              ~show_physical logical_plan)
   with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Render the result of a read-only DDL statement to [output]. [Listed] is
@@ -132,16 +139,18 @@ let execute_and_print_ddl environment ~output statement =
    relational pipeline goes through Lower / Translate / Eval; a DDL
    statement goes straight to [Ddl_executor.execute_*]), print. Parse and
    eval errors land in [output]; nothing is raised. *)
-let process_line environment ~output ~show_physical line =
+let process_line environment ~output ~show_logical ~show_physical line =
   match Surface_ra.Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message
   | Ok (Surface_ra.Ast.Pipeline plan) ->
       let logical_plan = Surface_ra.Lower.lower plan in
-      evaluate_and_print environment ~output ~show_physical logical_plan
+      evaluate_and_print environment ~output ~show_logical ~show_physical
+        logical_plan
   | Ok (Surface_ra.Ast.Ddl statement) ->
       execute_and_print_ddl environment ~output statement
 
-let run ?(show_physical = false) environment ~read_line ~output =
+let run ?(show_logical = false) ?(show_physical = false) environment ~read_line
+    ~output =
   let rec loop () =
     Format.fprintf output "%s" prompt;
     Format.pp_print_flush output ();
@@ -149,7 +158,7 @@ let run ?(show_physical = false) environment ~read_line ~output =
     | None -> ()
     | Some line ->
         if String.length (String.trim line) > 0 then
-          process_line environment ~output ~show_physical line;
+          process_line environment ~output ~show_logical ~show_physical line;
         loop ()
   in
   loop ()

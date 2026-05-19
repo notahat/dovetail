@@ -5,12 +5,12 @@ open Test_helpers
 module Plan = Dovetail_plan
 
 (** Run the REPL against a populated environment with [lines] as input,
-    capturing all formatter output as a string. [show_physical] defaults to
-    [false], matching the binary's default. *)
-let run_with_input ?(show_physical = false) lines =
+    capturing all formatter output as a string. [show_logical] and
+    [show_physical] default to [false], matching the binary's defaults. *)
+let run_with_input ?(show_logical = false) ?(show_physical = false) lines =
   with_fixture_environment @@ fun environment ->
   with_captured_formatter @@ fun formatter ->
-  Repl.run ~show_physical environment
+  Repl.run ~show_logical ~show_physical environment
     ~read_line:(read_line_from_list lines)
     ~output:formatter
 
@@ -54,6 +54,65 @@ let test_show_physical_defaults_off_omits_plan () =
   Alcotest.(check bool)
     "no FullScan in default output" false
     (contains_substring output "FullScan")
+
+let test_show_logical_defaults_off_omits_plan () =
+  let output = run_with_input [ "users" ] in
+  Alcotest.(check bool)
+    "no Scan( in default output" false
+    (contains_substring output "Scan(")
+
+let test_show_logical_prints_plan_before_results () =
+  let output =
+    run_with_input ~show_logical:true [ "users | restrict active" ]
+  in
+  check_contains "logical header line" output "Restrict(active)";
+  check_contains "logical input line" output "Scan(users)";
+  let plan_position =
+    String.index output 'R'
+    (* opening "Restrict" *)
+  in
+  let row_position =
+    let rec search position =
+      if position >= String.length output - 5 then String.length output
+      else if String.sub output position 5 = "Alice" then position
+      else search (position + 1)
+    in
+    search 0
+  in
+  Alcotest.(check bool)
+    "logical plan precedes the result rows" true
+    (plan_position < row_position)
+
+let test_both_show_flags_print_logical_then_physical () =
+  (* [restrict active] keeps Restrict/Filter separate (no IndexLookup fold),
+     so the logical and physical plans render distinguishable header lines.
+     Asserting Restrict appears before Filter pins down the ordering: the
+     REPL prints logical (pipeline-direction first) before physical. *)
+  let output =
+    run_with_input ~show_logical:true ~show_physical:true
+      [ "users | restrict active" ]
+  in
+  check_contains "logical header present" output "Restrict(active)";
+  check_contains "physical header present" output "Filter(active)";
+  let logical_position =
+    let rec search position =
+      if position >= String.length output - 8 then String.length output
+      else if String.sub output position 8 = "Restrict" then position
+      else search (position + 1)
+    in
+    search 0
+  in
+  let physical_position =
+    let rec search position =
+      if position >= String.length output - 6 then String.length output
+      else if String.sub output position 6 = "Filter" then position
+      else search (position + 1)
+    in
+    search 0
+  in
+  Alcotest.(check bool)
+    "logical plan precedes physical plan" true
+    (logical_position < physical_position)
 
 let test_show_physical_prints_plan_before_results () =
   (* [restrict active] stays as Filter(FullScan) -- a predicate that
@@ -358,6 +417,13 @@ let () =
           Alcotest.test_case
             "show-physical prints the plan before the result rows" `Quick
             test_show_physical_prints_plan_before_results;
+          Alcotest.test_case "show-logical defaults off and omits the plan"
+            `Quick test_show_logical_defaults_off_omits_plan;
+          Alcotest.test_case
+            "show-logical prints the plan before the result rows" `Quick
+            test_show_logical_prints_plan_before_results;
+          Alcotest.test_case "both show flags print logical before physical"
+            `Quick test_both_show_flags_print_logical_then_physical;
           Alcotest.test_case
             "a bare relation literal prints as a one-row relation" `Quick
             test_relation_literal_alone_prints_one_row;

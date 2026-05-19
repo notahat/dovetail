@@ -1,25 +1,31 @@
 (** Command-line argument parsing for the dovetail binary.
 
     The grammar is small enough that a hand-rolled walker is clearer than a CLI
-    library dependency: one boolean flag ([--show-physical]) that may appear in
-    any position, and an optional positional environment path. Two flags or two
-    paths is a usage error. *)
+    library dependency: a handful of boolean flags that may appear in any
+    position, and an optional positional environment path. A repeated flag or a
+    second positional path is a usage error. *)
 
 type options = {
+  show_logical : bool;
   show_physical : bool;
   demo_data : bool;
   environment_path : string;
 }
 (** Parsed argument set. [environment_path] is the directory the LMDB
     environment lives in; it defaults to {!default_environment_path} when no
-    positional argument is given. [show_physical] becomes [true] only when
-    [--show-physical] appears in the argument list. [demo_data] becomes [true]
-    only when [--demo-data] appears in the argument list; the binary uses it to
-    decide whether to seed the example tables on boot. *)
+    positional argument is given. [show_logical] becomes [true] only when
+    [--show-logical] appears in the argument list; [show_physical] mirrors that
+    for [--show-physical]. [demo_data] becomes [true] only when [--demo-data]
+    appears in the argument list; the binary uses it to decide whether to seed
+    the example tables on boot. *)
 
 val default_environment_path : string
 (** Path used when no positional argument is supplied -- a sibling directory of
     the binary's working directory, lazily created by [Storage]. *)
+
+val show_logical_flag : string
+(** The literal flag string [--show-logical], exposed so callers and tests don't
+    have to restate it. *)
 
 val show_physical_flag : string
 (** The literal flag string [--show-physical], exposed so callers and tests

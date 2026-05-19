@@ -25,6 +25,7 @@ val format_mutation_status : Plan.Physical.mutation -> int -> string
     REPL loop. *)
 
 val run :
+  ?show_logical:bool ->
   ?show_physical:bool ->
   Storage.Engine.environment ->
   read_line:(unit -> string option) ->
@@ -36,7 +37,10 @@ val run :
     that fail to parse, or that fail during evaluation, produce a one-line error
     to [output] and the loop continues.
 
-    When [?show_physical] is [true] (default [false]), the physical plan chosen
-    by {!Translate.translate} is printed to [output] before each successful
-    query is evaluated. Intended for the binary's [--show-physical] flag and for
-    tests that want to assert on plan shape. *)
+    When [?show_logical] is [true] (default [false]), the logical plan returned
+    by {!Lower.lower} is printed to [output] before translation. When
+    [?show_physical] is [true] (default [false]), the physical plan chosen by
+    {!Translate.translate} is printed to [output] after translation. Both print
+    before the query is evaluated; with both flags set they appear in pipeline
+    order (logical first). Intended for the binary's [--show-logical] and
+    [--show-physical] flags and for tests that want to assert on plan shape. *)

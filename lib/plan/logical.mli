@@ -71,3 +71,21 @@ val classify : plan -> [ `Read | `Write ]
     {!Dovetail_storage.Engine.with_write_transaction} before translation, so a
     read-only query isn't unnecessarily serialised against LMDB's writer lock.
 *)
+
+val format : Format.formatter -> t -> unit
+(** [format formatter plan] writes [plan] to [formatter] as an indented tree,
+    one operator per line, with each operator's inputs indented two spaces
+    further than the operator itself. Operators render their name followed by
+    their distinguishing parameters in parentheses ([Scan(table)],
+    [Restrict(predicate)], [Project(columns)],
+    [RelationLiteral(columns=..., rows=N)]); [CrossProduct] renders bare for the
+    same reason its physical counterpart does. The output is for EXPLAIN-style
+    debug printing -- the [--show-logical] flag on the binary is the primary
+    consumer. *)
+
+val format_plan : Format.formatter -> plan -> unit
+(** [format_plan formatter plan] writes [plan] to [formatter]. A {!Query}
+    renders exactly as {!format} would render its inner relation tree -- no
+    wrapping header. A {!Mutation} prints its operator header ([Insert(table)])
+    on one line with the [source] indented one level beneath, matching the
+    per-operator indentation convention {!format} uses. *)
