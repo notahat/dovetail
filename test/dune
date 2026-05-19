@@ -10,13 +10,13 @@
   test_demo_data)
  (libraries
   alcotest
-  dovetail
   dovetail.core
   dovetail.ddl
   dovetail.storage
   dovetail.plan
   dovetail.surface_ra
   dovetail.execution
+  dovetail.frontend
   test_helpers
   unix)
  (deps

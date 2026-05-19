@@ -1,6 +1,6 @@
 (** Tests for [Cli.parse]: argv parsing into options or a structured error. *)
 
-open Dovetail
+open Dovetail_frontend
 
 let options_testable =
   Alcotest.testable

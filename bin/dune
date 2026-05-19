@@ -1,4 +1,4 @@
 (executable
  (name main)
  (public_name dovetail)
- (libraries dovetail dovetail.storage))
+ (libraries dovetail.frontend dovetail.storage))

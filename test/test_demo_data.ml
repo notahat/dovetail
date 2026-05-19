@@ -4,7 +4,7 @@
     [test/test_documentation.ml] via the doctested markdown, so re-asserting
     them here would duplicate that coverage. *)
 
-open Dovetail
+open Dovetail_frontend
 open Test_helpers
 module Storage = Dovetail_storage
 

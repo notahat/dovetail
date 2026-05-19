@@ -17,12 +17,12 @@
       that run a query through parse / lower / translate / eval, so end-to-end
       tests don't have to restate the boilerplate. *)
 
-open Dovetail
 open Dovetail_core
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
 module Execution = Dovetail_execution
+module Frontend = Dovetail_frontend
 
 (* Re-export the sibling [Fixture] module so callers that [open Test_helpers]
    can write [Fixture.populate_if_empty] without qualifying the path. The
@@ -86,7 +86,7 @@ let with_fixture_environment f =
 let with_demo_seeded_environment f =
   with_temp_dir @@ fun directory ->
   with_environment directory @@ fun environment ->
-  Demo_data.run environment;
+  Frontend.Demo_data.run environment;
   f environment
 
 (** [with_captured_formatter write_to_formatter] runs [write_to_formatter]

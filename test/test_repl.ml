@@ -1,7 +1,7 @@
 (** Tests for [Repl]. *)
 
-open Dovetail
 open Dovetail_plan
+open Dovetail_frontend
 open Test_helpers
 
 (** Run the REPL against a populated environment with [lines] as input,

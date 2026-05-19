@@ -24,7 +24,7 @@
     in actual is accepted. This lets the doc show the first few rows of a long
     table without committing to verify the whole thing. *)
 
-open Dovetail
+open Dovetail_frontend
 
 type query = { source : string; expected_output : string }
 type session = { block_starts_at_line : int; queries : query list }
