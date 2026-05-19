@@ -85,7 +85,7 @@ surface_ra   ast, parser, lower             (depends on core, plan, ddl)
 execution    eval, ddl_executor             (depends on core, storage,
                                              plan, ddl)
   ↑
-frontend     cli, repl, fixture             (depends on everything below)
+frontend     cli, repl, demo_data           (depends on everything below)
 ```
 
 (See "Inner modules don't share library names" below for why
@@ -112,7 +112,7 @@ The edges:
   actually run plans and statements against storage: `eval`
   for query plans, `ddl_executor` for DDL statements.
 - **frontend** → everything below. The REPL, the CLI argv
-  parser, and the demo-data fixture loader.
+  parser, and the demo-data seeder.
 
 The shape was chosen so that future `surface_sql` slots in
 beside `surface_ra` with the same deps (core, plan, ddl) and no
@@ -419,6 +419,8 @@ lib/
     statement.ml         statement.mli (renamed from ddl;
                                         AST + classifier only,
                                         after the split)
+    format.ml            format.mli    (canonical-form printer,
+                                        added in slice 14)
   surface_ra/
     dune
     ast.ml               ast.mli
@@ -433,7 +435,7 @@ lib/
     dune
     cli.ml               cli.mli
     repl.ml              repl.mli
-    fixture.ml           fixture.mli
+    demo_data.ml         demo_data.mli
 ```
 
 The current `lib/dune` is removed. Dune walks into the
@@ -528,18 +530,21 @@ test/
                 test_translate.ml, test_projection.ml,
                 test_translate_index_lookup.ml,
                 test_translate_indexed_nested_loop_join.ml
-  ddl/          test_statement.ml
+  ddl/          test_statement.ml, test_format.ml
   surface_ra/   test_parser.ml,
                 test_expression_parser.ml,
                 test_lower.ml
   execution/    test_eval_*.ml,
                 test_ddl_executor.ml
-  frontend/     test_cli.ml, test_repl.ml, test_fixture.ml
-  helpers/      test_helpers.ml  (its own (library) so tests
-                                  can share it)
+  frontend/     test_cli.ml, test_repl.ml, test_demo_data.ml
+  helpers/      test_helpers.ml, fixture.ml  (its own (library)
+                                              so tests can share
+                                              it; fixture is the
+                                              low-level seeder
+                                              relocated in slice 15)
   integration/  test_pipeline.ml, test_dovetail.ml,
                 test_documentation.ml, test_doctest.ml,
-                doctest.ml
+                test_ddl_roundtrip.ml, doctest.ml
 ```
 
 Each per-group test directory is a `(tests ...)` stanza
@@ -592,29 +597,22 @@ additions without further restructure.
   machine-readable. Generating a Graphviz or Mermaid diagram
   from the dune files is a small script away.
 
-## Open items
+## Resolution status
 
-These are decisions deferred to the slice plan, not gaps in
-this design:
+This design lands across two slices:
 
-- **Ordering and commit boundaries.** Likely: introduce
-  `core` first (no deps, easiest to extract), then storage
-  (with the `storage` → `engine` inner-module rename), plan,
-  ddl (with the `Ddl` AST/executor split and the `ddl` →
-  `statement` rename as their own commits), then surface_ra,
-  execution, frontend, then delete the old `lib/dune`. Each
-  step needs to leave the project in a building, testing
-  state.
-- **`CLAUDE.md` updates.** The orientation section needs a
-  note about the new sub-library layout. The conventions
-  section gains a short note about module aliases at the top
-  of cross-library files. Lands in the same slice as the
-  relevant structural change. (No new naming-exceptions line
-  is needed: with wrapping in place, the surface modules keep
-  their short filenames.)
-- **`dune-project` package declaration.** One-line addition if
-  not already present, gating the use of `(public_name
-  dovetail.X)`. Slot in at the start of the slice.
-- **Whether to keep `frontend` as a single library or split
-  further.** `cli`, `repl`, and `fixture` are different jobs
-  but small. Worth revisiting if `frontend` grows; not now.
+- **Slice 13** introduced the first two sub-libraries (`core`
+  and `ddl`), split the `Ddl` module into `Statement` and
+  `Ddl_executor`, and established the cross-library alias
+  conventions in `CLAUDE.md`. The `dune-project` package
+  declaration was already present.
+- **Slice 16** extracts the remaining five libraries
+  (`storage` with the `storage.ml` → `engine.ml` rename,
+  `plan`, `surface_ra`, `execution`, `frontend`), deletes
+  `lib/dune`, mirrors the new structure into `test/`, and
+  finalises the `CLAUDE.md` orientation section. The
+  `frontend` library stays as one piece for now; splitting
+  is cheap to revisit if it grows.
+
+See [`16-slice-16-full-sub-library-setup.md`](16-slice-16-full-sub-library-setup.md)
+for the slice-16 plan.
