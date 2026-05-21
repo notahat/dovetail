@@ -38,8 +38,8 @@ type t =
       (** [RelationLiteral { columns; rows }] is a relation given directly by
           its contents, with no scan or storage involved. Each row in [rows] is
           a list of values, one per declared column, in column order. The output
-          schema is {!Dovetail_core.Relation_literal.schema_of} applied to
-          [columns] and the first row.
+          kind is {!Dovetail_core.Relation_literal.kind_of} applied to [columns]
+          and the first row.
 
           The parser currently produces single-row literals only; the IR shape
           leaves room for a future multi-row literal grammar. *)

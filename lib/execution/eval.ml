@@ -69,10 +69,10 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
   let kind = Relation.kind_of_schema schema in
   continue ({ kind; data } : [ `Bag ] Relation.t)
 
-(* Materialise a [RelationLiteral] as a [Relation.t]. The schema comes from
-   {!Relation_literal.schema_of} -- the kind-inference rule lives there so
+(* Materialise a [RelationLiteral] as a [Relation.t]. The kind comes from
+   {!Relation_literal.kind_of} -- the kind-inference rule lives there so
    {!Logical} and {!Physical}'s doc comments can point at it. The literal
-   stays small enough that the tuples can be produced eagerly via
+   stays small enough that the rows can be produced eagerly via
    [List.to_seq] without any storage scope. *)
 let evaluate_relation_literal ~columns ~rows continue =
   let first_row =
@@ -86,9 +86,8 @@ let evaluate_relation_literal ~columns ~rows continue =
          "Eval: relation literal row has %d value(s) but %d column(s) are \
           declared"
          (List.length first_row) (List.length columns));
-  let schema = Relation_literal.schema_of ~columns ~first_row in
+  let kind = Relation_literal.kind_of ~columns ~first_row in
   let data = rows |> List.to_seq |> Seq.map Array.of_list in
-  let kind = Relation.kind_of_schema schema in
   continue ({ kind; data } : [ `Bag ] Relation.t)
 
 (* CPS-shaped executor. Every operator is in continuation-passing form so

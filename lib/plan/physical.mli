@@ -85,9 +85,9 @@ type t =
           [CrossProduct]. *)
   | RelationLiteral of { columns : string list; rows : Value.data list list }
       (** [RelationLiteral { columns; rows }] yields a relation whose tuples are
-          the literal's [rows] -- no storage involved. The output schema is
-          {!Dovetail_core.Relation_literal.schema_of} applied to [columns] and
-          the first row.
+          the literal's [rows] -- no storage involved. The output kind is
+          {!Dovetail_core.Relation_literal.kind_of} applied to [columns] and the
+          first row.
 
           Each row in [rows] must have the same length as [columns]. The parser
           currently produces single-row literals only, so [rows] always has
