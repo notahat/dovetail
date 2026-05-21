@@ -6,7 +6,7 @@
     translated down into this one. *)
 
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 
 type t =
@@ -60,7 +60,7 @@ type t =
   | IndexedNestedLoopJoin of {
       outer : t;
       inner_table : string;
-      outer_key_column : Schema.column_reference;
+      outer_key_column : Row.column_reference;
       inner_position : [ `Left | `Right ];
     }
       (** [IndexedNestedLoopJoin { outer; inner_table; outer_key_column;

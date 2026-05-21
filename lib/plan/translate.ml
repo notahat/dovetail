@@ -1,29 +1,38 @@
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
+
+(* Extract the primary-key column names from a [Relation.kind]'s refinements,
+   or [[]] when no [Primary_key] refinement is present. *)
+let primary_key_of_kind (kind : Relation.kind) =
+  List.find_map
+    (function Relation.Primary_key keys -> Some keys)
+    kind.refinements
+  |> Option.value ~default:[]
 
 (* Match a column reference against the scanned table's primary-key column.
    A bare reference ([{ qualifier = None; name }]) matches if [name] is the
    PK column's name; a qualified reference ([{ qualifier = Some q; name }])
    matches only when [q] is the scanned table's name. *)
 let column_is_primary_key ~table ~primary_key_name
-    (reference : Schema.column_reference) =
+    (reference : Row.column_reference) =
   reference.name = primary_key_name
   &&
   match reference.qualifier with
   | None -> true
   | Some qualifier -> qualifier = table
 
-(* If [schema] has a single-column [Int64] primary key, return the PK column's
+(* If [kind] has a single-column [Int64] primary key, return the PK column's
    name. Composite keys, missing keys, and non-[Int64] keys all yield [None] --
    the conditions under which IndexLookup folding declines. *)
-let single_int64_primary_key (schema : Schema.t) =
-  match schema.primary_key with
+let single_int64_primary_key (kind : Relation.kind) =
+  match primary_key_of_kind kind with
   | [ primary_key_name ] -> (
       match
         List.find_opt
-          (fun (field : Schema.field) -> field.name = primary_key_name)
-          schema.fields
+          (fun (field : Row.field) -> field.name = primary_key_name)
+          kind.row_kind
       with
       | Some { kind = Int64; _ } -> Some primary_key_name
       | _ -> None)
@@ -96,8 +105,8 @@ let build_conjunction = function
 let rewrite_point_lookup ~catalog ~table ~predicate =
   match catalog table with
   | None -> None
-  | Some schema -> (
-      match single_int64_primary_key schema with
+  | Some kind -> (
+      match single_int64_primary_key kind with
       | None -> None
       | Some primary_key_name -> (
           let conjuncts = flatten_conjunction predicate in
@@ -124,8 +133,8 @@ let inner_candidate ~catalog (logical : Logical.t) =
   | Scan { table } -> (
       match catalog table with
       | None -> None
-      | Some schema -> (
-          match single_int64_primary_key schema with
+      | Some kind -> (
+          match single_int64_primary_key kind with
           | None -> None
           | Some primary_key_name -> Some (table, primary_key_name)))
   | _ -> None
@@ -136,7 +145,7 @@ let inner_candidate ~catalog (logical : Logical.t) =
    against a combined schema, and the canonical join queries already
    produce qualified references from the parser. *)
 let column_references_table_primary_key ~table ~primary_key_name
-    (reference : Schema.column_reference) =
+    (reference : Row.column_reference) =
   reference.qualifier = Some table && reference.name = primary_key_name
 
 (* Recognise [predicate] as a column-on-column equality where exactly one
@@ -174,7 +183,7 @@ let try_join_pk_column_equality ~table ~primary_key_name
 type indexed_join_match = {
   outer_logical : Logical.t;
   inner_table : string;
-  outer_key_column : Schema.column_reference;
+  outer_key_column : Row.column_reference;
   inner_position : [ `Left | `Right ];
   residual_conjuncts : Expression.t list;
 }
@@ -326,17 +335,17 @@ let multiset_difference ~expected ~actual =
   let unknown = List.filter (fun name -> not (List.mem name expected)) actual in
   (missing, unknown)
 
-(* Check that [literal_columns] is a permutation of [target_schema]'s
+(* Check that [literal_columns] is a permutation of [target_kind]'s
    column names. Raises [Failure] naming the missing columns first, then
    the unknown ones -- a single literal can hit both, and the missing-
    columns message is the more directly actionable of the two. *)
-let check_columns_match ~target_table ~(target_schema : Schema.t)
+let check_columns_match ~target_table ~(target_kind : Relation.kind)
     ~literal_columns =
-  let schema_column_names =
-    List.map (fun (field : Schema.field) -> field.name) target_schema.fields
+  let target_column_names =
+    List.map (fun (field : Row.field) -> field.name) target_kind.row_kind
   in
   let missing, unknown =
-    multiset_difference ~expected:schema_column_names ~actual:literal_columns
+    multiset_difference ~expected:target_column_names ~actual:literal_columns
   in
   if missing <> [] then
     failwith
@@ -362,23 +371,23 @@ let check_row_arity ~target_table ~literal_columns ~first_row =
          target_table (List.length first_row)
          (List.length literal_columns))
 
-(* Check that each value in [first_row] has the kind the target schema
+(* Check that each value in [first_row] has the kind the target kind
    declares for the column named at the same position in [literal_columns].
    Raises [Failure] naming the column and both kinds. The first-row kinds
    are sufficient because the literal grammar is currently single-row;
    multi-row literals would extend the check to every row.
 
    Precondition: [check_columns_match] and [check_row_arity] have passed,
-   so every name in [literal_columns] resolves in [target_schema.fields]
+   so every name in [literal_columns] resolves in [target_kind.row_kind]
    and the lists are the same length. *)
-let check_value_kinds ~target_table ~(target_schema : Schema.t) ~literal_columns
-    ~first_row =
+let check_value_kinds ~target_table ~(target_kind : Relation.kind)
+    ~literal_columns ~first_row =
   List.iter2
     (fun column_name value ->
       let target_field =
         List.find
-          (fun (field : Schema.field) -> field.name = column_name)
-          target_schema.fields
+          (fun (field : Row.field) -> field.name = column_name)
+          target_kind.row_kind
       in
       let actual_kind = Value.kind_of value in
       if actual_kind <> target_field.kind then
@@ -394,22 +403,22 @@ let check_value_kinds ~target_table ~(target_schema : Schema.t) ~literal_columns
    on the earlier ones: column-set agreement, then row arity, then per-
    column kinds. Each helper raises [Failure] on its own contract; this
    orchestrator just sequences them. *)
-let validate_literal_against_target ~target_table ~target_schema
-    ~literal_columns ~first_row =
-  check_columns_match ~target_table ~target_schema ~literal_columns;
+let validate_literal_against_target ~target_table ~target_kind ~literal_columns
+    ~first_row =
+  check_columns_match ~target_table ~target_kind ~literal_columns;
   check_row_arity ~target_table ~literal_columns ~first_row;
-  check_value_kinds ~target_table ~target_schema ~literal_columns ~first_row
+  check_value_kinds ~target_table ~target_kind ~literal_columns ~first_row
 
 (* Run validation when the insert source is a [RelationLiteral]; pass through
    silently for any other source. Non-literal sources aren't a tested path
    yet, but the sink stays source-agnostic by design -- the sink itself
    enforces column coverage at eval time. *)
-let validate_mutation_source ~target_table ~target_schema (source : Logical.t) =
+let validate_mutation_source ~target_table ~target_kind (source : Logical.t) =
   match source with
   | RelationLiteral { columns; rows } -> (
       match rows with
       | first_row :: _ ->
-          validate_literal_against_target ~target_table ~target_schema
+          validate_literal_against_target ~target_table ~target_kind
             ~literal_columns:columns ~first_row
       | [] ->
           failwith
@@ -418,20 +427,20 @@ let validate_mutation_source ~target_table ~target_schema (source : Logical.t) =
                target_table))
   | _ -> ()
 
-(* Look up [target_table]'s schema in the catalog and validate the literal
+(* Look up [target_table]'s kind in the catalog and validate the literal
    source's columns and value kinds against it. Returns the translated
-   physical mutation. Raises [Failure] if the catalog has no schema for the
+   physical mutation. Raises [Failure] if the catalog has no kind for the
    table or any validation check fails. *)
 let translate_mutation ~catalog (Logical.Insert { table; source }) :
     Physical.mutation =
-  let target_schema =
+  let target_kind =
     match catalog table with
-    | Some schema -> schema
+    | Some kind -> kind
     | None ->
         failwith
           (Printf.sprintf "Translate: insert into %S: unknown table" table)
   in
-  validate_mutation_source ~target_table:table ~target_schema source;
+  validate_mutation_source ~target_table:table ~target_kind source;
   Insert { table; source = translate_relation ~catalog source }
 
 let translate ~catalog (plan : Logical.plan) : Physical.plan =

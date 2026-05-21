@@ -150,10 +150,10 @@ let format_tuple_list formatter tuples =
     (fun tuple -> Format.fprintf formatter "%a@\n" format_tuple tuple)
     tuples
 
-(** Alcotest testable for a list of [Schema.tuple]s. Polymorphic-equality based.
-    The printer renders one tuple per line using {!Value.format} so failure
-    diffs surface the offending row rather than [\<tuples\> vs \<tuples\>]. *)
-let tuple_list_testable : Schema.tuple list Alcotest.testable =
+(** Alcotest testable for a list of [Row.data]s. Polymorphic-equality based. The
+    printer renders one tuple per line using {!Value.format} so failure diffs
+    surface the offending row rather than [\<tuples\> vs \<tuples\>]. *)
+let tuple_list_testable : Row.data list Alcotest.testable =
   Alcotest.testable format_tuple_list ( = )
 
 (** Alcotest testable for a [Physical.t]. Polymorphic-equality based; the
@@ -185,11 +185,11 @@ let unwrap_logical_query (plan : Plan.Logical.plan) : Plan.Logical.t =
   | Mutation _ ->
       Alcotest.fail "expected a Logical.Query plan, got a Logical.Mutation"
 
-(** Build a bare (unqualified) [Schema.column_reference]. *)
-let column_reference name : Schema.column_reference = { qualifier = None; name }
+(** Build a bare (unqualified) [Row.column_reference]. *)
+let column_reference name : Row.column_reference = { qualifier = None; name }
 
-(** Build a qualified [Schema.column_reference]. *)
-let qualified_column_reference ~qualifier ~name : Schema.column_reference =
+(** Build a qualified [Row.column_reference]. *)
+let qualified_column_reference ~qualifier ~name : Row.column_reference =
   { qualifier = Some qualifier; name }
 
 (** An [Expression.t] referring to a bare (unqualified) column. *)
@@ -221,7 +221,7 @@ let expression_not operand : Expression.t = Not operand
     tests that don't exercise schema-dependent rewrites; the catalog is
     consulted only for [IndexLookup] recognition, so a [None]-everywhere
     callback yields a catalog-free translation. *)
-let noop_catalog : string -> Schema.t option = fun _table_name -> None
+let noop_catalog : string -> Relation.kind option = fun _table_name -> None
 
 (** Build a catalog callback bound to [environment] and [transaction] so that
     [Translate] sees the real fixture schemas. Used by the pipeline-integration
@@ -273,14 +273,14 @@ let with_query_failure ~label ~expected query =
               ())))
 
 (** [evaluate_against_fixture plan] populates the standard fixture and evaluates
-    [plan] inside a read transaction, returning the resulting schema and tuples.
-    The temp directory, LMDB environment, fixture population, and read
-    transaction are all set up and torn down around the call. *)
+    [plan] inside a read transaction, returning the resulting kind and rows. The
+    temp directory, LMDB environment, fixture population, and read transaction
+    are all set up and torn down around the call. *)
 let evaluate_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Execution.Eval.eval environment transaction plan (fun relation ->
-          (Relation.schema_of_kind relation.kind, List.of_seq relation.data)))
+          (relation.kind, List.of_seq relation.data)))
 
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)

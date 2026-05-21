@@ -10,10 +10,10 @@
     the join is on a primary key). Future rules -- predicate pushdown,
     projection pushdown -- will sit alongside these. *)
 
-module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
 
 val translate :
-  catalog:(string -> Schema.t option) -> Logical.plan -> Physical.plan
+  catalog:(string -> Relation.kind option) -> Logical.plan -> Physical.plan
 (** [translate ~catalog plan] rewrites [plan] into an equivalent physical plan.
     A {!Logical.Query} translates to {!Physical.Query} wrapping the
     rewrite-recognised relation tree; a {!Logical.Mutation} translates to

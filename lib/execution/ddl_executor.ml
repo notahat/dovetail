@@ -1,15 +1,16 @@
 module Ddl = Dovetail_ddl
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 module Storage = Dovetail_storage
 
-(* Look up [table_name] in the catalog and return its schema wrapped in
+(* Look up [table_name] in the catalog and return its kind wrapped in
    [Described]. The catalog-aware "no such table" check happens here so
    the user-facing error names the operation they typed with the
    [DDL: describe ...] prefix. *)
 let describe_table environment transaction table_name :
     Ddl.Statement.read_result =
   match Storage.Catalog.get environment transaction ~table_name with
-  | Some schema -> Described { table_name; schema }
+  | Some kind -> Described { table_name; kind }
   | None ->
       failwith (Printf.sprintf "DDL: describe %S: no such table" table_name)
 
@@ -42,7 +43,7 @@ let drop_table environment transaction table_name : Ddl.Statement.write_result =
   Storage.Catalog.delete environment transaction ~table_name;
   Dropped table_name
 
-(* Build the [Schema.t] that a [Create_table] statement should write into
+(* Build the [Relation.kind] that a [Create_table] statement should write into
    the catalog. The DDL surface has no qualifier on its [field] type, so
    the executor stamps [Some table_name] onto every field -- this is the
    shape the read path expects, and the rest of the catalog (including
@@ -51,15 +52,18 @@ let drop_table environment transaction table_name : Ddl.Statement.write_result =
    [Statement.validate] is responsible for the structural checks
    (non-empty lists, no duplicates, PK columns drawn from the field
    list) and is expected to have run already. *)
-let schema_of_create_fields ~table_name (fields : Ddl.Statement.field list)
-    ~primary_key : Schema.t =
-  let schema_fields =
+let kind_of_create_fields ~table_name (fields : Ddl.Statement.field list)
+    ~primary_key : Relation.kind =
+  let row_kind =
     List.map
-      (fun (field : Ddl.Statement.field) : Schema.field ->
+      (fun (field : Ddl.Statement.field) : Row.field ->
         { name = field.name; kind = field.kind; qualifier = Some table_name })
       fields
   in
-  { fields = schema_fields; primary_key }
+  let refinements =
+    match primary_key with [] -> [] | keys -> [ Relation.Primary_key keys ]
+  in
+  { row_kind; refinements }
 
 (* Create both halves of [table_name] (catalog entry and storage subDB)
    inside the caller's write transaction. The catalog-aware "table
@@ -74,12 +78,12 @@ let create_table environment transaction ~table_name ~fields ~primary_key :
   | Some _ ->
       failwith
         (Printf.sprintf "DDL: create table %S: table already exists" table_name));
-  let schema = schema_of_create_fields ~table_name fields ~primary_key in
+  let kind = kind_of_create_fields ~table_name fields ~primary_key in
   let _map =
     Storage.Engine.create_map environment transaction
       ~name:(Storage.Catalog.table_subdb_name table_name)
   in
-  Storage.Catalog.put environment transaction ~table_name schema;
+  Storage.Catalog.put environment transaction ~table_name kind;
   Created table_name
 
 let execute_write environment transaction :

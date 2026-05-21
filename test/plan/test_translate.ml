@@ -245,24 +245,24 @@ let test_standalone_cross_product_does_not_trigger_join_rewrite () =
        })
     physical
 
-(* An [orders]-shaped schema used by the Mutation arm tests. Matches what
-   [Fixture.orders_schema] writes, rebuilt in-test so these tests don't need
+(* An [orders]-shaped kind used by the Mutation arm tests. Matches what
+   [Fixture.orders_kind] writes, rebuilt in-test so these tests don't need
    a live LMDB environment. *)
-let orders_schema : Schema.t =
+let orders_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "orders" };
         { name = "user_id"; kind = Int64; qualifier = Some "orders" };
         { name = "description"; kind = String; qualifier = Some "orders" };
         { name = "amount"; kind = Int64; qualifier = Some "orders" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
-(* A catalog that knows only about [orders] with the standard schema. *)
+(* A catalog that knows only about [orders] with the standard kind. *)
 let orders_catalog table_name =
-  if table_name = "orders" then Some orders_schema else None
+  if table_name = "orders" then Some orders_kind else None
 
 (* Alcotest testable for a [Physical.plan]. Polymorphic-equality based; the
    printer is {!Physical.format_plan}, so failure diffs show the EXPLAIN-style

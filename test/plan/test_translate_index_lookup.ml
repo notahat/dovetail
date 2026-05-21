@@ -14,35 +14,35 @@
 open Dovetail_plan
 open Test_helpers
 module Execution = Dovetail_execution
-module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
 module Storage = Dovetail_storage
 module Value = Dovetail_core.Value
 
-(* A users schema with a single int64 primary key. Matches what
-   [Fixture.users_schema] writes, but rebuilt in-test so the unit tests
+(* A users kind with a single int64 primary key. Matches what
+   [Fixture.users_kind] writes, but rebuilt in-test so the unit tests
    don't need a live LMDB environment. *)
-let users_schema : Schema.t =
+let users_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "users" };
         { name = "name"; kind = String; qualifier = Some "users" };
         { name = "email"; kind = String; qualifier = Some "users" };
         { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
-(* A catalog that knows only about [users] with the standard schema. Tests
+(* A catalog that knows only about [users] with the standard kind. Tests
    that aim to exercise the rewrite on a real PK use this. *)
 let users_catalog table_name =
-  if table_name = "users" then Some users_schema else None
+  if table_name = "users" then Some users_kind else None
 
-(* Build a catalog that returns [schema] for table "users" and [None]
+(* Build a catalog that returns [kind] for table "users" and [None]
    elsewhere. Used in the negative-precondition cases below where the
-   schema has the wrong shape for index-lookup recognition. *)
-let users_catalog_with schema table_name =
-  if table_name = "users" then Some schema else None
+   kind has the wrong shape for index-lookup recognition. *)
+let users_catalog_with kind table_name =
+  if table_name = "users" then Some kind else None
 
 let id_equals_int64_literal value =
   expression_compare ~left:(expression_column "id") ~op:Equal
@@ -356,22 +356,21 @@ let test_unknown_table_skips_folding () =
     physical
 
 let test_composite_pk_does_not_fold () =
-  let schema : Schema.t =
+  let kind : Relation.kind =
     {
-      fields =
+      row_kind =
         [
           { name = "id"; kind = Int64; qualifier = Some "users" };
           { name = "tenant"; kind = Int64; qualifier = Some "users" };
         ];
-      primary_key = [ "id"; "tenant" ];
+      refinements = [ Primary_key [ "id"; "tenant" ] ];
     }
   in
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
     unwrap_query
-      (Translate.translate
-         ~catalog:(users_catalog_with schema)
+      (Translate.translate ~catalog:(users_catalog_with kind)
          (Logical.Query logical))
   in
   Alcotest.(check physical_testable)
@@ -381,18 +380,17 @@ let test_composite_pk_does_not_fold () =
     physical
 
 let test_string_pk_does_not_fold () =
-  let schema : Schema.t =
+  let kind : Relation.kind =
     {
-      fields = [ { name = "id"; kind = String; qualifier = Some "users" } ];
-      primary_key = [ "id" ];
+      row_kind = [ { name = "id"; kind = String; qualifier = Some "users" } ];
+      refinements = [ Primary_key [ "id" ] ];
     }
   in
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
     unwrap_query
-      (Translate.translate
-         ~catalog:(users_catalog_with schema)
+      (Translate.translate ~catalog:(users_catalog_with kind)
          (Logical.Query logical))
   in
   Alcotest.(check physical_testable)
@@ -402,18 +400,17 @@ let test_string_pk_does_not_fold () =
     physical
 
 let test_missing_pk_does_not_fold () =
-  let schema : Schema.t =
+  let kind : Relation.kind =
     {
-      fields = [ { name = "id"; kind = Int64; qualifier = Some "users" } ];
-      primary_key = [];
+      row_kind = [ { name = "id"; kind = Int64; qualifier = Some "users" } ];
+      refinements = [];
     }
   in
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
     unwrap_query
-      (Translate.translate
-         ~catalog:(users_catalog_with schema)
+      (Translate.translate ~catalog:(users_catalog_with kind)
          (Logical.Query logical))
   in
   Alcotest.(check physical_testable)

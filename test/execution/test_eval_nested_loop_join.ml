@@ -11,7 +11,7 @@ module Plan = Dovetail_plan
    so users are visited in primary-key order; orders likewise within each
    user. The fixture has six matched pairs: Alice has two orders, Bob one,
    Carol two, Eve one (Dave has none). *)
-let expected_matched_user_order_rows : Schema.tuple list =
+let expected_matched_user_order_rows : Row.data list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair user_index order_index =
@@ -84,17 +84,17 @@ let test_nested_loop_join_with_false_predicate_yields_no_rows () =
   Alcotest.(check tuple_list_testable) "no rows" [] rows
 
 let test_nested_loop_join_schema_preserves_qualifiers () =
-  let schema, _rows =
+  let kind, _rows =
     evaluate_against_fixture
       (nested_loop_join_plan users_join_orders_on_id_predicate)
   in
   let qualified_field_names =
     List.map
-      (fun (field : Schema.field) ->
+      (fun (field : Row.field) ->
         match field.qualifier with
         | Some qualifier -> qualifier ^ "." ^ field.name
         | None -> field.name)
-      schema.fields
+      kind.row_kind
   in
   Alcotest.(check (list string))
     "fields are users.* followed by orders.*"
@@ -109,8 +109,9 @@ let test_nested_loop_join_schema_preserves_qualifiers () =
       "orders.amount";
     ]
     qualified_field_names;
-  Alcotest.(check (list string))
-    "primary_key is empty for derived relations" [] schema.primary_key
+  Alcotest.(check int)
+    "no refinements for derived relations" 0
+    (List.length kind.refinements)
 
 let () =
   Alcotest.run "eval_nested_loop_join"

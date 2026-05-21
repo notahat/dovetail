@@ -1,5 +1,6 @@
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 
 type field = { name : string; kind : Value.kind }
 
@@ -15,7 +16,7 @@ type t =
 
 type read_result =
   | Listed of string list
-  | Described of { table_name : string; schema : Schema.t }
+  | Described of { table_name : string; kind : Relation.kind }
 
 type write_result = Dropped of string | Created of string
 
@@ -70,17 +71,23 @@ let validate = function
   | Create_table { table_name; fields; primary_key } ->
       validate_create_table ~table_name ~fields ~primary_key
 
-(* Adapt a stored [Schema.t] into a [Create_table]-shaped statement: drop
+(* Adapt a stored [Relation.kind] into a [Create_table]-shaped statement: drop
    the per-field qualifiers (the DDL surface has no notion of qualified
    columns) and preserve field order and primary-key order verbatim. The
    round-trip with the catalog's storage shape -- where every field's
    qualifier is [Some table_name] -- is restored by the [Create_table]
-   executor when it reconstructs the [Schema.t]. *)
-let of_schema ~table_name (schema : Schema.t) : t =
+   executor when it reconstructs the [Relation.kind]. *)
+let of_kind ~table_name (kind : Relation.kind) : t =
   let fields =
     List.map
-      (fun (field : Schema.field) : field ->
+      (fun (field : Row.field) : field ->
         { name = field.name; kind = field.kind })
-      schema.fields
+      kind.row_kind
   in
-  Create_table { table_name; fields; primary_key = schema.primary_key }
+  let primary_key =
+    List.find_map
+      (function Relation.Primary_key keys -> Some keys)
+      kind.refinements
+    |> Option.value ~default:[]
+  in
+  Create_table { table_name; fields; primary_key }

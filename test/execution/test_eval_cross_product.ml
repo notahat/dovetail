@@ -17,14 +17,14 @@ let test_cross_product_yields_thirty_rows () =
   Alcotest.(check int) "5 users x 6 orders = 30 rows" 30 (List.length rows)
 
 let test_cross_product_schema_concatenates_with_qualifiers_preserved () =
-  let schema, _rows = evaluate_against_fixture users_cross_orders_plan in
+  let kind, _rows = evaluate_against_fixture users_cross_orders_plan in
   let qualified_field_names =
     List.map
-      (fun (field : Schema.field) ->
+      (fun (field : Row.field) ->
         match field.qualifier with
         | Some qualifier -> qualifier ^ "." ^ field.name
         | None -> field.name)
-      schema.fields
+      kind.row_kind
   in
   Alcotest.(check (list string))
     "fields are users.* followed by orders.*"
@@ -39,8 +39,9 @@ let test_cross_product_schema_concatenates_with_qualifiers_preserved () =
       "orders.amount";
     ]
     qualified_field_names;
-  Alcotest.(check (list string))
-    "primary_key is empty for derived relations" [] schema.primary_key
+  Alcotest.(check int)
+    "no refinements for derived relations" 0
+    (List.length kind.refinements)
 
 let test_cross_product_then_filter_yields_matched_pairs () =
   (* The plan: users x orders, filtered to rows where users.id = orders.user_id.

@@ -2,7 +2,7 @@
 
     Covers the pure parts of the DDL AST: [classify] for each constructor (the
     read/write routing decision that drives transaction selection in the REPL),
-    and [of_schema] (the adapter from a stored [Schema.t] back to a
+    and [of_kind] (the adapter from a stored [Relation.kind] back to a
     [Create_table]-shaped statement, used by the describe renderer to feed the
     canonical-form printer). The constructor surface itself is exercised through
     the parser ({!Test_parser}) and the executor ({!Test_ddl_executor}); this
@@ -10,7 +10,7 @@
 
 module Ddl = Dovetail_ddl
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
 
 let test_list_tables_classifies_as_read () =
   Alcotest.(check bool)
@@ -41,21 +41,21 @@ let test_create_table_classifies_as_write () =
           })
     = `Write)
 
-(* A fixture-shaped schema for [users]: every field carries
+(* A fixture-shaped kind for [users]: every field carries
    [qualifier = Some "users"], matching how [Fixture] and the
-   [Create_table] executor store schemas. *)
-let users_schema : Schema.t =
+   [Create_table] executor store kinds. *)
+let users_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Value.Int64; qualifier = Some "users" };
         { name = "name"; kind = Value.String; qualifier = Some "users" };
         { name = "active"; kind = Value.Bool; qualifier = Some "users" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
-let test_of_schema_strips_qualifiers () =
+let test_of_kind_strips_qualifiers () =
   let expected : Ddl.Statement.t =
     Create_table
       {
@@ -70,8 +70,8 @@ let test_of_schema_strips_qualifiers () =
       }
   in
   Alcotest.(check bool)
-    "of_schema produces Create_table with stripped qualifiers" true
-    (Ddl.Statement.of_schema ~table_name:"users" users_schema = expected)
+    "of_kind produces Create_table with stripped qualifiers" true
+    (Ddl.Statement.of_kind ~table_name:"users" users_kind = expected)
 
 (* Build a [Create_table] statement for [table_name] with the given [fields]
    and [primary_key]. The fields default to the well-formed [(id: Int64,
@@ -159,11 +159,11 @@ let () =
           Alcotest.test_case "Create_table classifies as Write" `Quick
             test_create_table_classifies_as_write;
         ] );
-      ( "of_schema",
+      ( "of_kind",
         [
           Alcotest.test_case
-            "of_schema produces Create_table with stripped qualifiers" `Quick
-            test_of_schema_strips_qualifiers;
+            "of_kind produces Create_table with stripped qualifiers" `Quick
+            test_of_kind_strips_qualifiers;
         ] );
       ( "validate",
         [

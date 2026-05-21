@@ -1,5 +1,5 @@
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 
 type t =
@@ -12,7 +12,7 @@ type t =
   | IndexedNestedLoopJoin of {
       outer : t;
       inner_table : string;
-      outer_key_column : Schema.column_reference;
+      outer_key_column : Row.column_reference;
       inner_position : [ `Left | `Right ];
     }
   | RelationLiteral of { columns : string list; rows : Value.data list list }
@@ -62,7 +62,7 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter
         "%sIndexedNestedLoopJoin(inner=%s, outer_key=%s, inner_position=%s)@\n"
         prefix inner_table
-        (Schema.format_column_reference outer_key_column)
+        (Row.format_column_reference outer_key_column)
         inner_position_label;
       format_at formatter (indent + 1) outer
   | RelationLiteral { columns; rows } ->

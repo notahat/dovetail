@@ -10,7 +10,7 @@ module Storage = Dovetail_storage
    stream [orders], probe [users] by [orders.user_id] -- should produce.
    Streaming [orders] means visiting orders in primary-key order; each
    probe is at most one row. Six orders, all with a matching user_id. *)
-let expected_user_then_order_rows : Schema.tuple list =
+let expected_user_then_order_rows : Row.data list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair user_index order_index =
@@ -33,7 +33,7 @@ let expected_user_then_order_rows : Schema.tuple list =
 
 (* The same matched pairs as above, but with [orders] columns first and
    [users] columns second. Used for the [inner_position = Right] case. *)
-let expected_order_then_user_rows : Schema.tuple list =
+let expected_order_then_user_rows : Row.data list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair order_index user_index =
@@ -64,10 +64,10 @@ let test_indexed_join_left_yields_matched_pairs () =
     expected_user_then_order_rows rows
 
 let test_indexed_join_left_schema_has_inner_then_outer_fields () =
-  let schema, _rows =
+  let kind, _rows =
     evaluate_against_fixture (canonical_indexed_join_plan `Left)
   in
-  let qualified_field_names = List.map Schema.format_field_name schema.fields in
+  let qualified_field_names = List.map Row.format_field_name kind.row_kind in
   Alcotest.(check (list string))
     "fields are users.* (inner) followed by orders.* (outer)"
     [
@@ -81,8 +81,9 @@ let test_indexed_join_left_schema_has_inner_then_outer_fields () =
       "orders.amount";
     ]
     qualified_field_names;
-  Alcotest.(check (list string))
-    "primary_key is empty for derived relations" [] schema.primary_key
+  Alcotest.(check int)
+    "no refinements for derived relations" 0
+    (List.length kind.refinements)
 
 let test_indexed_join_right_yields_matched_pairs () =
   let _schema, rows =
@@ -93,10 +94,10 @@ let test_indexed_join_right_yields_matched_pairs () =
     expected_order_then_user_rows rows
 
 let test_indexed_join_right_schema_has_outer_then_inner_fields () =
-  let schema, _rows =
+  let kind, _rows =
     evaluate_against_fixture (canonical_indexed_join_plan `Right)
   in
-  let qualified_field_names = List.map Schema.format_field_name schema.fields in
+  let qualified_field_names = List.map Row.format_field_name kind.row_kind in
   Alcotest.(check (list string))
     "fields are orders.* (outer) followed by users.* (inner)"
     [

@@ -17,65 +17,65 @@
 
 open Dovetail_plan
 open Test_helpers
-module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
 module Value = Dovetail_core.Value
 
-(* A users schema with a single int64 primary key, identical to
-   [Fixture.users_schema] but rebuilt in-test so unit tests don't need
+(* A users kind with a single int64 primary key, identical to
+   [Fixture.users_kind] but rebuilt in-test so unit tests don't need
    the LMDB fixture. *)
-let users_schema : Schema.t =
+let users_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "users" };
         { name = "name"; kind = String; qualifier = Some "users" };
         { name = "email"; kind = String; qualifier = Some "users" };
         { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
-(* An orders schema with a single int64 primary key. Same shape as the
+(* An orders kind with a single int64 primary key. Same shape as the
    fixture's, but locally defined for unit-test independence. *)
-let orders_schema : Schema.t =
+let orders_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "orders" };
         { name = "user_id"; kind = Int64; qualifier = Some "orders" };
         { name = "description"; kind = String; qualifier = Some "orders" };
         { name = "amount"; kind = Int64; qualifier = Some "orders" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
 (* A second table whose primary key is also a single Int64 [id]. Used to
    build the "both sides qualify" tiebreaker case: [users.id = admins.id]
    has the PK column referenced on both sides of the equality. *)
-let admins_schema : Schema.t =
+let admins_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "admins" };
         { name = "level"; kind = Int64; qualifier = Some "admins" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
 (* A catalog that knows about [users] and [orders]. The canonical test
    case for the rewrite uses this. *)
 let users_and_orders_catalog table_name =
   match table_name with
-  | "users" -> Some users_schema
-  | "orders" -> Some orders_schema
+  | "users" -> Some users_kind
+  | "orders" -> Some orders_kind
   | _ -> None
 
 (* A catalog that knows about [users] and [admins] -- both with PK [id]
    in the same kind. Drives the both-sides-qualify tiebreaker test. *)
 let users_and_admins_catalog table_name =
   match table_name with
-  | "users" -> Some users_schema
-  | "admins" -> Some admins_schema
+  | "users" -> Some users_kind
+  | "admins" -> Some admins_kind
   | _ -> None
 
 let users_id_column = qualified_column_reference ~qualifier:"users" ~name:"id"

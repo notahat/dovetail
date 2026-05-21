@@ -1,20 +1,20 @@
-(** Tests for [Row_codec]: schema-driven decoding of stored rows. *)
+(** Tests for [Row_codec]: kind-driven decoding of stored rows. *)
 
 open Dovetail_core
 module Storage = Dovetail_storage
 
-(* A schema with an int64 primary key column [id] and three non-PK columns,
+(* A kind with an int64 primary key column [id] and three non-PK columns,
    matching the [users] fixture's shape. *)
-let users_schema : Schema.t =
+let users_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "users" };
         { name = "name"; kind = String; qualifier = Some "users" };
         { name = "email"; kind = String; qualifier = Some "users" };
         { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
 let test_decode_row_round_trips_a_users_row () =
@@ -25,10 +25,8 @@ let test_decode_row_round_trips_a_users_row () =
         Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true;
       ]
   in
-  let tuple =
-    Storage.Row_codec.decode_row users_schema (key_bytes, value_bytes)
-  in
-  let expected : Schema.tuple =
+  let row = Storage.Row_codec.decode_row users_kind (key_bytes, value_bytes) in
+  let expected : Row.data =
     [|
       Value.Int64 7L;
       Value.String "Alice";
@@ -36,40 +34,40 @@ let test_decode_row_round_trips_a_users_row () =
       Value.Bool true;
     |]
   in
-  Alcotest.(check bool) "tuple matches expected" true (tuple = expected)
+  Alcotest.(check bool) "row matches expected" true (row = expected)
 
 let test_decode_row_raises_for_composite_primary_key () =
-  let composite_schema : Schema.t =
+  let composite_kind : Relation.kind =
     {
-      fields =
+      row_kind =
         [
           { name = "left_id"; kind = Int64; qualifier = None };
           { name = "right_id"; kind = Int64; qualifier = None };
         ];
-      primary_key = [ "left_id"; "right_id" ];
+      refinements = [ Primary_key [ "left_id"; "right_id" ] ];
     }
   in
   Alcotest.check_raises "composite primary key"
     (Failure "Row_codec: only single-column primary keys are supported")
     (fun () ->
       ignore
-        (Storage.Row_codec.decode_row composite_schema ("ignored", "ignored")))
+        (Storage.Row_codec.decode_row composite_kind ("ignored", "ignored")))
 
 let test_decode_row_raises_for_non_int64_primary_key () =
-  let string_pk_schema : Schema.t =
+  let string_pk_kind : Relation.kind =
     {
-      fields = [ { name = "id"; kind = String; qualifier = None } ];
-      primary_key = [ "id" ];
+      row_kind = [ { name = "id"; kind = String; qualifier = None } ];
+      refinements = [ Primary_key [ "id" ] ];
     }
   in
   Alcotest.check_raises "string primary key"
     (Failure "Row_codec: only int64 primary-key columns are supported")
     (fun () ->
       ignore
-        (Storage.Row_codec.decode_row string_pk_schema ("ignored", "ignored")))
+        (Storage.Row_codec.decode_row string_pk_kind ("ignored", "ignored")))
 
 let test_encode_row_round_trips_through_decode_row () =
-  let tuple : Schema.tuple =
+  let row : Row.data =
     [|
       Value.Int64 42L;
       Value.String "Alice";
@@ -77,39 +75,37 @@ let test_encode_row_round_trips_through_decode_row () =
       Value.Bool true;
     |]
   in
-  let key_bytes, value_bytes =
-    Storage.Row_codec.encode_row users_schema tuple
-  in
+  let key_bytes, value_bytes = Storage.Row_codec.encode_row users_kind row in
   let decoded =
-    Storage.Row_codec.decode_row users_schema (key_bytes, value_bytes)
+    Storage.Row_codec.decode_row users_kind (key_bytes, value_bytes)
   in
-  Alcotest.(check bool) "round-trip matches original" true (decoded = tuple)
+  Alcotest.(check bool) "round-trip matches original" true (decoded = row)
 
 let test_encode_row_raises_for_composite_primary_key () =
-  let composite_schema : Schema.t =
+  let composite_kind : Relation.kind =
     {
-      fields =
+      row_kind =
         [
           { name = "left_id"; kind = Int64; qualifier = None };
           { name = "right_id"; kind = Int64; qualifier = None };
         ];
-      primary_key = [ "left_id"; "right_id" ];
+      refinements = [ Primary_key [ "left_id"; "right_id" ] ];
     }
   in
   Alcotest.check_raises "composite primary key"
     (Failure "Row_codec: only single-column primary keys are supported")
     (fun () ->
       ignore
-        (Storage.Row_codec.encode_row composite_schema
+        (Storage.Row_codec.encode_row composite_kind
            [| Value.Int64 1L; Value.Int64 2L |]))
 
 let test_encode_row_raises_for_wrong_arity_tuple () =
-  Alcotest.check_raises "tuple shorter than schema"
+  Alcotest.check_raises "tuple shorter than kind"
     (Invalid_argument
        "Schema.split_tuple: tuple has 2 value(s) but schema declares 4 field(s)")
     (fun () ->
       ignore
-        (Storage.Row_codec.encode_row users_schema
+        (Storage.Row_codec.encode_row users_kind
            [| Value.Int64 7L; Value.String "Alice" |]))
 
 let () =
@@ -117,7 +113,7 @@ let () =
     [
       ( "decode_row",
         [
-          Alcotest.test_case "reconstructs a tuple from key and value bytes"
+          Alcotest.test_case "reconstructs a row from key and value bytes"
             `Quick test_decode_row_round_trips_a_users_row;
           Alcotest.test_case "raises for a composite primary key" `Quick
             test_decode_row_raises_for_composite_primary_key;
@@ -126,11 +122,11 @@ let () =
         ] );
       ( "encode_row",
         [
-          Alcotest.test_case "round-trips a tuple through decode_row" `Quick
+          Alcotest.test_case "round-trips a row through decode_row" `Quick
             test_encode_row_round_trips_through_decode_row;
           Alcotest.test_case "raises for a composite primary key" `Quick
             test_encode_row_raises_for_composite_primary_key;
-          Alcotest.test_case "raises when tuple length doesn't match schema"
-            `Quick test_encode_row_raises_for_wrong_arity_tuple;
+          Alcotest.test_case "raises when row length doesn't match kind" `Quick
+            test_encode_row_raises_for_wrong_arity_tuple;
         ] );
     ]

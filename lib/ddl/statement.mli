@@ -24,11 +24,11 @@
     {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}. *)
 
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
 
 type field = { name : string; kind : Value.kind }
 (** A single column declaration in a [Create_table] statement. Deliberately
-    distinct from {!Schema.field}: the DDL surface has no notion of qualified
+    distinct from {!Row.field}: the DDL surface has no notion of qualified
     columns, so the qualifier is absent here. The parser resolves the kind name
     ([Int64], [String], [Bool]) to a {!Value.kind} at parse time, so every
     [field] value already carries a real kind. *)
@@ -46,7 +46,7 @@ type t =
           the writes it guards. *)
   | Describe of { table_name : string }
       (** [Describe { table_name }] is the surface form [:describe <name>].
-          Reads the named table's schema from the catalog and returns it as a
+          Reads the named table's kind from the catalog and returns it as a
           {!read_result}. The REPL renders the result through
           {!Dovetail_ddl.Format.statement} so the output round-trips through the
           parser. The catalog-aware "no such table" check lives inside
@@ -59,22 +59,23 @@ type t =
       (** [Create_table { table_name; fields; primary_key }] is the surface form
           [:create table <name> (col: kind, ...) primary key (col, ...)].
           Declares a new table: creates its storage subDB and writes its
-          [Schema.t] into the catalog, all inside a single write transaction.
-          The fields appear in declaration order; [primary_key] names columns
-          drawn from [fields], in key order. The catalog-aware "table already
-          exists" check lives inside {!Ddl_executor.execute_write}. *)
+          [Relation.kind] into the catalog, all inside a single write
+          transaction. The fields appear in declaration order; [primary_key]
+          names columns drawn from [fields], in key order. The catalog-aware
+          "table already exists" check lives inside
+          {!Ddl_executor.execute_write}. *)
 
 type read_result =
   | Listed of string list
       (** A read DDL statement's outcome. [Listed names] is the result of
           [List_tables]: every table name from the catalog, in cursor
           (byte-sorted) order. *)
-  | Described of { table_name : string; schema : Schema.t }
-      (** [Described { table_name; schema }] is the result of [Describe]: the
-          schema bound to [table_name] in the catalog, returned alongside the
-          name itself. The name is carried explicitly so the renderer does not
-          have to recover it from per-field qualifiers — a recovery that would
-          be fragile if the catalog ever stored qualifier-less schemas. *)
+  | Described of { table_name : string; kind : Relation.kind }
+      (** [Described { table_name; kind }] is the result of [Describe]: the kind
+          bound to [table_name] in the catalog, returned alongside the name
+          itself. The name is carried explicitly so the renderer does not have
+          to recover it from per-field qualifiers — a recovery that would be
+          fragile if the catalog ever stored qualifier-less kinds. *)
 
 type write_result =
   | Dropped of string
@@ -111,10 +112,10 @@ val validate : t -> (unit, string) result
     REPL between parse and transaction so structural failures do not pay the
     cost of a writer-lock acquisition. *)
 
-val of_schema : table_name:string -> Schema.t -> t
-(** [of_schema ~table_name schema] adapts a stored [Schema.t] into a
+val of_kind : table_name:string -> Relation.kind -> t
+(** [of_kind ~table_name kind] adapts a stored [Relation.kind] into a
     [Create_table]-shaped statement: per-field qualifiers are stripped, the
     field order and primary-key order are preserved exactly, and [table_name] is
     carried on the result. Used by the REPL renderer for [Described] to feed the
     canonical-form printer, so that [:describe <name>] output is the
-    [:create table <name> (...)] that would reproduce the schema. *)
+    [:create table <name> (...)] that would reproduce the kind. *)

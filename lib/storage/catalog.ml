@@ -1,4 +1,4 @@
-module Schema = Dovetail_core.Schema
+module Relation = Dovetail_core.Relation
 
 let map_name = "catalog"
 
@@ -9,12 +9,12 @@ let get environment transaction ~table_name =
       match Engine.get map transaction ~key:table_name with
       | None -> None
       | Some bytes ->
-          let schema : Schema.t = Marshal.from_string bytes 0 in
-          Some schema)
+          let kind : Relation.kind = Marshal.from_string bytes 0 in
+          Some kind)
 
-let put environment transaction ~table_name schema =
+let put environment transaction ~table_name kind =
   let map = Engine.create_map environment transaction ~name:map_name in
-  let bytes = Marshal.to_string (schema : Schema.t) [] in
+  let bytes = Marshal.to_string (kind : Relation.kind) [] in
   Engine.put map transaction ~key:table_name ~value:bytes
 
 let list_table_names environment transaction =
