@@ -42,6 +42,12 @@ val kind_of : t -> Kind.t
 (** [kind_of value] returns the static {!Kind.t} that classifies [value]. Used
     when checking that two terms in a comparison have agreeing kinds. *)
 
+val kind_to_string : kind -> string
+(** [kind_to_string kind] is the framework-vocabulary name for what
+    {!Kind.to_string} does today: render a kind as a short capitalised name
+    ([Int64], [String], [Bool]) for type-mismatch error messages and
+    EXPLAIN-style output. *)
+
 val format : Format.formatter -> t -> unit
 (** [format formatter value] writes [value] to [formatter] in source-like form:
     [Int64] as bare digits (with leading [-] for negatives), [String] wrapped in

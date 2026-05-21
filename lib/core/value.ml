@@ -16,6 +16,8 @@ let kind_of = function
   | String _ -> Kind.String
   | Bool _ -> Kind.Bool
 
+let kind_to_string = Kind.to_string
+
 let format formatter = function
   | Int64 number -> Format.pp_print_string formatter (Int64.to_string number)
   | String text -> Format.fprintf formatter "\"%s\"" text
