@@ -1,22 +1,15 @@
-module Kind = struct
-  type t = Int64 | String | Bool
+type kind = Int64 | String | Bool
+type data = Int64 of int64 | String of string | Bool of bool
 
-  let to_string = function
-    | Int64 -> "Int64"
-    | String -> "String"
-    | Bool -> "Bool"
-end
+let kind_of : data -> kind = function
+  | Int64 _ -> Int64
+  | String _ -> String
+  | Bool _ -> Bool
 
-type t = Int64 of int64 | String of string | Bool of bool
-type kind = Kind.t = Int64 | String | Bool
-type data = t = Int64 of int64 | String of string | Bool of bool
-
-let kind_of = function
-  | Int64 _ -> Kind.Int64
-  | String _ -> Kind.String
-  | Bool _ -> Kind.Bool
-
-let kind_to_string = Kind.to_string
+let kind_to_string : kind -> string = function
+  | Int64 -> "Int64"
+  | String -> "String"
+  | Bool -> "Bool"
 
 let format formatter = function
   | Int64 number -> Format.pp_print_string formatter (Int64.to_string number)
