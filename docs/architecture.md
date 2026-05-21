@@ -81,6 +81,10 @@ runs ship no hardcoded rows; the seeder is opt-in.
 | `Row`      | `Row.kind` is an ordered list of named, typed, optionally qualified fields. `Row.data = Value.data array` is the values in field order.       |
 | `Relation` | `Relation.kind = { row_kind; refinements }` adds refinements (currently just `Primary_key`). `Relation.t` is a kind plus a `Row.data Seq.t`.  |
 
+`Value`, `Row`, and `Relation` form a deliberate three-rung type
+ladder; see [`type-ladder.md`](type-ladder.md) for the per-rung
+`kind`/`data`/`t` pattern and the rules for adding refinements.
+
 ## Sub-library dependencies
 
 Internal dependencies between the sub-libraries under `lib/`. External
