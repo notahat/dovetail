@@ -9,7 +9,7 @@
     different inputs. A {!type-column_reference} type captures the parser-level
     form of a column reference -- bare or dotted. *)
 
-type field = { name : string; kind : Value.Kind.t; qualifier : string option }
+type field = { name : string; kind : Value.kind; qualifier : string option }
 (** A single column declaration. [qualifier] is set to [Some table_name] for
     fields produced by a {!Logical.Scan} of [table_name]; intermediate relations
     preserve the qualifier their fields had on the way in. *)
@@ -19,7 +19,7 @@ type t = { fields : field list; primary_key : string list }
     Multi-column keys are supported even though only single-column keys are
     currently exercised. *)
 
-type tuple = Value.t array
+type tuple = Value.data array
 (** A row's values, in field order. An array (rather than a list) so
     column-position lookups are O(1). *)
 
@@ -59,8 +59,8 @@ val format_field_name : field -> string
 
 val assemble_tuple :
   t ->
-  primary_key_values:Value.t list ->
-  non_primary_key_values:Value.t list ->
+  primary_key_values:Value.data list ->
+  non_primary_key_values:Value.data list ->
   tuple
 (** [assemble_tuple schema ~primary_key_values ~non_primary_key_values] builds a
     tuple in field order by interleaving the two value lists according to
@@ -72,7 +72,7 @@ val assemble_tuple :
     columns come from the decoded key and the remaining columns from the decoded
     value. Raises [Invalid_argument] if either list has the wrong length. *)
 
-val split_tuple : t -> tuple -> Value.t list * Value.t list
+val split_tuple : t -> tuple -> Value.data list * Value.data list
 (** [split_tuple schema tuple] is the inverse of {!assemble_tuple}: it returns
     [(primary_key_values, non_primary_key_values)], where [primary_key_values]
     are in primary-key order (the order they appear in [schema.primary_key]) and

@@ -1,6 +1,6 @@
-type field = { name : string; kind : Value.Kind.t; qualifier : string option }
+type field = { name : string; kind : Value.kind; qualifier : string option }
 type t = { fields : field list; primary_key : string list }
-type tuple = Value.t array
+type tuple = Value.data array
 type column_reference = { qualifier : string option; name : string }
 
 (* Render a [column_reference] in dotted form (or bare, when unqualified) for

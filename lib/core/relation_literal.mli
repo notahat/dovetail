@@ -5,12 +5,12 @@
     every layer and lives here so the IR doc comments can point at a single
     definition rather than each restating the wording. *)
 
-val schema_of : columns:string list -> first_row:Value.t list -> Schema.t
+val schema_of : columns:string list -> first_row:Value.data list -> Schema.t
 (** [schema_of ~columns ~first_row] builds the schema implied by a relation
-    literal. Field names come from [columns] in order; each field's
-    [Value.Kind.t] is inferred from the value at the same position in
-    [first_row]; every field has [qualifier = None]; the schema's [primary_key]
-    is empty, matching the convention for derived relations.
+    literal. Field names come from [columns] in order; each field's [Value.kind]
+    is inferred from the value at the same position in [first_row]; every field
+    has [qualifier = None]; the schema's [primary_key] is empty, matching the
+    convention for derived relations.
 
     Inferring kinds from only the first row is sufficient because the literal
     grammar is currently single-row. Multi-row literals will need to verify the

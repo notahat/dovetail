@@ -7,7 +7,7 @@ type comparison_op =
   | GreaterEqual
 
 type t =
-  | Literal of Value.t
+  | Literal of Value.data
   | Column of Schema.column_reference
   | Compare of { left : t; op : comparison_op; right : t }
   | And of t * t
@@ -27,7 +27,7 @@ let describe_expression = function
   | Column reference ->
       Printf.sprintf "column %S" (Schema.format_column_reference reference)
   | Literal value ->
-      Printf.sprintf "literal %s" (Value.Kind.to_string (Value.kind_of value))
+      Printf.sprintf "literal %s" (Value.kind_to_string (Value.kind_of value))
   | Compare _ -> "comparison expression"
   | And _ -> "and expression"
   | Or _ -> "or expression"
@@ -43,9 +43,9 @@ let render_op = function
 
 (* Ordering operators only apply to kinds with a meaningful order. Today
    that is [Int64] and [String]; [Bool] is excluded. *)
-let is_ordered_kind = function
-  | Value.Kind.Int64 | Value.Kind.String -> true
-  | Value.Kind.Bool -> false
+let is_ordered_kind : Value.kind -> bool = function
+  | Int64 | String -> true
+  | Bool -> false
 
 let is_ordering_op = function
   | Less | LessEqual | Greater | GreaterEqual -> true
@@ -107,13 +107,13 @@ let format formatter expression = format_at 0 formatter expression
 
 (* Common helper for [And] and [Or]: the operator name (for the error
    message) and the kind check on a single operand. *)
-let check_bool_operand operator_name operand kind =
-  if kind <> Value.Kind.Bool then
+let check_bool_operand operator_name operand (kind : Value.kind) =
+  if kind <> Value.Bool then
     failwith
       (Printf.sprintf "Expression.resolve: %s requires Bool operands: %s is %s"
          operator_name
          (describe_expression operand)
-         (Value.Kind.to_string kind))
+         (Value.kind_to_string kind))
 
 (* Walk [expression] once, producing the value-producing closure paired with
    the value's static kind. Each [Column] is resolved against [schema] here,
@@ -123,7 +123,9 @@ let check_bool_operand operator_name operand kind =
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
    the produced closure: the right operand is only read when the left's
    verdict doesn't determine the result. *)
-let rec resolve_value schema = function
+let rec resolve_value schema : t -> Value.kind * (Schema.tuple -> Value.data) =
+ fun expression ->
+  match expression with
   | Literal value ->
       let kind = Value.kind_of value in
       let read (_tuple : Schema.tuple) = value in
@@ -142,15 +144,15 @@ let rec resolve_value schema = function
           (Printf.sprintf
              "Expression.resolve: type mismatch: %s is %s, %s is %s"
              (describe_expression left)
-             (Value.Kind.to_string left_kind)
+             (Value.kind_to_string left_kind)
              (describe_expression right)
-             (Value.Kind.to_string right_kind));
+             (Value.kind_to_string right_kind));
       if is_ordering_op op && not (is_ordered_kind left_kind) then
         failwith
           (Printf.sprintf
              "Expression.resolve: ordering operator %s is not defined for %s"
              (render_op op)
-             (Value.Kind.to_string left_kind));
+             (Value.kind_to_string left_kind));
       let comparator =
         match op with
         | Equal -> ( = )
@@ -163,7 +165,7 @@ let rec resolve_value schema = function
       let read tuple =
         Value.Bool (comparator (read_left tuple) (read_right tuple))
       in
-      (Value.Kind.Bool, read)
+      (Value.Bool, read)
   | And (left, right) ->
       let left_kind, read_left = resolve_value schema left in
       let right_kind, read_right = resolve_value schema right in
@@ -178,7 +180,7 @@ let rec resolve_value schema = function
         | Value.Bool true -> read_right tuple
         | _ -> assert false
       in
-      (Value.Kind.Bool, read)
+      (Value.Bool, read)
   | Or (left, right) ->
       let left_kind, read_left = resolve_value schema left in
       let right_kind, read_right = resolve_value schema right in
@@ -190,30 +192,30 @@ let rec resolve_value schema = function
         | Value.Bool false -> read_right tuple
         | _ -> assert false
       in
-      (Value.Kind.Bool, read)
+      (Value.Bool, read)
   | Not operand ->
       let operand_kind, read_operand = resolve_value schema operand in
-      if operand_kind <> Value.Kind.Bool then
+      if operand_kind <> Value.Bool then
         failwith
           (Printf.sprintf
              "Expression.resolve: not requires a Bool operand: %s is %s"
              (describe_expression operand)
-             (Value.Kind.to_string operand_kind));
+             (Value.kind_to_string operand_kind));
       let read tuple =
         match read_operand tuple with
         | Value.Bool true -> Value.Bool false
         | Value.Bool false -> Value.Bool true
         | _ -> assert false
       in
-      (Value.Kind.Bool, read)
+      (Value.Bool, read)
 
 let resolve schema expression =
   let kind, read_value = resolve_value schema expression in
-  if kind <> Value.Kind.Bool then
+  if kind <> Value.Bool then
     failwith
       (Printf.sprintf
          "Expression.resolve: predicate position requires Bool, got %s"
-         (Value.Kind.to_string kind));
+         (Value.kind_to_string kind));
   fun (tuple : Schema.tuple) ->
     (* The resolve-time kind check above guarantees a Bool value here. *)
     match read_value tuple with
