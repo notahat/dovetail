@@ -29,6 +29,15 @@ end
 *)
 type t = Int64 of int64 | String of string | Bool of bool
 
+(** Framework-vocabulary aliases for the kind and data types. [kind] is the same
+    type as [Kind.t] with the same constructors; [data] is the same type as [t]
+    with the same constructors. Callers may use either form. The [Kind]
+    submodule and bare [t] are scheduled for removal once consumers have
+    migrated. *)
+type kind = Kind.t = Int64 | String | Bool
+
+type data = t = Int64 of int64 | String of string | Bool of bool
+
 val kind_of : t -> Kind.t
 (** [kind_of value] returns the static {!Kind.t} that classifies [value]. Used
     when checking that two terms in a comparison have agreeing kinds. *)
