@@ -172,7 +172,7 @@ and resolve_int64_outer_key_position outer_row_kind outer_key_column =
     | Ok result -> result
     | Error message ->
         failwith
-          (Printf.sprintf "Eval: IndexedNestedLoopJoin outer key column: %s"
+          (Printf.sprintf "Eval: IndexedNestedLoopJoin: outer key column: %s"
              message)
   in
   match field.kind with
@@ -180,7 +180,7 @@ and resolve_int64_outer_key_position outer_row_kind outer_key_column =
   | other_kind ->
       failwith
         (Printf.sprintf
-           "Eval: IndexedNestedLoopJoin requires Int64 outer key column, got \
+           "Eval: IndexedNestedLoopJoin: requires Int64 outer key column, got \
             %s for %S"
            (Value.kind_to_string other_kind)
            (Row.format_column_reference outer_key_column))
@@ -273,7 +273,8 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
    its value. Raises [Failure] if a target field has no matching source
    column. Source columns absent from the target are tolerated here;
    Translate-level validation rejects them upstream. *)
-let build_source_position_map ~source_row_kind ~(target_kind : Relation.kind) =
+let build_source_position_map ~target_table ~source_row_kind
+    ~(target_kind : Relation.kind) =
   List.map
     (fun (target_field : Row.field) ->
       match
@@ -284,9 +285,9 @@ let build_source_position_map ~source_row_kind ~(target_kind : Relation.kind) =
       | Error _ ->
           failwith
             (Printf.sprintf
-               "Eval: insert source is missing column %S required by target \
-                kind"
-               target_field.name))
+               "Eval: insert into %S: source is missing column %S required by \
+                target kind"
+               target_table target_field.name))
     target_kind.row_kind
 
 (* Reorder [source_row] into a row matching [target_kind]'s field order, by
@@ -345,8 +346,8 @@ let evaluate_insert environment transaction ~target_table ~source continue =
   let affected_rows = ref 0 in
   eval environment transaction source (fun source_relation ->
       let position_map =
-        build_source_position_map ~source_row_kind:source_relation.kind.row_kind
-          ~target_kind
+        build_source_position_map ~target_table
+          ~source_row_kind:source_relation.kind.row_kind ~target_kind
       in
       Seq.iter
         (fun source_row ->
