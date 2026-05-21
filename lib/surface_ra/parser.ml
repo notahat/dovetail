@@ -1,7 +1,7 @@
 open Angstrom
 module StringSet = Set.Make (String)
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 module Ddl = Dovetail_ddl
 
@@ -208,8 +208,8 @@ let column_reference =
   peek_char >>= function
   | Some '.' ->
       char '.' *> identifier >>| fun second ->
-      ({ qualifier = Some first; name = second } : Schema.column_reference)
-  | _ -> return ({ qualifier = None; name = first } : Schema.column_reference)
+      ({ qualifier = Some first; name = second } : Row.column_reference)
+  | _ -> return ({ qualifier = None; name = first } : Row.column_reference)
 
 (* The expression grammar, built bottom-up inside [fix] so the atom can
    recurse into the full expression via parens. Top-level layering, from
