@@ -386,8 +386,8 @@ let check_value_kinds ~target_table ~(target_schema : Schema.t) ~literal_columns
           (Printf.sprintf
              "Translate: insert into %S: column %S expects %s, got %s"
              target_table column_name
-             (Value.Kind.to_string target_field.kind)
-             (Value.Kind.to_string actual_kind)))
+             (Value.kind_to_string target_field.kind)
+             (Value.kind_to_string actual_kind)))
     literal_columns first_row
 
 (* Run the three literal/target checks in the order the later ones depend

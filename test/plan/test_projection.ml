@@ -120,7 +120,7 @@ let test_projected_schema_has_requested_fields () =
   in
   Alcotest.(check bool)
     "first field kind is String" true
-    (field_kinds = [ Value.Kind.String; Value.Kind.Int64 ])
+    (field_kinds = ([ String; Int64 ] : Value.kind list))
 
 let test_projected_schema_preserves_qualifiers () =
   let projected_schema, _project_tuple =

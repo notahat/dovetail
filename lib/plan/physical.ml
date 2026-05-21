@@ -15,7 +15,7 @@ type t =
       outer_key_column : Schema.column_reference;
       inner_position : [ `Left | `Right ];
     }
-  | RelationLiteral of { columns : string list; rows : Value.t list list }
+  | RelationLiteral of { columns : string list; rows : Value.data list list }
 
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation
