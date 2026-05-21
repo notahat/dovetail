@@ -27,9 +27,9 @@ The storage stack sits below it, used by `Eval` and the catalog.
          ▼
      Physical.t     — physical operators; how to compute it
          │
-         │  Eval ────────────────────────────►  Catalog       — name → Schema.t
+         │  Eval ────────────────────────────►  Catalog       — name → Relation.kind
          ▼                                          │
-     Relation.t     — schema + Seq.t of tuples      │  uses
+     Relation.t     — kind + Seq.t of Row.data      │  uses
          │                                          ▼
          │  Relation.print                      Encoding      — keys (byte-
          ▼                                          │          comparable),
@@ -58,12 +58,12 @@ runs ship no hardcoded rows; the seeder is opt-in.
 | `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| Join \| ...` | What the user typed, structured. No semantics yet.                                                                                |
 | `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes. `Ast.Join` desugars to `Logical.Restrict (Logical.CrossProduct ..., predicate)`. |
 | `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×.                  |
-| `Translate` | `catalog:(string -> Schema.t option) -> Logical.t -> Physical.t` | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; folds `Restrict (Scan, pk = literal)` into an `IndexLookup` when the catalog says the PK matches. Future home of further optimisation. |
+| `Translate` | `catalog:(string -> Relation.kind option) -> Logical.t -> Physical.t` | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; folds `Restrict (Scan, pk = literal)` into an `IndexLookup` when the catalog says the PK matches. Future home of further optimisation. |
 | `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| IndexLookup \| NestedLoopJoin \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, primary-key point lookups, future hash joins, etc. |
 | `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
-| `Projection`| `t = Schema.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
-| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `tuples` seq is pulled lazily.                                |
-| `Relation`  | `'tag t = { schema; tuples }`            | Schema-tagged stream of tuples. Phantom `'tag` distinguishes set vs bag semantics.                                         |
+| `Projection`| `t = Row.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
+| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `data` seq is pulled lazily.                                  |
+| `Relation`  | `'tag t = { kind; data }`                | Kind-tagged stream of rows. Phantom `'tag` distinguishes set vs bag semantics.                                             |
 
 ### Storage stack
 
@@ -71,15 +71,15 @@ runs ship no hardcoded rows; the seeder is opt-in.
 | ---------- | ------------------------------------------------------------------------------------------- |
 | `Storage`  | Thin wrapper over LMDB. Env, scope-bound read/write transactions, byte-keyed sub-databases. |
 | `Encoding` | Byte-comparable key encoding (sign-flipped BE for `int64`); `Marshal` for tuple values.     |
-| `Catalog`  | Persistent table-name → `Schema.t` map, backed by a single `catalog` subDB.                 |
+| `Catalog`  | Persistent table-name → `Relation.kind` map, backed by a single `catalog` subDB.            |
 
 ### Data types
 
 | Module   | What it carries                                                                                    |
 | -------- | -------------------------------------------------------------------------------------------------- |
-| `Value`  | `Int64 \| String \| Bool` runtime values, plus a parallel `Kind.t` for static schema declarations. |
-| `Schema` | Ordered field list + primary-key column names. `Schema.tuple = Value.t array`.                     |
-| `Relation` | (See above.) Phantom-typed for set/bag semantics.                                                |
+| `Value`    | `Int64 \| String \| Bool` runtime values, plus a parallel `Value.kind` for static kind declarations.                                          |
+| `Row`      | `Row.kind` is an ordered list of named, typed, optionally qualified fields. `Row.data = Value.data array` is the values in field order.       |
+| `Relation` | `Relation.kind = { row_kind; refinements }` adds refinements (currently just `Primary_key`). `Relation.t` is a kind plus a `Row.data Seq.t`.  |
 
 ## Sub-library dependencies
 

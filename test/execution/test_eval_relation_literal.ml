@@ -49,9 +49,9 @@ let test_field_kinds_are_inferred_from_the_first_row () =
 
 let test_primary_key_is_empty () =
   with_literal_relation @@ fun relation ->
-  Alcotest.(check (list string))
-    "derived relations carry no primary key" []
-    (Relation.schema_of_kind relation.kind).primary_key
+  Alcotest.(check int)
+    "derived relations carry no refinements" 0
+    (List.length relation.kind.refinements)
 
 let test_tuples_match_the_literals_row () =
   with_literal_relation @@ fun relation ->

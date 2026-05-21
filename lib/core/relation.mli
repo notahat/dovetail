@@ -31,16 +31,6 @@ type 'tag t = {
 (** A relation tagged with its multiplicity semantics: a {!kind} describing the
     row shape and refinements, plus a lazy sequence of rows in that shape. *)
 
-val kind_of_schema : Schema.t -> kind
-(** Convert a {!Schema.t} to its framework-vocabulary {!kind}. The schema's
-    fields become the [row_kind]; a non-empty [primary_key] becomes a single
-    {!Primary_key} refinement; an empty [primary_key] becomes no refinement. *)
-
-val schema_of_kind : kind -> Schema.t
-(** Convert a {!kind} back to a {!Schema.t}. The [row_kind] becomes the schema's
-    fields; the first {!Primary_key} refinement (if any) becomes the schema's
-    [primary_key], otherwise [primary_key] is empty. *)
-
 val split_tuple : kind -> Row.data -> Value.data list * Value.data list
 (** [split_tuple kind tuple] returns
     [(primary_key_values, non_primary_key_values)], where [primary_key_values]

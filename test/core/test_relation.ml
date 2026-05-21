@@ -2,35 +2,35 @@
 
 open Dovetail_core
 
-(* The fixture's [users] schema, with qualifiers set just like {!Fixture}
-   writes them, so the rendered headers show [users.<column>]. *)
-let users_schema : Schema.t =
+(* A fixture-shaped kind for [users] with qualifiers set just like
+   {!Fixture} writes them, so rendered headers show [users.<column>]. *)
+let users_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "users" };
         { name = "name"; kind = String; qualifier = Some "users" };
         { name = "email"; kind = String; qualifier = Some "users" };
         { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
-(* A schema with no qualifier on its fields. Stands in for derived relations
+(* A kind with no qualifier on its fields. Stands in for derived relations
    that lose qualifier information (e.g. {!Projection.resolve} keeps the
    input's qualifier today, but a future expression-projection step might
    not), so the printer keeps working when [qualifier = None]. *)
-let unqualified_schema : Schema.t =
+let unqualified_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = None };
         { name = "name"; kind = String; qualifier = None };
       ];
-    primary_key = [];
+    refinements = [];
   }
 
-let two_users : Schema.tuple list =
+let two_users : Row.data list =
   [
     [|
       Value.Int64 1L;
@@ -55,10 +55,7 @@ let render relation =
 
 let test_renders_aligned_table_with_qualified_headers () =
   let relation : [ `Bag ] Relation.t =
-    {
-      kind = Relation.kind_of_schema users_schema;
-      data = List.to_seq two_users;
-    }
+    { kind = users_kind; data = List.to_seq two_users }
   in
   let expected =
     String.concat "\n"
@@ -75,7 +72,7 @@ let test_renders_aligned_table_with_qualified_headers () =
 let test_renders_unqualified_headers_when_fields_have_no_qualifier () =
   let relation : [ `Bag ] Relation.t =
     {
-      kind = Relation.kind_of_schema unqualified_schema;
+      kind = unqualified_kind;
       data = List.to_seq [ [| Value.Int64 1L; Value.String "Alice" |] ];
     }
   in
@@ -87,7 +84,7 @@ let test_renders_unqualified_headers_when_fields_have_no_qualifier () =
 
 let test_renders_header_only_when_empty () =
   let relation : [ `Bag ] Relation.t =
-    { kind = Relation.kind_of_schema users_schema; data = Seq.empty }
+    { kind = users_kind; data = Seq.empty }
   in
   let expected =
     String.concat "\n"
@@ -99,43 +96,144 @@ let test_renders_header_only_when_empty () =
   in
   Alcotest.(check string) "header-only table" expected (render relation)
 
-(* Schema → Relation.kind → Schema round-trip helper. Asserts the
-   converted-then-converted-back schema matches the original. *)
-let assert_schema_round_trips (schema : Schema.t) =
-  let kind = Relation.kind_of_schema schema in
-  let recovered = Relation.schema_of_kind kind in
-  Alcotest.(check bool) "schema round-trips" true (recovered = schema)
+let tuple_testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuple>")) ( = )
 
-let test_schema_round_trip_with_single_column_primary_key () =
-  assert_schema_round_trips users_schema
+let values_list_testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<values>")) ( = )
 
-let test_schema_round_trip_with_no_primary_key () =
-  assert_schema_round_trips unqualified_schema
+(* A kind where the primary key is in the middle of the row, exercising
+   that [assemble_tuple] interleaves by field order rather than appending. *)
+let mid_pk_kind : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "name"; kind = String; qualifier = None };
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "active"; kind = Bool; qualifier = None };
+      ];
+    refinements = [ Primary_key [ "id" ] ];
+  }
 
-let test_schema_round_trip_with_composite_primary_key () =
-  let schema : Schema.t =
-    {
-      fields =
+let composite_pk_kind : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "tenant"; kind = String; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+        { name = "id"; kind = Int64; qualifier = None };
+      ];
+    refinements = [ Primary_key [ "tenant"; "id" ] ];
+  }
+
+let test_assembles_in_field_order_with_leading_pk () =
+  let assembled =
+    Relation.assemble_tuple users_kind ~primary_key_values:[ Value.Int64 42L ]
+      ~non_primary_key_values:
         [
-          { name = "order_id"; kind = Int64; qualifier = None };
-          { name = "product_id"; kind = Int64; qualifier = None };
-          { name = "quantity"; kind = Int64; qualifier = None };
-        ];
-      primary_key = [ "order_id"; "product_id" ];
-    }
+          Value.String "Alice";
+          Value.String "alice@example.com";
+          Value.Bool true;
+        ]
   in
-  assert_schema_round_trips schema
+  let expected : Row.data =
+    [|
+      Value.Int64 42L;
+      Value.String "Alice";
+      Value.String "alice@example.com";
+      Value.Bool true;
+    |]
+  in
+  Alcotest.(check tuple_testable) "leading PK" expected assembled
 
-let test_kind_with_primary_key_refinement_round_trips () =
-  let kind : Relation.kind =
-    {
-      row_kind = [ { Row.name = "id"; kind = Int64; qualifier = Some "users" } ];
-      refinements = [ Primary_key [ "id" ] ];
-    }
+let test_assembles_with_pk_in_the_middle () =
+  let assembled =
+    Relation.assemble_tuple mid_pk_kind ~primary_key_values:[ Value.Int64 7L ]
+      ~non_primary_key_values:[ Value.String "Bob"; Value.Bool false ]
   in
-  let schema = Relation.schema_of_kind kind in
-  let recovered = Relation.kind_of_schema schema in
-  Alcotest.(check bool) "kind round-trips" true (recovered = kind)
+  let expected : Row.data =
+    [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
+  in
+  Alcotest.(check tuple_testable) "PK in middle" expected assembled
+
+let test_assembles_composite_primary_key () =
+  let assembled =
+    Relation.assemble_tuple composite_pk_kind
+      ~primary_key_values:[ Value.String "acme"; Value.Int64 3L ]
+      ~non_primary_key_values:[ Value.String "Carol" ]
+  in
+  let expected : Row.data =
+    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+  in
+  Alcotest.(check tuple_testable) "composite PK" expected assembled
+
+let test_splits_tuple_with_leading_pk () =
+  let tuple : Row.data =
+    [|
+      Value.Int64 42L;
+      Value.String "Alice";
+      Value.String "alice@example.com";
+      Value.Bool true;
+    |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Relation.split_tuple users_kind tuple
+  in
+  Alcotest.(check values_list_testable)
+    "primary-key values" [ Value.Int64 42L ] primary_key_values;
+  Alcotest.(check values_list_testable)
+    "non-primary-key values"
+    [ Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true ]
+    non_primary_key_values
+
+let test_splits_tuple_with_pk_in_the_middle () =
+  let tuple : Row.data =
+    [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Relation.split_tuple mid_pk_kind tuple
+  in
+  Alcotest.(check values_list_testable)
+    "primary-key values" [ Value.Int64 7L ] primary_key_values;
+  Alcotest.(check values_list_testable)
+    "non-primary-key values in field order"
+    [ Value.String "Bob"; Value.Bool false ]
+    non_primary_key_values
+
+let test_splits_tuple_with_composite_primary_key () =
+  let tuple : Row.data =
+    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Relation.split_tuple composite_pk_kind tuple
+  in
+  Alcotest.(check values_list_testable)
+    "primary-key values in primary-key order"
+    [ Value.String "acme"; Value.Int64 3L ]
+    primary_key_values;
+  Alcotest.(check values_list_testable)
+    "non-primary-key values" [ Value.String "Carol" ] non_primary_key_values
+
+let test_split_is_the_inverse_of_assemble () =
+  let tuple : Row.data =
+    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+  in
+  let primary_key_values, non_primary_key_values =
+    Relation.split_tuple composite_pk_kind tuple
+  in
+  let reassembled =
+    Relation.assemble_tuple composite_pk_kind ~primary_key_values
+      ~non_primary_key_values
+  in
+  Alcotest.(check tuple_testable)
+    "split then assemble round-trips the tuple" tuple reassembled
+
+let test_split_rejects_wrong_length_tuple () =
+  let tuple : Row.data = [| Value.Int64 1L; Value.String "Alice" |] in
+  Alcotest.check_raises "raises Invalid_argument"
+    (Invalid_argument
+       "Relation.split_tuple: tuple has 2 value(s) but kind declares 4 field(s)")
+    (fun () -> ignore (Relation.split_tuple users_kind tuple))
 
 let () =
   Alcotest.run "relation"
@@ -151,17 +249,27 @@ let () =
             "renders just the header when the relation has no tuples" `Quick
             test_renders_header_only_when_empty;
         ] );
-      ( "kind_of_schema / schema_of_kind",
+      ( "assemble_tuple",
         [
+          Alcotest.test_case "interleaves values in field order with leading PK"
+            `Quick test_assembles_in_field_order_with_leading_pk;
+          Alcotest.test_case "interleaves values when PK sits in the middle"
+            `Quick test_assembles_with_pk_in_the_middle;
+          Alcotest.test_case "interleaves values for a composite primary key"
+            `Quick test_assembles_composite_primary_key;
+        ] );
+      ( "split_tuple",
+        [
+          Alcotest.test_case "splits a tuple whose PK is the leading field"
+            `Quick test_splits_tuple_with_leading_pk;
+          Alcotest.test_case "splits a tuple whose PK sits in the middle" `Quick
+            test_splits_tuple_with_pk_in_the_middle;
           Alcotest.test_case
-            "Schema with a single-column primary key round-trips" `Quick
-            test_schema_round_trip_with_single_column_primary_key;
-          Alcotest.test_case "Schema with no primary key round-trips" `Quick
-            test_schema_round_trip_with_no_primary_key;
-          Alcotest.test_case "Schema with a composite primary key round-trips"
-            `Quick test_schema_round_trip_with_composite_primary_key;
-          Alcotest.test_case
-            "Relation.kind with a Primary_key refinement round-trips" `Quick
-            test_kind_with_primary_key_refinement_round_trips;
+            "splits a tuple with a composite primary key in PK order" `Quick
+            test_splits_tuple_with_composite_primary_key;
+          Alcotest.test_case "round-trips through assemble_tuple" `Quick
+            test_split_is_the_inverse_of_assemble;
+          Alcotest.test_case "rejects a tuple of the wrong length" `Quick
+            test_split_rejects_wrong_length_tuple;
         ] );
     ]

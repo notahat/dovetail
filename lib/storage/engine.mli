@@ -2,8 +2,8 @@
 
     Storage is the thin layer above the [lmdb] package that fixes a single shape
     for the rest of dovetail to talk against: every key and every value is a
-    [string] of bytes. Encoding and decoding live above this layer. Schemas,
-    tuples, and the catalog do not appear here.
+    [string] of bytes. Encoding and decoding live above this layer. Kinds, rows,
+    and the catalog do not appear here.
 
     Transactions are scope-bound via {!with_read_transaction} and
     {!with_write_transaction}. A transaction is alive only inside its callback;

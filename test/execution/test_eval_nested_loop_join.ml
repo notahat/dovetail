@@ -2,7 +2,6 @@
 
 open Test_helpers
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
 module Plan = Dovetail_plan
 
 (* The matched (user, order) pairs that a join on

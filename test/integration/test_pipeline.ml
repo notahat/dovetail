@@ -8,7 +8,6 @@
 
 open Test_helpers
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
 module Relation = Dovetail_core.Relation
 module Plan = Dovetail_plan
 module Execution = Dovetail_execution
@@ -185,7 +184,7 @@ let test_join_yields_matched_pairs () =
    rows arrive in orders' primary-key order) and tags users as the
    inner with inner_position = Left (so column order matches what the
    pre-rewrite plan produced). *)
-let expected_join_rows : Schema.tuple list =
+let expected_join_rows : Row.data list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair user_index order_index =
@@ -224,7 +223,7 @@ let test_indexed_join_then_project_matches_readme_example () =
   with_query_result
     "users | join orders on users.id = orders.user_id | project name, \
      description, amount" (fun rows ->
-      let expected : Schema.tuple list =
+      let expected : Row.data list =
         [
           [| Value.String "Alice"; Value.String "Coffee"; Value.Int64 5L |];
           [| Value.String "Alice"; Value.String "Bagel"; Value.Int64 4L |];
@@ -242,7 +241,7 @@ let test_indexed_join_then_project_matches_readme_example () =
    [orders.amount >= 5] filter on top of the indexed join. Carved out
    of [expected_join_rows] so both forms of the residual-filter query
    (on-clause [and], trailing [| restrict]) can assert against it. *)
-let expected_join_rows_with_amount_at_least_five : Schema.tuple list =
+let expected_join_rows_with_amount_at_least_five : Row.data list =
   [
     List.nth expected_join_rows 0;
     (* Alice + Coffee, amount 5 *)

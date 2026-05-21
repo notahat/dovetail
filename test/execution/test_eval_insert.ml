@@ -7,7 +7,6 @@
 open Dovetail_execution
 open Test_helpers
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
@@ -45,7 +44,7 @@ let test_insert_writes_row_and_reports_one_affected () =
           let rows = List.of_seq relation.data in
           let inserted =
             List.find_opt
-              (fun (tuple : Schema.tuple) -> tuple.(0) = Value.Int64 9L)
+              (fun (tuple : Row.data) -> tuple.(0) = Value.Int64 9L)
               rows
           in
           match inserted with

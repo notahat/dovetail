@@ -102,7 +102,7 @@ let test_encode_row_raises_for_composite_primary_key () =
 let test_encode_row_raises_for_wrong_arity_tuple () =
   Alcotest.check_raises "tuple shorter than kind"
     (Invalid_argument
-       "Schema.split_tuple: tuple has 2 value(s) but schema declares 4 field(s)")
+       "Relation.split_tuple: tuple has 2 value(s) but kind declares 4 field(s)")
     (fun () ->
       ignore
         (Storage.Row_codec.encode_row users_kind

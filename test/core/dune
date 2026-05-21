@@ -1,7 +1,7 @@
 (tests
  (names
   test_value
-  test_schema
+  test_row
   test_expression
   test_expression_format
   test_relation

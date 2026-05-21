@@ -5,18 +5,17 @@
 open Dovetail_execution
 open Test_helpers
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build a Project wrapping [input_plan] over the users fixture, evaluate
    it, and return the resulting tuples. [column_names] is a list of bare
-   names, wrapped into unqualified {!Schema.column_reference}s -- the test
+   names, wrapped into unqualified {!Row.column_reference}s -- the test
    bodies don't need qualifiers here. *)
 let evaluate_users_project ~input_plan column_names =
   let columns =
     List.map
-      (fun name : Schema.column_reference -> { qualifier = None; name })
+      (fun name : Row.column_reference -> { qualifier = None; name })
       column_names
   in
   with_temp_dir @@ fun dir ->

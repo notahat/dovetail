@@ -5,7 +5,6 @@
 open Dovetail_plan
 open Test_helpers
 module Execution = Dovetail_execution
-module Schema = Dovetail_core.Schema
 module Storage = Dovetail_storage
 module Value = Dovetail_core.Value
 

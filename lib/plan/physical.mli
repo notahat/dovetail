@@ -15,7 +15,7 @@ type t =
           via a cursor over the table's storage subDB. *)
   | Filter of { input : t; predicate : Expression.t }
       (** [Filter { input; predicate }] yields the rows from [input] for which
-          [predicate] holds. Schema and multiplicity tag are passed through from
+          [predicate] holds. Kind and multiplicity tag are passed through from
           [input] -- filtering preserves whether the input is a set or a bag. *)
   | Project of { input : t; columns : Projection.t }
       (** [Project { input; columns }] yields the rows from [input] narrowed to
@@ -48,10 +48,10 @@ type t =
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
           tuple pair for which [predicate] holds, executed as a nested loop with
           the right side materialised once and the predicate fused into the
-          inner loop. Schema construction matches [CrossProduct]: [left]'s
-          fields followed by [right]'s, qualifiers preserved, [primary_key]
-          empty. The multiplicity tag is preserved -- the join cannot introduce
-          duplicates that weren't already implicit in the cross.
+          inner loop. Kind construction matches [CrossProduct]: [left]'s fields
+          followed by [right]'s, qualifiers preserved, [primary_key] empty. The
+          multiplicity tag is preserved -- the join cannot introduce duplicates
+          that weren't already implicit in the cross.
 
           Per-pair work is the same as [Filter (CrossProduct ...)]; the node
           exists so that {!Translate} has a place to emit when it recognises an

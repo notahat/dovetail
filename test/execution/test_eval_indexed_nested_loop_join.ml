@@ -2,7 +2,6 @@
 
 open Dovetail_execution
 open Test_helpers
-module Schema = Dovetail_core.Schema
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
