@@ -115,8 +115,12 @@ let check_bool_operand operator_name operand (kind : Value.kind) =
          (Value.kind_to_string kind))
 
 (* Walk [expression] once, producing the value-producing closure paired with
-   the value's static kind. Each [Column] is resolved against [schema] here,
-   so per-tuple evaluation is just an array index. Kind mismatches inside a
+   the value's static kind. The closure shape is the whole point: name
+   lookups, kind checks, and operator dispatch happen here, and the closure
+   captures only the resolved positions and primitive operators it needs, so
+   the per-row caller does no name lookup and pays only array indices plus
+   structural compares. Each [Column] is resolved against [schema] here, so
+   per-tuple evaluation is just an array index. Kind mismatches inside a
    [Compare] are reported here, naming both operands via
    {!describe_expression}; [And]/[Or] operands are checked for {!Bool} kind
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
