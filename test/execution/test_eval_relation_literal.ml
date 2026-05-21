@@ -44,7 +44,7 @@ let test_field_kinds_are_inferred_from_the_first_row () =
     "field kinds match the first row's value kinds"
     [ "Int64"; "String"; "Bool" ]
     (List.map
-       (fun (field : Schema.field) -> Value.Kind.to_string field.kind)
+       (fun (field : Schema.field) -> Value.kind_to_string field.kind)
        relation.schema.fields)
 
 let test_primary_key_is_empty () =

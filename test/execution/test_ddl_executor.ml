@@ -17,14 +17,14 @@ module Storage = Dovetail_storage
 let users_schema : Schema.t =
   {
     fields =
-      [ { name = "id"; kind = Value.Kind.Int64; qualifier = Some "users" } ];
+      [ { name = "id"; kind = Value.Int64; qualifier = Some "users" } ];
     primary_key = [ "id" ];
   }
 
 let orders_schema : Schema.t =
   {
     fields =
-      [ { name = "id"; kind = Value.Kind.Int64; qualifier = Some "orders" } ];
+      [ { name = "id"; kind = Value.Int64; qualifier = Some "orders" } ];
     primary_key = [ "id" ];
   }
 
@@ -182,7 +182,7 @@ let widgets_create_statement : Ddl.Statement.t =
   Create_table
     {
       table_name = "widgets";
-      fields = [ { name = "id"; kind = Value.Kind.Int64 } ];
+      fields = [ { name = "id"; kind = Value.Int64 } ];
       primary_key = [ "id" ];
     }
 
@@ -192,7 +192,7 @@ let widgets_create_statement : Ddl.Statement.t =
 let widgets_expected_schema : Schema.t =
   {
     fields =
-      [ { name = "id"; kind = Value.Kind.Int64; qualifier = Some "widgets" } ];
+      [ { name = "id"; kind = Value.Int64; qualifier = Some "widgets" } ];
     primary_key = [ "id" ];
   }
 
@@ -230,9 +230,9 @@ let test_execute_write_create_table_qualifier_per_field () =
         table_name = "widgets";
         fields =
           [
-            { name = "id"; kind = Value.Kind.Int64 };
-            { name = "name"; kind = Value.Kind.String };
-            { name = "active"; kind = Value.Kind.Bool };
+            { name = "id"; kind = Value.Int64 };
+            { name = "name"; kind = Value.String };
+            { name = "active"; kind = Value.Bool };
           ];
         primary_key = [ "id" ];
       }
@@ -241,15 +241,15 @@ let test_execute_write_create_table_qualifier_per_field () =
     {
       fields =
         [
-          { name = "id"; kind = Value.Kind.Int64; qualifier = Some "widgets" };
+          { name = "id"; kind = Value.Int64; qualifier = Some "widgets" };
           {
             name = "name";
-            kind = Value.Kind.String;
+            kind = Value.String;
             qualifier = Some "widgets";
           };
           {
             name = "active";
-            kind = Value.Kind.Bool;
+            kind = Value.Bool;
             qualifier = Some "widgets";
           };
         ];

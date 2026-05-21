@@ -187,7 +187,7 @@ and resolve_int64_outer_key_position outer_schema outer_key_column =
         (Printf.sprintf
            "Eval: IndexedNestedLoopJoin requires Int64 outer key column, got \
             %s for %S"
-           (Value.Kind.to_string other_kind)
+           (Value.kind_to_string other_kind)
            (Schema.format_column_reference outer_key_column))
 
 (* Stream the [outer] sub-plan and probe [inner_table]'s storage by the
