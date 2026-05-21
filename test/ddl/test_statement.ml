@@ -36,7 +36,7 @@ let test_create_table_classifies_as_write () =
        (Ddl.Statement.Create_table
           {
             table_name = "widgets";
-            fields = [ { name = "id"; kind = Value.Kind.Int64 } ];
+            fields = [ { name = "id"; kind = Value.Int64 } ];
             primary_key = [ "id" ];
           })
     = `Write)
@@ -48,9 +48,9 @@ let users_schema : Schema.t =
   {
     fields =
       [
-        { name = "id"; kind = Value.Kind.Int64; qualifier = Some "users" };
-        { name = "name"; kind = Value.Kind.String; qualifier = Some "users" };
-        { name = "active"; kind = Value.Kind.Bool; qualifier = Some "users" };
+        { name = "id"; kind = Value.Int64; qualifier = Some "users" };
+        { name = "name"; kind = Value.String; qualifier = Some "users" };
+        { name = "active"; kind = Value.Bool; qualifier = Some "users" };
       ];
     primary_key = [ "id" ];
   }
@@ -62,9 +62,9 @@ let test_of_schema_strips_qualifiers () =
         table_name = "users";
         fields =
           [
-            { name = "id"; kind = Value.Kind.Int64 };
-            { name = "name"; kind = Value.Kind.String };
-            { name = "active"; kind = Value.Kind.Bool };
+            { name = "id"; kind = Value.Int64 };
+            { name = "name"; kind = Value.String };
+            { name = "active"; kind = Value.Bool };
           ];
         primary_key = [ "id" ];
       }
@@ -80,8 +80,8 @@ let test_of_schema_strips_qualifiers () =
 let make_create_table ?(table_name = "widgets")
     ?(fields : Ddl.Statement.field list =
       [
-        { name = "id"; kind = Value.Kind.Int64 };
-        { name = "name"; kind = Value.Kind.String };
+        { name = "id"; kind = Value.Int64 };
+        { name = "name"; kind = Value.String };
       ]) ?(primary_key = [ "id" ]) () : Ddl.Statement.t =
   Create_table { table_name; fields; primary_key }
 
@@ -107,9 +107,9 @@ let test_validate_rejects_duplicate_column () =
        (make_create_table
           ~fields:
             [
-              { name = "id"; kind = Value.Kind.Int64 };
-              { name = "email"; kind = Value.Kind.String };
-              { name = "email"; kind = Value.Kind.String };
+              { name = "id"; kind = Value.Int64 };
+              { name = "email"; kind = Value.String };
+              { name = "email"; kind = Value.String };
             ]
           ~primary_key:[ "id" ] ()))
 

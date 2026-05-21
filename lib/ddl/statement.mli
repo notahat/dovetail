@@ -26,11 +26,11 @@
 module Value = Dovetail_core.Value
 module Schema = Dovetail_core.Schema
 
-type field = { name : string; kind : Value.Kind.t }
+type field = { name : string; kind : Value.kind }
 (** A single column declaration in a [Create_table] statement. Deliberately
     distinct from {!Schema.field}: the DDL surface has no notion of qualified
     columns, so the qualifier is absent here. The parser resolves the kind name
-    ([Int64], [String], [Bool]) to a {!Value.Kind.t} at parse time, so every
+    ([Int64], [String], [Bool]) to a {!Value.kind} at parse time, so every
     [field] value already carries a real kind. *)
 
 type t =

@@ -33,7 +33,7 @@ let make_create_table ~table_name ~fields ~primary_key : Ddl.Statement.t =
 let test_format_create_table_int64 () =
   let statement =
     make_create_table ~table_name:"widgets"
-      ~fields:[ { name = "id"; kind = Value.Kind.Int64 } ]
+      ~fields:[ { name = "id"; kind = Value.Int64 } ]
       ~primary_key:[ "id" ]
   in
   Alcotest.(check string)
@@ -44,7 +44,7 @@ let test_format_create_table_int64 () =
 let test_format_create_table_string () =
   let statement =
     make_create_table ~table_name:"widgets"
-      ~fields:[ { name = "name"; kind = Value.Kind.String } ]
+      ~fields:[ { name = "name"; kind = Value.String } ]
       ~primary_key:[ "name" ]
   in
   Alcotest.(check string)
@@ -55,7 +55,7 @@ let test_format_create_table_string () =
 let test_format_create_table_bool () =
   let statement =
     make_create_table ~table_name:"widgets"
-      ~fields:[ { name = "active"; kind = Value.Kind.Bool } ]
+      ~fields:[ { name = "active"; kind = Value.Bool } ]
       ~primary_key:[ "active" ]
   in
   Alcotest.(check string)
@@ -68,8 +68,8 @@ let test_format_create_table_compound_primary_key () =
     make_create_table ~table_name:"pairs"
       ~fields:
         [
-          { name = "left"; kind = Value.Kind.Int64 };
-          { name = "right"; kind = Value.Kind.Int64 };
+          { name = "left"; kind = Value.Int64 };
+          { name = "right"; kind = Value.Int64 };
         ]
       ~primary_key:[ "left"; "right" ]
   in
@@ -87,10 +87,10 @@ let test_format_create_table_users_example () =
     make_create_table ~table_name:"users"
       ~fields:
         [
-          { name = "id"; kind = Value.Kind.Int64 };
-          { name = "name"; kind = Value.Kind.String };
-          { name = "email"; kind = Value.Kind.String };
-          { name = "active"; kind = Value.Kind.Bool };
+          { name = "id"; kind = Value.Int64 };
+          { name = "name"; kind = Value.String };
+          { name = "email"; kind = Value.String };
+          { name = "active"; kind = Value.Bool };
         ]
       ~primary_key:[ "id" ]
   in
@@ -110,9 +110,9 @@ let test_format_create_table_order_items_example () =
     make_create_table ~table_name:"order_items"
       ~fields:
         [
-          { name = "order_id"; kind = Value.Kind.Int64 };
-          { name = "product_id"; kind = Value.Kind.Int64 };
-          { name = "quantity"; kind = Value.Kind.Int64 };
+          { name = "order_id"; kind = Value.Int64 };
+          { name = "product_id"; kind = Value.Int64 };
+          { name = "quantity"; kind = Value.Int64 };
         ]
       ~primary_key:[ "order_id"; "product_id" ]
   in

@@ -5,7 +5,7 @@ module Value = Dovetail_core.Value
    the last). The two-space indent and the [name: Kind] separator are
    the canonical form's two formatting decisions for a column line. *)
 let format_field (field : Statement.field) =
-  Printf.sprintf "  %s: %s,\n" field.name (Value.Kind.to_string field.kind)
+  Printf.sprintf "  %s: %s,\n" field.name (Value.kind_to_string field.kind)
 
 (* Render a [Create_table] in the canonical multi-line form. The columns
    block is one [format_field] line per field; the closing line opens

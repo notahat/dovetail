@@ -1,7 +1,7 @@
 module Value = Dovetail_core.Value
 module Schema = Dovetail_core.Schema
 
-type field = { name : string; kind : Value.Kind.t }
+type field = { name : string; kind : Value.kind }
 
 type t =
   | List_tables
