@@ -2,21 +2,16 @@ module Value = Dovetail_core.Value
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
-(* Encode [primary_key_values] as the storage key bytes. Currently only
-   handles a single-column [Int64] primary key; any other shape raises
-   [Failure]. The [Relation.split_tuple] / [Relation.assemble_tuple] pair
-   already supports composite keys, so this restriction is purely about
-   byte encoding. *)
-let encode_primary_key = function
-  | [ Value.Int64 key ] -> Encoding.encode_int64_key key
-  | [ (Value.String _ | Value.Bool _) ] ->
-      failwith "Row_codec: only int64 primary-key columns are supported"
-  | _ -> failwith "Row_codec: only single-column primary keys are supported"
+(* TODO(composite-pk): lift the single-column restriction once the binary
+   key encoding handles multi-column tuples. The [Relation.split_tuple] /
+   [Relation.assemble_tuple] pair already supports composite keys; the
+   blocker is here. *)
 
-(* Inverse of [encode_primary_key]: decode the storage key bytes into the
-   primary-key values list, in primary-key order. Same shape restrictions
-   apply. *)
-let decode_primary_key (kind : Relation.kind) key_bytes =
+(* Validate that [kind]'s primary key is the single [Int64] column the
+   storage format currently supports, and return that column's field.
+   Both [encode_row] and [decode_row] funnel through this so the
+   canonical error messages live in exactly one place. *)
+let require_single_int64_primary_key_field (kind : Relation.kind) : Row.field =
   match Relation.primary_key_names kind with
   | [ primary_key_name ] -> (
       let primary_key_field =
@@ -25,20 +20,30 @@ let decode_primary_key (kind : Relation.kind) key_bytes =
           kind.row_kind
       in
       match primary_key_field.kind with
-      | Int64 -> [ Value.Int64 (Encoding.decode_int64_key key_bytes) ]
+      | Int64 -> primary_key_field
       | String | Bool ->
           failwith "Row_codec: only int64 primary-key columns are supported")
   | _ -> failwith "Row_codec: only single-column primary keys are supported"
 
 let decode_row kind (key_bytes, value_bytes) =
-  let primary_key_values = decode_primary_key kind key_bytes in
+  let _ : Row.field = require_single_int64_primary_key_field kind in
+  let primary_key_values =
+    [ Value.Int64 (Encoding.decode_int64_key key_bytes) ]
+  in
   let non_primary_key_values = Encoding.decode_tuple_value value_bytes in
   Relation.assemble_tuple kind ~primary_key_values ~non_primary_key_values
 
 let encode_row kind row =
+  let _ : Row.field = require_single_int64_primary_key_field kind in
   let primary_key_values, non_primary_key_values =
     Relation.split_tuple kind row
   in
-  let key_bytes = encode_primary_key primary_key_values in
+  let key_bytes =
+    match primary_key_values with
+    | [ Value.Int64 key ] -> Encoding.encode_int64_key key
+    (* [require_single_int64_primary_key_field] above plus [split_tuple]'s
+       kind-respecting projection guarantee this shape. *)
+    | _ -> assert false
+  in
   let value_bytes = Encoding.encode_tuple_value non_primary_key_values in
   (key_bytes, value_bytes)
