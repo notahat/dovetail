@@ -40,6 +40,13 @@ let schema_of_kind (kind : kind) : Schema.t =
   in
   { fields; primary_key }
 
+let split_tuple (kind : kind) tuple =
+  Schema.split_tuple (schema_of_kind kind) tuple
+
+let assemble_tuple (kind : kind) ~primary_key_values ~non_primary_key_values =
+  Schema.assemble_tuple (schema_of_kind kind) ~primary_key_values
+    ~non_primary_key_values
+
 (* Render a single value as the cell text that will appear in a table. No
    quoting, no escaping; the pretty-print is illustrative. This is
    deliberately distinct from {!Value.format}, which quotes strings so the

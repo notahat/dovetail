@@ -39,6 +39,24 @@ val schema_of_kind : kind -> Schema.t
     fields; the first {!Primary_key} refinement (if any) becomes the schema's
     [primary_key], otherwise [primary_key] is empty. *)
 
+val split_tuple : kind -> Row.data -> Value.data list * Value.data list
+(** [split_tuple kind tuple] returns
+    [(primary_key_values, non_primary_key_values)], where [primary_key_values]
+    are the values at the primary-key columns (in primary-key order) and
+    [non_primary_key_values] are the values at the remaining columns (in field
+    order). Raises [Invalid_argument] if [tuple] does not have the right length
+    for [kind]. *)
+
+val assemble_tuple :
+  kind ->
+  primary_key_values:Value.data list ->
+  non_primary_key_values:Value.data list ->
+  Row.data
+(** [assemble_tuple kind ~primary_key_values ~non_primary_key_values] is the
+    inverse of {!split_tuple}: it interleaves the two value lists according to
+    the kind's primary key to produce a tuple in field order. Raises
+    [Invalid_argument] if either list has the wrong length. *)
+
 val print : ?formatter:Format.formatter -> _ t -> unit
 (** [print ?formatter relation] renders [relation] as a table to [formatter]
     (defaulting to [Format.std_formatter]), using Unicode box-drawing characters
