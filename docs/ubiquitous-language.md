@@ -24,8 +24,9 @@ not exist, columns that do not match a schema, or operators
 in combinations that are semantically nonsense. Those checks
 belong to later layers.
 
-In Dovetail the AST lives in [`lib/ast.mli`](../lib/ast.mli),
-and is the output of the parser and the input to `Lower`.
+In Dovetail the AST lives in
+[`lib/surface_ra/ast.mli`](../lib/surface_ra/ast.mli), and is the
+output of the parser and the input to `Lower`.
 
 ## IR — Intermediate representation
 
@@ -38,13 +39,15 @@ about.
 
 Dovetail has two IRs between the AST and the executor:
 
-- **Logical IR** ([`lib/logical.mli`](../lib/logical.mli)) —
+- **Logical IR**
+  ([`lib/plan/logical.mli`](../lib/plan/logical.mli)) —
   relational algebra. Says *what* the query computes:
   scans, restrictions, projections, products, joins.
   Independent of execution strategy. The output of `Lower`,
   the input of `Translate`.
-- **Physical IR** ([`lib/physical.mli`](../lib/physical.mli))
-  — concrete execution plan. Says *how* the query runs:
+- **Physical IR**
+  ([`lib/plan/physical.mli`](../lib/plan/physical.mli)) —
+  concrete execution plan. Says *how* the query runs:
   cursors, filters, nested-loop joins, point lookups. The
   output of `Translate`, the input of `Eval`.
 
@@ -72,7 +75,7 @@ the resource's scope.
 
 Dovetail's executor is CPS-shaped for exactly that reason.
 `Eval.eval` opens database cursors to produce a `Relation.t`
-whose tuple sequence pulls rows lazily from those cursors.
+whose `data` sequence pulls rows lazily from those cursors.
 The cursors are only valid while their transaction is alive;
 if `eval` returned the relation directly, callers could
 hold it past the point where it's safe to iterate. Instead
@@ -81,7 +84,7 @@ relation, and tears the cursors down when the continuation
 returns. The relation's lifetime is structurally bounded by
 the call to `eval`.
 
-See [`lib/eval.mli`](../lib/eval.mli) for the entry-point
-signature and slice 6
+See [`lib/execution/eval.mli`](../lib/execution/eval.mli) for the
+entry-point signature and slice 6
 ([`docs/plans/06-slice-6-streaming-cps-executor.md`](plans/06-slice-6-streaming-cps-executor.md))
 for the rationale behind the conversion to CPS.

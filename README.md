@@ -88,7 +88,7 @@ is not committed to here.
 - Secondary indexes on columns other than the primary key.
 - Hash join, for joins where neither side has a useful index.
 - NULL values and option-typed columns. Cross-cutting: touches `Value`,
-  `Schema`, `Encoding`, `Expression`, and `Eval`.
+  `Row`, `Relation`, `Encoding`, `Expression`, and `Eval`.
 - Set operators: `distinct`, `union`, `intersect`, `difference`.
 - `sort` and `limit`.
 - Outer joins.

@@ -31,7 +31,7 @@ still settling — refine this file as cases come up.
 - Single-letter names are out, per the global rules — no `f`, `x`, `xs`,
   `i`. Pick a real name even in short closures.
 - Use the OCaml `.t` convention: a module's primary type is named `t`
-  (so callers write `Schema.t`, `Catalog.t`, etc.). This is the one place
+  (so callers write `Relation.t`, `Catalog.t`, etc.). This is the one place
   where extreme brevity is the right call — the module name carries the
   meaning.
 - Use submodules when a module owns multiple peer concepts that each
@@ -69,7 +69,7 @@ underlying tool's vocabulary.
   `Prefix: operation: detail` when the operation is worth naming
   (`Translate: insert into "orders": ...`,
   `Eval: insert into "orders": ...`, `Projection.resolve: ...`,
-  `Schema.assemble_tuple: ...`, `DDL: drop table "orders": ...`). The
+  `Relation.assemble_tuple: ...`, `DDL: drop table "orders": ...`). The
   prefix usually matches a module name, since the user-facing concept
   and the module that implements it usually line up. When they don't —
   e.g. `Ddl_executor` is implementation detail, but the user typed a
@@ -101,8 +101,8 @@ boundaries to use modules from sibling sub-libraries. Two styles:
 
 **Rule of thumb:** library alias by default; per-module alias for
 `core` (and any future library where the prefix would be noise rather
-than signal). `core` types — `Value`, `Schema`, `Relation`,
-`Expression`, `Relation_literal` — are pervasive enough that a `Core.`
+than signal). `core` types — `Value`, `Row`, `Relation`, `Expression`,
+`Relation_literal` — are pervasive enough that a `Core.`
 prefix on every reference would add noise without signal. Localised
 sublibraries (`storage`, `plan`, `ddl`, `surface_ra`, `execution`,
 `frontend`) carry meaningful prefixes, so the library-alias form is
