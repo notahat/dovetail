@@ -3,14 +3,6 @@ module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
 
-(* Extract the primary-key column names from a [Relation.kind]'s refinements,
-   or [[]] when no [Primary_key] refinement is present. *)
-let primary_key_of_kind (kind : Relation.kind) =
-  List.find_map
-    (function Relation.Primary_key keys -> Some keys)
-    kind.refinements
-  |> Option.value ~default:[]
-
 (* Match a column reference against the scanned table's primary-key column.
    A bare reference ([{ qualifier = None; name }]) matches if [name] is the
    PK column's name; a qualified reference ([{ qualifier = Some q; name }])
@@ -27,7 +19,7 @@ let column_is_primary_key ~table ~primary_key_name
    name. Composite keys, missing keys, and non-[Int64] keys all yield [None] --
    the conditions under which IndexLookup folding declines. *)
 let single_int64_primary_key (kind : Relation.kind) =
-  match primary_key_of_kind kind with
+  match Relation.primary_key_names kind with
   | [ primary_key_name ] -> (
       match
         List.find_opt

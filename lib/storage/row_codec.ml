@@ -2,14 +2,6 @@ module Value = Dovetail_core.Value
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
-(* Extract the primary-key column names from a [Relation.kind]'s refinements,
-   or [[]] when no [Primary_key] refinement is present. *)
-let primary_key_of_kind (kind : Relation.kind) =
-  List.find_map
-    (function Relation.Primary_key keys -> Some keys)
-    kind.refinements
-  |> Option.value ~default:[]
-
 (* Encode [primary_key_values] as the storage key bytes. Currently only
    handles a single-column [Int64] primary key; any other shape raises
    [Failure]. The [Relation.split_tuple] / [Relation.assemble_tuple] pair
@@ -25,7 +17,7 @@ let encode_primary_key = function
    primary-key values list, in primary-key order. Same shape restrictions
    apply. *)
 let decode_primary_key (kind : Relation.kind) key_bytes =
-  match primary_key_of_kind kind with
+  match Relation.primary_key_names kind with
   | [ primary_key_name ] -> (
       let primary_key_field =
         List.find

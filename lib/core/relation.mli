@@ -31,6 +31,11 @@ type 'tag t = {
 (** A relation tagged with its multiplicity semantics: a {!kind} describing the
     row shape and refinements, plus a lazy sequence of rows in that shape. *)
 
+val primary_key_names : kind -> string list
+(** [primary_key_names kind] returns the primary-key column names from [kind]'s
+    refinements, in declared order, or the empty list when no [Primary_key]
+    refinement is present. *)
+
 val split_tuple : kind -> Row.data -> Value.data list * Value.data list
 (** [split_tuple kind tuple] returns
     [(primary_key_values, non_primary_key_values)], where [primary_key_values]

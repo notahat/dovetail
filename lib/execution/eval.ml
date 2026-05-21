@@ -298,19 +298,11 @@ let project_to_target_order ~position_map source_row =
        (fun source_position -> source_row.(source_position))
        position_map)
 
-(* Extract the primary-key column names from a [Relation.kind]'s refinements,
-   or [[]] when no [Primary_key] refinement is present. *)
-let primary_key_of_kind (kind : Relation.kind) =
-  List.find_map
-    (function Relation.Primary_key keys -> Some keys)
-    kind.refinements
-  |> Option.value ~default:[]
-
 (* Extract a human-readable string for the primary-key value of a row already
    projected to [target_kind]'s field order. Used only to build the
    PK-collision error message. *)
 let primary_key_value_text (target_kind : Relation.kind) target_row =
-  match primary_key_of_kind target_kind with
+  match Relation.primary_key_names target_kind with
   | [ primary_key_name ] -> (
       match
         Row.find_field target_kind.row_kind
