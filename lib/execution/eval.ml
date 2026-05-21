@@ -44,8 +44,9 @@ let evaluate_full_scan environment transaction table continue =
     lookup_table_resources environment transaction table
   in
   let* pairs = Storage.Engine.with_iter_seq table_map transaction in
-  let tuples = Seq.map (Storage.Row_codec.decode_row schema) pairs in
-  continue ({ schema; tuples } : [ `Bag ] Relation.t)
+  let data = Seq.map (Storage.Row_codec.decode_row schema) pairs in
+  let kind = Relation.kind_of_schema schema in
+  continue ({ kind; data } : [ `Bag ] Relation.t)
 
 (* Encode [key], probe the table's storage subDB with [Storage.Engine.get], and
    hand [continue] a relation whose [tuples] seq has either one element
@@ -58,14 +59,15 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
     lookup_table_resources environment transaction table
   in
   let encoded_key = Storage.Encoding.encode_int64_key key in
-  let tuples =
+  let data =
     match Storage.Engine.get table_map transaction ~key:encoded_key with
     | None -> Seq.empty
     | Some value_bytes ->
         Seq.return
           (Storage.Row_codec.decode_row schema (encoded_key, value_bytes))
   in
-  continue ({ schema; tuples } : [ `Bag ] Relation.t)
+  let kind = Relation.kind_of_schema schema in
+  continue ({ kind; data } : [ `Bag ] Relation.t)
 
 (* Materialise a [RelationLiteral] as a [Relation.t]. The schema comes from
    {!Relation_literal.schema_of} -- the kind-inference rule lives there so
@@ -85,8 +87,9 @@ let evaluate_relation_literal ~columns ~rows continue =
           declared"
          (List.length first_row) (List.length columns));
   let schema = Relation_literal.schema_of ~columns ~first_row in
-  let tuples = rows |> List.to_seq |> Seq.map Array.of_list in
-  continue ({ schema; tuples } : [ `Bag ] Relation.t)
+  let data = rows |> List.to_seq |> Seq.map Array.of_list in
+  let kind = Relation.kind_of_schema schema in
+  continue ({ kind; data } : [ `Bag ] Relation.t)
 
 (* CPS-shaped executor. Every operator is in continuation-passing form so
    the consumer's [continue] runs inside whatever cursor and resource
@@ -120,11 +123,12 @@ let rec eval environment transaction plan continue =
    before any tuples are pulled. *)
 and evaluate_filter environment transaction ~input ~predicate continue =
   let* input_relation = eval environment transaction input in
-  let evaluate_predicate = Expression.resolve input_relation.schema predicate in
+  let input_schema = Relation.schema_of_kind input_relation.kind in
+  let evaluate_predicate = Expression.resolve input_schema predicate in
   continue
     {
-      schema = input_relation.schema;
-      tuples = Seq.filter evaluate_predicate input_relation.tuples;
+      kind = input_relation.kind;
+      data = Seq.filter evaluate_predicate input_relation.data;
     }
 
 (* Stream the input through [eval], then wrap its tuple seq in a [Seq.map]
@@ -133,13 +137,14 @@ and evaluate_filter environment transaction ~input ~predicate continue =
    errors surface before any tuples are pulled. *)
 and evaluate_project environment transaction ~input ~columns continue =
   let* input_relation = eval environment transaction input in
+  let input_schema = Relation.schema_of_kind input_relation.kind in
   let projected_schema, project_tuple =
-    Plan.Projection.resolve input_relation.schema columns
+    Plan.Projection.resolve input_schema columns
   in
   continue
     {
-      schema = projected_schema;
-      tuples = Seq.map project_tuple input_relation.tuples;
+      kind = Relation.kind_of_schema projected_schema;
+      data = Seq.map project_tuple input_relation.data;
     }
 
 (* Sequence the left scope and then the right scope via [let*]; the body
@@ -150,21 +155,21 @@ and evaluate_project environment transaction ~input ~columns continue =
 and evaluate_cross_product environment transaction ~left ~right continue =
   let* left_relation = eval environment transaction left in
   let* right_relation = eval environment transaction right in
-  let right_tuples = List.of_seq right_relation.tuples in
-  let combined_schema : Schema.t =
+  let right_tuples = List.of_seq right_relation.data in
+  let combined_kind : Relation.kind =
     {
-      fields = left_relation.schema.fields @ right_relation.schema.fields;
-      primary_key = [];
+      row_kind = left_relation.kind.row_kind @ right_relation.kind.row_kind;
+      refinements = [];
     }
   in
-  let combined_tuples =
+  let combined_data =
     Seq.flat_map
       (fun left_tuple ->
         List.to_seq right_tuples
         |> Seq.map (fun right_tuple -> Array.append left_tuple right_tuple))
-      left_relation.tuples
+      left_relation.data
   in
-  continue { schema = combined_schema; tuples = combined_tuples }
+  continue { kind = combined_kind; data = combined_data }
 
 (* Resolve [outer_key_column] against the outer relation's schema and
    verify that the resolved field is the [Int64] kind required by the
@@ -201,16 +206,17 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
     lookup_table_resources environment transaction inner_table
   in
   let* outer_relation = eval environment transaction outer in
+  let outer_schema = Relation.schema_of_kind outer_relation.kind in
   let outer_key_position =
-    resolve_int64_outer_key_position outer_relation.schema outer_key_column
+    resolve_int64_outer_key_position outer_schema outer_key_column
   in
   let combined_fields =
     match inner_position with
-    | `Left -> inner_schema.fields @ outer_relation.schema.fields
-    | `Right -> outer_relation.schema.fields @ inner_schema.fields
+    | `Left -> inner_schema.fields @ outer_schema.fields
+    | `Right -> outer_schema.fields @ inner_schema.fields
   in
-  let combined_schema : Schema.t =
-    { fields = combined_fields; primary_key = [] }
+  let combined_kind : Relation.kind =
+    { row_kind = combined_fields; refinements = [] }
   in
   let combine_tuples ~inner_tuple ~outer_tuple =
     match inner_position with
@@ -238,10 +244,8 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
            error. *)
         assert false
   in
-  let combined_tuples =
-    Seq.filter_map probe_outer_tuple outer_relation.tuples
-  in
-  continue { schema = combined_schema; tuples = combined_tuples }
+  let combined_data = Seq.filter_map probe_outer_tuple outer_relation.data in
+  continue { kind = combined_kind; data = combined_data }
 
 (* Same shape as [evaluate_cross_product] -- left and right sequenced via
    [let*], right side materialised -- with the predicate resolved against
@@ -251,24 +255,25 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
     continue =
   let* left_relation = eval environment transaction left in
   let* right_relation = eval environment transaction right in
-  let right_tuples = List.of_seq right_relation.tuples in
-  let combined_schema : Schema.t =
+  let right_tuples = List.of_seq right_relation.data in
+  let combined_kind : Relation.kind =
     {
-      fields = left_relation.schema.fields @ right_relation.schema.fields;
-      primary_key = [];
+      row_kind = left_relation.kind.row_kind @ right_relation.kind.row_kind;
+      refinements = [];
     }
   in
+  let combined_schema = Relation.schema_of_kind combined_kind in
   let evaluate_predicate = Expression.resolve combined_schema predicate in
-  let combined_tuples =
+  let combined_data =
     Seq.flat_map
       (fun left_tuple ->
         List.to_seq right_tuples
         |> Seq.filter_map (fun right_tuple ->
             let combined = Array.append left_tuple right_tuple in
             if evaluate_predicate combined then Some combined else None))
-      left_relation.tuples
+      left_relation.data
   in
-  continue { schema = combined_schema; tuples = combined_tuples }
+  continue { kind = combined_kind; data = combined_data }
 
 (* The mutation entry below evaluates its [source] sub-plan through [eval]
    inside its own write-transaction scope, then writes the resulting tuples
@@ -350,16 +355,16 @@ let evaluate_insert environment transaction ~target_table ~source continue =
   in
   let affected_rows = ref 0 in
   eval environment transaction source (fun source_relation ->
+      let source_schema = Relation.schema_of_kind source_relation.kind in
       let position_map =
-        build_source_position_map ~source_schema:source_relation.schema
-          ~target_schema
+        build_source_position_map ~source_schema ~target_schema
       in
       Seq.iter
         (fun source_tuple ->
           insert_one_row ~target_schema ~target_map ~target_table
             ~write_transaction:transaction ~position_map source_tuple;
           incr affected_rows)
-        source_relation.tuples);
+        source_relation.data);
   continue !affected_rows
 
 let eval_mutation environment transaction mutation continue =

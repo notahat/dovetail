@@ -42,7 +42,7 @@ let test_insert_writes_row_and_reports_one_affected () =
       Eval.eval environment transaction
         (Plan.Physical.FullScan { table = "orders" })
         (fun relation ->
-          let rows = List.of_seq relation.tuples in
+          let rows = List.of_seq relation.data in
           let inserted =
             List.find_opt
               (fun (tuple : Schema.tuple) -> tuple.(0) = Value.Int64 9L)
@@ -88,7 +88,7 @@ let test_insert_with_existing_primary_key_raises () =
       Eval.eval environment transaction
         (Plan.Physical.FullScan { table = "orders" })
         (fun relation ->
-          let rows = List.of_seq relation.tuples in
+          let rows = List.of_seq relation.data in
           Alcotest.(check tuple_list_testable)
             "orders unchanged after aborted insert" expected_orders_rows rows))
 

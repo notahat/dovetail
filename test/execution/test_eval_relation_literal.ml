@@ -3,7 +3,7 @@
 open Dovetail_execution
 open Test_helpers
 module Value = Dovetail_core.Value
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
@@ -28,15 +28,15 @@ let test_field_names_match_the_literals_columns () =
   with_literal_relation @@ fun relation ->
   Alcotest.(check (list string))
     "field names come from the literal's [columns]" [ "id"; "name"; "active" ]
-    (List.map (fun (field : Schema.field) -> field.name) relation.schema.fields)
+    (List.map (fun (field : Row.field) -> field.name) relation.kind.row_kind)
 
 let test_field_qualifiers_are_all_absent () =
   with_literal_relation @@ fun relation ->
   Alcotest.(check (list (option string)))
     "every field's qualifier is None" [ None; None; None ]
     (List.map
-       (fun (field : Schema.field) -> field.qualifier)
-       relation.schema.fields)
+       (fun (field : Row.field) -> field.qualifier)
+       relation.kind.row_kind)
 
 let test_field_kinds_are_inferred_from_the_first_row () =
   with_literal_relation @@ fun relation ->
@@ -44,17 +44,18 @@ let test_field_kinds_are_inferred_from_the_first_row () =
     "field kinds match the first row's value kinds"
     [ "Int64"; "String"; "Bool" ]
     (List.map
-       (fun (field : Schema.field) -> Value.kind_to_string field.kind)
-       relation.schema.fields)
+       (fun (field : Row.field) -> Value.kind_to_string field.kind)
+       relation.kind.row_kind)
 
 let test_primary_key_is_empty () =
   with_literal_relation @@ fun relation ->
   Alcotest.(check (list string))
-    "derived relations carry no primary key" [] relation.schema.primary_key
+    "derived relations carry no primary key" []
+    (Relation.schema_of_kind relation.kind).primary_key
 
 let test_tuples_match_the_literals_row () =
   with_literal_relation @@ fun relation ->
-  let rows = List.of_seq relation.tuples in
+  let rows = List.of_seq relation.data in
   Alcotest.(check tuple_list_testable)
     "one row, values match the literal"
     [ [| Value.Int64 7L; Value.String "Pretzel"; Value.Bool true |] ]

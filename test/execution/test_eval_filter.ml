@@ -18,7 +18,7 @@ let evaluate_users_filter predicate =
           { input = Plan.Physical.FullScan { table = "users" }; predicate }
       in
       Eval.eval environment transaction plan (fun relation ->
-          List.of_seq relation.tuples))
+          List.of_seq relation.data))
 
 let test_filter_equality_on_int64_yields_one_row () =
   let rows =

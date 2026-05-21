@@ -2,8 +2,8 @@ type refinement = Primary_key of string list
 type kind = { row_kind : Row.kind; refinements : refinement list }
 
 type 'tag t = {
-  schema : Schema.t;
-  tuples : Schema.tuple Seq.t;
+  kind : kind;
+  data : Row.data Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
 
@@ -115,17 +115,15 @@ let format_header_separator widths =
   "├" ^ String.concat "┼" segments ^ "┤"
 
 let print ?(formatter = Format.std_formatter) relation =
-  let fields = relation.schema.fields in
-  let headers = Array.of_list (List.map Schema.format_field_name fields) in
+  let fields = relation.kind.row_kind in
+  let headers = Array.of_list (List.map Row.format_field_name fields) in
   let right_aligns =
     Array.of_list
-      (List.map
-         (fun (field : Schema.field) -> is_numeric_kind field.kind)
-         fields)
+      (List.map (fun (field : Row.field) -> is_numeric_kind field.kind) fields)
   in
   let rendered_rows =
-    relation.tuples
-    |> Seq.map (fun tuple -> Array.map render_value tuple)
+    relation.data
+    |> Seq.map (fun row -> Array.map render_value row)
     |> List.of_seq
   in
   let widths = column_widths headers rendered_rows in

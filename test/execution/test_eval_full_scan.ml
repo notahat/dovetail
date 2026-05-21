@@ -13,10 +13,11 @@ let test_full_scan_yields_fixture_rows () =
       Eval.eval environment transaction
         (Plan.Physical.FullScan { table = "users" })
         (fun relation ->
+          let schema = Relation.schema_of_kind relation.kind in
           Alcotest.(check string)
             "schema primary key" "id"
-            (String.concat "," relation.schema.primary_key);
-          let rows = List.of_seq relation.tuples in
+            (String.concat "," schema.primary_key);
+          let rows = List.of_seq relation.data in
           Alcotest.(check tuple_list_testable)
             "five rows in primary-key order" expected_users_rows rows))
 

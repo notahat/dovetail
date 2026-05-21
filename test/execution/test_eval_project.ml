@@ -25,7 +25,7 @@ let evaluate_users_project ~input_plan column_names =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan = Plan.Physical.Project { input = input_plan; columns } in
       Eval.eval environment transaction plan (fun relation ->
-          List.of_seq relation.tuples))
+          List.of_seq relation.data))
 
 let users_full_scan = Plan.Physical.FullScan { table = "users" }
 
@@ -100,7 +100,7 @@ let test_project_then_filter () =
           }
       in
       Eval.eval environment transaction plan (fun relation ->
-          let rows = List.of_seq relation.tuples in
+          let rows = List.of_seq relation.data in
           let expected =
             [
               [| Value.String "Alice"; Value.Bool true |];

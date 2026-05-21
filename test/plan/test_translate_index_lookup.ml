@@ -437,7 +437,7 @@ let test_index_lookup_pipeline_yields_one_row () =
         (Physical.IndexLookup { table = "users"; key = 1L })
         physical;
       Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.tuples in
+          let rows = List.of_seq relation.data in
           Alcotest.(check tuple_list_testable)
             "Alice's row from the lookup"
             [ List.nth expected_users_rows 0 ]

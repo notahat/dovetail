@@ -1,13 +1,14 @@
-(** A schema-tagged stream of tuples produced by query evaluation.
+(** A kind-tagged stream of rows produced by query evaluation.
 
     A relation is the runtime representation of intermediate and final query
-    results: a schema describing the row shape, paired with a lazy [Seq.t] of
-    tuples in that shape. The phantom [`Set] / [`Bag] tag declares whether the
-    relation has duplicate-elimination semantics, allowing the type system to
-    reject combinations that would silently change those semantics. The full
-    table scan -- currently the only producer -- emits [[`Bag] t].
+    results: a {!kind} describing the row shape and refinements, paired with a
+    lazy [Seq.t] of {!Row.data} in that shape. The phantom [`Set] / [`Bag] tag
+    declares whether the relation has duplicate-elimination semantics, allowing
+    the type system to reject combinations that would silently change those
+    semantics. The full table scan -- currently the only producer -- emits
+    [[`Bag] t].
 
-    Relations are tied to the transaction that produced their [tuples] sequence.
+    Relations are tied to the transaction that produced their [data] sequence.
     The sequence must be consumed before the transaction's callback returns;
     using a relation outside its originating transaction's scope is undefined
     behaviour and not statically prevented. *)
@@ -23,11 +24,12 @@ type kind = { row_kind : Row.kind; refinements : refinement list }
     layout, plus zero or more {!refinement}s constraining the contents. *)
 
 type 'tag t = {
-  schema : Schema.t;
-  tuples : Schema.tuple Seq.t;
+  kind : kind;
+  data : Row.data Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
-(** A relation tagged with its multiplicity semantics. *)
+(** A relation tagged with its multiplicity semantics: a {!kind} describing the
+    row shape and refinements, plus a lazy sequence of rows in that shape. *)
 
 val kind_of_schema : Schema.t -> kind
 (** Convert a {!Schema.t} to its framework-vocabulary {!kind}. The schema's
