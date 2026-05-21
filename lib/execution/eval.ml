@@ -343,6 +343,9 @@ let evaluate_insert environment transaction ~target_table ~source continue =
   let target_kind, target_map =
     lookup_table_resources environment transaction target_table
   in
+  (* The row-write is the point of the iteration and the count is
+     incidental; [Seq.iter] + [ref] expresses that more honestly than
+     folding the count through a [Seq.fold_left] accumulator. *)
   let affected_rows = ref 0 in
   eval environment transaction source (fun source_relation ->
       let position_map =
