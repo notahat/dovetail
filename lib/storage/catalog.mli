@@ -6,7 +6,16 @@
     written return [None] rather than raising.
 
     The Marshal coupling to OCaml's runtime representation is accepted for now
-    and will be revisited alongside composite-key encoding. *)
+    and will be revisited alongside composite-key encoding. Two consequences
+    follow from that choice and are worth being explicit about:
+
+    - The on-disk bytes are tied to the OCaml version that wrote them. An
+      environment written by one compiler is not guaranteed to read back under
+      another.
+    - Any change to the shape of {!Relation.kind} (or anything it transitively
+      reaches) invalidates every environment already on disk. There is no
+      version tag and no migration path; the working assumption is that the
+      catalog format is replaced wholesale once a hand-rolled encoding lands. *)
 
 module Relation = Dovetail_core.Relation
 

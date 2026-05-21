@@ -1,5 +1,10 @@
 module Relation = Dovetail_core.Relation
 
+(* TODO(catalog-format): replace the Marshal round-trip with a hand-rolled
+   encoding that does not depend on OCaml's runtime representation and that
+   carries a version tag. See {!Catalog}'s mli for the consequences of the
+   current choice. *)
+
 let map_name = "catalog"
 
 let get environment transaction ~table_name =
