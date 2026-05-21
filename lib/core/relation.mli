@@ -12,12 +12,32 @@
     using a relation outside its originating transaction's scope is undefined
     behaviour and not statically prevented. *)
 
+(** A constraint that a relation's contents must satisfy, beyond its row shape.
+    The list of refinements on a {!kind} grows as new kinds of constraint arrive
+    (uniqueness, check expressions, cardinality bounds, …); for now only the
+    primary key is represented. *)
+type refinement = Primary_key of string list
+
+type kind = { row_kind : Row.kind; refinements : refinement list }
+(** The shape and refinements of a relation: a {!Row.kind} declaring the row
+    layout, plus zero or more {!refinement}s constraining the contents. *)
+
 type 'tag t = {
   schema : Schema.t;
   tuples : Schema.tuple Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
 (** A relation tagged with its multiplicity semantics. *)
+
+val kind_of_schema : Schema.t -> kind
+(** Convert a {!Schema.t} to its framework-vocabulary {!kind}. The schema's
+    fields become the [row_kind]; a non-empty [primary_key] becomes a single
+    {!Primary_key} refinement; an empty [primary_key] becomes no refinement. *)
+
+val schema_of_kind : kind -> Schema.t
+(** Convert a {!kind} back to a {!Schema.t}. The [row_kind] becomes the schema's
+    fields; the first {!Primary_key} refinement (if any) becomes the schema's
+    [primary_key], otherwise [primary_key] is empty. *)
 
 val print : ?formatter:Format.formatter -> _ t -> unit
 (** [print ?formatter relation] renders [relation] as a table to [formatter]

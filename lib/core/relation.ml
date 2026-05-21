@@ -1,8 +1,44 @@
+type refinement = Primary_key of string list
+type kind = { row_kind : Row.kind; refinements : refinement list }
+
 type 'tag t = {
   schema : Schema.t;
   tuples : Schema.tuple Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
+
+let kind_of_schema (schema : Schema.t) : kind =
+  let row_kind : Row.kind =
+    List.map
+      (fun (field : Schema.field) ->
+        {
+          Row.name = field.name;
+          kind = field.kind;
+          qualifier = field.qualifier;
+        })
+      schema.fields
+  in
+  let refinements =
+    match schema.primary_key with [] -> [] | keys -> [ Primary_key keys ]
+  in
+  { row_kind; refinements }
+
+let schema_of_kind (kind : kind) : Schema.t =
+  let fields =
+    List.map
+      (fun (field : Row.field) ->
+        {
+          Schema.name = field.name;
+          kind = field.kind;
+          qualifier = field.qualifier;
+        })
+      kind.row_kind
+  in
+  let primary_key =
+    List.find_map (function Primary_key keys -> Some keys) kind.refinements
+    |> Option.value ~default:[]
+  in
+  { fields; primary_key }
 
 (* Render a single value as the cell text that will appear in a table. No
    quoting, no escaping; the pretty-print is illustrative. This is

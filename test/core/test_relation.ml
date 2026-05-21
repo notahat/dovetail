@@ -96,6 +96,44 @@ let test_renders_header_only_when_empty () =
   in
   Alcotest.(check string) "header-only table" expected (render relation)
 
+(* Schema → Relation.kind → Schema round-trip helper. Asserts the
+   converted-then-converted-back schema matches the original. *)
+let assert_schema_round_trips (schema : Schema.t) =
+  let kind = Relation.kind_of_schema schema in
+  let recovered = Relation.schema_of_kind kind in
+  Alcotest.(check bool) "schema round-trips" true (recovered = schema)
+
+let test_schema_round_trip_with_single_column_primary_key () =
+  assert_schema_round_trips users_schema
+
+let test_schema_round_trip_with_no_primary_key () =
+  assert_schema_round_trips unqualified_schema
+
+let test_schema_round_trip_with_composite_primary_key () =
+  let schema : Schema.t =
+    {
+      fields =
+        [
+          { name = "order_id"; kind = Int64; qualifier = None };
+          { name = "product_id"; kind = Int64; qualifier = None };
+          { name = "quantity"; kind = Int64; qualifier = None };
+        ];
+      primary_key = [ "order_id"; "product_id" ];
+    }
+  in
+  assert_schema_round_trips schema
+
+let test_kind_with_primary_key_refinement_round_trips () =
+  let kind : Relation.kind =
+    {
+      row_kind = [ { Row.name = "id"; kind = Int64; qualifier = Some "users" } ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  let schema = Relation.schema_of_kind kind in
+  let recovered = Relation.kind_of_schema schema in
+  Alcotest.(check bool) "kind round-trips" true (recovered = kind)
+
 let () =
   Alcotest.run "relation"
     [
@@ -109,5 +147,18 @@ let () =
           Alcotest.test_case
             "renders just the header when the relation has no tuples" `Quick
             test_renders_header_only_when_empty;
+        ] );
+      ( "kind_of_schema / schema_of_kind",
+        [
+          Alcotest.test_case
+            "Schema with a single-column primary key round-trips" `Quick
+            test_schema_round_trip_with_single_column_primary_key;
+          Alcotest.test_case "Schema with no primary key round-trips" `Quick
+            test_schema_round_trip_with_no_primary_key;
+          Alcotest.test_case "Schema with a composite primary key round-trips"
+            `Quick test_schema_round_trip_with_composite_primary_key;
+          Alcotest.test_case
+            "Relation.kind with a Primary_key refinement round-trips" `Quick
+            test_kind_with_primary_key_refinement_round_trips;
         ] );
     ]
