@@ -137,15 +137,11 @@ and evaluate_filter environment transaction ~input ~predicate continue =
    errors surface before any tuples are pulled. *)
 and evaluate_project environment transaction ~input ~columns continue =
   let* input_relation = eval environment transaction input in
-  let input_schema = Relation.schema_of_kind input_relation.kind in
-  let projected_schema, project_tuple =
-    Plan.Projection.resolve input_schema columns
+  let projected_kind, project_row =
+    Plan.Projection.resolve input_relation.kind columns
   in
   continue
-    {
-      kind = Relation.kind_of_schema projected_schema;
-      data = Seq.map project_tuple input_relation.data;
-    }
+    { kind = projected_kind; data = Seq.map project_row input_relation.data }
 
 (* Sequence the left scope and then the right scope via [let*]; the body
    below runs inside both. The right side is materialised via [List.of_seq]

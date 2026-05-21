@@ -1,12 +1,13 @@
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 
-type t = Schema.column_reference list
+type t = Row.column_reference list
 
-(* Look up [reference] in [input_schema] and return its (position, field).
+(* Look up [reference] in [input_row_kind] and return its (position, field).
    Raises [Failure] with the [Projection.resolve:] prefix on unknown or
    ambiguous references. *)
-let resolve_column input_schema reference =
-  match Schema.find_field input_schema reference with
+let resolve_column input_row_kind reference =
+  match Row.find_field input_row_kind reference with
   | Ok result -> result
   | Error message -> failwith ("Projection.resolve: " ^ message)
 
@@ -18,7 +19,7 @@ let check_no_duplicates columns =
   let rec walk seen = function
     | [] -> ()
     | reference :: rest ->
-        let key = Schema.format_column_reference reference in
+        let key = Row.format_column_reference reference in
         if List.mem key seen then
           failwith
             (Printf.sprintf "Projection.resolve: duplicate column %S" key);
@@ -28,21 +29,25 @@ let check_no_duplicates columns =
 
 let format formatter columns =
   let rendered =
-    columns |> List.map Schema.format_column_reference |> String.concat ", "
+    columns |> List.map Row.format_column_reference |> String.concat ", "
   in
   Format.pp_print_string formatter rendered
 
-let resolve input_schema columns =
+let resolve (input_kind : Relation.kind) columns =
   check_no_duplicates columns;
   let resolved =
-    List.map (fun reference -> resolve_column input_schema reference) columns
+    List.map
+      (fun reference -> resolve_column input_kind.row_kind reference)
+      columns
   in
-  let projected_fields = List.map (fun (_position, field) -> field) resolved in
+  let projected_row_kind =
+    List.map (fun (_position, field) -> field) resolved
+  in
   let positions = Array.of_list (List.map fst resolved) in
-  let projected_schema : Schema.t =
-    { fields = projected_fields; primary_key = [] }
+  let projected_kind : Relation.kind =
+    { row_kind = projected_row_kind; refinements = [] }
   in
-  let project_tuple (tuple : Schema.tuple) : Schema.tuple =
-    Array.map (fun position -> tuple.(position)) positions
+  let project_row (row : Row.data) : Row.data =
+    Array.map (fun position -> row.(position)) positions
   in
-  (projected_schema, project_tuple)
+  (projected_kind, project_row)

@@ -2,32 +2,31 @@
 
 open Dovetail_plan
 open Test_helpers
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 module Value = Dovetail_core.Value
 
-(* The fixture's [users] schema, repeated here so the projection tests are
+(* The fixture's [users] kind, repeated here so the projection tests are
    self-contained and don't need to spin up an LMDB environment. The
    qualifier is set to [Some "users"], matching what {!Fixture} writes. *)
-let users_schema : Schema.t =
+let users_kind : Relation.kind =
   {
-    fields =
+    row_kind =
       [
         { name = "id"; kind = Int64; qualifier = Some "users" };
         { name = "name"; kind = String; qualifier = Some "users" };
         { name = "email"; kind = String; qualifier = Some "users" };
         { name = "active"; kind = Bool; qualifier = Some "users" };
       ];
-    primary_key = [ "id" ];
+    refinements = [ Primary_key [ "id" ] ];
   }
 
 let users_rows = expected_users_rows
 
 (* Apply [projection] to every fixture row and return the projected rows. *)
 let project_users projection =
-  let _projected_schema, project_tuple =
-    Projection.resolve users_schema projection
-  in
-  List.map project_tuple users_rows
+  let _projected_kind, project_row = Projection.resolve users_kind projection in
+  List.map project_row users_rows
 
 let test_single_column_projection () =
   let rows = project_users [ column_reference "name" ] in
@@ -105,49 +104,49 @@ let test_projection_accepts_qualified_column () =
   Alcotest.(check tuple_list_testable)
     "qualified projection yields the same rows" expected rows
 
-let test_projected_schema_has_requested_fields () =
-  let projected_schema, _project_tuple =
-    Projection.resolve users_schema
+let test_projected_kind_has_requested_fields () =
+  let projected_kind, _project_row =
+    Projection.resolve users_kind
       [ column_reference "email"; column_reference "id" ]
   in
   let field_names =
-    List.map (fun (field : Schema.field) -> field.name) projected_schema.fields
+    List.map (fun (field : Row.field) -> field.name) projected_kind.row_kind
   in
   Alcotest.(check (list string))
     "field names in requested order" [ "email"; "id" ] field_names;
   let field_kinds =
-    List.map (fun (field : Schema.field) -> field.kind) projected_schema.fields
+    List.map (fun (field : Row.field) -> field.kind) projected_kind.row_kind
   in
   Alcotest.(check bool)
     "first field kind is String" true
     (field_kinds = ([ String; Int64 ] : Value.kind list))
 
-let test_projected_schema_preserves_qualifiers () =
-  let projected_schema, _project_tuple =
-    Projection.resolve users_schema [ column_reference "name" ]
+let test_projected_kind_preserves_qualifiers () =
+  let projected_kind, _project_row =
+    Projection.resolve users_kind [ column_reference "name" ]
   in
   let qualifiers =
     List.map
-      (fun (field : Schema.field) -> field.qualifier)
-      projected_schema.fields
+      (fun (field : Row.field) -> field.qualifier)
+      projected_kind.row_kind
   in
   Alcotest.(check (list (option string)))
     "qualifier is preserved" [ Some "users" ] qualifiers
 
-let test_projected_schema_has_empty_primary_key () =
-  let projected_schema, _project_tuple =
-    Projection.resolve users_schema
+let test_projected_kind_has_no_refinements () =
+  let projected_kind, _project_row =
+    Projection.resolve users_kind
       [ column_reference "id"; column_reference "name" ]
   in
-  Alcotest.(check (list string))
-    "primary_key is empty even when projection includes the input PK" []
-    projected_schema.primary_key
+  Alcotest.(check int)
+    "no refinements even when projection includes the input PK" 0
+    (List.length projected_kind.refinements)
 
 let test_unknown_column_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Projection.resolve: unknown column \"unknown_col\"") (fun () ->
       let _ =
-        Projection.resolve users_schema
+        Projection.resolve users_kind
           [ column_reference "name"; column_reference "unknown_col" ]
       in
       ())
@@ -156,7 +155,7 @@ let test_unknown_qualifier_raises () =
   Alcotest.check_raises "unknown qualified column"
     (Failure "Projection.resolve: unknown column \"orders.id\"") (fun () ->
       let _ =
-        Projection.resolve users_schema
+        Projection.resolve users_kind
           [ qualified_column_reference ~qualifier:"orders" ~name:"id" ]
       in
       ())
@@ -198,7 +197,7 @@ let test_duplicate_column_raises () =
   Alcotest.check_raises "duplicate column"
     (Failure "Projection.resolve: duplicate column \"name\"") (fun () ->
       let _ =
-        Projection.resolve users_schema
+        Projection.resolve users_kind
           [ column_reference "name"; column_reference "name" ]
       in
       ())
@@ -218,12 +217,12 @@ let () =
             test_projection_of_non_leading_column;
           Alcotest.test_case "qualified column projects the same as bare name"
             `Quick test_projection_accepts_qualified_column;
-          Alcotest.test_case "projected schema has requested fields" `Quick
-            test_projected_schema_has_requested_fields;
-          Alcotest.test_case "projected schema preserves qualifiers" `Quick
-            test_projected_schema_preserves_qualifiers;
-          Alcotest.test_case "projected schema has empty primary key" `Quick
-            test_projected_schema_has_empty_primary_key;
+          Alcotest.test_case "projected kind has requested fields" `Quick
+            test_projected_kind_has_requested_fields;
+          Alcotest.test_case "projected kind preserves qualifiers" `Quick
+            test_projected_kind_preserves_qualifiers;
+          Alcotest.test_case "projected kind has no refinements" `Quick
+            test_projected_kind_has_no_refinements;
         ] );
       ( "format",
         [

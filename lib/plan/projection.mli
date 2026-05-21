@@ -6,11 +6,12 @@
     the IR stays human-readable for debugging. Mapping references to tuple
     positions is an executor concern, handled by {!resolve}. *)
 
-module Schema = Dovetail_core.Schema
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 
-type t = Schema.column_reference list
+type t = Row.column_reference list
 (** The ordered list of column references to project. Order is preserved in the
-    output schema and tuples. *)
+    output row kind and rows. *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter projection] writes [projection] as a comma-separated list
@@ -19,27 +20,27 @@ val format : Format.formatter -> t -> unit
     Intended for EXPLAIN-style debug printing -- {!Physical.format} renders a
     [Project] operator's [columns] parameter through this function. *)
 
-val resolve : Schema.t -> t -> Schema.t * (Schema.tuple -> Schema.tuple)
-(** [resolve input_schema columns] validates [columns] against [input_schema]
-    and returns the projected schema together with a closure that builds the
-    projected tuple.
+val resolve : Relation.kind -> t -> Relation.kind * (Row.data -> Row.data)
+(** [resolve input_kind columns] validates [columns] against [input_kind] and
+    returns the projected {!Relation.kind} together with a closure that builds
+    the projected row.
 
     Validation, performed once at resolve time:
 
     - Every column reference in [columns] must resolve uniquely against
-      [input_schema].
+      [input_kind].
     - No column reference (in its source form -- bare or dotted) may appear more
       than once in [columns].
 
-    The returned schema has its [fields] in the order requested by [columns],
-    each field carrying the kind and qualifier it had in [input_schema]. The
-    [primary_key] of the returned schema is always [[]]: derived relations don't
-    carry primary-key information at this stage of the project, even when the
-    projected columns happen to include the input's primary key.
+    The returned kind has its [row_kind] in the order requested by [columns],
+    each field carrying the kind and qualifier it had in [input_kind]. The
+    returned kind carries no refinements: derived relations don't carry primary-
+    key information at this stage of the project, even when the projected
+    columns happen to include the input's primary key.
 
-    Each column's field-order position in the input schema is captured at
-    resolve time, so the per-tuple closure does only [List.length columns] array
+    Each column's field-order position in the input row kind is captured at
+    resolve time, so the per-row closure does only [List.length columns] array
     indexes -- no name lookup happens per row.
 
     Raises [Failure] if a column reference is unknown or ambiguous against
-    [input_schema], or if the same reference appears more than once. *)
+    [input_kind], or if the same reference appears more than once. *)
