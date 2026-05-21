@@ -123,8 +123,9 @@ let rec eval environment transaction plan continue =
    before any tuples are pulled. *)
 and evaluate_filter environment transaction ~input ~predicate continue =
   let* input_relation = eval environment transaction input in
-  let input_schema = Relation.schema_of_kind input_relation.kind in
-  let evaluate_predicate = Expression.resolve input_schema predicate in
+  let evaluate_predicate =
+    Expression.resolve input_relation.kind.row_kind predicate
+  in
   continue
     {
       kind = input_relation.kind;
@@ -262,8 +263,9 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
       refinements = [];
     }
   in
-  let combined_schema = Relation.schema_of_kind combined_kind in
-  let evaluate_predicate = Expression.resolve combined_schema predicate in
+  let evaluate_predicate =
+    Expression.resolve combined_kind.row_kind predicate
+  in
   let combined_data =
     Seq.flat_map
       (fun left_tuple ->

@@ -8,7 +8,7 @@ type comparison_op =
 
 type t =
   | Literal of Value.data
-  | Column of Schema.column_reference
+  | Column of Row.column_reference
   | Compare of { left : t; op : comparison_op; right : t }
   | And of t * t
   | Or of t * t
@@ -25,7 +25,7 @@ type t =
    too. *)
 let describe_expression = function
   | Column reference ->
-      Printf.sprintf "column %S" (Schema.format_column_reference reference)
+      Printf.sprintf "column %S" (Row.format_column_reference reference)
   | Literal value ->
       Printf.sprintf "literal %s" (Value.kind_to_string (Value.kind_of value))
   | Compare _ -> "comparison expression"
@@ -84,8 +84,7 @@ let rec format_at min_precedence formatter expression =
     match expression with
     | Literal value -> Value.format formatter value
     | Column reference ->
-        Format.pp_print_string formatter
-          (Schema.format_column_reference reference)
+        Format.pp_print_string formatter (Row.format_column_reference reference)
     | Compare { left; op; right } ->
         Format.fprintf formatter "%a %s %a"
           (format_at (precedence_compare + 1))
@@ -123,22 +122,22 @@ let check_bool_operand operator_name operand (kind : Value.kind) =
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
    the produced closure: the right operand is only read when the left's
    verdict doesn't determine the result. *)
-let rec resolve_value schema : t -> Value.kind * (Schema.tuple -> Value.data) =
+let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
  fun expression ->
   match expression with
   | Literal value ->
       let kind = Value.kind_of value in
-      let read (_tuple : Schema.tuple) = value in
+      let read (_row : Row.data) = value in
       (kind, read)
   | Column reference -> (
-      match Schema.find_field schema reference with
+      match Row.find_field row_kind reference with
       | Error message -> failwith ("Expression.resolve: " ^ message)
       | Ok (column_position, field) ->
-          let read (tuple : Schema.tuple) = tuple.(column_position) in
+          let read (row : Row.data) = row.(column_position) in
           (field.kind, read))
   | Compare { left; op; right } ->
-      let left_kind, read_left = resolve_value schema left in
-      let right_kind, read_right = resolve_value schema right in
+      let left_kind, read_left = resolve_value row_kind left in
+      let right_kind, read_right = resolve_value row_kind right in
       if left_kind <> right_kind then
         failwith
           (Printf.sprintf
@@ -167,8 +166,8 @@ let rec resolve_value schema : t -> Value.kind * (Schema.tuple -> Value.data) =
       in
       (Value.Bool, read)
   | And (left, right) ->
-      let left_kind, read_left = resolve_value schema left in
-      let right_kind, read_right = resolve_value schema right in
+      let left_kind, read_left = resolve_value row_kind left in
+      let right_kind, read_right = resolve_value row_kind right in
       check_bool_operand "and" left left_kind;
       check_bool_operand "and" right right_kind;
       let read tuple =
@@ -182,8 +181,8 @@ let rec resolve_value schema : t -> Value.kind * (Schema.tuple -> Value.data) =
       in
       (Value.Bool, read)
   | Or (left, right) ->
-      let left_kind, read_left = resolve_value schema left in
-      let right_kind, read_right = resolve_value schema right in
+      let left_kind, read_left = resolve_value row_kind left in
+      let right_kind, read_right = resolve_value row_kind right in
       check_bool_operand "or" left left_kind;
       check_bool_operand "or" right right_kind;
       let read tuple =
@@ -194,7 +193,7 @@ let rec resolve_value schema : t -> Value.kind * (Schema.tuple -> Value.data) =
       in
       (Value.Bool, read)
   | Not operand ->
-      let operand_kind, read_operand = resolve_value schema operand in
+      let operand_kind, read_operand = resolve_value row_kind operand in
       if operand_kind <> Value.Bool then
         failwith
           (Printf.sprintf
@@ -209,15 +208,15 @@ let rec resolve_value schema : t -> Value.kind * (Schema.tuple -> Value.data) =
       in
       (Value.Bool, read)
 
-let resolve schema expression =
-  let kind, read_value = resolve_value schema expression in
+let resolve row_kind expression =
+  let kind, read_value = resolve_value row_kind expression in
   if kind <> Value.Bool then
     failwith
       (Printf.sprintf
          "Expression.resolve: predicate position requires Bool, got %s"
          (Value.kind_to_string kind));
-  fun (tuple : Schema.tuple) ->
+  fun (row : Row.data) ->
     (* The resolve-time kind check above guarantees a Bool value here. *)
-    match read_value tuple with
+    match read_value row with
     | Value.Bool flag -> flag
     | _ -> assert false

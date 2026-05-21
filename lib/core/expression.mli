@@ -1,10 +1,10 @@
 (** Expression tree used in predicate positions across the IRs.
 
     An [Expression.t] is an algebraic expression that produces a {!Value.data}
-    when evaluated against a {!Schema.tuple}. The tree's leaves are literals and
+    when evaluated against a {!Row.data}. The tree's leaves are literals and
     column references; its internal nodes are comparisons and boolean
     composition ([and], [or], [not]). Column references carry a
-    {!Schema.column_reference} so a qualifier (set when a cross product or join
+    {!Row.column_reference} so a qualifier (set when a cross product or join
     exposes same-named columns from different inputs) is preserved end to end.
 
     Both {!Logical.Restrict} and {!Physical.Filter} carry an [Expression.t];
@@ -36,8 +36,8 @@ type comparison_op =
 (** An expression node. *)
 type t =
   | Literal of Value.data  (** A constant value. *)
-  | Column of Schema.column_reference
-      (** A reference to a column in the surrounding schema. The qualifier is
+  | Column of Row.column_reference
+      (** A reference to a column in the surrounding row kind. The qualifier is
           set when the schema exposes same-named columns from different inputs.
       *)
   | Compare of { left : t; op : comparison_op; right : t }
@@ -64,16 +64,16 @@ val format : Format.formatter -> t -> unit
     The output is meant for EXPLAIN-style debug printing, not for round-tripping
     back through the parser. *)
 
-val resolve : Schema.t -> t -> Schema.tuple -> bool
-(** [resolve schema expression] validates [expression] against [schema] and
-    returns a closure that evaluates [expression] against a single tuple as a
+val resolve : Row.kind -> t -> Row.data -> bool
+(** [resolve row_kind expression] validates [expression] against [row_kind] and
+    returns a closure that evaluates [expression] against a single row as a
     boolean predicate.
 
     Validation, performed once at resolve time:
 
-    - Every {!Column} sub-expression must resolve uniquely against [schema] -- a
-      qualified reference must match exactly one field; an unqualified one must
-      match exactly one field by name.
+    - Every {!Column} sub-expression must resolve uniquely against [row_kind] --
+      a qualified reference must match exactly one field; an unqualified one
+      must match exactly one field by name.
     - Each {!Compare}'s left and right sub-expressions must agree on
       {!Value.kind}.
     - Ordering operators ({!Less}, {!LessEqual}, {!Greater}, {!GreaterEqual})

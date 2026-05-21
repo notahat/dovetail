@@ -10,43 +10,35 @@ open Test_helpers
 (* The fixture's [users] schema, repeated here so the predicate tests are
    self-contained and don't need to spin up an LMDB environment. The
    qualifier is set to [Some "users"], matching what {!Fixture} writes. *)
-let users_schema : Schema.t =
-  {
-    fields =
-      [
-        { name = "id"; kind = Int64; qualifier = Some "users" };
-        { name = "name"; kind = String; qualifier = Some "users" };
-        { name = "email"; kind = String; qualifier = Some "users" };
-        { name = "active"; kind = Bool; qualifier = Some "users" };
-      ];
-    primary_key = [ "id" ];
-  }
+let users_row_kind : Row.kind =
+  [
+    { name = "id"; kind = Int64; qualifier = Some "users" };
+    { name = "name"; kind = String; qualifier = Some "users" };
+    { name = "email"; kind = String; qualifier = Some "users" };
+    { name = "active"; kind = Bool; qualifier = Some "users" };
+  ]
 
 let users_rows = expected_users_rows
 
-(* The fixture's [orders] schema, repeated here for the same reason. *)
-let orders_schema : Schema.t =
-  {
-    fields =
-      [
-        { name = "id"; kind = Int64; qualifier = Some "orders" };
-        { name = "user_id"; kind = Int64; qualifier = Some "orders" };
-        { name = "description"; kind = String; qualifier = Some "orders" };
-        { name = "amount"; kind = Int64; qualifier = Some "orders" };
-      ];
-    primary_key = [ "id" ];
-  }
+(* The fixture's [orders] row kind, repeated here for the same reason. *)
+let orders_row_kind : Row.kind =
+  [
+    { name = "id"; kind = Int64; qualifier = Some "orders" };
+    { name = "user_id"; kind = Int64; qualifier = Some "orders" };
+    { name = "description"; kind = String; qualifier = Some "orders" };
+    { name = "amount"; kind = Int64; qualifier = Some "orders" };
+  ]
 
 let orders_rows = expected_orders_rows
 
 (* Apply [predicate] to every users fixture row and return the survivors. *)
 let filter_users predicate =
-  let evaluator = Expression.resolve users_schema predicate in
+  let evaluator = Expression.resolve users_row_kind predicate in
   List.filter evaluator users_rows
 
 (* Apply [predicate] to every orders fixture row and return the survivors. *)
 let filter_orders predicate =
-  let evaluator = Expression.resolve orders_schema predicate in
+  let evaluator = Expression.resolve orders_row_kind predicate in
   List.filter evaluator orders_rows
 
 let test_equality_on_int64_column () =
@@ -218,7 +210,7 @@ let test_bare_bool_column_resolves_as_predicate () =
      resolves directly as a predicate; each row's verdict equals its
      [active] flag. *)
   let evaluator =
-    Expression.resolve users_schema (expression_column "active")
+    Expression.resolve users_row_kind (expression_column "active")
   in
   let verdicts = List.map evaluator users_rows in
   Alcotest.(check (list bool))
@@ -230,7 +222,7 @@ let test_bare_bool_literal_resolves_as_predicate () =
   (* A standalone Bool literal is a valid (degenerate) predicate; the
      verdict is constant across all rows. *)
   let always_true =
-    Expression.resolve users_schema (expression_literal (Value.Bool true))
+    Expression.resolve users_row_kind (expression_literal (Value.Bool true))
   in
   Alcotest.(check bool)
     "true literal is true for every row" true
@@ -254,8 +246,8 @@ let test_qualified_column_resolves_identically_to_unqualified () =
 let test_unknown_qualifier_raises () =
   Alcotest.check_raises "unknown qualified column"
     (Failure "Expression.resolve: unknown column \"orders.id\"") (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_compare
              ~left:(expression_qualified_column ~qualifier:"orders" ~name:"id")
              ~op:Equal
@@ -266,8 +258,8 @@ let test_unknown_qualifier_raises () =
 let test_unknown_column_on_left_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_compare
              ~left:(expression_column "unknown_col")
              ~op:Equal
@@ -278,8 +270,8 @@ let test_unknown_column_on_left_raises () =
 let test_unknown_column_on_right_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "id") ~op:Equal
              ~right:(expression_column "unknown_col"))
       in
@@ -290,8 +282,8 @@ let test_type_mismatch_column_vs_literal_raises () =
     (Failure
        "Expression.resolve: type mismatch: column \"name\" is String, literal \
         Int64 is Int64") (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "name") ~op:Equal
              ~right:(expression_literal (Value.Int64 1L)))
       in
@@ -304,8 +296,8 @@ let test_ordering_on_bool_column_raises () =
   Alcotest.check_raises "ordering operator on Bool"
     (Failure "Expression.resolve: ordering operator > is not defined for Bool")
     (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_compare
              ~left:(expression_column "active")
              ~op:Greater
@@ -320,8 +312,8 @@ let test_non_bool_predicate_raises () =
   Alcotest.check_raises "non-Bool top-level expression"
     (Failure "Expression.resolve: predicate position requires Bool, got Int64")
     (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema (expression_column "id")
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind (expression_column "id")
       in
       ())
 
@@ -329,8 +321,8 @@ let test_non_bool_literal_predicate_raises () =
   Alcotest.check_raises "non-Bool literal predicate"
     (Failure "Expression.resolve: predicate position requires Bool, got String")
     (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_literal (Value.String "hello"))
       in
       ())
@@ -340,8 +332,8 @@ let test_type_mismatch_column_vs_column_raises () =
     (Failure
        "Expression.resolve: type mismatch: column \"id\" is Int64, column \
         \"name\" is String") (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "id") ~op:Equal
              ~right:(expression_column "name"))
       in
@@ -389,7 +381,7 @@ let test_and_short_circuits_on_false_left () =
       ~left:(expression_literal (Value.Bool false))
       ~right:(expression_column "active")
   in
-  let evaluator = Expression.resolve users_schema predicate in
+  let evaluator = Expression.resolve users_row_kind predicate in
   let too_short_to_contain_active = [| Value.Int64 1L |] in
   Alcotest.(check bool)
     "short-circuits to false without reading right operand" false
@@ -403,7 +395,7 @@ let test_or_short_circuits_on_true_left () =
       ~left:(expression_literal (Value.Bool true))
       ~right:(expression_column "active")
   in
-  let evaluator = Expression.resolve users_schema predicate in
+  let evaluator = Expression.resolve users_row_kind predicate in
   let too_short_to_contain_active = [| Value.Int64 1L |] in
   Alcotest.(check bool)
     "short-circuits to true without reading right operand" true
@@ -430,8 +422,8 @@ let test_not_with_non_bool_operand_raises () =
     (Failure
        "Expression.resolve: not requires a Bool operand: column \"id\" is Int64")
     (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_not (expression_column "id"))
       in
       ())
@@ -441,8 +433,8 @@ let test_and_with_non_bool_operand_raises () =
     (Failure
        "Expression.resolve: and requires Bool operands: column \"id\" is Int64")
     (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_and ~left:(expression_column "id")
              ~right:(expression_column "active"))
       in
@@ -453,8 +445,8 @@ let test_or_with_non_bool_operand_raises () =
     (Failure
        "Expression.resolve: or requires Bool operands: column \"id\" is Int64")
     (fun () ->
-      let (_ : Schema.tuple -> bool) =
-        Expression.resolve users_schema
+      let (_ : Row.data -> bool) =
+        Expression.resolve users_row_kind
           (expression_or
              ~left:(expression_column "active")
              ~right:(expression_column "id"))

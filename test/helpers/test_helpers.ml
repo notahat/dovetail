@@ -20,6 +20,7 @@
 module Schema = Dovetail_core.Schema
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
+module Row = Dovetail_core.Row
 module Value = Dovetail_core.Value
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
