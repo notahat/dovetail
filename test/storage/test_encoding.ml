@@ -48,7 +48,7 @@ let test_decode_int64_key_rejects_wrong_length () =
     (fun () -> ignore (Storage.Encoding.decode_int64_key "1234567"))
 
 let test_tuple_value_round_trip () =
-  let values : Value.t list =
+  let values : Value.data list =
     [ Int64 42L; String "hello"; Bool true; Int64 (-1L); Bool false ]
   in
   let encoded = Storage.Encoding.encode_tuple_value values in

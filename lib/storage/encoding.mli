@@ -20,11 +20,11 @@ val decode_int64_key : string -> int64
 (** Inverse of {!encode_int64_key}. Raises [Invalid_argument] if the input is
     not exactly 8 bytes. *)
 
-val encode_tuple_value : Value.t list -> string
+val encode_tuple_value : Value.data list -> string
 (** Encode a list of values as bytes via [Marshal]. Used to serialise the non-PK
     columns of a tuple. *)
 
-val decode_tuple_value : string -> Value.t list
+val decode_tuple_value : string -> Value.data list
 (** Inverse of {!encode_tuple_value}. Trusts that the input was produced by
-    {!encode_tuple_value} for a [Value.t list]; supplying mismatched bytes is
+    {!encode_tuple_value} for a [Value.data list]; supplying mismatched bytes is
     undefined behaviour, per [Marshal]'s contract. *)
