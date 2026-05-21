@@ -81,6 +81,8 @@ let assemble_tuple (kind : kind) ~primary_key_values ~non_primary_key_values =
   let non_primary_key_remaining = ref non_primary_key_values in
   let take_non_primary_key () =
     match !non_primary_key_remaining with
+    (* The length check above guarantees one value per non-PK field, so the
+       list cannot be exhausted before [resolve_field] stops asking. *)
     | [] -> assert false
     | head :: rest ->
         non_primary_key_remaining := rest;

@@ -186,6 +186,9 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
       check_bool_operand "or" left left_kind;
       check_bool_operand "or" right right_kind;
       let read tuple =
+        (* Short-circuit: the right operand is only read when the left is
+           false. The two non-Bool cases are unreachable given the kind
+           checks above. *)
         match read_left tuple with
         | Value.Bool true -> Value.Bool true
         | Value.Bool false -> read_right tuple
@@ -201,6 +204,8 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
              (describe_expression operand)
              (Value.kind_to_string operand_kind));
       let read tuple =
+        (* The operand-kind check above guarantees a Bool value here; the
+           non-Bool arm is unreachable. *)
         match read_operand tuple with
         | Value.Bool true -> Value.Bool false
         | Value.Bool false -> Value.Bool true
