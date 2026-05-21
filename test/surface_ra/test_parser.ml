@@ -486,7 +486,7 @@ let test_pipeline_keyword_describe_is_a_relation_name () =
 (* [:create table <name> (col: kind, ...) primary key
    (col, ...)] parses to [Statement.Create_table { table_name; fields;
    primary_key }]. Kind names are resolved at parse time to
-   [Value.Kind.t]; unknown kind names raise a parse error. Whitespace
+   [Value.kind]; unknown kind names raise a parse error. Whitespace
    and trailing commas are flexible inside the parentheses, matching
    the canonical printer's output so [parse (format s) = Ok (Ddl s)]
    holds for hand-built [Create_table] values. *)

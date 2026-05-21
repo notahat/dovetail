@@ -9,7 +9,7 @@ type t =
   | Project of { input : t; columns : Plan.Projection.t }
   | CrossProduct of { left : t; right : t }
   | Join of { left : t; right : t; predicate : Expression.t }
-  | RelationLiteral of { columns : string list; rows : Value.t list list }
+  | RelationLiteral of { columns : string list; rows : Value.data list list }
 
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation

@@ -100,7 +100,7 @@ let literal_value =
    a source-span field doesn't force every destructure site to change. *)
 type literal_pair = {
   column_key : string;
-  value : Value.t;
+  value : Value.data;
   key_is_qualified : bool;
 }
 
@@ -398,15 +398,15 @@ let ddl_describe =
 
 (* Resolve a [:create table] column kind at parse time. The surface kind
    position carries an identifier ([Int64], [String], [Bool]) and the
-   parser maps it to {!Value.Kind.t} directly -- downstream code never
+   parser maps it to {!Value.kind} directly -- downstream code never
    sees a raw kind string. An unknown identifier here raises a parse
    error rather than deferring the diagnostic to validate, so
    [Statement.t] values never carry a phantom kind. *)
-let create_table_kind =
+let create_table_kind : Value.kind Angstrom.t =
   identifier >>= function
-  | "Int64" -> return Value.Kind.Int64
-  | "String" -> return Value.Kind.String
-  | "Bool" -> return Value.Kind.Bool
+  | "Int64" -> return (Value.Int64 : Value.kind)
+  | "String" -> return (Value.String : Value.kind)
+  | "Bool" -> return (Value.Bool : Value.kind)
   | other -> fail (Printf.sprintf "unknown kind %S" other)
 
 (* A single column declaration: [<identifier> : <kind>]. Whitespace

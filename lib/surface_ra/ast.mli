@@ -51,7 +51,7 @@ type t =
           [CrossProduct] -- both inputs' fields, each retaining its qualifier --
           so a [predicate] like [users.id = orders.user_id] resolves
           unambiguously across the combined schema. *)
-  | RelationLiteral of { columns : string list; rows : Value.t list list }
+  | RelationLiteral of { columns : string list; rows : Value.data list list }
       (** [RelationLiteral { columns; rows }] is the surface form
           [{col: val, col: val, ...}] -- a relation whose contents the user gave
           directly, instead of a reference to a stored table. The parser
