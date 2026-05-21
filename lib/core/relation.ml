@@ -16,8 +16,8 @@ let render_value = function
   | Value.Bool true -> "true"
   | Value.Bool false -> "false"
 
-let is_numeric_kind = function
-  | Value.Kind.Int64 -> true
+let is_numeric_kind : Value.kind -> bool = function
+  | Int64 -> true
   | String | Bool -> false
 
 (* Pad [text] with trailing or leading spaces to reach [width], depending on

@@ -1,10 +1,12 @@
 (** Database values.
 
-    [Value.t] is a runtime value -- one of the v1 supported types carrying its
-    payload. [Kind.t] is the static tag used in schemas to declare the type of a
-    column. The two are deliberately separated so schemas can be described
-    without committing to any particular value, and so the constructors don't
-    clash.
+    [Value.data] is a runtime value -- one of the v1 supported types carrying
+    its payload. [Value.kind] is the static tag used in schemas to declare the
+    type of a column. The two are deliberately separated so schemas can be
+    described without committing to any particular value.
+
+    The bare names [t] and [Kind.t] remain as aliases during the framework
+    migration; new code should prefer [data] and [kind].
 
     {!format} is the canonical source-like renderer: bare digits for [Int64],
     double-quoted text (no escape) for [String], lowercase keywords for [Bool].

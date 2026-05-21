@@ -19,7 +19,7 @@ let test_schema_of_infers_kinds_from_first_row () =
     "field kinds come from the first row's values"
     [ "Int64"; "String"; "Bool" ]
     (List.map
-       (fun (field : Schema.field) -> Value.Kind.to_string field.kind)
+       (fun (field : Schema.field) -> Value.kind_to_string field.kind)
        schema.fields)
 
 let test_schema_of_leaves_qualifiers_absent () =
