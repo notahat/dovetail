@@ -30,7 +30,7 @@ let test_pipeline_yields_fixture_rows () =
         unwrap_query (Translate.translate ~catalog (Logical.Query logical))
       in
       Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.data in
+          let rows = List.of_seq relation.value in
           Alcotest.(check row_list_testable)
             "five rows from logical scan" expected_users_rows rows))
 
@@ -76,7 +76,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
         unwrap_query (Translate.translate ~catalog (Logical.Query logical))
       in
       Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.data in
+          let rows = List.of_seq relation.value in
           Alcotest.(check row_list_testable)
             "Carol's row from logical Restrict"
             [ List.nth expected_users_rows 2 ]
@@ -117,7 +117,7 @@ let test_project_pipeline_yields_projected_rows () =
         unwrap_query (Translate.translate ~catalog (Logical.Query logical))
       in
       Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.data in
+          let rows = List.of_seq relation.value in
           let expected =
             [
               [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];

@@ -3,7 +3,7 @@ type kind = { row_kind : Row.kind; refinements : refinement list }
 
 type 'tag t = {
   kind : kind;
-  data : Row.value Seq.t;
+  value : Row.value Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
 
@@ -171,7 +171,7 @@ let print ?(formatter = Format.std_formatter) relation =
          row_kind)
   in
   let rendered_rows =
-    relation.data
+    relation.value
     |> Seq.map (fun row -> Array.map render_value row)
     |> List.of_seq
   in

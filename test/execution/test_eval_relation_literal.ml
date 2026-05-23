@@ -55,7 +55,7 @@ let test_primary_key_is_empty () =
 
 let test_rows_match_the_literals_row () =
   with_literal_relation @@ fun relation ->
-  let rows = List.of_seq relation.data in
+  let rows = List.of_seq relation.value in
   Alcotest.(check row_list_testable)
     "one row, values match the literal"
     [ [| Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true |] ]

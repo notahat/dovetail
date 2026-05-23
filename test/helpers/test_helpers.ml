@@ -246,7 +246,7 @@ let with_query_result query check_rows =
       let catalog = make_catalog environment transaction in
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
       Execution.Eval.eval environment transaction physical (fun relation ->
-          check_rows (List.of_seq relation.data)))
+          check_rows (List.of_seq relation.value)))
 
 (** [with_query_failure ~label ~expected query] runs [query] through the same
     pipeline as {!with_query_result} but asserts that [Eval.eval] raises
@@ -277,7 +277,7 @@ let evaluate_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Execution.Eval.eval environment transaction plan (fun relation ->
-          (relation.kind, List.of_seq relation.data)))
+          (relation.kind, List.of_seq relation.value)))
 
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)

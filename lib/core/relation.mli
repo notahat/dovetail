@@ -8,7 +8,7 @@
     semantics. The full table scan -- currently the only producer -- emits
     [[`Bag] t].
 
-    Relations are tied to the transaction that produced their [data] sequence.
+    Relations are tied to the transaction that produced their [value] sequence.
     The sequence must be consumed before the transaction's callback returns;
     using a relation outside its originating transaction's scope is undefined
     behaviour and not statically prevented. *)
@@ -25,7 +25,7 @@ type kind = { row_kind : Row.kind; refinements : refinement list }
 
 type 'tag t = {
   kind : kind;
-  data : Row.value Seq.t;
+  value : Row.value Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
 (** A relation tagged with its multiplicity semantics: a {!kind} describing the
@@ -60,5 +60,5 @@ val print : ?formatter:Format.formatter -> _ t -> unit
 
     Column widths are sized to the wider of the header and the rendered values;
     [Int64] columns are right-aligned and the others left-aligned. Materialises
-    the [data] sequence eagerly to compute widths, so all rows are pulled before
-    any output is produced. *)
+    the [value] sequence eagerly to compute widths, so all rows are pulled
+    before any output is produced. *)

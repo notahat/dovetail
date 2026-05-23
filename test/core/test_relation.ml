@@ -55,7 +55,7 @@ let render relation =
 
 let test_renders_aligned_table_with_qualified_headers () =
   let relation : [ `Bag ] Relation.t =
-    { kind = users_kind; data = List.to_seq two_users }
+    { kind = users_kind; value = List.to_seq two_users }
   in
   let expected =
     String.concat "\n"
@@ -73,7 +73,7 @@ let test_renders_unqualified_headers_when_fields_have_no_qualifier () =
   let relation : [ `Bag ] Relation.t =
     {
       kind = unqualified_kind;
-      data = List.to_seq [ [| Scalar.Int64 1L; Scalar.String "Alice" |] ];
+      value = List.to_seq [ [| Scalar.Int64 1L; Scalar.String "Alice" |] ];
     }
   in
   let expected =
@@ -84,7 +84,7 @@ let test_renders_unqualified_headers_when_fields_have_no_qualifier () =
 
 let test_renders_header_only_when_empty () =
   let relation : [ `Bag ] Relation.t =
-    { kind = users_kind; data = Seq.empty }
+    { kind = users_kind; value = Seq.empty }
   in
   let expected =
     String.concat "\n"

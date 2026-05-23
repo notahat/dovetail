@@ -20,7 +20,7 @@ let test_full_scan_yields_fixture_rows () =
           in
           Alcotest.(check (list (list string)))
             "kind primary key" [ [ "id" ] ] primary_keys;
-          let rows = List.of_seq relation.data in
+          let rows = List.of_seq relation.value in
           Alcotest.(check row_list_testable)
             "five rows in primary-key order" expected_users_rows rows))
 

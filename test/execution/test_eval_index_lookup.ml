@@ -15,7 +15,7 @@ let evaluate_index_lookup ~table ~key =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan = Plan.Physical.IndexLookup { table; key } in
       Eval.eval environment transaction plan (fun relation ->
-          (relation.kind, List.of_seq relation.data)))
+          (relation.kind, List.of_seq relation.value)))
 
 let test_index_lookup_returns_the_matching_row () =
   let _kind, rows = evaluate_index_lookup ~table:"users" ~key:1L in

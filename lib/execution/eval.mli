@@ -1,7 +1,7 @@
 (** Streaming, continuation-passing executor for the physical IR.
 
     [eval] takes a {!Physical.t} tree and a consumer continuation. It invokes
-    the continuation with a {!Relation.t} whose [data] sequence pulls rows
+    the continuation with a {!Relation.t} whose [value] sequence pulls rows
     lazily from whatever cursors the plan opens. The continuation runs inside
     those cursor scopes; once it returns, the cursors are torn down and the
     relation is no longer usable.
@@ -25,7 +25,7 @@ val eval :
   'a
 (** [eval environment transaction plan continue] runs [plan] against the
     database open in [environment], using [transaction] for all reads, and
-    invokes [continue] with the resulting relation. The relation's [data]
+    invokes [continue] with the resulting relation. The relation's [value]
     sequence must be consumed inside [continue]; using it after [continue]
     returns is undefined behaviour.
 
