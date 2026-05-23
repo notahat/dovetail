@@ -124,3 +124,28 @@ how you name which side of the join each column comes from.
 │        1 │ Alice      │ alice@example.com │ true         │         1 │              1 │ Coffee             │             5 │
 │        1 │ Alice      │ alice@example.com │ true         │         2 │              1 │ Bagel              │             4 │
 ```
+
+## insert into
+
+**Syntax:** `<input> | insert into <table-name>`
+
+Writes every row of `<input>` to `<table-name>` and returns a one-row
+relation `(insert_count: int64)` reporting how many rows were
+written. `<input>` is currently a single-row literal of the form
+`{column: value, ...}`; the literal's columns must be a permutation
+of the target's columns, and each value must match its target
+column's kind. A multi-row literal form and arbitrary upstream
+pipelines (insert-from-query) are deferred to a later slice.
+
+Insert is a regular pipeline operator with one surface restriction:
+the parser rejects any pipe-step after `insert into <name>`, so it
+always appears as the last step. The whole insert runs in one write
+transaction; a primary-key collision (or any other failure) aborts
+the transaction and the table is unchanged.
+
+```
+> {id: 7, user_id: 4, description: "Muffin", amount: 2} | insert into orders
+│ insert_count │
+├──────────────┤
+│            1 │
+```

@@ -64,8 +64,11 @@ existing parser does:
   `Filter` and `Project` wrap with `Seq.filter` / `Seq.map`;
   `FullScan` opens a live cursor. Pipelines compose without
   intermediate materialisation (`lib/execution/eval.ml`).
-- Mutations (`insert into …`) are sinks at the right-hand end of a
-  pipeline, not separate statements (`parser.ml:372-379`).
+- `insert into …` is a regular pipe operator that happens to terminate
+  a pipeline (the parser rejects anything after it). It produces a
+  one-row `(insert_count: int64)` relation, so downstream eval and
+  printing don't need a separate "mutation" universe
+  (`parser.ml:372-379`).
 
 DDL is the exception: a `:`-sigil grammar with its own AST
 (`lib/ddl/statement.ml`), its own executor (`Ddl_executor`), and a
@@ -236,8 +239,8 @@ What flows into what:
 | relation              | `project (...)`                  | relation (streaming)                             |
 | relation              | `cross …`                        | relation                                         |
 | relation              | `join … on …`                    | relation                                         |
-| relation              | `insert into <name>`             | write-result                                     |
-| row                   | `insert into <name>`             | write-result                                     |
+| relation              | `insert into <name>`             | one-row `(insert_count: int64)` relation         |
+| row                   | `insert into <name>`             | one-row `(insert_count: int64)` relation         |
 | relation-type         | `create table <name>`            | write-result                                     |
 | relation              | `create table <name>`            | write-result (seeds rows after create)           |
 | catalog               | `tables`                         | list of table names                              |

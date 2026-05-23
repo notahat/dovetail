@@ -37,10 +37,12 @@ deliberately separate.
 
 - **Relations.** Schema-tagged streams of rows. Composition lives in
   *pipelines*: a relation enters from the left, operators transform it,
-  a relation comes out the right (or, with sinks, a side effect). Atoms
-  in this universe are table names, parenthesised sub-pipelines, and
-  relation literals. The composition operator is `|`, plus binary
-  operators like `cross` / `join` that take a second relation.
+  a relation comes out the right. Some operators have side effects on
+  storage too (`insert`, future `update`/`delete`), but they still
+  return a relation — typically a small reporting one. Atoms in this
+  universe are table names, parenthesised sub-pipelines, and relation
+  literals. The composition operator is `|`, plus binary operators
+  like `cross` / `join` that take a second relation.
 - **Scalars.** `Int64`, `String`, `Bool` values. Composition lives in
   *expressions*: `=`, `and`, `not`, eventually `+`, function calls.
   Atoms are literals and column references. The current row is implicit
@@ -56,7 +58,7 @@ There are three places where things compose:
 
 | Position                          | Allowed              | Examples                                                                |
 | --------------------------------- | -------------------- | ----------------------------------------------------------------------- |
-| Pipeline in pipeline position     | Any pipeline         | Right side of `join`/`cross`/`semijoin`; source of a sink               |
+| Pipeline in pipeline position     | Any pipeline         | Right side of `join`/`cross`/`semijoin`; source of `insert`/`update`/`delete` |
 | Expression in expression position | Any expression       | `(a + b) * (c - d)`                                                     |
 | Expression in pipeline position   | Expression with row  | `restrict <expr>`, `join … on <expr>`, `update {col: <expr>}`           |
 
@@ -92,15 +94,19 @@ relation_expr := identifier                       -- bare table name
               |  relation_literal                 -- new in this design
 pipeline_op   := restrict | project | cross | join             -- existing
               |  semijoin | antijoin                            -- future
-              |  "insert" "into" identifier                     -- sink
-              |  "update" row_literal                           -- sink
-              |  "delete"                                       -- sink
+              |  "insert" "into" identifier                     -- write
+              |  "update" row_literal                           -- write
+              |  "delete"                                       -- write
 ```
 
 There is no separate "statement" form. Every input is a pipeline.
-Whether it's a query or a mutation is determined by whether the
-pipeline ends in a sink operator. Queries print their result rows; sinks
-take effect and print a one-line affected-rows status.
+`insert` (and future `update` / `delete`) are pipe operators like any
+other — relation in, relation out. They happen to be write operators,
+so the REPL opens a write transaction when one appears anywhere in
+the tree, and the parser rejects extra pipe-steps after them as a
+surface-syntax rule. Each one hands the printer a small reporting
+relation — for `insert` today, a one-row `(insert_count: int64)` —
+so every pipeline output renders through the same path.
 
 ## Relation literals
 
@@ -244,9 +250,9 @@ Operator classification:
 The constraint is enforced as a validation pass on the lowered logical
 tree — not in the grammar (the AST mirrors syntax, not semantics) and
 not at runtime (the error message is far better at validation time).
-The pass walks the upstream of each mutation sink, classifies each
-operator, and errors if any non-preserving operator is present or if
-the upstream doesn't resolve to a single `Scan`.
+The pass walks the upstream of each `Update` / `Delete`, classifies
+each operator, and errors if any non-preserving operator is present
+or if the upstream doesn't resolve to a single `Scan`.
 
 Cross-table mutation cases ("delete orders belonging to inactive
 users") aren't expressible through the existing operator set. They fit
@@ -274,50 +280,56 @@ scope, breaking the bridge.
 
 ## IR shape
 
-The logical IR grows three new constructors at the top of a plan tree.
-Each carries the target table explicitly so the IR is self-describing
-and so the validator has something to check the upstream's root
-`Scan` against.
+The logical IR gains mutation constructors directly inside `Logical.t`,
+alongside `Scan`, `Restrict`, `Project`, etc. Each carries the target
+table explicitly so the IR is self-describing and so the validator
+has something to check the upstream's root `Scan` against.
 
 ```ocaml
-type mutation =
+type t =
+  | Scan of { table : string }
+  | Restrict of { input : t; predicate : Expression.t }
+  | Project of { input : t; columns : Projection.t }
+  | CrossProduct of { left : t; right : t }
+  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
-  | Update of {
-      table       : string;
-      source      : t;                   (* must be identity-preserving *)
-      assignments : (string * Expression.t) list;
-    }
-  | Delete of { table : string; source : t }
+  (* future: Update, Delete *)
 ```
 
-The physical IR grows matching constructors. Each evaluates by opening
-no new transaction (the eval entry point's transaction is already a
-write transaction for these), reading the source pipeline, and
-applying the per-row write.
+There is no separate `mutation` type or `plan` wrapper — every operator
+lives on `t`. The physical IR mirrors the same shape. `Insert` evaluates
+inside the eval entry point's existing transaction (a write transaction,
+picked by the REPL via `Logical.required_access` walking the tree),
+reads its source pipeline through the same streaming `eval`, and applies
+the per-row write.
 
 ## Eval result and the REPL
 
-Mutation sinks don't yield a relation in the same sense queries do.
-The eval entry point therefore returns a discriminated variant:
+Every operator returns a relation, including the write operators.
+`Insert` returns a one-row relation with kind `(insert_count: int64)`;
+`Update` and `Delete` will follow the same shape (`update_count`,
+`delete_count`). The eval entry point therefore has a single signature
+for every operator:
 
 ```ocaml
-type eval_result =
-  | Query    of [ `Bag ] Relation.t
-  | Mutation of { affected_rows : int }
+val eval :
+  environment ->
+  [> `Read ] transaction ->
+  Physical.t ->
+  ([ `Bag ] Relation.t -> 'a) ->
+  'a
 ```
 
-The REPL pattern-matches and renders accordingly: queries get the
-existing bordered-table format; mutations get a one-line status
-(`inserted 1 row`, `updated 3 rows`, `deleted 0 rows`) with the
-pluralisation handled.
+The REPL renders whatever falls out — read and write pipelines both
+go through `Relation.print`, so the bordered-table format is uniform.
+Pluralisation is no longer the REPL's problem; the user reads `1` or
+`3` directly from the `insert_count` cell.
 
-Mutation sinks are *terminal* in this design — they can't appear in
-the middle of a pipeline, because what they return isn't a relation.
-This is a small wart on regime B's purity that's worth naming, but
-worth living with: most pipeline languages have the same constraint
-(Kusto's `.ingest`, PowerShell's `Out-*` cmdlets), and a future
-`RETURNING`-style opt-in cleanly separates the "just do it" case from
-the "give me the affected rows" case without conflating them.
+The parser currently rejects extra pipe-steps after `insert into ...`
+as a surface-syntax rule, but the IR carries no such restriction. If a
+future `RETURNING`-style opt-in wants to compose writes into larger
+pipelines, the IR is already shaped to accommodate it; only the
+parser rule has to relax.
 
 ## Transactions
 
@@ -354,9 +366,11 @@ the decisions here.
   patterns, CTE-style intermediate naming, and join-on-filtered-subquery.
 - **Upsert** as a separate operator. Keeps `insert`'s "error on
   conflict" semantics intact.
-- **RETURNING-style mutation outputs** as an explicit opt-in. Mutation
-  sinks become composable in that mode; default-terminal in the
-  other.
+- **RETURNING-style mutation outputs** as an explicit opt-in. Write
+  operators already return relations in the IR; the parser's
+  "nothing after `insert into`" rule is what makes them
+  default-terminal at the surface, and a RETURNING opt-in would
+  relax that rule.
 - **Insert-from-query.** `(users | restrict active) | insert into
   active_users`. Already legal under regime B; just needs the target
   table to exist (which means DDL).

@@ -49,9 +49,11 @@ Out of scope here, mentioned only as context:
 The DML design framed the surface language around two universes of
 first-class values: **relations** (composed in pipelines) and
 **scalars** (composed in expressions). DML lives in pipeline position
-because rows are the thing that flows. Queries take relations in;
-mutations are pipeline sinks that take relations in and produce side
-effects.
+because rows are the thing that flows. Every pipeline operator —
+read or write — takes relations in and returns a relation out;
+write operators (`insert`, future `update`/`delete`) additionally
+have a storage side effect, and their returned relation typically
+reports the row count.
 
 DDL doesn't fit that frame, and shouldn't be made to. `create table`
 doesn't consume a relation — there's no relation flowing in. `drop
@@ -76,8 +78,8 @@ This frame retroactively justifies several decisions:
 
 - DDL appears in its own top-level grammar position, not as a
   nullary-upstream pipeline sink.
-- DDL has its own module (`lib/ddl.ml`), not constructors inside
-  `Logical.plan`. The implementation mirrors the surface split.
+- DDL has its own library (`lib/ddl/`), not constructors inside
+  `Logical.t`. The implementation mirrors the surface split.
 - `describe` prints text matching the `create table` form, rather
   than returning a relation that the user composes with `restrict`.
   Inspection lives in the DDL universe because the catalog lives
@@ -306,8 +308,8 @@ DDL: create table "widgets": primary key column "id" not in column list
 
 ## IR shape
 
-DDL lives in its own module rather than as constructors inside
-`Logical.plan`. The implementation mirrors the user-facing universe
+DDL lives in its own library rather than as constructors inside
+`Logical.t`. The implementation mirrors the user-facing universe
 split: relational work goes through `Logical` / `Translate` /
 `Physical`; catalog work goes through `Ddl`.
 
@@ -353,33 +355,30 @@ surface DDL has no notion of qualified columns. Reusing
 the parser and AST — a small but real form of the type lying about
 the data.
 
-The top-level program type and eval result grow to discriminate the
-two universes:
+The top-level program type discriminates the two universes:
 
 ```ocaml
 type program =
-  | Pipeline of Logical.plan
-  | Ddl      of Ddl.statement
-
-type eval_result =
-  | Query    of [ `Bag ] Relation.t
-  | Mutation of { affected_rows : int }
-  | Ddl      of Ddl.result
+  | Pipeline of Logical.t
+  | Ddl      of Ddl.Statement.t
 ```
 
-The REPL's top-level dispatch gains one arm:
+There is no eval-result variant — relational pipelines return a
+relation regardless of whether they end in a write operator, and DDL
+returns its own result type. The REPL handles the two branches
+separately:
 
 ```ocaml
 match program with
 | Pipeline plan ->
-    let transaction_kind = Logical.classify plan in
+    let transaction_kind = Logical.required_access plan in
     with_transaction transaction_kind (fun transaction ->
-      Eval.run plan transaction)
+      Eval.eval environment transaction (translate plan) print_relation)
 | Ddl statement ->
-    let () = Ddl.validate statement |> raise_if_error in
-    let transaction_kind = Ddl.classify statement in
+    let () = Ddl.Statement.validate statement |> raise_if_error in
+    let transaction_kind = Ddl.Statement.classify statement in
     with_transaction transaction_kind (fun transaction ->
-      Ddl.execute environment transaction statement)
+      Ddl_executor.execute environment transaction statement)
 ```
 
 Renderers per `Ddl.result` constructor:
@@ -398,9 +397,9 @@ The DML design's transaction model carries over without modification,
 extended by one classifier arm.
 
 - **One operation per top-level REPL input.** An input is either a
-  pipeline (Query or Mutation) or a DDL statement; they don't mix.
+  relational pipeline or a DDL statement; they don't mix.
   Multi-statement input remains out of scope, matching DML.
-- **Per-statement read/write classification.** `Ddl.classify`
+- **Per-statement read/write classification.** `Ddl.Statement.classify`
   returns `` `Write `` for `Create_table` and `Drop_table`, `` `Read
   `` for `Describe` and `List_tables`. The REPL picks
   `with_read_transaction` or `with_write_transaction` accordingly.
