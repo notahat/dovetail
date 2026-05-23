@@ -39,23 +39,22 @@ val eval_mutation :
   Storage.Engine.environment ->
   [ `Read | `Write ] Storage.Engine.transaction ->
   Plan.Physical.mutation ->
-  (int -> 'a) ->
+  ([ `Bag ] Relation.t -> 'a) ->
   'a
 (** [eval_mutation environment transaction mutation continue] runs [mutation]
-    against the database open in [environment] and invokes [continue] with the
-    number of rows it wrote.
+    against the database open in [environment] and invokes [continue] with a
+    one-row relation describing what the mutation did.
 
     For [Insert { table; source }], the sink evaluates [source] as a relation
     via {!eval} (inside the same write [transaction]), then for each source row
     performs a [Storage.Engine.get] to detect a primary-key collision against an
     existing row, and a [Storage.Engine.put] to write the row otherwise. The
-    count handed to [continue] is the number of [put]s performed.
+    relation handed to [continue] has kind [(insert_count : int64)] and a single
+    row whose value is the number of [put]s performed.
 
     The continuation shape mirrors {!eval} so the two entry points dispatch
-    uniformly at the call site. The affected-row count is itself a plain value
-    with no scoped resource attached, but threading it through a continuation
-    keeps future mutation outputs (e.g. RETURNING-style row streams) able to
-    slot in without a second signature break.
+    uniformly at the call site, and so the eventual merge into a single
+    pipeline-result type doesn't change the shape again.
 
     Raises [Failure] under the same conditions as {!eval}, plus on a primary-key
     collision against an existing row in the target table. A raise aborts the

@@ -7,8 +7,14 @@
 open Dovetail_execution
 open Test_helpers
 module Scalar = Dovetail_core.Scalar
+module Relation = Dovetail_core.Relation
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
+
+(* Build a [Physical.Insert] sourced from a multi-row literal in target
+   schema order, so the count-reporting tests can vary the source size. *)
+let insert_mutation_multi ~table ~columns ~rows : Plan.Physical.mutation =
+  Insert { table; source = RelationLiteral { columns; rows } }
 
 (* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]
    with the given column/value pairs. The pairs are in target schema order;
@@ -33,8 +39,17 @@ let test_insert_writes_row_and_reports_one_affected () =
         ]
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
-      Eval.eval_mutation environment transaction mutation (fun affected_rows ->
-          Alcotest.(check int) "one row affected" 1 affected_rows));
+      Eval.eval_mutation environment transaction mutation
+        (fun (relation : [ `Bag ] Relation.t) ->
+          Alcotest.(check (list string))
+            "result kind has one insert_count column" [ "insert_count" ]
+            (List.map
+               (fun (field : Row.field) -> field.name)
+               relation.kind.row_kind);
+          Alcotest.(check row_list_testable)
+            "result has a single (insert_count = 1) row"
+            [ [| Scalar.Int64 1L |] ]
+            (List.of_seq relation.value)));
   (* The row should now be present in a fresh read transaction, so we know
      the write committed rather than just being visible to the writer. *)
   Storage.Engine.with_read_transaction environment (fun transaction ->
@@ -61,6 +76,41 @@ let test_insert_writes_row_and_reports_one_affected () =
                   |];
                 ]
                 [ row ]))
+
+let test_insert_three_rows_reports_count_of_three () =
+  with_fixture_environment @@ fun environment ->
+  let mutation =
+    insert_mutation_multi ~table:"orders"
+      ~columns:[ "id"; "user_id"; "description"; "amount" ]
+      ~rows:
+        [
+          [
+            Scalar.Int64 10L;
+            Scalar.Int64 1L;
+            Scalar.String "A";
+            Scalar.Int64 1L;
+          ];
+          [
+            Scalar.Int64 11L;
+            Scalar.Int64 1L;
+            Scalar.String "B";
+            Scalar.Int64 2L;
+          ];
+          [
+            Scalar.Int64 12L;
+            Scalar.Int64 1L;
+            Scalar.String "C";
+            Scalar.Int64 3L;
+          ];
+        ]
+  in
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      Eval.eval_mutation environment transaction mutation
+        (fun (relation : [ `Bag ] Relation.t) ->
+          Alcotest.(check row_list_testable)
+            "three rows inserted yields insert_count = 3"
+            [ [| Scalar.Int64 3L |] ]
+            (List.of_seq relation.value)))
 
 let test_insert_with_existing_primary_key_raises () =
   with_fixture_environment @@ fun environment ->
@@ -99,6 +149,8 @@ let () =
           Alcotest.test_case
             "writes the row and reports one affected row on success" `Quick
             test_insert_writes_row_and_reports_one_affected;
+          Alcotest.test_case "three rows inserted yields insert_count = 3"
+            `Quick test_insert_three_rows_reports_count_of_three;
           Alcotest.test_case
             "raises and leaves storage untouched on a primary-key collision"
             `Quick test_insert_with_existing_primary_key_raises;

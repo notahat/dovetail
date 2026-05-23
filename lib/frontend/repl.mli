@@ -13,16 +13,6 @@
     the loop in-process. *)
 
 module Storage = Dovetail_storage
-module Plan = Dovetail_plan
-
-val format_mutation_status : Plan.Physical.mutation -> int -> string
-(** [format_mutation_status mutation affected_rows] renders the one-line status
-    the REPL prints after a successful mutation, e.g. ["inserted 1 row"] or
-    ["inserted 5 rows"]. The verb is chosen by the [mutation] constructor (so
-    future {!Physical.mutation} constructors slot in next to [Insert]'s
-    "inserted"); the noun pluralises on [affected_rows = 1]. Exposed so a unit
-    test can pin the wording without having to drive a real mutation through the
-    REPL loop. *)
 
 val run :
   ?show_logical:bool ->

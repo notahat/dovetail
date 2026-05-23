@@ -336,9 +336,26 @@ let insert_one_row ~target_kind ~target_map ~target_table ~write_transaction
   Storage.Engine.put target_map write_transaction ~key:key_bytes
     ~value:value_bytes
 
+(* The static row shape an insert reports: a one-column [insert_count : int64]
+   row. The kind has no refinements -- the relation describes an evaluation
+   result, not a stored table. *)
+let insert_result_kind : Relation.kind =
+  {
+    row_kind =
+      [ { name = "insert_count"; kind = Scalar.Int64; qualifier = None } ];
+    refinements = [];
+  }
+
+(* Wrap a row count as the one-row [insert_count : int64] relation. *)
+let insert_result_relation count : [ `Bag ] Relation.t =
+  {
+    kind = insert_result_kind;
+    value = Seq.return [| Scalar.Int64 (Int64.of_int count) |];
+  }
+
 (* Evaluate the [source] sub-plan inside its own resource scope and write each
-   row it produces into [target_table]. Returns the number of rows written
-   via [continue]. *)
+   row it produces into [target_table]. Hands [continue] a one-row relation
+   reporting how many rows were written. *)
 let evaluate_insert environment transaction ~target_table ~source continue =
   let target_kind, target_map =
     lookup_table_resources environment transaction target_table
@@ -358,7 +375,7 @@ let evaluate_insert environment transaction ~target_table ~source continue =
             ~write_transaction:transaction ~position_map source_row;
           incr affected_rows)
         source_relation.value);
-  continue !affected_rows
+  continue (insert_result_relation !affected_rows)
 
 let eval_mutation environment transaction mutation continue =
   match (mutation : Plan.Physical.mutation) with

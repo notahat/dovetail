@@ -7,15 +7,6 @@ module Execution = Dovetail_execution
 
 let prompt = "> "
 
-(* Render the affected-row status line for a completed mutation. The verb is
-   keyed off the [mutation] constructor so the classifier and the rendered
-   word come from the same source of truth: a future [Update]/[Delete] adds
-   one constructor and one verb here and the rest of the renderer reuses. *)
-let format_mutation_status mutation affected_rows =
-  let verb = match mutation with Plan.Physical.Insert _ -> "inserted" in
-  let noun = if affected_rows = 1 then "row" else "rows" in
-  Printf.sprintf "%s %d %s" verb affected_rows noun
-
 (* Translate [logical_plan] inside [transaction] and, when the matching
    [show_*] flag is true, dump the logical and/or chosen physical plan to
    [output] around the translate call. Both plans share one helper so the
@@ -47,10 +38,11 @@ let print_query_result environment transaction ~output ~show_logical
   | Plan.Physical.Mutation _ -> assert false
 
 (* Inside a write transaction: translate the plan, evaluate the mutation,
-   and emit the affected-rows status line to [output]. The [Query] arm is
-   unreachable for the symmetric reason -- [Logical.classify] chose [`Write]
-   and so [Translate.translate] is contracted to return a [Physical.Mutation].
-*)
+   and pretty-print the result relation to [output]. Mutations report their
+   outcome as a one-row relation now, so this prints exactly the way the
+   query path does. The [Query] arm is unreachable for the symmetric reason
+   -- [Logical.classify] chose [`Write] and so [Translate.translate] is
+   contracted to return a [Physical.Mutation]. *)
 let print_mutation_result environment transaction ~output ~show_logical
     ~show_physical logical_plan =
   match
@@ -59,9 +51,7 @@ let print_mutation_result environment transaction ~output ~show_logical
   with
   | Plan.Physical.Mutation mutation ->
       Execution.Eval.eval_mutation environment transaction mutation
-        (fun affected_rows ->
-          Format.fprintf output "%s@."
-            (format_mutation_status mutation affected_rows))
+        (fun relation -> Relation.print ~formatter:output relation)
   | Plan.Physical.Query _ -> assert false
 
 (* Run a single parsed query against [environment] and pretty-print the

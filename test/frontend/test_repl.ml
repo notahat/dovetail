@@ -2,7 +2,6 @@
 
 open Dovetail_frontend
 open Test_helpers
-module Plan = Dovetail_plan
 
 (** Run the REPL against a populated environment with [lines] as input,
     capturing all formatter output as a string. [show_logical] and
@@ -142,36 +141,12 @@ let test_show_physical_prints_plan_before_results () =
     "plan precedes the result rows" true
     (plan_position < row_position)
 
-(* A hand-built insert mutation used only as a constructor witness for the
-   render-status tests below. The source plan is irrelevant -- the renderer
-   keys off the mutation constructor for the verb and never touches [source]. *)
-let example_insert : Plan.Physical.mutation =
-  Insert
-    {
-      table = "orders";
-      source = Plan.Physical.RelationLiteral { columns = []; rows = [ [] ] };
-    }
-
-let test_format_mutation_status_singular_row () =
-  Alcotest.(check string)
-    "one row uses the singular noun" "inserted 1 row"
-    (Repl.format_mutation_status example_insert 1)
-
-let test_format_mutation_status_zero_rows_pluralises () =
-  Alcotest.(check string)
-    "zero rows uses the plural noun" "inserted 0 rows"
-    (Repl.format_mutation_status example_insert 0)
-
-let test_format_mutation_status_many_rows_pluralises () =
-  Alcotest.(check string)
-    "many rows use the plural noun" "inserted 5 rows"
-    (Repl.format_mutation_status example_insert 5)
-
 (* End-to-end: a user-typed insert pipeline runs through parse / lower /
-   translate / eval, commits the row inside a write transaction, and
-   prints the affected-row status line. The follow-up restrict query
-   confirms the row landed in storage and is readable. *)
-let test_insert_into_orders_writes_row_and_reports_status () =
+   translate / eval, commits the row inside a write transaction, and prints
+   a one-row [(insert_count : int64)] relation reporting the affected-row
+   count. The follow-up restrict query confirms the row landed in storage
+   and is readable. *)
+let test_insert_into_orders_writes_row_and_reports_count () =
   let output =
     run_with_input
       [
@@ -180,7 +155,8 @@ let test_insert_into_orders_writes_row_and_reports_status () =
         "orders | restrict id = 9";
       ]
   in
-  check_contains "insert status line" output "inserted 1 row";
+  check_contains "insert result column header" output "insert_count";
+  check_contains "insert result count cell" output " 1 ";
   check_contains "inserted row's description" output "Pretzel";
   check_contains "inserted row's id column" output " 9 "
 
@@ -428,8 +404,9 @@ let () =
             "a bare relation literal prints as a one-row relation" `Quick
             test_relation_literal_alone_prints_one_row;
           Alcotest.test_case
-            "insert into orders writes the row and prints the status line"
-            `Quick test_insert_into_orders_writes_row_and_reports_status;
+            "insert into orders writes the row and prints the insert_count \
+             relation"
+            `Quick test_insert_into_orders_writes_row_and_reports_count;
           Alcotest.test_case
             ":list tables prints fixture tables in byte-sorted order" `Quick
             test_list_tables_prints_fixture_tables_in_byte_sorted_order;
@@ -472,14 +449,5 @@ let () =
           Alcotest.test_case
             ":create table on an existing table reports the error and continues"
             `Quick test_create_table_already_exists_reports_error_and_continues;
-        ] );
-      ( "mutation rendering",
-        [
-          Alcotest.test_case "one affected row uses the singular noun" `Quick
-            test_format_mutation_status_singular_row;
-          Alcotest.test_case "zero affected rows uses the plural noun" `Quick
-            test_format_mutation_status_zero_rows_pluralises;
-          Alcotest.test_case "many affected rows use the plural noun" `Quick
-            test_format_mutation_status_many_rows_pluralises;
         ] );
     ]
