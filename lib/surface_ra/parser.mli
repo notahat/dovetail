@@ -36,6 +36,28 @@ val parse : string -> (Ast.program, error) result
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)
 
+val parse_row_type : string -> (Ast.type_expression, error) result
+(** [parse_row_type input] parses [input] as a surface row-type expression: a
+    parenthesised, comma-separated list of [name: kind] bindings, with a
+    permitted trailing comma. The empty form [()] is accepted. Refinement
+    clauses (e.g. [primary key (...)]) are rejected — those belong to a relation
+    type, parsed by {!parse_relation_type}.
+
+    Leading and trailing whitespace are accepted; the parser must consume the
+    entire input. Not yet wired into the pipeline grammar; exposed for direct
+    testing while the new literal syntax is being assembled. *)
+
+val parse_relation_type : string -> (Ast.type_expression, error) result
+(** [parse_relation_type input] parses [input] as a surface relation-type
+    expression: the row-type form (see {!parse_row_type}) followed by zero or
+    more refinement clauses, all in the same parenthesised list. The only
+    refinement available today is [primary key (col, col, ...)]; new refinements
+    slot in as additional clause keywords.
+
+    Leading and trailing whitespace are accepted; the parser must consume the
+    entire input. Not yet wired into the pipeline grammar; exposed for direct
+    testing while the new literal syntax is being assembled. *)
+
 val parse_expression : string -> (Expression.t, error) result
 (** [parse_expression input] parses [input] as a single expression in the
     sublanguage shared by [restrict] and [join ... on]. The grammar, from

@@ -15,8 +15,32 @@
 
 module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
+module Relation = Dovetail_core.Relation
 module Ddl = Dovetail_ddl
 module Plan = Dovetail_plan
+
+type type_field = { name : string; kind : Scalar.kind }
+(** A single binding inside a row- or relation-type expression: a field name
+    paired with the scalar kind it carries. The surface syntax is [name: kind] —
+    bare identifier, [:], lowercase type keyword ([int64] / [string] / [bool]).
+    Field qualifiers have no surface form on a type expression, so {!type_field}
+    carries none. *)
+
+type type_expression = {
+  fields : type_field list;
+  refinements : Relation.refinement list;
+}
+(** A parenthesised type expression as written at the surface. Two surface forms
+    map onto this one node:
+
+    - A {b row-type expression} ([(id: int64, name: string)]) parses with
+      [refinements = []]; the row-type parser rejects any refinement clause.
+    - A {b relation-type expression}
+      ([(id: int64, name: string, primary key (id))]) parses with the same
+      fields plus zero or more refinement clauses.
+
+    The empty form [()] parses as [{ fields = []; refinements = [] }] in either
+    context. *)
 
 type t =
   | Relation_name of string

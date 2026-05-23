@@ -1,5 +1,10 @@
 (tests
- (names test_parser test_expression_parser test_lower test_scalar_roundtrip)
+ (names
+  test_parser
+  test_expression_parser
+  test_type_expression_parser
+  test_lower
+  test_scalar_roundtrip)
  (libraries
   alcotest
   dovetail.core

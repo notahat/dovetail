@@ -1,7 +1,15 @@
 module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
+module Relation = Dovetail_core.Relation
 module Ddl = Dovetail_ddl
 module Plan = Dovetail_plan
+
+type type_field = { name : string; kind : Scalar.kind }
+
+type type_expression = {
+  fields : type_field list;
+  refinements : Relation.refinement list;
+}
 
 type t =
   | Relation_name of string

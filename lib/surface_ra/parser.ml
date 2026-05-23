@@ -2,6 +2,7 @@ open Angstrom
 module StringSet = Set.Make (String)
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
 module Ddl = Dovetail_ddl
 
@@ -487,3 +488,110 @@ let parse input = parse_string ~consume:All program_parser input
    consumption. *)
 let expression_query = whitespace *> expression <* whitespace <* end_of_input
 let parse_expression input = parse_string ~consume:All expression_query input
+
+(* The lowercase kind keywords [int64], [string], and [bool] inside a type
+   expression. Distinct from the capitalised identifiers [Int64] / [String]
+   / [Bool] used by the [:create table] grammar; the two surfaces are
+   converging on the lowercase form but the legacy DDL parser still owns
+   the capitalised one. *)
+let type_expression_kind_keyword =
+  keyword "int64" *> return (Scalar.Int64 : Scalar.kind)
+  <|> keyword "string" *> return (Scalar.String : Scalar.kind)
+  <|> keyword "bool" *> return (Scalar.Bool : Scalar.kind)
+
+(* Reserved words inside a type expression: the kind keywords and the
+   refinement-clause keywords. A field name matching one of these is a parse
+   error so the surface stays unambiguous as more refinement clauses arrive. *)
+let type_expression_reserved_words =
+  StringSet.of_list [ "int64"; "string"; "bool"; "primary"; "key" ]
+
+(* The body of a [primary key (col, col, ...)] refinement: a non-empty,
+   comma-separated list of column names with a permitted trailing comma. *)
+let primary_key_columns =
+  identifier >>= fun first_column ->
+  many (whitespace *> char ',' *> whitespace *> identifier)
+  >>= fun more_columns ->
+  whitespace *> option false (char ',' *> return true) *> return ()
+  >>| fun () -> first_column :: more_columns
+
+(* A single item inside a type expression: either a field binding
+   ([name: kind]) or a [primary key (...)] refinement. The two are
+   disambiguated by the first identifier — [primary] introduces the refinement
+   clause; anything else is a field name. Reserved words are rejected at the
+   field-name position. *)
+let type_expression_item =
+  identifier >>= fun first_word ->
+  if first_word = "primary" then
+    whitespace *> keyword "key" *> whitespace *> char '(' *> whitespace
+    *> primary_key_columns
+    <* whitespace <* char ')'
+    >>| fun columns -> `Refinement (Relation.Primary_key columns)
+  else if StringSet.mem first_word type_expression_reserved_words then
+    fail
+      (Printf.sprintf "%S is reserved as a keyword inside a type expression"
+         first_word)
+  else
+    whitespace *> char ':' *> whitespace *> type_expression_kind_keyword
+    >>| fun field_kind ->
+    `Field ({ name = first_word; kind = field_kind } : Ast.type_field)
+
+(* A parenthesised type-expression body: zero or more comma-separated items
+   with a permitted trailing comma, or the empty form [()]. Returns the items
+   in source order so the row-type entry point can scan for refinements. *)
+let type_expression_items =
+  whitespace
+  *> ( peek_char >>= function
+       | Some ')' -> return []
+       | _ ->
+           type_expression_item >>= fun first_item ->
+           many (whitespace *> char ',' *> whitespace *> type_expression_item)
+           >>= fun more_items ->
+           whitespace *> option false (char ',' *> return true) *> return ()
+           >>| fun () -> first_item :: more_items )
+
+(* The shared parenthesised type-expression grammar. The row / relation
+   distinction lives in the caller, which decides whether refinements are
+   tolerated. *)
+let type_expression_body =
+  char '(' *> type_expression_items <* whitespace <* char ')'
+
+(* Split the item list into fields and refinements, preserving source order
+   within each bucket. The interleaved surface form means refinements can
+   appear anywhere in the list, but the AST keeps the two buckets separate. *)
+let partition_type_expression_items items =
+  let fields =
+    List.filter_map
+      (function `Field field -> Some field | `Refinement _ -> None)
+      items
+  in
+  let refinements =
+    List.filter_map
+      (function `Refinement refinement -> Some refinement | `Field _ -> None)
+      items
+  in
+  (fields, refinements)
+
+let row_type_query =
+  whitespace *> type_expression_body <* whitespace <* end_of_input
+  >>= fun items ->
+  match
+    List.find_opt (function `Refinement _ -> true | `Field _ -> false) items
+  with
+  | Some _ ->
+      fail
+        "primary key refinement is not allowed in a row type; use a relation \
+         type"
+  | None ->
+      let fields, refinements = partition_type_expression_items items in
+      return ({ fields; refinements } : Ast.type_expression)
+
+let relation_type_query =
+  whitespace *> type_expression_body <* whitespace <* end_of_input
+  >>| fun items ->
+  let fields, refinements = partition_type_expression_items items in
+  ({ fields; refinements } : Ast.type_expression)
+
+let parse_row_type input = parse_string ~consume:All row_type_query input
+
+let parse_relation_type input =
+  parse_string ~consume:All relation_type_query input
