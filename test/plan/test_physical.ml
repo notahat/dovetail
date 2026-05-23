@@ -121,6 +121,12 @@ let test_indexed_nested_loop_join_renders_with_inner_position_right () =
     \  FullScan(orders)\n"
     (format_to_string plan)
 
+let test_type_op_renders_header_with_indented_input () =
+  let plan : Physical.t = Type_op { input = users_full_scan } in
+  Alcotest.(check string)
+    "Type prints a bare header with its input indented one level"
+    "Type\n  FullScan(users)\n" (format_to_string plan)
+
 let test_nested_indentation_compounds () =
   (* A Filter wrapping a CrossProduct: confirms that each level of nesting
      adds two spaces, not just the immediate one. *)
@@ -163,6 +169,8 @@ let () =
           Alcotest.test_case
             "IndexedNestedLoopJoin renders with inner_position=Right" `Quick
             test_indexed_nested_loop_join_renders_with_inner_position_right;
+          Alcotest.test_case "Type renders header with indented input" `Quick
+            test_type_op_renders_header_with_indented_input;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
         ] );

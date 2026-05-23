@@ -19,6 +19,7 @@ type t =
     }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
+  | Type_op of { input : t }
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
@@ -73,6 +74,9 @@ let rec format_at formatter indent plan =
   | Insert { table; source } ->
       Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
       format_at formatter (indent + 1) source
+  | Type_op { input } ->
+      Format.fprintf formatter "%sType@\n" prefix;
+      format_at formatter (indent + 1) input
 
 let format formatter plan = format_at formatter 0 plan
 
@@ -127,3 +131,9 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
       in
       Relation_literal.kind_of ~columns ~first_row
   | Insert _ -> insert_result_kind
+  | Type_op _ ->
+      (* [Type_op]'s evaluation result is a relation kind, not a relation
+         value, so it has no [Relation.kind] of its own. The [Eval] layer
+         calls [kind_of] on the input of a [Type_op], never on the
+         [Type_op] node itself. *)
+      failwith "Physical.kind_of: Type_op does not produce a relation kind"

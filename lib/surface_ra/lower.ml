@@ -15,3 +15,4 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
         }
   | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
   | Insert { table; source } -> Insert { table; source = lower source }
+  | Type { input } -> Type_op { input = lower input }

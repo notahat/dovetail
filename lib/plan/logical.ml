@@ -8,6 +8,7 @@ type t =
   | CrossProduct of { left : t; right : t }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
+  | Type_op of { input : t }
 
 (* Walks a plan and reports the strongest transaction access any operator
    in it needs. Insert is the only write operator today; every other
@@ -22,6 +23,7 @@ let rec required_access = function
       access_max (required_access left) (required_access right)
   | RelationLiteral _ -> `Read
   | Insert { source; _ } -> access_max `Write (required_access source)
+  | Type_op { input } -> required_access input
 
 and access_max left right =
   match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
@@ -56,5 +58,8 @@ let rec format_at formatter indent plan =
   | Insert { table; source } ->
       Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
       format_at formatter (indent + 1) source
+  | Type_op { input } ->
+      Format.fprintf formatter "%sType@\n" prefix;
+      format_at formatter (indent + 1) input
 
 let format formatter plan = format_at formatter 0 plan

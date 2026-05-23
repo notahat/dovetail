@@ -11,5 +11,6 @@ type t =
   | Join of { left : t; right : t; predicate : Expression.t }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
+  | Type of { input : t }
 
 type program = Pipeline of t | Ddl of Ddl.Statement.t

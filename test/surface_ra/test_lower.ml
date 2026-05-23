@@ -222,6 +222,14 @@ let test_insert_mutation_lowers_relational_source () =
        })
     logical
 
+let test_type_lowers_to_type_op () =
+  let ast = Ast.Type { input = Ast.Relation_name "users" } in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Type -> Logical.Type_op wrapping the lowered input"
+    (Type_op { input = Scan { table = "users" } })
+    logical
+
 let test_relation_literal_lowers_through () =
   let ast : Ast.t =
     RelationLiteral
@@ -283,6 +291,11 @@ let () =
           Alcotest.test_case
             "lowers Ast.RelationLiteral to Logical.RelationLiteral" `Quick
             test_relation_literal_lowers_through;
+        ] );
+      ( "type",
+        [
+          Alcotest.test_case "lowers Ast.Type to Logical.Type_op" `Quick
+            test_type_lowers_to_type_op;
         ] );
       ( "insert mutation",
         [

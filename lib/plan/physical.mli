@@ -99,6 +99,12 @@ type t =
           yields a one-row relation reporting the affected-row count. {!Eval}
           handles it as a regular case, writing rows inside the active write
           transaction and producing the (insert_count : int64) result. *)
+  | Type_op of { input : t }
+      (** [Type_op { input }] yields [input]'s relation kind rather than its
+          rows. {!Eval} reads the static kind via {!kind_of} without opening any
+          cursors. The node sits at the root of a plan only; {!kind_of} raises
+          [Failure] if called on a [Type_op] directly, since the operator's
+          evaluation result is a kind, not a relation. *)
 
 val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
 (** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}

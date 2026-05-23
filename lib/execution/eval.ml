@@ -113,6 +113,21 @@ let rec eval environment transaction plan continue =
   | Insert { table; source } ->
       evaluate_insert environment transaction ~target_table:table ~source
         continue
+  | Type_op { input } ->
+      evaluate_type_op environment transaction ~input continue
+
+(* Compute [input]'s static [Relation.kind] via [Physical.kind_of] and hand
+   [continue] the kind wrapped as [Term.Relation_kind]. No cursors are
+   opened; the answer comes from the plan alone. The catalog callback
+   reads from the live [Storage.Catalog], so a missing-table reference
+   inside [input] surfaces with the same wording the relational cases
+   produce at scan time. *)
+and evaluate_type_op environment transaction ~input continue =
+  let catalog table_name =
+    Storage.Catalog.get environment transaction ~table_name
+  in
+  let kind = Plan.Physical.kind_of ~catalog input in
+  continue (Term.Relation_kind kind)
 
 (* CPS helper for internal recursion: a relational operator's sub-plan always
    produces a [Term.Relation_value]. The [Term.Relation_kind] arm only arises

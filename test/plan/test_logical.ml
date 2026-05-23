@@ -54,6 +54,12 @@ let test_insert_requires_write_access () =
     "Insert requires Write access" true
     (Logical.required_access plan = `Write)
 
+let test_type_op_required_access_passes_through () =
+  let plan : Logical.t = Type_op { input = Scan { table = "users" } } in
+  Alcotest.(check bool)
+    "Type_op over a read-only input is read-only" true
+    (Logical.required_access plan = `Read)
+
 let format_to_string plan =
   with_captured_formatter (fun formatter -> Logical.format formatter plan)
 
@@ -134,6 +140,12 @@ let test_nested_indentation_compounds () =
     \    Scan(orders)\n"
     (format_to_string plan)
 
+let test_type_op_renders_header_with_indented_input () =
+  let plan : Logical.t = Type_op { input = users_scan } in
+  Alcotest.(check string)
+    "Type prints a bare header with its input indented one level"
+    "Type\n  Scan(users)\n" (format_to_string plan)
+
 let test_insert_renders_header_with_indented_source () =
   let plan : Logical.t =
     Insert
@@ -161,6 +173,8 @@ let () =
             `Quick test_cross_product_of_scans_requires_read_access;
           Alcotest.test_case "Insert requires Write access" `Quick
             test_insert_requires_write_access;
+          Alcotest.test_case "Type_op required_access passes through input"
+            `Quick test_type_op_required_access_passes_through;
         ] );
       ( "format",
         [
@@ -178,5 +192,7 @@ let () =
             test_nested_indentation_compounds;
           Alcotest.test_case "Insert prints header with indented source" `Quick
             test_insert_renders_header_with_indented_source;
+          Alcotest.test_case "Type renders header with indented input" `Quick
+            test_type_op_renders_header_with_indented_input;
         ] );
     ]

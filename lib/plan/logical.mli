@@ -48,6 +48,14 @@ type t =
           yields a one-row relation reporting the affected-row count. Insert
           declares [`Write] in {!required_access}, which is how the REPL knows
           to open a write transaction for any plan that contains it. *)
+  | Type_op of { input : t }
+      (** [Type_op { input }] yields [input]'s relation type rather than its
+          rows. {!Eval} reads the static {!Relation.kind} via
+          {!Physical.kind_of} without opening any cursors. The node sits at the
+          root of a pipeline only — [Lower] rejects a nested
+          [Type_op { input = Type_op _ }] with a user-facing error.
+          {!required_access} recurses into [input], so a [Type_op] over a
+          read-only sub-plan stays read-only. *)
 
 val required_access : t -> [ `Read | `Write ]
 (** [required_access plan] walks [plan] and returns the strongest transaction

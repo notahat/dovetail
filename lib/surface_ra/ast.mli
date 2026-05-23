@@ -68,6 +68,14 @@ type t =
           mutation universe. The grammar still admits the sink only in terminal
           position, but the structural guarantee no longer comes from the type.
       *)
+  | Type of { input : t }
+      (** [Type { input }] is the surface form [input | type]. Evaluation yields
+          [input]'s relation type rather than its rows — no cursors open, no
+          rows pulled. The constructor sits at the root of a pipeline only;
+          {!Lower} rejects [input | type | type] because the second [type]'s
+          input is a type, not a relation. The parser does not yet produce this
+          node — until it does, the only way to reach it is by building one
+          directly. *)
 
 type program =
   | Pipeline of t

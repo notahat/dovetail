@@ -203,6 +203,12 @@ let test_insert_returns_insert_count_kind () =
     "Insert reports a one-column (insert_count : int64) result" expected
     (Physical.kind_of ~catalog:fixture_catalog plan)
 
+let test_type_op_raises_because_result_is_a_kind () =
+  let plan : Physical.t = Type_op { input = FullScan { table = "users" } } in
+  Alcotest.check_raises "Type_op has no relation kind"
+    (Failure "Physical.kind_of: Type_op does not produce a relation kind")
+    (fun () -> ignore (Physical.kind_of ~catalog:fixture_catalog plan))
+
 let () =
   Alcotest.run "physical_kind_of"
     [
@@ -234,5 +240,7 @@ let () =
           Alcotest.test_case
             "Insert reports a one-column (insert_count : int64) result" `Quick
             test_insert_returns_insert_count_kind;
+          Alcotest.test_case "Type_op raises because its result is a kind"
+            `Quick test_type_op_raises_because_result_is_a_kind;
         ] );
     ]
