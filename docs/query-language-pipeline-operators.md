@@ -155,10 +155,10 @@ for the catalog-inspection use.
 
 Writes every row of `<input>` to `<table-name>` and returns a one-row
 relation `(insert_count: int64)` reporting how many rows were
-written. `<input>` is currently a single-row literal of the form
-`{column: value, ...}`; the literal's columns must be a permutation
-of the target's columns, and each value must match its target
-column's kind. A multi-row literal form and arbitrary upstream
+written. `<input>` is currently a relation literal of the form
+`relation (column: type, ...) { (column = value, ...), ... }`; the
+literal's columns must be a permutation of the target's columns, and
+each value must match its target column's kind. Arbitrary upstream
 pipelines (insert-from-query) are deferred to a later slice.
 
 Insert is a regular pipeline operator with one surface restriction:
@@ -168,7 +168,7 @@ transaction; a primary-key collision (or any other failure) aborts
 the transaction and the table is unchanged.
 
 ```
-> {id: 7, user_id: 4, description: "Muffin", amount: 2} | insert into orders
+> relation (id: int64, user_id: int64, description: string, amount: int64) { (id = 7, user_id = 4, description = "Muffin", amount = 2) } | insert into orders
 │ insert_count │
 ├──────────────┤
 │            1 │

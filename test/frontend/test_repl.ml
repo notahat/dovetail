@@ -150,8 +150,9 @@ let test_insert_into_orders_writes_row_and_reports_count () =
   let output =
     run_with_input
       [
-        "{id: 9, user_id: 1, description: \"Pretzel\", amount: 9} | insert \
-         into orders";
+        "relation (id: int64, user_id: int64, description: string, amount: \
+         int64) { (id = 9, user_id = 1, description = \"Pretzel\", amount = 9) \
+         } | insert into orders";
         "orders | restrict id = 9";
       ]
   in
@@ -338,7 +339,13 @@ let test_create_table_already_exists_reports_error_and_continues () =
   check_contains "loop continues after create error" output "users"
 
 let test_relation_literal_alone_prints_one_row () =
-  let output = run_with_input [ "{id: 7, name: \"Pretzel\", amount: 9}" ] in
+  let output =
+    run_with_input
+      [
+        "relation (id: int64, name: string, amount: int64) { (id = 7, name = \
+         \"Pretzel\", amount = 9) }";
+      ]
+  in
   (* Bare column headers, no qualifier prefix. *)
   check_contains "literal column headers" output "│ id │ name";
   check_contains "literal column headers" output "amount";

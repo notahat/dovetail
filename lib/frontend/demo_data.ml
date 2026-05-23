@@ -10,28 +10,41 @@ let script =
   [
     ":create table users (id: Int64, name: String, email: String, active: \
      Bool) primary key (id)";
-    "{id: 1, name: \"Alice\", email: \"alice@example.com\", active: true} | \
+    "relation (id: int64, name: string, email: string, active: bool) { (id = \
+     1, name = \"Alice\", email = \"alice@example.com\", active = true) } | \
      insert into users";
-    "{id: 2, name: \"Bob\", email: \"bob@example.com\", active: false} | \
+    "relation (id: int64, name: string, email: string, active: bool) { (id = \
+     2, name = \"Bob\", email = \"bob@example.com\", active = false) } | \
      insert into users";
-    "{id: 3, name: \"Carol\", email: \"carol@example.com\", active: true} | \
+    "relation (id: int64, name: string, email: string, active: bool) { (id = \
+     3, name = \"Carol\", email = \"carol@example.com\", active = true) } | \
      insert into users";
-    "{id: 4, name: \"Dave\", email: \"dave@example.com\", active: true} | \
+    "relation (id: int64, name: string, email: string, active: bool) { (id = \
+     4, name = \"Dave\", email = \"dave@example.com\", active = true) } | \
      insert into users";
-    "{id: 5, name: \"Eve\", email: \"eve@example.com\", active: false} | \
+    "relation (id: int64, name: string, email: string, active: bool) { (id = \
+     5, name = \"Eve\", email = \"eve@example.com\", active = false) } | \
      insert into users";
     ":create table orders (id: Int64, user_id: Int64, description: String, \
      amount: Int64) primary key (id)";
-    "{id: 1, user_id: 1, description: \"Coffee\", amount: 5} | insert into \
-     orders";
-    "{id: 2, user_id: 1, description: \"Bagel\", amount: 4} | insert into \
-     orders";
-    "{id: 3, user_id: 2, description: \"Tea\", amount: 3} | insert into orders";
-    "{id: 4, user_id: 3, description: \"Sandwich\", amount: 8} | insert into \
-     orders";
-    "{id: 5, user_id: 3, description: \"Cake\", amount: 6} | insert into orders";
-    "{id: 6, user_id: 5, description: \"Cookie\", amount: 2} | insert into \
-     orders";
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 1, user_id = 1, description = \"Coffee\", amount = 5) } | insert \
+     into orders";
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 2, user_id = 1, description = \"Bagel\", amount = 4) } | insert \
+     into orders";
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 3, user_id = 2, description = \"Tea\", amount = 3) } | insert \
+     into orders";
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 4, user_id = 3, description = \"Sandwich\", amount = 8) } | \
+     insert into orders";
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 5, user_id = 3, description = \"Cake\", amount = 6) } | insert \
+     into orders";
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 6, user_id = 5, description = \"Cookie\", amount = 2) } | insert \
+     into orders";
   ]
 
 (* True when every name in {!demo_tables} is already present in the
