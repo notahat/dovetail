@@ -35,8 +35,8 @@ still settling — refine this file as cases come up.
   where extreme brevity is the right call — the module name carries the
   meaning.
 - Use submodules when a module owns multiple peer concepts that each
-  deserve a namespace. `Value.Kind.t` is the example: it sits alongside
-  the future `Value.t` without constructor clashes.
+  deserve a namespace, so each peer's primary type can be `.t` without
+  constructor clashes between them.
 
 ### Exceptions where short forms stay
 
@@ -59,7 +59,7 @@ The static shape of a value goes by two names depending on which side
 of the wall you're on. They are the same concept — see
 [`docs/type-system.md`](docs/type-system.md) for the framing.
 
-- **Inside the code**, the name is `kind`: `Value.kind`, `Row.kind`,
+- **Inside the code**, the name is `kind`: `Scalar.kind`, `Row.kind`,
   `Relation.kind`. OCaml's `type` is a keyword, so we cannot use it
   for our own identifiers; `kind` is the disambiguating choice and
   `type-ladder.md` documents the as-built shape.
@@ -128,13 +128,14 @@ boundaries to use modules from sibling sub-libraries. Two styles:
   references become `Ddl.Statement.t`. The prefix keeps group membership
   visible at the call site — "this is the DDL vocabulary" — which is
   worth signal when the sibling library names a localised concern.
-- **Per-module alias.** `module Value = Dovetail_core.Value` for each
-  used module; references stay unqualified (`Value.t`). Smaller per-file
-  diff and no prefix noise at every type signature and pattern match.
+- **Per-module alias.** `module Scalar = Dovetail_core.Scalar` for each
+  used module; references stay unqualified (`Scalar.value`). Smaller
+  per-file diff and no prefix noise at every type signature and pattern
+  match.
 
 **Rule of thumb:** library alias by default; per-module alias for
 `core` (and any future library where the prefix would be noise rather
-than signal). `core` types — `Value`, `Row`, `Relation`, `Expression`,
+than signal). `core` types — `Scalar`, `Row`, `Relation`, `Expression`,
 `Relation_literal` — are pervasive enough that a `Core.`
 prefix on every reference would add noise without signal. Localised
 sublibraries (`storage`, `plan`, `ddl`, `surface_ra`, `execution`,
@@ -150,7 +151,7 @@ pipeline subtest inside a translate test, or `Plan.Physical.t` from
 a `surface_ra` test — get the same `module X = Dovetail_X` library
 aliases that lib code uses, and the call sites pay the prefix.
 `core` types stay on per-module aliases everywhere
-(`module Value = Dovetail_core.Value`) for the same noise-vs-signal
+(`module Scalar = Dovetail_core.Scalar`) for the same noise-vs-signal
 reason lib code uses them. Integration tests in `test/integration/`
 have no single SUT, so all libraries get the `module X = …`
 treatment there.
