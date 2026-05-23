@@ -56,10 +56,10 @@ existing parser does:
 
 - `|` is the only composition operator. It is left-associative; each
   step is a function from the upstream relation to a new one
-  (`parser.ml:346`, `parser.ml:356`).
+  (`parser.ml`'s `pipeline_step` / `query_pipeline`).
 - A bare query in the REPL is evaluated and printed. There is no
   explicit print step; results render automatically
-  (`repl.ml:142-150`).
+  (`repl.ml`'s `evaluate_and_print` / `print_result`).
 - Evaluation streams end-to-end. `Relation.value` is a lazy `Seq.t`;
   `Filter` and `Project` wrap with `Seq.filter` / `Seq.map`;
   `FullScan` opens a live cursor. Pipelines compose without
@@ -68,7 +68,7 @@ existing parser does:
   a pipeline (the parser rejects anything after it). It produces a
   one-row `(insert_count: int64)` relation, so downstream eval and
   printing don't need a separate "mutation" universe
-  (`parser.ml:372-379`).
+  (`parser.ml`'s `insert_sink` / `pipeline_parser`).
 
 DDL is the exception: a `:`-sigil grammar with its own AST
 (`lib/ddl/statement.ml`), its own executor (`Ddl_executor`), and a
@@ -268,20 +268,21 @@ Some things to note about that table:
 
 ## How the existing DDL surface maps over
 
-The DDL universe today is exactly four statements (see
-`lib/ddl/statement.mli`):
+The DDL universe today is exactly three statements (see
+`lib/ddl/statement.mli`); a fourth, `:describe`, was retired once the
+`| type` operator landed and now lives only as a pipe stage:
 
 | Existing DDL                                                | Pipe-form replacement                                                |
 |-------------------------------------------------------------|----------------------------------------------------------------------|
 | `:list tables`                                              | `catalog \| tables`                                                  |
-| `:describe users`                                           | `users \| type`                                                      |
 | `:create table users (id: int64, …) primary key (id)`       | `(id: int64, …, primary key (id)) \| create table users`             |
 | `:drop table users`                                         | `drop table users`                                                   |
 
-Every output form is covered. The relation-type syntax round-trips
-the same content the canonical-form printer produces today; `users |
-type`'s output is identical to `:describe users`'s output up to
-spelling differences (`int64` lowercase, `:` between name and type).
+`| type` is already built — `users | type` prints the relation type
+that `:describe users` used to print, up to spelling differences
+(`int64` lowercase, `:` between name and type). The remaining
+pipe-form replacements above are the design target; the `:`-sigil
+statements are what the parser dispatches to today.
 
 Once this is built, `lib/ddl/` becomes dead code: no `:`-sigil
 grammar, no `Ddl.Statement.t` AST, no `Ddl_executor`, no
