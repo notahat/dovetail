@@ -1,6 +1,6 @@
 # Type ladder
 
-The shape that the `lib/core/` modules — `Value`, `Row`, `Relation` —
+The shape that the `lib/core/` modules — `Scalar`, `Row`, `Relation` —
 follow, and the rules for adding to it. Pairs with
 [`literals-as-a-ladder.md`](literals-as-a-ladder.md), which sketches
 the design; this file describes what got built.
@@ -11,53 +11,59 @@ Four rungs, each composing the one below:
 
 | Rung       | Shape          | Carrier     |
 | ---------- | -------------- | ----------- |
-| `Value`    | a single typed value          | `kind` + `data` |
-| `Row`      | an ordered list of values     | `kind` + `data` |
-| `Relation` | a stream of rows, plus refinements on the contents | `kind` + `data` + `t` |
-| `Catalog`  | a named collection of relations, plus cross-table refinements | `kind` + `data` + `t` (not yet built as a value) |
+| `Scalar`   | a single typed value          | `kind` + `value` |
+| `Row`      | an ordered list of values     | `kind` + `value` |
+| `Relation` | a stream of rows, plus refinements on the contents | `kind` + `value` + `t` |
+| `Catalog`  | a named collection of relations, plus cross-table refinements | `kind` + `value` + `t` (not yet built as a value) |
 
 At each rung the vocabulary is the same:
 
-- **`kind`** is the static shape — what something is, with no values.
-- **`data`** is a value at that shape — the actual payload.
-- **`t`** is the carrier that pairs a `kind` with its `data`.
+- **`kind`** is the static shape — what something is, with no payload.
+- **`value`** is a payload at that shape — the actual contents.
+- **`t`** is the carrier that pairs a `kind` with its `value`.
 
-The uniformity is the point. Once a reader knows what `kind` and `data`
+The uniformity is the point. Once a reader knows what `kind` and `value`
 mean at one rung, they know what to look for at every other rung; new
 operators and conversions name themselves the same way at any level.
 
+`kind` is the documented internal exception to the
+[surface/internal vocabulary split](type-system.md): user-facing
+strings say "type", but OCaml reserves `type` as a keyword, so the
+code side calls it `kind`. The payload half is `value` on both sides.
+
 ## Per-rung detail
 
-### `Value` ([`lib/core/value.mli`](../lib/core/value.mli))
+### `Scalar` ([`lib/core/scalar.mli`](../lib/core/scalar.mli))
 
 ```
 type kind = Int64 | String | Bool
-type data = Int64 of int64 | String of string | Bool of bool
+type value = Int64 of int64 | String of string | Bool of bool
 ```
 
-A `Value.kind` is one of three tags; a `Value.data` is the same tag
+A `Scalar.kind` is one of three tags; a `Scalar.value` is the same tag
 with a payload. The two share constructor names so OCaml's
 type-directed disambiguation usually picks the right one without
 annotation.
 
-There is no `Value.t`. A value *is* its own carrier — pairing a
-`Value.data` with its `Value.kind` adds no information (`Value.kind_of`
-recovers the kind in one step), so the rung stops at `kind` and `data`.
+There is no `Scalar.t`. A scalar *is* its own carrier — pairing a
+`Scalar.value` with its `Scalar.kind` adds no information
+(`Scalar.kind_of` recovers the kind in one step), so the rung stops
+at `kind` and `value`.
 
 ### `Row` ([`lib/core/row.mli`](../lib/core/row.mli))
 
 ```
-type field = { name : string; kind : Value.kind; qualifier : string option }
+type field = { name : string; kind : Scalar.kind; qualifier : string option }
 type kind = field list
-type data = Value.data array
+type value = Scalar.value array
 ```
 
 A `Row.kind` is an ordered list of named, typed, optionally-qualified
-fields. A `Row.data` is the values themselves, in field order; an array
+fields. A `Row.value` is the cells themselves, in field order; an array
 so column lookups are O(1) on the hot path.
 
 There is no `Row.t` either. A row is consumed in the context of a
-relation, which already pairs the kind with each row's data — pairing
+relation, which already pairs the kind with each row's value — pairing
 them per-row would just inflate the working set.
 
 ### `Relation` ([`lib/core/relation.mli`](../lib/core/relation.mli))
@@ -65,7 +71,7 @@ them per-row would just inflate the working set.
 ```
 type refinement = Primary_key of string list
 type kind = { row_kind : Row.kind; refinements : refinement list }
-type 'tag t = { kind : kind; data : Row.data Seq.t }
+type 'tag t = { kind : kind; value : Row.value Seq.t }
   constraint 'tag = [< `Set | `Bag ]
 ```
 
@@ -90,8 +96,8 @@ eventually take:
 ```
 type refinement = Foreign_key of { ... } | ...
 type kind = { table_kinds : (string * Relation.kind) list; refinements : refinement list }
-type data = (string * [ `Bag ] Relation.t) list
-type t = { kind : kind; data : data }
+type value = (string * [ `Bag ] Relation.t) list
+type t = { kind : kind; value : value }
 ```
 
 Only the kind side exists today, and it is implicit. `Storage.Catalog`
@@ -99,7 +105,7 @@ is an imperative shell over LMDB — `get` / `put` / `list_table_names`
 / `delete` — operating on a persistent map from table name to
 `Relation.kind`. No cross-table refinements are tracked yet, so the
 kind is effectively just the named map; no `Catalog.kind` record
-type names it. The data side does not exist at all: the rows
+type names it. The value side does not exist at all: the rows
 themselves live in per-table storage subDBs, accessed through
 `Engine` rather than through any catalog-shaped value.
 
@@ -139,13 +145,13 @@ The ladder framing came from asking what a *literal* at each rung
 would look like (see [`literals-as-a-ladder.md`](literals-as-a-ladder.md)).
 The realized literals so far:
 
-- **Value literal** — `42`, `"alice"`, `true` in expression position,
-  parsed straight into `Value.data`.
+- **Scalar literal** — `42`, `"alice"`, `true` in expression position,
+  parsed straight into `Scalar.value`.
 - **Row literal** — the parenthesised tuple form inside a relation
   literal, e.g. `(1, "alice", true)`.
 - **Relation literal** — the `{cols | rows}` form parsed by
   `Surface_ra.Parser` and lowered into `Relation_literal.t`. Carries
-  a `Row.kind` and a list of `Row.data`.
+  a `Row.kind` and a list of `Row.value`.
 
 - **Catalog literal** — DDL as text that denotes a catalog value:
   sketched in [`literals-as-a-ladder.md`](literals-as-a-ladder.md),

@@ -29,7 +29,7 @@ The storage stack sits below it, used by `Eval` and the catalog.
          │
          │  Eval ────────────────────────────►  Catalog       — name → Relation.kind
          ▼                                          │
-     Relation.t     — kind + Seq.t of Row.data      │  uses
+     Relation.t     — kind + Seq.t of Row.value     │  uses
          │                                          ▼
          │  Relation.print                      Encoding      — keys (byte-
          ▼                                          │          comparable),
@@ -62,8 +62,8 @@ runs ship no hardcoded rows; the seeder is opt-in.
 | `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| IndexLookup \| NestedLoopJoin \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, primary-key point lookups, future hash joins, etc. |
 | `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
 | `Projection`| `t = Row.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
-| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `data` seq is pulled lazily.                                  |
-| `Relation`  | `'tag t = { kind; data }`                | Kind-tagged stream of rows. Phantom `'tag` distinguishes set vs bag semantics.                                             |
+| `Eval`      | `env -> txn -> Physical.t -> Relation.t` | Volcano executor. Each operator returns a `Relation.t` whose `value` seq is pulled lazily.                                 |
+| `Relation`  | `'tag t = { kind; value }`               | Kind-tagged stream of rows. Phantom `'tag` distinguishes set vs bag semantics.                                             |
 
 ### Storage stack
 
@@ -77,13 +77,13 @@ runs ship no hardcoded rows; the seeder is opt-in.
 
 | Module   | What it carries                                                                                    |
 | -------- | -------------------------------------------------------------------------------------------------- |
-| `Value`    | `Int64 \| String \| Bool` runtime values, plus a parallel `Value.kind` for static kind declarations.                                          |
-| `Row`      | `Row.kind` is an ordered list of named, typed, optionally qualified fields. `Row.data = Value.data array` is the values in field order.       |
-| `Relation` | `Relation.kind = { row_kind; refinements }` adds refinements (currently just `Primary_key`). `Relation.t` is a kind plus a `Row.data Seq.t`.  |
+| `Scalar`   | `Int64 \| String \| Bool` runtime values, plus a parallel `Scalar.kind` for static kind declarations.                                         |
+| `Row`      | `Row.kind` is an ordered list of named, typed, optionally qualified fields. `Row.value = Scalar.value array` is the cells in field order.     |
+| `Relation` | `Relation.kind = { row_kind; refinements }` adds refinements (currently just `Primary_key`). `Relation.t` is a kind plus a `Row.value Seq.t`. |
 
-`Value`, `Row`, and `Relation` form a deliberate three-rung type
+`Scalar`, `Row`, and `Relation` form a deliberate three-rung type
 ladder; see [`type-ladder.md`](type-ladder.md) for the per-rung
-`kind`/`data`/`t` pattern and the rules for adding refinements.
+`kind`/`value`/`t` pattern and the rules for adding refinements.
 
 ## Sub-library dependencies
 

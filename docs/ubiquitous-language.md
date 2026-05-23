@@ -61,7 +61,7 @@ the resource's scope.
 
 Dovetail's executor is CPS-shaped for exactly that reason.
 `Eval.eval` opens database cursors to produce a `Relation.t`
-whose `data` sequence pulls rows lazily from those cursors.
+whose `value` sequence pulls rows lazily from those cursors.
 The cursors are only valid while their transaction is alive;
 if `eval` returned the relation directly, callers could
 hold it past the point where it's safe to iterate. Instead
@@ -144,13 +144,13 @@ The second rung of the type ladder; see
 [`docs/type-ladder.md`](type-ladder.md) and
 [`lib/core/row.mli`](../lib/core/row.mli).
 
-## Value
+## Scalar
 
 A single piece of data the database can hold — an integer, a
 string, a boolean. The smallest thing Dovetail can store or
-compute with. A value has a *kind* (which of the supported types
+compute with. A scalar has a *kind* (which of the supported types
 it is) and a payload (the bits for that type).
 
 The bottom rung of the type ladder; see
 [`docs/type-ladder.md`](type-ladder.md) and
-[`lib/core/value.mli`](../lib/core/value.mli).
+[`lib/core/scalar.mli`](../lib/core/scalar.mli).

@@ -2,7 +2,7 @@
 
 A design note, not a plan. It commits to a surface syntax for the
 ladder of values and types Dovetail already organises its core around
-— Value, Row, Relation, Catalog — and folds DDL into the same
+— Scalar, Row, Relation, Catalog — and folds DDL into the same
 pipe-style language the surface RA already uses.
 
 Pairs with:
@@ -25,7 +25,7 @@ shape of a value, with no payload — under two names.
 The split is forced by OCaml. `type` is a keyword in the host
 language, so the code has to call its own type-shaped identifiers
 something else; `kind` is the convention `lib/core/` settles on
-(`Value.kind`, `Row.kind`, `Relation.kind`). A user typing at the
+(`Scalar.kind`, `Row.kind`, `Relation.kind`). A user typing at the
 REPL has no such constraint, and "what's the type of this column" is
 what they would actually say.
 
@@ -37,7 +37,7 @@ syntax lands.
 ## The premise
 
 Dovetail's core already organises everything as types and values at
-four rungs: Value, Row, Relation, Catalog. The query language already
+four rungs: Scalar, Row, Relation, Catalog. The query language already
 composes operators through `|`. The DDL surface — a separate `:`-sigil
 grammar with its own AST — is the one place that doesn't fit. This
 note describes a syntax in which the ladder is a first-class part of
@@ -60,7 +60,7 @@ existing parser does:
 - A bare query in the REPL is evaluated and printed. There is no
   explicit print step; results render automatically
   (`repl.ml:142-150`).
-- Evaluation streams end-to-end. `Relation.data` is a lazy `Seq.t`;
+- Evaluation streams end-to-end. `Relation.value` is a lazy `Seq.t`;
   `Filter` and `Project` wrap with `Seq.filter` / `Seq.map`;
   `FullScan` opens a live cursor. Pipelines compose without
   intermediate materialisation (`lib/execution/eval.ml`).
@@ -89,7 +89,7 @@ Same parens-and-comma machinery, different right-hand side. The
 distinction is the same one OCaml records use (`{ x : int }` versus
 `{ x = 1 }`) and lets a reader tell type from value at a glance.
 
-### Value
+### Scalar
 
 **Type** — one of three lowercase keywords:
 
@@ -105,7 +105,7 @@ int64    string    bool
 true      false
 ```
 
-`Value.format` in `lib/core/value.ml` already prints values in this
+`Scalar.format` in `lib/core/scalar.ml` already prints values in this
 form. The type-side spellings (`int64` etc.) replace the current
 DDL-side capitalised forms (`Int64`).
 
