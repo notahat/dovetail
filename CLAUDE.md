@@ -53,6 +53,39 @@ If you find yourself wanting to add to this list, prefer spelling out
 unless the short form is genuinely conventional in OCaml or the
 underlying tool's vocabulary.
 
+### Internal `kind` vs user-facing `type`
+
+The static shape of a value goes by two names depending on which side
+of the wall you're on. They are the same concept — see
+[`docs/type-system.md`](docs/type-system.md) for the framing.
+
+- **Inside the code**, the name is `kind`: `Value.kind`, `Row.kind`,
+  `Relation.kind`. OCaml's `type` is a keyword, so we cannot use it
+  for our own identifiers; `kind` is the disambiguating choice and
+  `type-ladder.md` documents the as-built shape.
+- **At the surface** — REPL output, the `type` pipe operator, error
+  messages, user-facing docs, this project's prose for users — the
+  name is `type`. That's the word a database user expects.
+
+Apply the split deliberately:
+
+- Code identifiers, doc comments inside `.mli` files, and references
+  to specific OCaml identifiers use `kind`.
+- User-facing strings (REPL prompts, errors, `:`-command output until
+  it's retired, anything a user reads) use `type`.
+- Design docs in `docs/` use `type` in prose and `kind` only when
+  pointing at OCaml identifiers. `type-ladder.md` is the documented
+  exception — it describes the as-built code and uses `kind`
+  throughout because that's the code's vocabulary.
+
+When introducing a new module or value at this rung, follow the
+existing code convention (`kind` / `data` / `t`). When writing a new
+user-facing string, pick `type`. If a piece of prose lives in both
+worlds — say, a doc comment that describes an operator a user
+invokes — write for the user (`type`) and add a parenthetical
+(`internally: kind`) only if the OCaml-side name needs to be visible
+from that paragraph.
+
 ## Comments
 
 - Don't reference slices or steps in code or comments. The plan
