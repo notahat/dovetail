@@ -41,42 +41,42 @@ let test_insert_writes_row_and_reports_one_affected () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction mutation
-        (fun (relation : [ `Bag ] Relation.t) ->
-          Alcotest.(check (list string))
-            "result kind has one insert_count column" [ "insert_count" ]
-            (List.map
-               (fun (field : Row.field) -> field.name)
-               relation.kind.row_kind);
-          Alcotest.(check row_list_testable)
-            "result has a single (insert_count = 1) row"
-            [ [| Scalar.Int64 1L |] ]
-            (List.of_seq relation.value)));
+        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+             Alcotest.(check (list string))
+               "result kind has one insert_count column" [ "insert_count" ]
+               (List.map
+                  (fun (field : Row.field) -> field.name)
+                  relation.kind.row_kind);
+             Alcotest.(check row_list_testable)
+               "result has a single (insert_count = 1) row"
+               [ [| Scalar.Int64 1L |] ]
+               (List.of_seq relation.value))));
   (* The row should now be present in a fresh read transaction, so we know
      the write committed rather than just being visible to the writer. *)
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
         (Plan.Physical.FullScan { table = "orders" })
-        (fun relation ->
-          let rows = List.of_seq relation.value in
-          let inserted =
-            List.find_opt
-              (fun (row : Row.value) -> row.(0) = Scalar.Int64 9L)
-              rows
-          in
-          match inserted with
-          | None -> Alcotest.fail "inserted row not found in orders"
-          | Some row ->
-              Alcotest.(check row_list_testable)
-                "inserted row matches"
-                [
-                  [|
-                    Scalar.Int64 9L;
-                    Scalar.Int64 1L;
-                    Scalar.String "Pretzel";
-                    Scalar.Int64 9L;
-                  |];
-                ]
-                [ row ]))
+        (expect_relation (fun relation ->
+             let rows = List.of_seq relation.value in
+             let inserted =
+               List.find_opt
+                 (fun (row : Row.value) -> row.(0) = Scalar.Int64 9L)
+                 rows
+             in
+             match inserted with
+             | None -> Alcotest.fail "inserted row not found in orders"
+             | Some row ->
+                 Alcotest.(check row_list_testable)
+                   "inserted row matches"
+                   [
+                     [|
+                       Scalar.Int64 9L;
+                       Scalar.Int64 1L;
+                       Scalar.String "Pretzel";
+                       Scalar.Int64 9L;
+                     |];
+                   ]
+                   [ row ])))
 
 let test_insert_three_rows_reports_count_of_three () =
   with_fixture_environment @@ fun environment ->
@@ -107,11 +107,11 @@ let test_insert_three_rows_reports_count_of_three () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction mutation
-        (fun (relation : [ `Bag ] Relation.t) ->
-          Alcotest.(check row_list_testable)
-            "three rows inserted yields insert_count = 3"
-            [ [| Scalar.Int64 3L |] ]
-            (List.of_seq relation.value)))
+        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+             Alcotest.(check row_list_testable)
+               "three rows inserted yields insert_count = 3"
+               [ [| Scalar.Int64 3L |] ]
+               (List.of_seq relation.value))))
 
 let test_insert_with_existing_primary_key_raises () =
   with_fixture_environment @@ fun environment ->
@@ -137,10 +137,10 @@ let test_insert_with_existing_primary_key_raises () =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
         (Plan.Physical.FullScan { table = "orders" })
-        (fun relation ->
-          let rows = List.of_seq relation.value in
-          Alcotest.(check row_list_testable)
-            "orders unchanged after aborted insert" expected_orders_rows rows))
+        (expect_relation (fun relation ->
+             let rows = List.of_seq relation.value in
+             Alcotest.(check row_list_testable)
+               "orders unchanged after aborted insert" expected_orders_rows rows)))
 
 let () =
   Alcotest.run "eval_insert"

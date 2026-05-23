@@ -24,10 +24,11 @@ let test_pipeline_yields_fixture_rows () =
       let logical = Logical.Scan { table = "users" } in
       let catalog = make_catalog environment transaction in
       let physical = Translate.translate ~catalog logical in
-      Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.value in
-          Alcotest.(check row_list_testable)
-            "five rows from logical scan" expected_users_rows rows))
+      Execution.Eval.eval environment transaction physical
+        (expect_relation (fun relation ->
+             let rows = List.of_seq relation.value in
+             Alcotest.(check row_list_testable)
+               "five rows from logical scan" expected_users_rows rows)))
 
 let id_equals_three =
   expression_compare ~left:(expression_column "id") ~op:Equal
@@ -65,12 +66,13 @@ let test_restrict_pipeline_yields_filtered_rows () =
       in
       let catalog = make_catalog environment transaction in
       let physical = Translate.translate ~catalog logical in
-      Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.value in
-          Alcotest.(check row_list_testable)
-            "Carol's row from logical Restrict"
-            [ List.nth expected_users_rows 2 ]
-            rows))
+      Execution.Eval.eval environment transaction physical
+        (expect_relation (fun relation ->
+             let rows = List.of_seq relation.value in
+             Alcotest.(check row_list_testable)
+               "Carol's row from logical Restrict"
+               [ List.nth expected_users_rows 2 ]
+               rows)))
 
 let test_project_translates_to_physical_project () =
   let logical =
@@ -101,19 +103,20 @@ let test_project_pipeline_yields_projected_rows () =
       in
       let catalog = make_catalog environment transaction in
       let physical = Translate.translate ~catalog logical in
-      Execution.Eval.eval environment transaction physical (fun relation ->
-          let rows = List.of_seq relation.value in
-          let expected =
-            [
-              [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
-              [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
-              [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
-              [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
-              [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
-            ]
-          in
-          Alcotest.(check row_list_testable)
-            "five projected rows from logical Project" expected rows))
+      Execution.Eval.eval environment transaction physical
+        (expect_relation (fun relation ->
+             let rows = List.of_seq relation.value in
+             let expected =
+               [
+                 [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
+                 [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
+                 [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
+                 [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
+                 [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
+               ]
+             in
+             Alcotest.(check row_list_testable)
+               "five projected rows from logical Project" expected rows)))
 
 let test_cross_product_translates_to_physical_cross_product () =
   let logical =

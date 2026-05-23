@@ -3,6 +3,7 @@ module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Relation_literal = Dovetail_core.Relation_literal
+module Term = Dovetail_core.Term
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 
@@ -43,7 +44,7 @@ let evaluate_full_scan environment transaction table continue =
   let kind, table_map = lookup_table_resources environment transaction table in
   let* pairs = Storage.Engine.with_iter_seq table_map transaction in
   let value = Seq.map (Storage.Row_codec.decode_row kind) pairs in
-  continue ({ kind; value } : [ `Bag ] Relation.t)
+  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
 
 (* Encode [key], probe the table's storage subDB with [Storage.Engine.get], and
    hand [continue] a relation whose [value] seq has either one element
@@ -61,7 +62,7 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
         Seq.return
           (Storage.Row_codec.decode_row kind (encoded_key, value_bytes))
   in
-  continue ({ kind; value } : [ `Bag ] Relation.t)
+  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
 
 (* Materialise a [RelationLiteral] as a [Relation.t]. The kind comes from
    {!Relation_literal.kind_of} -- the kind-inference rule lives there so
@@ -82,7 +83,7 @@ let evaluate_relation_literal ~columns ~rows continue =
          (List.length first_row) (List.length columns));
   let kind = Relation_literal.kind_of ~columns ~first_row in
   let value = rows |> List.to_seq |> Seq.map Array.of_list in
-  continue ({ kind; value } : [ `Bag ] Relation.t)
+  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
 
 (* CPS-shaped executor. Every operator is in continuation-passing form so
    the consumer's [continue] runs inside whatever cursor and resource
@@ -113,32 +114,50 @@ let rec eval environment transaction plan continue =
       evaluate_insert environment transaction ~target_table:table ~source
         continue
 
+(* CPS helper for internal recursion: a relational operator's sub-plan always
+   produces a [Term.Relation_value]. The [Term.Relation_kind] arm only arises
+   from the [Type_op] operator, which sits at the pipeline root and is never
+   the input of another relational operator. *)
+and eval_input environment transaction plan continue =
+  eval environment transaction plan (function
+    | Term.Relation_value relation -> continue relation
+    | Term.Relation_kind _ ->
+        (* By construction relational sub-plans don't carry kinds. *)
+        assert false)
+
 (* Stream the input through [eval], then wrap its value seq in a [Seq.filter]
    guarded by the resolved predicate. The kind is unchanged. Resolution
    happens inside the input's scope so type errors still surface before any
    rows are pulled. *)
 and evaluate_filter environment transaction ~input ~predicate continue =
-  let* input_relation = eval environment transaction input in
+  let* input_relation = eval_input environment transaction input in
   let evaluate_predicate =
     Expression.resolve input_relation.kind.row_kind predicate
   in
   continue
-    {
-      kind = input_relation.kind;
-      value = Seq.filter evaluate_predicate input_relation.value;
-    }
+    (Term.Relation_value
+       ({
+          kind = input_relation.kind;
+          value = Seq.filter evaluate_predicate input_relation.value;
+        }
+         : [ `Bag ] Relation.t))
 
 (* Stream the input through [eval], then wrap its value seq in a [Seq.map] that
    projects each row to the requested columns. The projected kind is computed
    eagerly inside the input's scope so column-resolution errors surface before
    any rows are pulled. *)
 and evaluate_project environment transaction ~input ~columns continue =
-  let* input_relation = eval environment transaction input in
+  let* input_relation = eval_input environment transaction input in
   let projected_kind, project_row =
     Plan.Projection.resolve input_relation.kind columns
   in
   continue
-    { kind = projected_kind; value = Seq.map project_row input_relation.value }
+    (Term.Relation_value
+       ({
+          kind = projected_kind;
+          value = Seq.map project_row input_relation.value;
+        }
+         : [ `Bag ] Relation.t))
 
 (* Sequence the left scope and then the right scope via [let*]; the body
    below runs inside both. The right side is materialised via [List.of_seq]
@@ -146,8 +165,8 @@ and evaluate_project environment transaction ~input ~columns continue =
    streaming seq can't be replayed, and streaming both sides would require
    a different join algorithm (hash, merge). *)
 and evaluate_cross_product environment transaction ~left ~right continue =
-  let* left_relation = eval environment transaction left in
-  let* right_relation = eval environment transaction right in
+  let* left_relation = eval_input environment transaction left in
+  let* right_relation = eval_input environment transaction right in
   let right_rows = List.of_seq right_relation.value in
   let combined_kind : Relation.kind =
     {
@@ -162,7 +181,9 @@ and evaluate_cross_product environment transaction ~left ~right continue =
         |> Seq.map (fun right_row -> Array.append left_row right_row))
       left_relation.value
   in
-  continue { kind = combined_kind; value = combined_value }
+  continue
+    (Term.Relation_value
+       ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
 
 (* Resolve [outer_key_column] against the outer relation's row kind and
    verify that the resolved field is the [Int64] kind required by the
@@ -198,7 +219,7 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
   let inner_kind, inner_table_map =
     lookup_table_resources environment transaction inner_table
   in
-  let* outer_relation = eval environment transaction outer in
+  let* outer_relation = eval_input environment transaction outer in
   let outer_key_position =
     resolve_int64_outer_key_position outer_relation.kind.row_kind
       outer_key_column
@@ -237,7 +258,9 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
         assert false
   in
   let combined_value = Seq.filter_map probe_outer_row outer_relation.value in
-  continue { kind = combined_kind; value = combined_value }
+  continue
+    (Term.Relation_value
+       ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
 
 (* Same shape as [evaluate_cross_product] -- left and right sequenced via
    [let*], right side materialised -- with the predicate resolved against
@@ -245,8 +268,8 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
    combined row is emitted. *)
 and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
     continue =
-  let* left_relation = eval environment transaction left in
-  let* right_relation = eval environment transaction right in
+  let* left_relation = eval_input environment transaction left in
+  let* right_relation = eval_input environment transaction right in
   let right_rows = List.of_seq right_relation.value in
   let combined_kind : Relation.kind =
     {
@@ -266,7 +289,9 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
             if evaluate_predicate combined then Some combined else None))
       left_relation.value
   in
-  continue { kind = combined_kind; value = combined_value }
+  continue
+    (Term.Relation_value
+       ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
 
 (* For each target field, find the position in [source_row_kind] that supplies
    its value. Raises [Failure] if a target field has no matching source
@@ -374,7 +399,7 @@ and evaluate_insert environment transaction ~target_table ~source continue =
      incidental; [Seq.iter] + [ref] expresses that more honestly than
      folding the count through a [Seq.fold_left] accumulator. *)
   let affected_rows = ref 0 in
-  eval environment transaction source (fun source_relation ->
+  eval_input environment transaction source (fun source_relation ->
       let position_map =
         build_source_position_map ~target_table
           ~source_row_kind:source_relation.kind.row_kind ~target_kind
@@ -385,4 +410,4 @@ and evaluate_insert environment transaction ~target_table ~source continue =
             ~write_transaction ~position_map source_row;
           incr affected_rows)
         source_relation.value;
-      continue (insert_result_relation !affected_rows))
+      continue (Term.Relation_value (insert_result_relation !affected_rows)))

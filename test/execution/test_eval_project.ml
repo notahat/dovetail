@@ -23,8 +23,8 @@ let evaluate_users_project ~input_plan column_names =
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan = Plan.Physical.Project { input = input_plan; columns } in
-      Eval.eval environment transaction plan (fun relation ->
-          List.of_seq relation.value))
+      Eval.eval environment transaction plan
+        (expect_relation (fun relation -> List.of_seq relation.value)))
 
 let users_full_scan = Plan.Physical.FullScan { table = "users" }
 
@@ -98,17 +98,18 @@ let test_project_then_filter () =
                 ~right:(expression_literal (Scalar.Bool true));
           }
       in
-      Eval.eval environment transaction plan (fun relation ->
-          let rows = List.of_seq relation.value in
-          let expected =
-            [
-              [| Scalar.String "Alice"; Scalar.Bool true |];
-              [| Scalar.String "Carol"; Scalar.Bool true |];
-              [| Scalar.String "Dave"; Scalar.Bool true |];
-            ]
-          in
-          Alcotest.(check row_list_testable)
-            "three active projected rows" expected rows))
+      Eval.eval environment transaction plan
+        (expect_relation (fun relation ->
+             let rows = List.of_seq relation.value in
+             let expected =
+               [
+                 [| Scalar.String "Alice"; Scalar.Bool true |];
+                 [| Scalar.String "Carol"; Scalar.Bool true |];
+                 [| Scalar.String "Dave"; Scalar.Bool true |];
+               ]
+             in
+             Alcotest.(check row_list_testable)
+               "three active projected rows" expected rows)))
 
 let test_filter_then_project () =
   let filter_active_true =
@@ -165,9 +166,8 @@ let () =
           Alcotest.test_case
             "filter then project narrows the survivors to the named columns"
             `Quick test_filter_then_project;
-          Alcotest.test_case
-            "unknown column raises before any rows are pulled" `Quick
-            test_project_unknown_column_raises;
+          Alcotest.test_case "unknown column raises before any rows are pulled"
+            `Quick test_project_unknown_column_raises;
           Alcotest.test_case
             "duplicate column raises before any rows are pulled" `Quick
             test_project_duplicate_column_raises;

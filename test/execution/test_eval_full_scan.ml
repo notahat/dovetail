@@ -12,17 +12,17 @@ let test_full_scan_yields_fixture_rows () =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Eval.eval environment transaction
         (Plan.Physical.FullScan { table = "users" })
-        (fun relation ->
-          let primary_keys =
-            List.map
-              (function Relation.Primary_key keys -> keys)
-              relation.kind.refinements
-          in
-          Alcotest.(check (list (list string)))
-            "kind primary key" [ [ "id" ] ] primary_keys;
-          let rows = List.of_seq relation.value in
-          Alcotest.(check row_list_testable)
-            "five rows in primary-key order" expected_users_rows rows))
+        (expect_relation (fun relation ->
+             let primary_keys =
+               List.map
+                 (function Relation.Primary_key keys -> keys)
+                 relation.kind.refinements
+             in
+             Alcotest.(check (list (list string)))
+               "kind primary key" [ [ "id" ] ] primary_keys;
+             let rows = List.of_seq relation.value in
+             Alcotest.(check row_list_testable)
+               "five rows in primary-key order" expected_users_rows rows)))
 
 let test_full_scan_raises_for_missing_table () =
   with_temp_dir @@ fun dir ->
@@ -33,7 +33,7 @@ let test_full_scan_raises_for_missing_table () =
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           Eval.eval environment transaction
             (Plan.Physical.FullScan { table = "nonexistent_table" })
-            (fun _relation -> ())))
+            (fun _term -> ())))
 
 let () =
   Alcotest.run "eval_full_scan"

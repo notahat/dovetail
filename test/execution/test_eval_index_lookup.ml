@@ -14,8 +14,9 @@ let evaluate_index_lookup ~table ~key =
   Fixture.populate_if_empty environment;
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let plan = Plan.Physical.IndexLookup { table; key } in
-      Eval.eval environment transaction plan (fun relation ->
-          (relation.kind, List.of_seq relation.value)))
+      Eval.eval environment transaction plan
+        (expect_relation (fun relation ->
+             (relation.kind, List.of_seq relation.value))))
 
 let test_index_lookup_returns_the_matching_row () =
   let _kind, rows = evaluate_index_lookup ~table:"users" ~key:1L in
@@ -62,7 +63,7 @@ let test_index_lookup_raises_for_missing_table () =
         (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
           Eval.eval environment transaction
             (Plan.Physical.IndexLookup { table = "nonexistent_table"; key = 1L })
-            (fun _relation -> ())))
+            (fun _term -> ())))
 
 let () =
   Alcotest.run "eval_index_lookup"

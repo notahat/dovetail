@@ -1,4 +1,5 @@
 module Relation = Dovetail_core.Relation
+module Term = Dovetail_core.Term
 module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
@@ -32,8 +33,8 @@ let print_result environment transaction ~output ~show_logical ~show_physical
     translate_in environment transaction ~output ~show_logical ~show_physical
       logical_plan
   in
-  Execution.Eval.eval environment transaction physical_plan (fun relation ->
-      Relation.print ~formatter:output relation)
+  Execution.Eval.eval environment transaction physical_plan (fun term ->
+      Term.format output term)
 
 (* Run a single parsed query against [environment] and pretty-print the
    result to [output]. The plan's required access picks the transaction

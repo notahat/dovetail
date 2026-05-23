@@ -17,8 +17,8 @@ let evaluate_users_filter predicate =
         Plan.Physical.Filter
           { input = Plan.Physical.FullScan { table = "users" }; predicate }
       in
-      Eval.eval environment transaction plan (fun relation ->
-          List.of_seq relation.value))
+      Eval.eval environment transaction plan
+        (expect_relation (fun relation -> List.of_seq relation.value)))
 
 let test_filter_equality_on_int64_yields_one_row () =
   let rows =
@@ -128,9 +128,8 @@ let () =
             test_filter_matches_zero_rows;
           Alcotest.test_case "column = column with no matches yields no rows"
             `Quick test_filter_column_equals_column_yields_no_rows;
-          Alcotest.test_case
-            "unknown column raises before any rows are pulled" `Quick
-            test_filter_unknown_column_raises;
+          Alcotest.test_case "unknown column raises before any rows are pulled"
+            `Quick test_filter_unknown_column_raises;
           Alcotest.test_case "type mismatch raises before any rows are pulled"
             `Quick test_filter_type_mismatch_raises;
         ] );

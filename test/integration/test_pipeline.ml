@@ -293,9 +293,10 @@ let test_cross_with_ordering_predicate_still_uses_nested_loop_join () =
 let render_plan_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      Execution.Eval.eval environment transaction plan (fun relation ->
-          with_captured_formatter @@ fun formatter ->
-          Relation.print ~formatter relation))
+      Execution.Eval.eval environment transaction plan
+        (expect_relation (fun relation ->
+             with_captured_formatter @@ fun formatter ->
+             Relation.print ~formatter relation)))
 
 let test_indexed_nested_loop_join_renders_matched_pairs () =
   (* Hand-built plan: stream [orders], probe [users] by

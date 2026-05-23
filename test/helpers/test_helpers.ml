@@ -21,6 +21,7 @@ module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
 module Scalar = Dovetail_core.Scalar
+module Term = Dovetail_core.Term
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
@@ -191,6 +192,15 @@ let expression_or ~left ~right : Expression.t = Or (left, right)
 (** An [Expression.t] negating a sub-expression. *)
 let expression_not operand : Expression.t = Not operand
 
+(** [expect_relation callback term] applies [callback] to the relation inside
+    [term], failing the running test with [Alcotest.fail] if [term] is the
+    relation-kind arm instead. Wraps an existing relation-shaped callback for
+    use against [Eval.eval], which hands its continuation a [Term.t]. *)
+let expect_relation callback : [ `Bag ] Term.t -> 'a = function
+  | Term.Relation_value relation -> callback relation
+  | Term.Relation_kind _ ->
+      Alcotest.fail "expected a relation value but got a relation kind"
+
 (** A catalog callback that knows about no tables. Use in [Translate]-level unit
     tests that don't exercise schema-dependent rewrites; the catalog is
     consulted only for [IndexLookup] recognition, so a [None]-everywhere
@@ -222,8 +232,9 @@ let with_query_result query check_rows =
       let logical = Surface_ra.Lower.lower ast in
       let catalog = make_catalog environment transaction in
       let physical = Plan.Translate.translate ~catalog logical in
-      Execution.Eval.eval environment transaction physical (fun relation ->
-          check_rows (List.of_seq relation.value)))
+      Execution.Eval.eval environment transaction physical
+        (expect_relation (fun relation ->
+             check_rows (List.of_seq relation.value))))
 
 (** [with_query_failure ~label ~expected query] runs [query] through the same
     pipeline as {!with_query_result} but asserts that [Eval.eval] raises
@@ -243,8 +254,7 @@ let with_query_failure ~label ~expected query =
       let catalog = make_catalog environment transaction in
       let physical = Plan.Translate.translate ~catalog logical in
       Alcotest.check_raises label expected (fun () ->
-          Execution.Eval.eval environment transaction physical (fun _relation ->
-              ())))
+          Execution.Eval.eval environment transaction physical (fun _term -> ())))
 
 (** [evaluate_against_fixture plan] populates the standard fixture and evaluates
     [plan] inside a read transaction, returning the resulting kind and rows. The
@@ -253,8 +263,9 @@ let with_query_failure ~label ~expected query =
 let evaluate_against_fixture plan =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
-      Execution.Eval.eval environment transaction plan (fun relation ->
-          (relation.kind, List.of_seq relation.value)))
+      Execution.Eval.eval environment transaction plan
+        (expect_relation (fun relation ->
+             (relation.kind, List.of_seq relation.value))))
 
 (** [contains_substring haystack needle] is [true] if [needle] appears anywhere
     in [haystack]. Avoids pulling in [Str] for one-off checks. *)

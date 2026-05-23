@@ -22,7 +22,7 @@ let with_literal_relation f =
               [ [ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ] ];
           }
       in
-      Eval.eval environment transaction plan f)
+      Eval.eval environment transaction plan (expect_relation f))
 
 let test_field_names_match_the_literals_columns () =
   with_literal_relation @@ fun relation ->

@@ -149,7 +149,7 @@ let test_indexed_join_raises_when_outer_key_column_is_not_int64 () =
         (Failure
            "Eval: IndexedNestedLoopJoin: requires Int64 outer key column, got \
             String for \"orders.description\"") (fun () ->
-          Eval.eval environment transaction plan (fun _relation -> ())))
+          Eval.eval environment transaction plan (fun _term -> ())))
 
 let () =
   Alcotest.run "eval_indexed_nested_loop_join"
@@ -159,9 +159,8 @@ let () =
           Alcotest.test_case
             "Left inner_position yields inner.fields @ outer.fields rows" `Quick
             test_indexed_join_left_yields_matched_pairs;
-          Alcotest.test_case
-            "Left inner_position kind is users.* then orders.*" `Quick
-            test_indexed_join_left_kind_has_inner_then_outer_fields;
+          Alcotest.test_case "Left inner_position kind is users.* then orders.*"
+            `Quick test_indexed_join_left_kind_has_inner_then_outer_fields;
           Alcotest.test_case
             "Right inner_position yields outer.fields @ inner.fields rows"
             `Quick test_indexed_join_right_yields_matched_pairs;
