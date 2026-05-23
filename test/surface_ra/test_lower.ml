@@ -153,17 +153,29 @@ let test_join_lowers_to_restrict_over_cross_product () =
     logical
 
 let test_insert_mutation_lowers_through () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "user_id"; kind = Int64; qualifier = None };
+          { name = "description"; kind = String; qualifier = None };
+          { name = "amount"; kind = Int64; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
   let source : Ast.t =
-    RelationLiteral
+    Relation_literal
       {
-        columns = [ "id"; "user_id"; "description"; "amount" ];
+        kind;
         rows =
           [
             [
-              Scalar.Int64 9L;
-              Scalar.Int64 1L;
-              Scalar.String "Pretzel";
-              Scalar.Int64 9L;
+              ("id", Scalar.Int64 9L);
+              ("user_id", Scalar.Int64 1L);
+              ("description", Scalar.String "Pretzel");
+              ("amount", Scalar.Int64 9L);
             ];
           ];
       }
@@ -176,9 +188,9 @@ let test_insert_mutation_lowers_through () =
        {
          table = "orders";
          source =
-           RelationLiteral
+           Relation_literal
              {
-               columns = [ "id"; "user_id"; "description"; "amount" ];
+               kind;
                rows =
                  [
                    [
@@ -389,7 +401,7 @@ let users_kind : Relation.kind =
 
 let test_relation_literal_typed_lowers_to_relation_literal_typed () =
   let ast : Ast.t =
-    Relation_literal_typed
+    Relation_literal
       {
         kind = users_kind;
         rows =
@@ -401,9 +413,9 @@ let test_relation_literal_typed_lowers_to_relation_literal_typed () =
   in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
-    "typed relation literal lowers to Logical.Relation_literal_typed with the \
+    "typed relation literal lowers to Logical.Relation_literal with the \
      declared kind"
-    (Relation_literal_typed
+    (Relation_literal
        {
          kind = users_kind;
          rows =
@@ -416,7 +428,7 @@ let test_relation_literal_typed_lowers_to_relation_literal_typed () =
 
 let test_relation_literal_typed_reorders_row_fields_to_kind_order () =
   let ast : Ast.t =
-    Relation_literal_typed
+    Relation_literal
       {
         kind = users_kind;
         rows =
@@ -431,7 +443,7 @@ let test_relation_literal_typed_reorders_row_fields_to_kind_order () =
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
     "row values land in kind order"
-    (Relation_literal_typed
+    (Relation_literal
        {
          kind = users_kind;
          rows = [ [ Scalar.Int64 1L; Scalar.String "alice" ] ];
@@ -440,7 +452,7 @@ let test_relation_literal_typed_reorders_row_fields_to_kind_order () =
 
 let test_relation_literal_typed_rejects_extra_field_in_row () =
   let ast : Ast.t =
-    Relation_literal_typed
+    Relation_literal
       {
         kind = users_kind;
         rows =
@@ -459,7 +471,7 @@ let test_relation_literal_typed_rejects_extra_field_in_row () =
 
 let test_relation_literal_typed_rejects_missing_field_in_row () =
   let ast : Ast.t =
-    Relation_literal_typed
+    Relation_literal
       { kind = users_kind; rows = [ [ ("id", Scalar.Int64 1L) ] ] }
   in
   Alcotest.check_raises "row missing a declared field is rejected"
@@ -468,7 +480,7 @@ let test_relation_literal_typed_rejects_missing_field_in_row () =
 
 let test_relation_literal_typed_rejects_kind_mismatch () =
   let ast : Ast.t =
-    Relation_literal_typed
+    Relation_literal
       {
         kind = users_kind;
         rows =
@@ -481,29 +493,11 @@ let test_relation_literal_typed_rejects_kind_mismatch () =
     (fun () -> ignore (Lower.lower ast))
 
 let test_relation_literal_typed_empty_rows_lowers_to_empty_rows () =
-  let ast : Ast.t = Relation_literal_typed { kind = users_kind; rows = [] } in
+  let ast : Ast.t = Relation_literal { kind = users_kind; rows = [] } in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
     "empty rows preserves the kind and yields an empty row list"
-    (Relation_literal_typed { kind = users_kind; rows = [] })
-    logical
-
-let test_relation_literal_lowers_through () =
-  let ast : Ast.t =
-    RelationLiteral
-      {
-        columns = [ "id"; "name" ];
-        rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
-      }
-  in
-  let logical = Lower.lower ast in
-  Alcotest.(check logical_testable)
-    "Ast.RelationLiteral -> Logical.RelationLiteral with same payload"
-    (RelationLiteral
-       {
-         columns = [ "id"; "name" ];
-         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
-       })
+    (Relation_literal { kind = users_kind; rows = [] })
     logical
 
 let () =
@@ -547,15 +541,8 @@ let () =
       ( "relation literal",
         [
           Alcotest.test_case
-            "lowers Ast.RelationLiteral to Logical.RelationLiteral" `Quick
-            test_relation_literal_lowers_through;
-        ] );
-      ( "relation literal typed",
-        [
-          Alcotest.test_case
-            "lowers Ast.Relation_literal_typed to \
-             Logical.Relation_literal_typed"
-            `Quick test_relation_literal_typed_lowers_to_relation_literal_typed;
+            "lowers Ast.Relation_literal to Logical.Relation_literal" `Quick
+            test_relation_literal_typed_lowers_to_relation_literal_typed;
           Alcotest.test_case "reorders row values into the kind's field order"
             `Quick test_relation_literal_typed_reorders_row_fields_to_kind_order;
           Alcotest.test_case "rejects a row whose fields include an extra"

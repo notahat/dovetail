@@ -157,15 +157,8 @@ let test_indexed_nested_loop_join_right_puts_outer_first () =
     expected
     (Physical.kind_of ~catalog:fixture_catalog plan)
 
-let test_relation_literal_kind_from_columns_and_first_row () =
-  let plan : Physical.t =
-    RelationLiteral
-      {
-        columns = [ "id"; "name" ];
-        rows = [ [ Scalar.Int64 1L; Scalar.String "Alice" ] ];
-      }
-  in
-  let expected : Relation.kind =
+let test_relation_literal_returns_declared_kind () =
+  let kind : Relation.kind =
     {
       row_kind =
         [
@@ -175,8 +168,12 @@ let test_relation_literal_kind_from_columns_and_first_row () =
       refinements = [];
     }
   in
+  let plan : Physical.t =
+    Relation_literal
+      { kind; rows = [ [ Scalar.Int64 1L; Scalar.String "Alice" ] ] }
+  in
   Alcotest.(check kind_testable)
-    "RelationLiteral derives its kind from columns and first row" expected
+    "Relation_literal returns the kind it was built with" kind
     (Physical.kind_of ~catalog:fixture_catalog plan)
 
 let test_insert_returns_insert_count_kind () =
@@ -185,9 +182,18 @@ let test_insert_returns_insert_count_kind () =
       {
         table = "users";
         source =
-          RelationLiteral
+          Relation_literal
             {
-              columns = [ "id"; "name"; "active" ];
+              kind =
+                {
+                  row_kind =
+                    [
+                      { name = "id"; kind = Int64; qualifier = None };
+                      { name = "name"; kind = String; qualifier = None };
+                      { name = "active"; kind = Bool; qualifier = None };
+                    ];
+                  refinements = [];
+                };
               rows =
                 [ [ Scalar.Int64 9L; Scalar.String "Eve"; Scalar.Bool true ] ];
             };
@@ -249,8 +255,8 @@ let () =
             "IndexedNestedLoopJoin with `Right places outer first" `Quick
             test_indexed_nested_loop_join_right_puts_outer_first;
           Alcotest.test_case
-            "RelationLiteral derives its kind from columns and first row" `Quick
-            test_relation_literal_kind_from_columns_and_first_row;
+            "Relation_literal returns the kind it was built with" `Quick
+            test_relation_literal_returns_declared_kind;
           Alcotest.test_case
             "Insert reports a one-column (insert_count : int64) result" `Quick
             test_insert_returns_insert_count_kind;

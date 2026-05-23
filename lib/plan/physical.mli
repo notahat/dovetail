@@ -84,28 +84,12 @@ type t =
 
           The output [primary_key] is [], matching [NestedLoopJoin] and
           [CrossProduct]. *)
-  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
-      (** [RelationLiteral { columns; rows }] yields a relation whose rows are
-          the literal's [rows] -- no storage involved. The output kind is
-          {!Dovetail_core.Relation_literal.kind_of} applied to [columns] and the
-          first row.
-
-          Each row in [rows] must have the same length as [columns]. The parser
-          currently produces single-row literals only, so [rows] always has
-          length one in user-driven plans; the IR shape leaves room for a future
-          multi-row literal grammar. *)
-  | Relation_literal_typed of {
-      kind : Relation.kind;
-      rows : Scalar.value list list;
-    }
-      (** [Relation_literal_typed { kind; rows }] yields a relation whose row
-          kind is declared up front rather than inferred from the first row.
-          Each row in [rows] is a list of values in the order of
-          [kind.row_kind]'s fields. The empty form ([rows = []]) is valid
-          because the kind no longer depends on a first row. {!Eval} uses [kind]
-          directly and skips the row-inference path that {!RelationLiteral}
-          relies on. Coexists with {!RelationLiteral} while the curly-brace
-          surface syntax is still parseable. *)
+  | Relation_literal of { kind : Relation.kind; rows : Scalar.value list list }
+      (** [Relation_literal { kind; rows }] yields a relation whose row kind is
+          declared up front. Each row in [rows] is a list of values in the order
+          of [kind.row_kind]'s fields. The empty form ([rows = []]) is valid
+          because the kind is declared directly, not inferred from a first row.
+          {!Eval} uses [kind] directly. *)
   | Insert of { table : string; source : t }
       (** [Insert { table; source }] writes [source]'s rows to [table] and
           yields a one-row relation reporting the affected-row count. {!Eval}

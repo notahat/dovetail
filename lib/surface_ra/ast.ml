@@ -17,12 +17,11 @@ type t =
   | Project of { input : t; columns : Plan.Projection.t }
   | CrossProduct of { left : t; right : t }
   | Join of { left : t; right : t; predicate : Expression.t }
-  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
   | Type of { input : t }
   | Scalar_literal of Scalar.value
   | Row_literal of (string * Scalar.value) list
-  | Relation_literal_typed of {
+  | Relation_literal of {
       kind : Relation.kind;
       rows : (string * Scalar.value) list list;
     }

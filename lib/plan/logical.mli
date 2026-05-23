@@ -35,26 +35,12 @@ type t =
           fields followed by [right]'s, with qualifiers preserved. The output
           [primary_key] is empty: derived relations don't carry PK information
           at this point in the project. *)
-  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
-      (** [RelationLiteral { columns; rows }] is a relation given directly by
-          its contents, with no scan or storage involved. Each row in [rows] is
-          a list of values, one per declared column, in column order. The output
-          kind is {!Dovetail_core.Relation_literal.kind_of} applied to [columns]
-          and the first row.
-
-          The parser currently produces single-row literals only; the IR shape
-          leaves room for a future multi-row literal grammar. *)
-  | Relation_literal_typed of {
-      kind : Relation.kind;
-      rows : Scalar.value list list;
-    }
-      (** [Relation_literal_typed { kind; rows }] is a relation given directly
-          by its contents, with the row kind declared up front rather than
-          inferred from the first row. Each row in [rows] is a list of values in
-          the order of [kind.row_kind]'s fields. The empty form ([rows = []]) is
-          valid because the kind no longer depends on a first row. Coexists with
-          {!RelationLiteral} while the curly-brace surface syntax is still
-          parseable; the next slice step collapses both arms into one. *)
+  | Relation_literal of { kind : Relation.kind; rows : Scalar.value list list }
+      (** [Relation_literal { kind; rows }] is a relation given directly by its
+          contents, with the row kind declared up front. Each row in [rows] is a
+          list of values in the order of [kind.row_kind]'s fields. The empty
+          form ([rows = []]) is valid because the kind is declared directly, not
+          inferred from a first row. *)
   | Insert of { table : string; source : t }
       (** [Insert { table; source }] writes [source]'s rows to [table] and
           yields a one-row relation reporting the affected-row count. Insert

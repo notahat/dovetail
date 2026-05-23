@@ -47,7 +47,15 @@ let test_insert_requires_write_access () =
       {
         table = "orders";
         source =
-          RelationLiteral { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
+          Relation_literal
+            {
+              kind =
+                {
+                  row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+                  refinements = [];
+                };
+              rows = [ [ Scalar.Int64 7L ] ];
+            };
       }
   in
   Alcotest.(check bool)
@@ -117,9 +125,17 @@ let test_cross_product_renders_both_inputs_indented () =
 
 let test_relation_literal_renders_columns_and_row_count () =
   let plan : Logical.t =
-    RelationLiteral
+    Relation_literal
       {
-        columns = [ "id"; "name" ];
+        kind =
+          {
+            row_kind =
+              [
+                { name = "id"; kind = Int64; qualifier = None };
+                { name = "name"; kind = String; qualifier = None };
+              ];
+            refinements = [];
+          };
         rows = [ [ Scalar.Int64 1L; Scalar.String "Alice" ] ];
       }
   in
@@ -191,7 +207,15 @@ let test_insert_renders_header_with_indented_source () =
       {
         table = "orders";
         source =
-          RelationLiteral { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
+          Relation_literal
+            {
+              kind =
+                {
+                  row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+                  refinements = [];
+                };
+              rows = [ [ Scalar.Int64 7L ] ];
+            };
       }
   in
   Alcotest.(check string)

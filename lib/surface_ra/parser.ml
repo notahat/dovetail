@@ -92,87 +92,6 @@ let literal_value =
   | Some character when is_letter character -> bool_literal
   | _ -> fail "expected a literal value (number, string, or bool)"
 
-(* One pair parsed inside a relation literal's braces. [column_key] is the
-   key text as written (bare [id] or dotted [users.id]); [key_is_qualified]
-   records the dotted-form flag so post-pass validation can name it in the
-   error. A record rather than a 3-tuple so the eventual addition of, say,
-   a source-span field doesn't force every destructure site to change. *)
-type literal_pair = {
-  column_key : string;
-  value : Scalar.value;
-  key_is_qualified : bool;
-}
-
-(* A single key-value pair inside a relation literal: [identifier : value].
-   Whitespace around the colon is tolerated. The key grammar accepts both
-   bare and qualified forms ([id] and [users.id]); the surface language
-   forbids qualified keys, but rejecting them here would happen inside an
-   angstrom [many], which backtracks on inner-parser failure and would
-   discard the useful message. Instead the pair returns the full key text
-   plus a flag, and {!relation_literal} validates after [many] has run --
-   the same shape as the duplicate-column check below. *)
-let relation_literal_pair =
-  identifier >>= fun first_segment ->
-  ( peek_char >>= function
-    | Some '.' ->
-        char '.' *> identifier >>| fun second_segment ->
-        (first_segment ^ "." ^ second_segment, true)
-    | _ -> return (first_segment, false) )
-  >>= fun (column_key, key_is_qualified) ->
-  whitespace *> char ':' *> whitespace *> literal_value >>| fun value ->
-  { column_key; value; key_is_qualified }
-
-(* One or more pairs separated by commas, with whitespace tolerated around
-   commas and an optional trailing comma. The list is non-empty: the empty
-   literal [{}] is rejected because we require at least one pair. *)
-let relation_literal_pairs =
-  relation_literal_pair >>= fun first_pair ->
-  many (whitespace *> char ',' *> whitespace *> relation_literal_pair)
-  >>= fun more_pairs ->
-  whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
-  first_pair :: more_pairs
-
-(* Raise a parse error if any pair carries a qualified key. The error
-   names the first offender in full ([users.id], not just [users]) so the
-   user can find what they typed. Runs after [many] has gathered the
-   pairs, sidestepping angstrom's backtracking on inner-parser failure. *)
-let check_for_qualified_keys pairs =
-  match List.find_opt (fun pair -> pair.key_is_qualified) pairs with
-  | None -> return ()
-  | Some offender ->
-      fail
-        (Printf.sprintf
-           "qualified column key %S in relation literal: only bare column \
-            names are allowed"
-           offender.column_key)
-
-(* Raise a parse error if [pairs] contains the same column name twice. The
-   error names the first duplicate so the user can find it. Walks [pairs]
-   left to right accumulating a [StringSet] of seen names; the
-   accumulator-passing form replaces the prior [Hashtbl] mutation. *)
-let check_for_duplicate_columns pairs =
-  let rec walk seen = function
-    | [] -> return ()
-    | pair :: _ when StringSet.mem pair.column_key seen ->
-        fail
-          (Printf.sprintf "duplicate column %S in relation literal"
-             pair.column_key)
-    | pair :: rest -> walk (StringSet.add pair.column_key seen) rest
-  in
-  walk StringSet.empty pairs
-
-(* A relation literal: [{column: value, column: value, ...}]. Single-row
-   named-pair form only -- the multi-row literal grammar is a separate
-   production deferred for later. *)
-let relation_literal =
-  char '{' *> whitespace *> relation_literal_pairs <* whitespace <* char '}'
-  >>= fun pairs ->
-  check_for_qualified_keys pairs >>= fun () ->
-  check_for_duplicate_columns pairs >>| fun () ->
-  let columns = List.map (fun pair -> pair.column_key) pairs in
-  let values = List.map (fun pair -> pair.value) pairs in
-  Ast.RelationLiteral { columns; rows = [ values ] }
-
 (* One [name = value] binding inside a row literal. Returns the field name
    alongside its scalar value; whitespace around the [=] is tolerated. *)
 let row_literal_field =
@@ -299,13 +218,13 @@ let row_literal_body =
    that doesn't contain a [name = value] binding is a parse error. *)
 let row_literal = row_literal_body >>| fun fields -> Ast.Row_literal fields
 
-(* The body of a typed relation literal that follows the [relation] keyword:
+(* The body of a relation literal that follows the [relation] keyword:
    a parenthesised relation-type expression, then a brace-delimited list of
    row literals separated by commas with an optional trailing comma. The
    empty form [relation (T) {}] parses to [rows = []]. Field-name validation
    against the declared kind happens in {!Lower}; the parser checks only
    syntactic shape and per-row duplicates. *)
-let relation_literal_typed_body =
+let relation_literal_body =
   whitespace *> type_expression_body >>= fun items ->
   let fields, refinements = partition_type_expression_items items in
   let kind : Relation.kind =
@@ -328,32 +247,29 @@ let relation_literal_typed_body =
            whitespace *> option false (char ',' *> return true) *> return ()
            >>| fun () -> first_row :: more_rows )
   <* whitespace <* char '}'
-  >>| fun rows -> Ast.Relation_literal_typed { kind; rows }
+  >>| fun rows -> Ast.Relation_literal { kind; rows }
 
 (* A bare identifier at pipeline-source position: a [true] / [false] scalar
-   literal, the [relation] keyword introducing a typed relation literal, or
-   a relation name. The leading-letter character class is shared, so we parse
+   literal, the [relation] keyword introducing a relation literal, or a
+   relation name. The leading-letter character class is shared, so we parse
    the identifier eagerly and dispatch on its spelling. The [relation] case
-   commits to the typed-literal grammar: a table called [relation] is now a
-   parse error in source position, on the assumption that the migration in
-   the same slice will have flipped any such fixture. *)
+   commits to the literal grammar: a table called [relation] is a parse
+   error in source position. *)
 let identifier_relation_or_bool_literal =
   identifier >>= function
   | "true" -> return (Ast.Scalar_literal (Scalar.Bool true))
   | "false" -> return (Ast.Scalar_literal (Scalar.Bool false))
-  | "relation" -> relation_literal_typed_body
+  | "relation" -> relation_literal_body
   | name -> return (Ast.Relation_name name)
 
-(* The leading position of a pipeline: a relation literal, a row literal, a
-   bare scalar literal, the [relation] keyword introducing a typed relation
-   literal, or a relation name. Dispatched by lookahead on the leading
-   character: a brace introduces the old curly relation literal; an open
-   paren introduces a row literal; a double quote, a minus, or a digit
-   introduces a scalar literal; a letter is one of [true], [false],
-   [relation], or a relation name. *)
+(* The leading position of a pipeline: a row literal, a bare scalar literal,
+   the [relation] keyword introducing a relation literal, or a relation name.
+   Dispatched by lookahead on the leading character: an open paren introduces
+   a row literal; a double quote, a minus, or a digit introduces a scalar
+   literal; a letter is one of [true], [false], [relation], or a relation
+   name. *)
 let relation_expr =
   peek_char >>= function
-  | Some '{' -> relation_literal
   | Some '(' -> row_literal
   | Some '"' ->
       string_literal >>| fun literal_value -> Ast.Scalar_literal literal_value

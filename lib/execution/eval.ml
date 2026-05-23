@@ -2,7 +2,6 @@ module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
-module Relation_literal = Dovetail_core.Relation_literal
 module Term = Dovetail_core.Term
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
@@ -64,27 +63,6 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
   in
   continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
 
-(* Materialise a [RelationLiteral] as a [Relation.t]. The kind comes from
-   {!Relation_literal.kind_of} -- the kind-inference rule lives there so
-   {!Logical} and {!Physical}'s doc comments can point at it. The literal
-   stays small enough that the rows can be produced eagerly via
-   [List.to_seq] without any storage scope. *)
-let evaluate_relation_literal ~columns ~rows continue =
-  let first_row =
-    match rows with
-    | first :: _ -> first
-    | [] -> failwith "Eval: relation literal must have at least one row"
-  in
-  if List.length first_row <> List.length columns then
-    failwith
-      (Printf.sprintf
-         "Eval: relation literal row has %d value(s) but %d column(s) are \
-          declared"
-         (List.length first_row) (List.length columns));
-  let kind = Relation_literal.kind_of ~columns ~first_row in
-  let value = rows |> List.to_seq |> Seq.map Array.of_list in
-  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
-
 (* CPS-shaped executor. Every operator is in continuation-passing form so
    the consumer's [continue] runs inside whatever cursor and resource
    scopes the plan opens, letting rows stream directly from live
@@ -108,10 +86,8 @@ let rec eval environment transaction plan continue =
       { outer; inner_table; outer_key_column; inner_position } ->
       evaluate_indexed_nested_loop_join environment transaction ~outer
         ~inner_table ~outer_key_column ~inner_position continue
-  | RelationLiteral { columns; rows } ->
-      evaluate_relation_literal ~columns ~rows continue
-  | Relation_literal_typed { kind; rows } ->
-      evaluate_relation_literal_typed ~kind ~rows continue
+  | Relation_literal { kind; rows } ->
+      evaluate_relation_literal ~kind ~rows continue
   | Insert { table; source } ->
       evaluate_insert environment transaction ~target_table:table ~source
         continue
@@ -149,10 +125,10 @@ and row_kind_of_fields fields : Row.kind =
       { name; kind = Scalar.kind_of value; qualifier = None })
     fields
 
-(* Materialise a [Relation_literal_typed] as a [Relation.t] using the kind
-   declared up front. The empty form ([rows = []]) is valid here because
-   the kind doesn't need a first row to derive from. *)
-and evaluate_relation_literal_typed ~kind ~rows continue =
+(* Materialise a [Relation_literal] as a [Relation.t] using the kind declared
+   up front. The empty form ([rows = []]) is valid because the kind doesn't
+   depend on a first row. *)
+and evaluate_relation_literal ~kind ~rows continue =
   let value = rows |> List.to_seq |> Seq.map Array.of_list in
   continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
 

@@ -71,18 +71,6 @@ type t =
           [CrossProduct] -- both inputs' fields, each retaining its qualifier --
           so a [predicate] like [users.id = orders.user_id] resolves
           unambiguously across the combined schema. *)
-  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
-      (** [RelationLiteral { columns; rows }] is the surface form
-          [{col: val, col: val, ...}] -- a relation whose contents the user gave
-          directly, instead of a reference to a stored table. The parser
-          currently accepts the single-row named-pair form only, so [rows]
-          always has length one; the IR shape leaves room for a future multi-row
-          literal grammar.
-
-          Column names are bare identifiers (the parser rejects qualified keys)
-          and must be unique within the literal (the parser rejects duplicates).
-          Each row in [rows] has the same length as [columns], and the values
-          appear in column order. *)
   | Insert of { table : string; source : t }
       (** [Insert { table; source }] is the surface form
           [source | insert into <table>]. [source] is the upstream relation
@@ -114,19 +102,18 @@ type t =
           parser rejects duplicate field names. Evaluation hands the row down
           the pipe as a {!Term.Row_value}, and [| type] over a row literal
           yields the corresponding {!Row.kind}. *)
-  | Relation_literal_typed of {
+  | Relation_literal of {
       kind : Relation.kind;
       rows : (string * Scalar.value) list list;
     }
-      (** [Relation_literal_typed { kind; rows }] is the surface form
+      (** [Relation_literal { kind; rows }] is the surface form
           [relation (id: int64, name: string) { (id = 1, name = "alice"), ... }]
           — a relation whose type is declared up front and whose rows are
           self-describing row literals. The empty form [relation (...) {}]
           parses with [rows = []]. Field names inside each row come straight
           from the surface; {!Lower} checks each row against [kind] and reorders
           the values to [kind]'s field order, then emits a
-          {!Plan.Logical.RelationLiteral}. Coexists with {!RelationLiteral}
-          while the old [{col: val}] form is still in the grammar. *)
+          {!Plan.Logical.Relation_literal}. *)
 
 type program =
   | Pipeline of t

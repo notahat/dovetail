@@ -71,12 +71,11 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
           input = CrossProduct { left = lower left; right = lower right };
           predicate;
         }
-  | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
   | Insert { table; source } -> Insert { table; source = lower source }
   | Type { input = Type _ } -> failwith "type: input is already a type"
   | Type { input } -> Type_op { input = lower input }
   | Scalar_literal value -> Scalar_literal value
   | Row_literal fields -> Row_literal { fields }
-  | Relation_literal_typed { kind; rows } ->
+  | Relation_literal { kind; rows } ->
       let normalized_rows = List.map (validate_typed_row kind) rows in
-      Relation_literal_typed { kind; rows = normalized_rows }
+      Relation_literal { kind; rows = normalized_rows }

@@ -7,6 +7,8 @@ open Test_helpers
 module Execution = Dovetail_execution
 module Storage = Dovetail_storage
 module Scalar = Dovetail_core.Scalar
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 
 let test_scan_lowers_to_full_scan () =
   let logical = Logical.Scan { table = "users" } in
@@ -182,21 +184,25 @@ let test_standalone_restrict_does_not_trigger_join_rewrite () =
     physical
 
 let test_relation_literal_translates_through () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
   let logical : Logical.t =
-    RelationLiteral
-      {
-        columns = [ "id"; "name" ];
-        rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
-      }
+    Relation_literal
+      { kind; rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ] }
   in
   let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
-    "Logical.RelationLiteral -> Physical.RelationLiteral with same payload"
-    (Physical.RelationLiteral
-       {
-         columns = [ "id"; "name" ];
-         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
-       })
+    "Logical.Relation_literal -> Physical.Relation_literal with same payload"
+    (Physical.Relation_literal
+       { kind; rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ] })
     physical
 
 let test_scalar_literal_translates_through () =
@@ -257,12 +263,22 @@ let orders_catalog table_name =
 
 (* Build a [Logical.t] that inserts a single-row literal into [table].
    [pairs] gives the column/value pairs in the order the test wants written;
-   the validator sees this order and the per-value kind comes from the
-   value's runtime constructor. *)
+   the literal's declared kind mirrors that order with per-column kinds
+   inferred from each value's runtime constructor -- the same shape Lower
+   produces for a typed relation literal. *)
 let insert_plan ~table ~pairs : Logical.t =
-  let columns = List.map fst pairs in
+  let kind : Relation.kind =
+    {
+      row_kind =
+        List.map
+          (fun (name, value) : Row.field ->
+            { name; kind = Scalar.kind_of value; qualifier = None })
+          pairs;
+      refinements = [];
+    }
+  in
   let values = List.map snd pairs in
-  Insert { table; source = RelationLiteral { columns; rows = [ values ] } }
+  Insert { table; source = Relation_literal { kind; rows = [ values ] } }
 
 let test_mutation_in_target_order_translates_through () =
   let plan =
@@ -276,6 +292,18 @@ let test_mutation_in_target_order_translates_through () =
         ]
   in
   let translated = Translate.translate ~catalog:orders_catalog plan in
+  let expected_kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "user_id"; kind = Int64; qualifier = None };
+          { name = "description"; kind = String; qualifier = None };
+          { name = "amount"; kind = Int64; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
   Alcotest.(check physical_testable)
     "Logical.Insert -> Physical.Insert with the literal source translated \
      through"
@@ -283,9 +311,9 @@ let test_mutation_in_target_order_translates_through () =
        {
          table = "orders";
          source =
-           Physical.RelationLiteral
+           Physical.Relation_literal
              {
-               columns = [ "id"; "user_id"; "description"; "amount" ];
+               kind = expected_kind;
                rows =
                  [
                    [
@@ -314,10 +342,10 @@ let test_mutation_in_permuted_order_translates_through () =
   in
   let translated = Translate.translate ~catalog:orders_catalog plan in
   match translated with
-  | Physical.Insert { table; source = RelationLiteral _ } ->
+  | Physical.Insert { table; source = Relation_literal _ } ->
       Alcotest.(check string)
         "the target table name reaches the Physical Insert" "orders" table
-  | _ -> Alcotest.fail "expected a Physical.Insert wrapping a RelationLiteral"
+  | _ -> Alcotest.fail "expected a Physical.Insert wrapping a Relation_literal"
 
 let test_mutation_against_unknown_table_raises () =
   let plan =
@@ -359,28 +387,6 @@ let test_mutation_with_unknown_column_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Translate: insert into \"orders\": unknown column(s): colour")
     (fun () -> ignore (Translate.translate ~catalog:orders_catalog plan))
-
-let test_mutation_with_row_arity_mismatch_raises () =
-  (* Built directly rather than via [insert_plan], because that helper
-     derives [columns] and [values] from the same list and so can't
-     produce a width mismatch between them. *)
-  let plan : Logical.t =
-    Insert
-      {
-        table = "orders";
-        source =
-          RelationLiteral
-            {
-              columns = [ "id"; "user_id"; "description"; "amount" ];
-              rows = [ [ Scalar.Int64 9L; Scalar.Int64 1L; Scalar.Int64 9L ] ];
-            };
-      }
-  in
-  Alcotest.check_raises "row arity"
-    (Failure
-       "Translate: insert into \"orders\": row has 3 value(s) but 4 column(s) \
-        declared") (fun () ->
-      ignore (Translate.translate ~catalog:orders_catalog plan))
 
 let test_mutation_with_kind_mismatch_raises () =
   let plan =
@@ -436,7 +442,7 @@ let () =
       ( "relation literal",
         [
           Alcotest.test_case
-            "translates Logical.RelationLiteral through unchanged" `Quick
+            "translates Logical.Relation_literal through unchanged" `Quick
             test_relation_literal_translates_through;
         ] );
       ( "scalar literal",
@@ -480,10 +486,6 @@ let () =
             "Insert with a column not in the target schema names it in the \
              error"
             `Quick test_mutation_with_unknown_column_raises;
-          Alcotest.test_case
-            "Insert whose row width disagrees with its declared columns names \
-             both counts in the error"
-            `Quick test_mutation_with_row_arity_mismatch_raises;
           Alcotest.test_case
             "Insert whose value kind disagrees with the target column names \
              both kinds in the error"

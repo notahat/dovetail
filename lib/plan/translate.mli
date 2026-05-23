@@ -23,10 +23,10 @@ val translate :
     [Restrict (Scan t, pk = K)] is why the catalog handle is needed.
 
     [Insert] looks up the target table in the catalog (failing if absent), then
-    -- when the source is a {!Logical.RelationLiteral} -- validates that the
-    literal's columns are a permutation of the target schema's column names and
-    that each value's kind matches the target schema. Each error message names
-    the offending columns or column/kind pair so the user can locate the
+    -- when the source is a {!Logical.Relation_literal} -- validates that the
+    literal's declared kind is a permutation of the target schema's column names
+    and that each column's kind matches the target schema. Each error message
+    names the offending columns or column/kind pair so the user can locate the
     mismatch from the wording alone. Non-literal sources translate without
     shape-level checks; the sink itself enforces column coverage at eval time
     (insert-from-query is grammatically legal but currently untested).

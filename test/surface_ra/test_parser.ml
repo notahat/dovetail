@@ -251,83 +251,6 @@ let test_pipeline_join_on_keyword_prefix_is_a_column_name () =
      [on], the rest of the input is unparseable. *)
   rejects "users | join orders oncology users.id = orders.user_id"
 
-let test_relation_literal_parses_single_pair () =
-  parses "{id: 7}"
-    (Ast.RelationLiteral { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] })
-
-let test_relation_literal_parses_multiple_pairs () =
-  parses "{id: 7, name: \"Pretzel\", active: true}"
-    (Ast.RelationLiteral
-       {
-         columns = [ "id"; "name"; "active" ];
-         rows =
-           [ [ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ] ];
-       })
-
-let test_relation_literal_tolerates_trailing_comma () =
-  parses "{id: 7, name: \"Pretzel\",}"
-    (Ast.RelationLiteral
-       {
-         columns = [ "id"; "name" ];
-         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
-       })
-
-let test_relation_literal_tolerates_extra_whitespace () =
-  parses "{  id  :  7  ,  name  :  \"Pretzel\"  }"
-    (Ast.RelationLiteral
-       {
-         columns = [ "id"; "name" ];
-         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
-       })
-
-let test_relation_literal_accepts_negative_int () =
-  parses "{amount: -5}"
-    (Ast.RelationLiteral
-       { columns = [ "amount" ]; rows = [ [ Scalar.Int64 (-5L) ] ] })
-
-let test_relation_literal_alone_is_a_valid_pipeline_head () =
-  parses "{id: 7} | restrict id = 7"
-    (Ast.Restrict
-       {
-         input =
-           Ast.RelationLiteral
-             { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
-         predicate =
-           expression_compare ~left:(expression_column "id") ~op:Equal
-             ~right:(expression_literal (Scalar.Int64 7L));
-       })
-
-let test_relation_literal_rejects_empty () = rejects "{}"
-let test_relation_literal_rejects_leading_comma () = rejects "{, id: 7}"
-
-(* The error must name the duplicate so the user can find it; ["id"] in the
-   "mentions" list is the column name and "duplicate column" is the kind of
-   problem. *)
-let test_relation_literal_rejects_duplicate_column () =
-  rejects_with_message "{id: 1, id: 2}"
-    ~mentions:[ "duplicate column"; "\"id\"" ]
-
-(* The error must name the full qualified key ["users.id"] -- not just
-   "users" -- so the user sees exactly what they typed. The wording
-   "qualified column key" labels the kind of problem. *)
-let test_relation_literal_rejects_qualified_key () =
-  rejects_with_message "{users.id: 7}"
-    ~mentions:[ "qualified column key"; "\"users.id\"" ]
-
-(* The same check has to fire mid-literal, not just on the first pair --
-   the qualified-key detection sits inside [relation_literal_pair], which
-   runs once per pair, but the angstrom [many] wrapping is easy to get
-   wrong so we lock in the second-position case with a dedicated test. *)
-let test_relation_literal_rejects_qualified_key_in_second_position () =
-  rejects_with_message "{x: 1, orders.amount: 2}"
-    ~mentions:[ "qualified column key"; "\"orders.amount\"" ]
-
-let test_relation_literal_rejects_missing_colon () = rejects "{id 7}"
-let test_relation_literal_rejects_missing_value () = rejects "{id:}"
-
-let test_relation_literal_rejects_column_reference_in_value_position () =
-  rejects "{id: x}"
-
 (* The sink production. A pipeline that ends in [| insert into <table>]
    parses as an [Ast.Insert] with everything before the sink as the
    upstream relation. Pipelines without a sink parse as the relation
@@ -356,22 +279,35 @@ let parses_program input expected_program =
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
 let test_pipeline_ending_in_sink_parses_as_insert () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "user_id"; kind = Int64; qualifier = None };
+          { name = "description"; kind = String; qualifier = None };
+          { name = "amount"; kind = Int64; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
   parses_plan
-    "{id: 9, user_id: 1, description: \"Pretzel\", amount: 9} | insert into \
-     orders"
+    "relation (id: int64, user_id: int64, description: string, amount: int64) \
+     { (id = 9, user_id = 1, description = \"Pretzel\", amount = 9) } | insert \
+     into orders"
     (Ast.Insert
        {
          source =
-           Ast.RelationLiteral
+           Ast.Relation_literal
              {
-               columns = [ "id"; "user_id"; "description"; "amount" ];
+               kind;
                rows =
                  [
                    [
-                     Scalar.Int64 9L;
-                     Scalar.Int64 1L;
-                     Scalar.String "Pretzel";
-                     Scalar.Int64 9L;
+                     ("id", Scalar.Int64 9L);
+                     ("user_id", Scalar.Int64 1L);
+                     ("description", Scalar.String "Pretzel");
+                     ("amount", Scalar.Int64 9L);
                    ];
                  ];
              };
@@ -704,23 +640,23 @@ let id_int64_name_string_kind : Relation.kind =
     refinements = [];
   }
 
-let test_relation_literal_typed_empty_parses () =
+let test_relation_literal_empty_parses () =
   parses "relation (id: int64, name: string) {}"
-    (Ast.Relation_literal_typed { kind = id_int64_name_string_kind; rows = [] })
+    (Ast.Relation_literal { kind = id_int64_name_string_kind; rows = [] })
 
-let test_relation_literal_typed_single_row_parses () =
+let test_relation_literal_single_row_parses () =
   parses "relation (id: int64, name: string) { (id = 1, name = \"alice\") }"
-    (Ast.Relation_literal_typed
+    (Ast.Relation_literal
        {
          kind = id_int64_name_string_kind;
          rows = [ [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] ];
        })
 
-let test_relation_literal_typed_multiple_rows_parses () =
+let test_relation_literal_multiple_rows_parses () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
      name = \"bob\") }"
-    (Ast.Relation_literal_typed
+    (Ast.Relation_literal
        {
          kind = id_int64_name_string_kind;
          rows =
@@ -730,11 +666,11 @@ let test_relation_literal_typed_multiple_rows_parses () =
            ];
        })
 
-let test_relation_literal_typed_tolerates_trailing_comma () =
+let test_relation_literal_tolerates_trailing_comma () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
      name = \"bob\"), }"
-    (Ast.Relation_literal_typed
+    (Ast.Relation_literal
        {
          kind = id_int64_name_string_kind;
          rows =
@@ -744,9 +680,9 @@ let test_relation_literal_typed_tolerates_trailing_comma () =
            ];
        })
 
-let test_relation_literal_typed_with_primary_key_refinement_parses () =
+let test_relation_literal_with_primary_key_refinement_parses () =
   parses "relation (id: int64, name: string, primary key (id)) {}"
-    (Ast.Relation_literal_typed
+    (Ast.Relation_literal
        {
          kind =
            {
@@ -760,9 +696,9 @@ let test_relation_literal_typed_with_primary_key_refinement_parses () =
          rows = [];
        })
 
-let test_relation_literal_typed_tolerates_extra_whitespace () =
+let test_relation_literal_tolerates_extra_whitespace () =
   parses "  relation  (  id : int64  )  {  ( id = 1 )  ,  ( id = 2 )  }  "
-    (Ast.Relation_literal_typed
+    (Ast.Relation_literal
        {
          kind =
            {
@@ -772,23 +708,28 @@ let test_relation_literal_typed_tolerates_extra_whitespace () =
          rows = [ [ ("id", Scalar.Int64 1L) ]; [ ("id", Scalar.Int64 2L) ] ];
        })
 
-let test_relation_literal_typed_rejects_duplicate_field_in_row () =
+let test_relation_literal_rejects_duplicate_field_in_row () =
   rejects_with_message "relation (id: int64) { (id = 1, id = 2) }"
     ~mentions:[ "duplicate field"; "\"id\"" ]
 
-let test_relation_literal_typed_rejects_missing_type_expression () =
+let test_relation_literal_rejects_missing_type_expression () =
   rejects "relation { (id = 1) }"
 
-let test_relation_literal_typed_rejects_missing_brace_block () =
+let test_relation_literal_rejects_missing_brace_block () =
   rejects "relation (id: int64)"
 
-let test_relation_literal_typed_followed_by_type_step () =
+(* The curly-brace form [{col: val}] was retired with the relation literal
+   syntax flip. Confirm the parser now rejects it; pipeline-source position no
+   longer accepts the curly form. *)
+let test_relation_literal_curly_form_is_a_parse_error () = rejects "{id: 7}"
+
+let test_relation_literal_followed_by_type_step () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\") } | type"
     (Ast.Type
        {
          input =
-           Ast.Relation_literal_typed
+           Ast.Relation_literal
              {
                kind = id_int64_name_string_kind;
                rows =
@@ -914,39 +855,6 @@ let () =
             "identifier with an on-keyword prefix is not the on keyword" `Quick
             test_pipeline_join_on_keyword_prefix_is_a_column_name;
         ] );
-      ( "relation literal syntax",
-        [
-          Alcotest.test_case "parses a single-pair literal" `Quick
-            test_relation_literal_parses_single_pair;
-          Alcotest.test_case "parses a multi-pair literal" `Quick
-            test_relation_literal_parses_multiple_pairs;
-          Alcotest.test_case "tolerates a trailing comma" `Quick
-            test_relation_literal_tolerates_trailing_comma;
-          Alcotest.test_case "tolerates extra whitespace inside the literal"
-            `Quick test_relation_literal_tolerates_extra_whitespace;
-          Alcotest.test_case "accepts a negative int64 value" `Quick
-            test_relation_literal_accepts_negative_int;
-          Alcotest.test_case "a literal alone is a valid pipeline head" `Quick
-            test_relation_literal_alone_is_a_valid_pipeline_head;
-          Alcotest.test_case "rejects the empty literal" `Quick
-            test_relation_literal_rejects_empty;
-          Alcotest.test_case "rejects a literal with a leading comma" `Quick
-            test_relation_literal_rejects_leading_comma;
-          Alcotest.test_case "rejects a literal with a duplicate column" `Quick
-            test_relation_literal_rejects_duplicate_column;
-          Alcotest.test_case "rejects a literal with a qualified key" `Quick
-            test_relation_literal_rejects_qualified_key;
-          Alcotest.test_case
-            "rejects a literal with a qualified key in second position" `Quick
-            test_relation_literal_rejects_qualified_key_in_second_position;
-          Alcotest.test_case "rejects a literal missing the colon" `Quick
-            test_relation_literal_rejects_missing_colon;
-          Alcotest.test_case "rejects a literal with a missing value" `Quick
-            test_relation_literal_rejects_missing_value;
-          Alcotest.test_case "rejects a column reference in the value position"
-            `Quick
-            test_relation_literal_rejects_column_reference_in_value_position;
-        ] );
       ( "type syntax",
         [
           Alcotest.test_case "parses a single type step" `Quick
@@ -999,29 +907,30 @@ let () =
             "row literal feeds a [| type] step at pipeline-source position"
             `Quick test_row_literal_followed_by_type_step;
         ] );
-      ( "relation literal typed",
+      ( "relation literal",
         [
           Alcotest.test_case "empty form parses with rows = []" `Quick
-            test_relation_literal_typed_empty_parses;
+            test_relation_literal_empty_parses;
           Alcotest.test_case "single-row form parses" `Quick
-            test_relation_literal_typed_single_row_parses;
+            test_relation_literal_single_row_parses;
           Alcotest.test_case "multi-row form parses" `Quick
-            test_relation_literal_typed_multiple_rows_parses;
+            test_relation_literal_multiple_rows_parses;
           Alcotest.test_case "tolerates a trailing comma after the last row"
-            `Quick test_relation_literal_typed_tolerates_trailing_comma;
+            `Quick test_relation_literal_tolerates_trailing_comma;
           Alcotest.test_case "accepts a primary-key refinement on the kind"
-            `Quick
-            test_relation_literal_typed_with_primary_key_refinement_parses;
+            `Quick test_relation_literal_with_primary_key_refinement_parses;
           Alcotest.test_case "tolerates extra whitespace throughout" `Quick
-            test_relation_literal_typed_tolerates_extra_whitespace;
+            test_relation_literal_tolerates_extra_whitespace;
           Alcotest.test_case "rejects a row with a duplicate field name" `Quick
-            test_relation_literal_typed_rejects_duplicate_field_in_row;
+            test_relation_literal_rejects_duplicate_field_in_row;
           Alcotest.test_case "rejects the [relation] keyword without a type"
-            `Quick test_relation_literal_typed_rejects_missing_type_expression;
+            `Quick test_relation_literal_rejects_missing_type_expression;
           Alcotest.test_case "rejects a typed literal without the brace block"
-            `Quick test_relation_literal_typed_rejects_missing_brace_block;
+            `Quick test_relation_literal_rejects_missing_brace_block;
           Alcotest.test_case "typed literal feeds a [| type] step" `Quick
-            test_relation_literal_typed_followed_by_type_step;
+            test_relation_literal_followed_by_type_step;
+          Alcotest.test_case "the retired [{col: val}] form is a parse error"
+            `Quick test_relation_literal_curly_form_is_a_parse_error;
         ] );
       ( "insert sink syntax",
         [

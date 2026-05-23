@@ -286,17 +286,21 @@ let multiset_difference ~expected ~actual =
   let unknown = List.filter (fun name -> not (List.mem name expected)) actual in
   (missing, unknown)
 
-(* Check that [literal_columns] is a permutation of [target_kind]'s
-   column names. Raises [Failure] naming the missing columns first, then
+(* Check that [literal_kind]'s field names are a permutation of
+   [target_kind]'s. Raises [Failure] naming the missing columns first, then
    the unknown ones -- a single literal can hit both, and the missing-
    columns message is the more directly actionable of the two. *)
 let check_columns_match ~target_table ~(target_kind : Relation.kind)
-    ~literal_columns =
+    ~(literal_kind : Relation.kind) =
   let target_column_names =
     List.map (fun (field : Row.field) -> field.name) target_kind.row_kind
   in
+  let literal_column_names =
+    List.map (fun (field : Row.field) -> field.name) literal_kind.row_kind
+  in
   let missing, unknown =
-    multiset_difference ~expected:target_column_names ~actual:literal_columns
+    multiset_difference ~expected:target_column_names
+      ~actual:literal_column_names
   in
   if missing <> [] then
     failwith
@@ -309,73 +313,45 @@ let check_columns_match ~target_table ~(target_kind : Relation.kind)
          target_table
          (String.concat ", " unknown))
 
-(* Check that [first_row] has one value per declared literal column.
-   Raises [Failure] naming both counts. This is structural agreement
-   between the literal's own columns and rows; the per-column kind check
-   below is what compares against the target schema. *)
-let check_row_arity ~target_table ~literal_columns ~first_row =
-  if List.length first_row <> List.length literal_columns then
-    failwith
-      (Printf.sprintf
-         "Translate: insert into %S: row has %d value(s) but %d column(s) \
-          declared"
-         target_table (List.length first_row)
-         (List.length literal_columns))
+(* Check that each field in [literal_kind] has the same scalar kind as the
+   target column with the same name. Raises [Failure] naming the column and
+   both kinds.
 
-(* Check that each value in [first_row] has the kind the target kind
-   declares for the column named at the same position in [literal_columns].
-   Raises [Failure] naming the column and both kinds. The first-row kinds
-   are sufficient because the literal grammar is currently single-row;
-   multi-row literals would extend the check to every row.
-
-   Precondition: [check_columns_match] and [check_row_arity] have passed,
-   so every name in [literal_columns] resolves in [target_kind.row_kind]
-   and the lists are the same length. *)
+   Precondition: [check_columns_match] has passed, so every name in
+   [literal_kind] resolves in [target_kind.row_kind]. *)
 let check_value_kinds ~target_table ~(target_kind : Relation.kind)
-    ~literal_columns ~first_row =
-  List.iter2
-    (fun column_name value ->
+    ~(literal_kind : Relation.kind) =
+  List.iter
+    (fun (literal_field : Row.field) ->
       let target_field =
         List.find
-          (fun (field : Row.field) -> field.name = column_name)
+          (fun (field : Row.field) -> field.name = literal_field.name)
           target_kind.row_kind
       in
-      let actual_kind = Scalar.kind_of value in
-      if actual_kind <> target_field.kind then
+      if literal_field.kind <> target_field.kind then
         failwith
           (Printf.sprintf
              "Translate: insert into %S: column %S expects %s, got %s"
-             target_table column_name
+             target_table literal_field.name
              (Scalar.kind_to_string target_field.kind)
-             (Scalar.kind_to_string actual_kind)))
-    literal_columns first_row
+             (Scalar.kind_to_string literal_field.kind)))
+    literal_kind.row_kind
 
-(* Run the three literal/target checks in the order the later ones depend
-   on the earlier ones: column-set agreement, then row arity, then per-
-   column kinds. Each helper raises [Failure] on its own contract; this
+(* Run the literal/target checks in order: column-set agreement, then
+   per-column kinds. Each helper raises [Failure] on its own contract; this
    orchestrator just sequences them. *)
-let validate_literal_against_target ~target_table ~target_kind ~literal_columns
-    ~first_row =
-  check_columns_match ~target_table ~target_kind ~literal_columns;
-  check_row_arity ~target_table ~literal_columns ~first_row;
-  check_value_kinds ~target_table ~target_kind ~literal_columns ~first_row
+let validate_literal_against_target ~target_table ~target_kind ~literal_kind =
+  check_columns_match ~target_table ~target_kind ~literal_kind;
+  check_value_kinds ~target_table ~target_kind ~literal_kind
 
-(* Run validation when the insert source is a [RelationLiteral]; pass through
+(* Run validation when the insert source is a [Relation_literal]; pass through
    silently for any other source. Non-literal sources aren't a tested path
    yet, but the sink stays source-agnostic by design -- the sink itself
    enforces column coverage at eval time. *)
 let validate_mutation_source ~target_table ~target_kind (source : Logical.t) =
   match source with
-  | RelationLiteral { columns; rows } -> (
-      match rows with
-      | first_row :: _ ->
-          validate_literal_against_target ~target_table ~target_kind
-            ~literal_columns:columns ~first_row
-      | [] ->
-          failwith
-            (Printf.sprintf
-               "Translate: insert into %S: relation literal has no rows"
-               target_table))
+  | Relation_literal { kind = literal_kind; _ } ->
+      validate_literal_against_target ~target_table ~target_kind ~literal_kind
   | _ -> ()
 
 let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
@@ -417,9 +393,7 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
           left = translate_relation ~catalog left;
           right = translate_relation ~catalog right;
         }
-  | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
-  | Relation_literal_typed { kind; rows } ->
-      Relation_literal_typed { kind; rows }
+  | Relation_literal { kind; rows } -> Relation_literal { kind; rows }
   | Insert { table; source } -> translate_insert ~catalog ~table ~source
   | Type_op { input } -> Type_op { input = translate_relation ~catalog input }
   | Scalar_literal value -> Scalar_literal value

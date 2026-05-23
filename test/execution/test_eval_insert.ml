@@ -8,24 +8,50 @@
 open Dovetail_execution
 open Test_helpers
 module Scalar = Dovetail_core.Scalar
+module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
-(* Build a [Physical.Insert] sourced from a multi-row literal in target
-   schema order, so the count-reporting tests can vary the source size. *)
-let insert_mutation_multi ~table ~columns ~rows : Plan.Physical.t =
-  Insert { table; source = RelationLiteral { columns; rows } }
+(* Build a [Relation.kind] mirroring the source row's columns: each field's
+   scalar kind comes from the value's runtime constructor, matching what
+   Lower produces for a typed relation literal. *)
+let kind_from_pairs pairs : Relation.kind =
+  {
+    row_kind =
+      List.map
+        (fun (name, value) : Row.field ->
+          { name; kind = Scalar.kind_of value; qualifier = None })
+        pairs;
+    refinements = [];
+  }
 
-(* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]
+(* Build a [Physical.Insert] sourced from a multi-row literal in target
+   schema order, so the count-reporting tests can vary the source size.
+   [column_kinds] declares the literal's kind; every row in [rows] has the
+   same arity and per-position kinds. *)
+let insert_mutation_multi ~table ~column_kinds ~rows : Plan.Physical.t =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        List.map
+          (fun (name, scalar_kind) : Row.field ->
+            { name; kind = scalar_kind; qualifier = None })
+          column_kinds;
+      refinements = [];
+    }
+  in
+  Insert { table; source = Relation_literal { kind; rows } }
+
+(* Build a [Physical.Insert] whose source is a single-row [Relation_literal]
    with the given column/value pairs. The pairs are in target schema order;
    this keeps the tests focused on the sink itself and not on column
    reordering (Translate-level permutation validation lets the sink trust
    its input). *)
 let insert_mutation ~table ~pairs : Plan.Physical.t =
-  let columns = List.map fst pairs in
+  let kind = kind_from_pairs pairs in
   let values = List.map snd pairs in
-  Insert { table; source = RelationLiteral { columns; rows = [ values ] } }
+  Insert { table; source = Relation_literal { kind; rows = [ values ] } }
 
 let test_insert_writes_row_and_reports_one_affected () =
   with_fixture_environment @@ fun environment ->
@@ -82,7 +108,13 @@ let test_insert_three_rows_reports_count_of_three () =
   with_fixture_environment @@ fun environment ->
   let mutation =
     insert_mutation_multi ~table:"orders"
-      ~columns:[ "id"; "user_id"; "description"; "amount" ]
+      ~column_kinds:
+        [
+          ("id", Int64);
+          ("user_id", Int64);
+          ("description", String);
+          ("amount", Int64);
+        ]
       ~rows:
         [
           [

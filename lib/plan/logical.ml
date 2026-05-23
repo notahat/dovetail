@@ -8,11 +8,7 @@ type t =
   | Restrict of { input : t; predicate : Expression.t }
   | Project of { input : t; columns : Projection.t }
   | CrossProduct of { left : t; right : t }
-  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
-  | Relation_literal_typed of {
-      kind : Relation.kind;
-      rows : Scalar.value list list;
-    }
+  | Relation_literal of { kind : Relation.kind; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
@@ -29,8 +25,7 @@ let rec required_access = function
   | Project { input; _ } -> required_access input
   | CrossProduct { left; right } ->
       access_max (required_access left) (required_access right)
-  | RelationLiteral _ -> `Read
-  | Relation_literal_typed _ -> `Read
+  | Relation_literal _ -> `Read
   | Insert { source; _ } -> access_max `Write (required_access source)
   | Type_op { input } -> required_access input
   | Scalar_literal _ -> `Read
@@ -61,16 +56,11 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter "%sCrossProduct@\n" prefix;
       format_at formatter (indent + 1) left;
       format_at formatter (indent + 1) right
-  | RelationLiteral { columns; rows } ->
-      Format.fprintf formatter "%sRelationLiteral(columns=%s, rows=%d)@\n"
-        prefix
-        (String.concat ", " columns)
-        (List.length rows)
-  | Relation_literal_typed { kind; rows } ->
+  | Relation_literal { kind; rows } ->
       let columns =
         List.map (fun (field : Row.field) -> field.name) kind.row_kind
       in
-      Format.fprintf formatter "%sRelationLiteralTyped(columns=%s, rows=%d)@\n"
+      Format.fprintf formatter "%sRelationLiteral(columns=%s, rows=%d)@\n"
         prefix
         (String.concat ", " columns)
         (List.length rows)
