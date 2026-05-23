@@ -26,7 +26,7 @@ let test_decode_row_round_trips_a_users_row () =
       ]
   in
   let row = Storage.Row_codec.decode_row users_kind (key_bytes, value_bytes) in
-  let expected : Row.data =
+  let expected : Row.value =
     [|
       Scalar.Int64 7L;
       Scalar.String "Alice";
@@ -67,7 +67,7 @@ let test_decode_row_raises_for_non_int64_primary_key () =
         (Storage.Row_codec.decode_row string_pk_kind ("ignored", "ignored")))
 
 let test_encode_row_round_trips_through_decode_row () =
-  let row : Row.data =
+  let row : Row.value =
     [|
       Scalar.Int64 42L;
       Scalar.String "Alice";

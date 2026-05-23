@@ -9,7 +9,7 @@ module Storage = Dovetail_storage
    stream [orders], probe [users] by [orders.user_id] -- should produce.
    Streaming [orders] means visiting orders in primary-key order; each
    probe is at most one row. Six orders, all with a matching user_id. *)
-let expected_user_then_order_rows : Row.data list =
+let expected_user_then_order_rows : Row.value list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair user_index order_index =
@@ -32,7 +32,7 @@ let expected_user_then_order_rows : Row.data list =
 
 (* The same matched pairs as above, but with [orders] columns first and
    [users] columns second. Used for the [inner_position = Right] case. *)
-let expected_order_then_user_rows : Row.data list =
+let expected_order_then_user_rows : Row.value list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair order_index user_index =

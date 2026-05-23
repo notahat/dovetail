@@ -9,11 +9,11 @@
 module Row = Dovetail_core.Row
 module Storage = Dovetail_storage
 
-val users_rows : Row.data list
+val users_rows : Row.value list
 (** The five [users] rows, in primary-key order. Exposed so tests that compare
     pipeline output against the fixture have a single source of truth. *)
 
-val orders_rows : Row.data list
+val orders_rows : Row.value list
 (** The six [orders] rows, in primary-key order. Dave (user id 4) deliberately
     has no orders; Alice (id 1) and Carol (id 3) each have two. *)
 

@@ -14,7 +14,7 @@ let users_kind : Relation.kind =
     refinements = [ Primary_key [ "id" ] ];
   }
 
-let users_rows : Row.data list =
+let users_rows : Row.value list =
   [
     [| Int64 1L; String "Alice"; String "alice@example.com"; Bool true |];
     [| Int64 2L; String "Bob"; String "bob@example.com"; Bool false |];
@@ -35,7 +35,7 @@ let orders_kind : Relation.kind =
     refinements = [ Primary_key [ "id" ] ];
   }
 
-let orders_rows : Row.data list =
+let orders_rows : Row.value list =
   [
     [| Int64 1L; Int64 1L; String "Coffee"; Int64 5L |];
     [| Int64 2L; Int64 1L; String "Bagel"; Int64 4L |];

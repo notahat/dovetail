@@ -10,7 +10,7 @@ module Plan = Dovetail_plan
    so users are visited in primary-key order; orders likewise within each
    user. The fixture has six matched pairs: Alice has two orders, Bob one,
    Carol two, Eve one (Dave has none). *)
-let expected_matched_user_order_rows : Row.data list =
+let expected_matched_user_order_rows : Row.value list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair user_index order_index =

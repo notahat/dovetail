@@ -1,7 +1,7 @@
 (** Expression tree used in predicate positions across the IRs.
 
     An [Expression.t] is an algebraic expression that produces a {!Scalar.value}
-    when evaluated against a {!Row.data}. The tree's leaves are literals and
+    when evaluated against a {!Row.value}. The tree's leaves are literals and
     column references; its internal nodes are comparisons and boolean
     composition ([and], [or], [not]). Column references carry a
     {!Row.column_reference} so a qualifier (set when a cross product or join
@@ -64,7 +64,7 @@ val format : Format.formatter -> t -> unit
     The output is meant for EXPLAIN-style debug printing, not for round-tripping
     back through the parser. *)
 
-val resolve : Row.kind -> t -> Row.data -> bool
+val resolve : Row.kind -> t -> Row.value -> bool
 (** [resolve row_kind expression] validates [expression] against [row_kind] and
     returns a closure that evaluates [expression] against a single row as a
     boolean predicate.

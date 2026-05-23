@@ -246,7 +246,7 @@ let test_qualified_column_resolves_identically_to_unqualified () =
 let test_unknown_qualifier_raises () =
   Alcotest.check_raises "unknown qualified column"
     (Failure "Expression.resolve: unknown column \"orders.id\"") (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_compare
              ~left:(expression_qualified_column ~qualifier:"orders" ~name:"id")
@@ -258,7 +258,7 @@ let test_unknown_qualifier_raises () =
 let test_unknown_column_on_left_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_compare
              ~left:(expression_column "unknown_col")
@@ -270,7 +270,7 @@ let test_unknown_column_on_left_raises () =
 let test_unknown_column_on_right_raises () =
   Alcotest.check_raises "unknown column"
     (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "id") ~op:Equal
              ~right:(expression_column "unknown_col"))
@@ -282,7 +282,7 @@ let test_type_mismatch_column_vs_literal_raises () =
     (Failure
        "Expression.resolve: type mismatch: column \"name\" is String, literal \
         Int64 is Int64") (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "name") ~op:Equal
              ~right:(expression_literal (Scalar.Int64 1L)))
@@ -296,7 +296,7 @@ let test_ordering_on_bool_column_raises () =
   Alcotest.check_raises "ordering operator on Bool"
     (Failure "Expression.resolve: ordering operator > is not defined for Bool")
     (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_compare
              ~left:(expression_column "active")
@@ -312,7 +312,7 @@ let test_non_bool_predicate_raises () =
   Alcotest.check_raises "non-Bool top-level expression"
     (Failure "Expression.resolve: predicate position requires Bool, got Int64")
     (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind (expression_column "id")
       in
       ())
@@ -321,7 +321,7 @@ let test_non_bool_literal_predicate_raises () =
   Alcotest.check_raises "non-Bool literal predicate"
     (Failure "Expression.resolve: predicate position requires Bool, got String")
     (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_literal (Scalar.String "hello"))
       in
@@ -332,7 +332,7 @@ let test_type_mismatch_column_vs_column_raises () =
     (Failure
        "Expression.resolve: type mismatch: column \"id\" is Int64, column \
         \"name\" is String") (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "id") ~op:Equal
              ~right:(expression_column "name"))
@@ -422,7 +422,7 @@ let test_not_with_non_bool_operand_raises () =
     (Failure
        "Expression.resolve: not requires a Bool operand: column \"id\" is Int64")
     (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_not (expression_column "id"))
       in
@@ -433,7 +433,7 @@ let test_and_with_non_bool_operand_raises () =
     (Failure
        "Expression.resolve: and requires Bool operands: column \"id\" is Int64")
     (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_and ~left:(expression_column "id")
              ~right:(expression_column "active"))
@@ -445,7 +445,7 @@ let test_or_with_non_bool_operand_raises () =
     (Failure
        "Expression.resolve: or requires Bool operands: column \"id\" is Int64")
     (fun () ->
-      let (_ : Row.data -> bool) =
+      let (_ : Row.value -> bool) =
         Expression.resolve users_row_kind
           (expression_or
              ~left:(expression_column "active")

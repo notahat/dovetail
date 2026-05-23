@@ -2,7 +2,7 @@
 
     A relation is the runtime representation of intermediate and final query
     results: a {!kind} describing the row shape and refinements, paired with a
-    lazy [Seq.t] of {!Row.data} in that shape. The phantom [`Set] / [`Bag] tag
+    lazy [Seq.t] of {!Row.value} in that shape. The phantom [`Set] / [`Bag] tag
     declares whether the relation has duplicate-elimination semantics, allowing
     the type system to reject combinations that would silently change those
     semantics. The full table scan -- currently the only producer -- emits
@@ -25,7 +25,7 @@ type kind = { row_kind : Row.kind; refinements : refinement list }
 
 type 'tag t = {
   kind : kind;
-  data : Row.data Seq.t;
+  data : Row.value Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
 (** A relation tagged with its multiplicity semantics: a {!kind} describing the
@@ -36,7 +36,7 @@ val primary_key_names : kind -> string list
     refinements, in declared order, or the empty list when no [Primary_key]
     refinement is present. *)
 
-val split_row : kind -> Row.data -> Scalar.value list * Scalar.value list
+val split_row : kind -> Row.value -> Scalar.value list * Scalar.value list
 (** [split_row kind row] returns [(primary_key_values, non_primary_key_values)],
     where [primary_key_values] are the values at the primary-key columns (in
     primary-key order) and [non_primary_key_values] are the values at the
@@ -47,7 +47,7 @@ val assemble_row :
   kind ->
   primary_key_values:Scalar.value list ->
   non_primary_key_values:Scalar.value list ->
-  Row.data
+  Row.value
 (** [assemble_row kind ~primary_key_values ~non_primary_key_values] is the
     inverse of {!split_row}: it interleaves the two value lists according to the
     kind's primary key to produce a row in field order. Raises

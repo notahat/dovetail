@@ -184,7 +184,7 @@ let test_join_yields_matched_pairs () =
    rows arrive in orders' primary-key order) and tags users as the
    inner with inner_position = Left (so column order matches what the
    pre-rewrite plan produced). *)
-let expected_join_rows : Row.data list =
+let expected_join_rows : Row.value list =
   let user index = List.nth expected_users_rows index in
   let order index = List.nth expected_orders_rows index in
   let pair user_index order_index =
@@ -223,7 +223,7 @@ let test_indexed_join_then_project_matches_readme_example () =
   with_query_result
     "users | join orders on users.id = orders.user_id | project name, \
      description, amount" (fun rows ->
-      let expected : Row.data list =
+      let expected : Row.value list =
         [
           [| Scalar.String "Alice"; Scalar.String "Coffee"; Scalar.Int64 5L |];
           [| Scalar.String "Alice"; Scalar.String "Bagel"; Scalar.Int64 4L |];
@@ -241,7 +241,7 @@ let test_indexed_join_then_project_matches_readme_example () =
    [orders.amount >= 5] filter on top of the indexed join. Carved out
    of [expected_join_rows] so both forms of the residual-filter query
    (on-clause [and], trailing [| restrict]) can assert against it. *)
-let expected_join_rows_with_amount_at_least_five : Row.data list =
+let expected_join_rows_with_amount_at_least_five : Row.value list =
   [
     List.nth expected_join_rows 0;
     (* Alice + Coffee, amount 5 *)

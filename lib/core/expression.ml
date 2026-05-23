@@ -126,18 +126,18 @@ let check_bool_operand operator_name operand (kind : Scalar.kind) =
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
    the produced closure: the right operand is only read when the left's
    verdict doesn't determine the result. *)
-let rec resolve_value row_kind : t -> Scalar.kind * (Row.data -> Scalar.value) =
+let rec resolve_value row_kind : t -> Scalar.kind * (Row.value -> Scalar.value) =
  fun expression ->
   match expression with
   | Literal value ->
       let kind = Scalar.kind_of value in
-      let read (_row : Row.data) = value in
+      let read (_row : Row.value) = value in
       (kind, read)
   | Column reference -> (
       match Row.find_field row_kind reference with
       | Error message -> failwith ("Expression.resolve: " ^ message)
       | Ok (column_position, field) ->
-          let read (row : Row.data) = row.(column_position) in
+          let read (row : Row.value) = row.(column_position) in
           (field.kind, read))
   | Compare { left; op; right } ->
       let left_kind, read_left = resolve_value row_kind left in
@@ -222,7 +222,7 @@ let resolve row_kind expression =
       (Printf.sprintf
          "Expression.resolve: predicate position requires Bool, got %s"
          (Scalar.kind_to_string kind));
-  fun (row : Row.data) ->
+  fun (row : Row.value) ->
     (* The resolve-time kind check above guarantees a Bool value here. *)
     match read_value row with
     | Scalar.Bool flag -> flag

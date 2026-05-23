@@ -47,7 +47,7 @@ let resolve (input_kind : Relation.kind) columns =
   let projected_kind : Relation.kind =
     { row_kind = projected_row_kind; refinements = [] }
   in
-  let project_row (row : Row.data) : Row.data =
+  let project_row (row : Row.value) : Row.value =
     Array.map (fun position -> row.(position)) positions
   in
   (projected_kind, project_row)

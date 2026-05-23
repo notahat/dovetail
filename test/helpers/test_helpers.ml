@@ -147,10 +147,10 @@ let format_row formatter row =
 let format_row_list formatter rows =
   List.iter (fun row -> Format.fprintf formatter "%a@\n" format_row row) rows
 
-(** Alcotest testable for a list of [Row.data]s. Polymorphic-equality based. The
+(** Alcotest testable for a list of [Row.value]s. Polymorphic-equality based. The
     printer renders one row per line using {!Scalar.format} so failure diffs
     surface the offending row rather than [\<rows\> vs \<rows\>]. *)
-let row_list_testable : Row.data list Alcotest.testable =
+let row_list_testable : Row.value list Alcotest.testable =
   Alcotest.testable format_row_list ( = )
 
 (** Alcotest testable for a [Physical.t]. Polymorphic-equality based; the

@@ -30,7 +30,7 @@ let unqualified_kind : Relation.kind =
     refinements = [];
   }
 
-let two_users : Row.data list =
+let two_users : Row.value list =
   [
     [|
       Scalar.Int64 1L;
@@ -135,7 +135,7 @@ let test_assembles_in_field_order_with_leading_pk () =
           Scalar.Bool true;
         ]
   in
-  let expected : Row.data =
+  let expected : Row.value =
     [|
       Scalar.Int64 42L;
       Scalar.String "Alice";
@@ -150,7 +150,7 @@ let test_assembles_with_pk_in_the_middle () =
     Relation.assemble_row mid_pk_kind ~primary_key_values:[ Scalar.Int64 7L ]
       ~non_primary_key_values:[ Scalar.String "Bob"; Scalar.Bool false ]
   in
-  let expected : Row.data =
+  let expected : Row.value =
     [| Scalar.String "Bob"; Scalar.Int64 7L; Scalar.Bool false |]
   in
   Alcotest.(check row_testable) "PK in middle" expected assembled
@@ -161,13 +161,13 @@ let test_assembles_composite_primary_key () =
       ~primary_key_values:[ Scalar.String "acme"; Scalar.Int64 3L ]
       ~non_primary_key_values:[ Scalar.String "Carol" ]
   in
-  let expected : Row.data =
+  let expected : Row.value =
     [| Scalar.String "acme"; Scalar.String "Carol"; Scalar.Int64 3L |]
   in
   Alcotest.(check row_testable) "composite PK" expected assembled
 
 let test_splits_row_with_leading_pk () =
-  let row : Row.data =
+  let row : Row.value =
     [|
       Scalar.Int64 42L;
       Scalar.String "Alice";
@@ -186,7 +186,7 @@ let test_splits_row_with_leading_pk () =
     non_primary_key_values
 
 let test_splits_row_with_pk_in_the_middle () =
-  let row : Row.data =
+  let row : Row.value =
     [| Scalar.String "Bob"; Scalar.Int64 7L; Scalar.Bool false |]
   in
   let primary_key_values, non_primary_key_values =
@@ -200,7 +200,7 @@ let test_splits_row_with_pk_in_the_middle () =
     non_primary_key_values
 
 let test_splits_row_with_composite_primary_key () =
-  let row : Row.data =
+  let row : Row.value =
     [| Scalar.String "acme"; Scalar.String "Carol"; Scalar.Int64 3L |]
   in
   let primary_key_values, non_primary_key_values =
@@ -214,7 +214,7 @@ let test_splits_row_with_composite_primary_key () =
     "non-primary-key values" [ Scalar.String "Carol" ] non_primary_key_values
 
 let test_split_is_the_inverse_of_assemble () =
-  let row : Row.data =
+  let row : Row.value =
     [| Scalar.String "acme"; Scalar.String "Carol"; Scalar.Int64 3L |]
   in
   let primary_key_values, non_primary_key_values =
@@ -228,7 +228,7 @@ let test_split_is_the_inverse_of_assemble () =
     "split then assemble round-trips the row" row reassembled
 
 let test_split_rejects_wrong_length_row () =
-  let row : Row.data = [| Scalar.Int64 1L; Scalar.String "Alice" |] in
+  let row : Row.value = [| Scalar.Int64 1L; Scalar.String "Alice" |] in
   Alcotest.check_raises "raises Invalid_argument"
     (Invalid_argument
        "Relation.split_row: row has 2 value(s) but kind declares 4 field(s)")

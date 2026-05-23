@@ -44,7 +44,7 @@ let test_insert_writes_row_and_reports_one_affected () =
           let rows = List.of_seq relation.data in
           let inserted =
             List.find_opt
-              (fun (row : Row.data) -> row.(0) = Scalar.Int64 9L)
+              (fun (row : Row.value) -> row.(0) = Scalar.Int64 9L)
               rows
           in
           match inserted with

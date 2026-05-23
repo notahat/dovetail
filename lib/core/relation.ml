@@ -3,7 +3,7 @@ type kind = { row_kind : Row.kind; refinements : refinement list }
 
 type 'tag t = {
   kind : kind;
-  data : Row.data Seq.t;
+  data : Row.value Seq.t;
 }
   constraint 'tag = [< `Set | `Bag ]
 

@@ -20,7 +20,7 @@ val format : Format.formatter -> t -> unit
     Intended for EXPLAIN-style debug printing -- {!Physical.format} renders a
     [Project] operator's [columns] parameter through this function. *)
 
-val resolve : Relation.kind -> t -> Relation.kind * (Row.data -> Row.data)
+val resolve : Relation.kind -> t -> Relation.kind * (Row.value -> Row.value)
 (** [resolve input_kind columns] validates [columns] against [input_kind] and
     returns the projected {!Relation.kind} together with a closure that builds
     the projected row.
