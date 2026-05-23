@@ -106,6 +106,14 @@ type t =
           the value itself; evaluation hands the value down the pipe as a
           {!Term.Scalar_value}, and [| type] over a scalar literal yields the
           corresponding {!Scalar.kind}. *)
+  | Row_literal of (string * Scalar.value) list
+      (** [Row_literal fields] is the surface form of a bare row at the head of
+          a pipeline: [(id = 1, name = "alice")] parses as
+          [Row_literal [("id", Int64 1L); ("name", String "alice")]]. The empty
+          row [()] parses as [Row_literal []]. Fields are in source order; the
+          parser rejects duplicate field names. Evaluation hands the row down
+          the pipe as a {!Term.Row_value}, and [| type] over a row literal
+          yields the corresponding {!Row.kind}. *)
 
 type program =
   | Pipeline of t

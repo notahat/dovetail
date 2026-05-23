@@ -215,6 +215,14 @@ let test_scalar_literal_raises_because_result_is_a_scalar () =
     (Failure "Physical.kind_of: Scalar_literal does not produce a relation kind")
     (fun () -> ignore (Physical.kind_of ~catalog:fixture_catalog plan))
 
+let test_row_literal_raises_because_result_is_a_row () =
+  let plan : Physical.t =
+    Row_literal { fields = [ ("id", Dovetail_core.Scalar.Int64 1L) ] }
+  in
+  Alcotest.check_raises "Row_literal has no relation kind"
+    (Failure "Physical.kind_of: Row_literal does not produce a relation kind")
+    (fun () -> ignore (Physical.kind_of ~catalog:fixture_catalog plan))
+
 let () =
   Alcotest.run "physical_kind_of"
     [
@@ -251,5 +259,7 @@ let () =
           Alcotest.test_case
             "Scalar_literal raises because its result is a scalar" `Quick
             test_scalar_literal_raises_because_result_is_a_scalar;
+          Alcotest.test_case "Row_literal raises because its result is a row"
+            `Quick test_row_literal_raises_because_result_is_a_row;
         ] );
     ]

@@ -10,6 +10,7 @@ type t =
   | Insert of { table : string; source : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
+  | Row_literal of { fields : (string * Scalar.value) list }
 
 (* Walks a plan and reports the strongest transaction access any operator
    in it needs. Insert is the only write operator today; every other
@@ -26,6 +27,7 @@ let rec required_access = function
   | Insert { source; _ } -> access_max `Write (required_access source)
   | Type_op { input } -> required_access input
   | Scalar_literal _ -> `Read
+  | Row_literal _ -> `Read
 
 and access_max left right =
   match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
@@ -66,5 +68,13 @@ let rec format_at formatter indent plan =
   | Scalar_literal value ->
       Format.fprintf formatter "%sScalarLiteral(%a)@\n" prefix Scalar.format
         value
+  | Row_literal { fields } ->
+      let format_field formatter (name, value) =
+        Format.fprintf formatter "%s=%a" name Scalar.format value
+      in
+      let separator formatter () = Format.pp_print_string formatter ", " in
+      Format.fprintf formatter "%sRowLiteral(%a)@\n" prefix
+        (Format.pp_print_list ~pp_sep:separator format_field)
+        fields
 
 let format formatter plan = format_at formatter 0 plan

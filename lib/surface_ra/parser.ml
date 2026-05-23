@@ -173,6 +173,45 @@ let relation_literal =
   let values = List.map (fun pair -> pair.value) pairs in
   Ast.RelationLiteral { columns; rows = [ values ] }
 
+(* One [name = value] binding inside a row literal. Returns the field name
+   alongside its scalar value; whitespace around the [=] is tolerated. *)
+let row_literal_field =
+  identifier >>= fun field_name ->
+  whitespace *> char '=' *> whitespace *> literal_value >>| fun value ->
+  (field_name, value)
+
+(* Raise a parse error if [fields] has two entries with the same name. The
+   error names the first duplicate so the user can find it. Mirrors the
+   relation-literal duplicate-column check. *)
+let check_for_duplicate_row_fields fields =
+  let rec walk seen = function
+    | [] -> return ()
+    | (field_name, _) :: _ when StringSet.mem field_name seen ->
+        fail (Printf.sprintf "duplicate field %S in row literal" field_name)
+    | (field_name, _) :: rest -> walk (StringSet.add field_name seen) rest
+  in
+  walk StringSet.empty fields
+
+(* A row literal at pipeline-source position: [(name = value, ...)]. The
+   empty form [()] parses to an empty field list. The grammar is
+   disambiguated from a future grouped expression by the [=] inside each
+   field; at pipeline-source position only the row-literal form is
+   admitted, so any non-empty parens that doesn't contain a [name = value]
+   binding is a parse error. *)
+let row_literal =
+  char '(' *> whitespace
+  *> ( peek_char >>= function
+       | Some ')' -> return []
+       | _ ->
+           row_literal_field >>= fun first_field ->
+           many (whitespace *> char ',' *> whitespace *> row_literal_field)
+           >>= fun more_fields ->
+           whitespace *> option false (char ',' *> return true) *> return ()
+           >>| fun () -> first_field :: more_fields )
+  <* whitespace <* char ')'
+  >>= fun fields ->
+  check_for_duplicate_row_fields fields >>| fun () -> Ast.Row_literal fields
+
 (* A bare identifier at pipeline-source position: either a [true] / [false]
    scalar literal or a relation name. The two share the leading-letter
    character class, so we parse the identifier eagerly and dispatch on its
@@ -183,14 +222,16 @@ let identifier_relation_or_bool_literal =
   | "false" -> Ast.Scalar_literal (Scalar.Bool false)
   | name -> Ast.Relation_name name
 
-(* The leading position of a pipeline: a relation literal, a bare scalar
-   literal, or a relation name. Dispatched by lookahead on the leading
-   character: a brace introduces a relation literal; a double quote, a
-   minus, or a digit introduces a scalar literal; a letter is either a
-   [true] / [false] scalar literal or a relation name. *)
+(* The leading position of a pipeline: a relation literal, a row literal, a
+   bare scalar literal, or a relation name. Dispatched by lookahead on the
+   leading character: a brace introduces a relation literal; an open paren
+   introduces a row literal; a double quote, a minus, or a digit introduces
+   a scalar literal; a letter is either a [true] / [false] scalar literal
+   or a relation name. *)
 let relation_expr =
   peek_char >>= function
   | Some '{' -> relation_literal
+  | Some '(' -> row_literal
   | Some '"' ->
       string_literal >>| fun literal_value -> Ast.Scalar_literal literal_value
   | Some '-' ->

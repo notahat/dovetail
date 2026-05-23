@@ -63,6 +63,13 @@ type t =
           relation-typed inputs, so a scalar source flows through rungs that
           match it ([Type_op] today; row-level operators in later slices).
           Reports [`Read] from {!required_access}. *)
+  | Row_literal of { fields : (string * Scalar.value) list }
+      (** [Row_literal { fields }] is a pipeline whose source is a literal row,
+          with no scan or storage involved. [fields] carries the row's bindings
+          in source order; the parser rejects duplicate field names so the list
+          is unique. Sits at a pipeline's root only; the row's kind is derived
+          eagerly from the values' scalar kinds. Reports [`Read] from
+          {!required_access}. *)
 
 val required_access : t -> [ `Read | `Write ]
 (** [required_access plan] walks [plan] and returns the strongest transaction

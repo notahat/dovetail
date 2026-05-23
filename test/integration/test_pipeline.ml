@@ -424,6 +424,78 @@ let test_bool_literal_then_type_yields_bool_kind () =
       Alcotest.(check scalar_kind_testable)
         "true | type yields Bool" Scalar.Bool kind)
 
+(* Row literal source — end-to-end through every layer, producing a
+   [Term.Row_value] (or a [Term.Row_kind] when followed by [| type]). *)
+
+module Row = Dovetail_core.Row
+
+let row_testable : Row.t Alcotest.testable = Alcotest.testable Row.format ( = )
+
+let row_kind_testable : Row.kind Alcotest.testable =
+  Alcotest.testable Row.format_kind ( = )
+
+let test_single_field_row_literal_yields_its_row () =
+  let expected : Row.t =
+    {
+      kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+      value = [| Scalar.Int64 1L |];
+    }
+  in
+  with_query_row_value "(id = 1)" (fun row ->
+      Alcotest.(check row_testable)
+        "(id = 1) yields the single-field row" expected row)
+
+let test_multi_field_row_literal_yields_its_row () =
+  let expected : Row.t =
+    {
+      kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      value = [| Scalar.Int64 1L; Scalar.String "alice" |];
+    }
+  in
+  with_query_row_value "(id = 1, name = \"alice\")" (fun row ->
+      Alcotest.(check row_testable)
+        "(id = 1, name = \"alice\") yields the two-field row" expected row)
+
+let test_empty_row_literal_yields_empty_row () =
+  let expected : Row.t = { kind = []; value = [||] } in
+  with_query_row_value "()" (fun row ->
+      Alcotest.(check row_testable) "() yields the empty row" expected row)
+
+let test_row_literal_then_type_yields_row_kind () =
+  let expected : Row.kind =
+    [
+      { name = "id"; kind = Int64; qualifier = None };
+      { name = "name"; kind = String; qualifier = None };
+    ]
+  in
+  with_query_row_kind "(id = 1, name = \"alice\") | type" (fun kind ->
+      Alcotest.(check row_kind_testable)
+        "(id = 1, name = \"alice\") | type yields the row's kind" expected kind)
+
+let test_empty_row_literal_then_type_yields_empty_row_kind () =
+  with_query_row_kind "() | type" (fun kind ->
+      Alcotest.(check row_kind_testable)
+        "() | type yields the empty row kind" [] kind)
+
+let test_row_literal_type_over_type_raises_at_lower () =
+  (* The Lower-time rejection of [type | type] now triggers on a row source
+     too. Walk parse and lower by hand since the rejection happens before
+     Eval. *)
+  let ast =
+    match Surface_ra.Parser.parse "(id = 1) | type | type" with
+    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+    | Ok (Surface_ra.Ast.Ddl _) ->
+        Alcotest.fail "expected a pipeline but got a DDL statement"
+    | Error message -> Alcotest.failf "parse failed: %s" message
+  in
+  Alcotest.check_raises "type applied to a row's type"
+    (Failure "type: input is already a type") (fun () ->
+      ignore (Surface_ra.Lower.lower ast))
+
 let test_scalar_literal_type_over_type_raises_at_lower () =
   (* The Lower-time rejection of [type | type] now triggers on a scalar
      source too. Walk parse and lower by hand since the rejection happens
@@ -547,6 +619,22 @@ let () =
             test_bool_literal_then_type_yields_bool_kind;
           Alcotest.test_case "42 | type | type raises at Lower" `Quick
             test_scalar_literal_type_over_type_raises_at_lower;
+        ] );
+      ( "row literal source",
+        [
+          Alcotest.test_case "(id = 1) yields the single-field row" `Quick
+            test_single_field_row_literal_yields_its_row;
+          Alcotest.test_case "(id = 1, name = ...) yields the two-field row"
+            `Quick test_multi_field_row_literal_yields_its_row;
+          Alcotest.test_case "() yields the empty row" `Quick
+            test_empty_row_literal_yields_empty_row;
+          Alcotest.test_case
+            "(id = 1, name = ...) | type yields the matching row kind" `Quick
+            test_row_literal_then_type_yields_row_kind;
+          Alcotest.test_case "() | type yields the empty row kind" `Quick
+            test_empty_row_literal_then_type_yields_empty_row_kind;
+          Alcotest.test_case "(id = 1) | type | type raises at Lower" `Quick
+            test_row_literal_type_over_type_raises_at_lower;
         ] );
       ( "errors",
         [

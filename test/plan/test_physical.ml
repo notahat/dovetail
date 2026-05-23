@@ -141,6 +141,19 @@ let test_scalar_literal_renders_value () =
     "Bool scalar literal renders as keyword" "ScalarLiteral(false)\n"
     (format_to_string bool_plan)
 
+let test_row_literal_renders_fields () =
+  let plan : Physical.t =
+    Row_literal
+      { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] }
+  in
+  Alcotest.(check string)
+    "Row_literal lists fields comma-separated"
+    "RowLiteral(id=1, name=\"alice\")\n" (format_to_string plan);
+  let empty_plan : Physical.t = Row_literal { fields = [] } in
+  Alcotest.(check string)
+    "Empty Row_literal renders with no inner content" "RowLiteral()\n"
+    (format_to_string empty_plan)
+
 let test_nested_indentation_compounds () =
   (* A Filter wrapping a CrossProduct: confirms that each level of nesting
      adds two spaces, not just the immediate one. *)
@@ -187,6 +200,8 @@ let () =
             test_type_op_renders_header_with_indented_input;
           Alcotest.test_case "ScalarLiteral renders its value inline" `Quick
             test_scalar_literal_renders_value;
+          Alcotest.test_case "RowLiteral renders fields comma-separated" `Quick
+            test_row_literal_renders_fields;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
         ] );

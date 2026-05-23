@@ -647,6 +647,49 @@ let test_scalar_literal_followed_by_type_step () =
   parses "42 | type"
     (Ast.Type { input = Ast.Scalar_literal (Scalar.Int64 42L) })
 
+(* Bare row literals at pipeline-source position. *)
+
+let test_row_literal_empty_parses () = parses "()" (Ast.Row_literal [])
+
+let test_row_literal_single_field_parses () =
+  parses "(id = 1)" (Ast.Row_literal [ ("id", Scalar.Int64 1L) ])
+
+let test_row_literal_multiple_fields_parses () =
+  parses "(id = 1, name = \"alice\", active = true)"
+    (Ast.Row_literal
+       [
+         ("id", Scalar.Int64 1L);
+         ("name", Scalar.String "alice");
+         ("active", Scalar.Bool true);
+       ])
+
+let test_row_literal_tolerates_trailing_comma () =
+  parses "(id = 1, name = \"alice\",)"
+    (Ast.Row_literal
+       [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ])
+
+let test_row_literal_tolerates_extra_whitespace () =
+  parses "(  id  =  1  ,  name  =  \"alice\"  )"
+    (Ast.Row_literal
+       [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ])
+
+let test_row_literal_rejects_duplicate_field () =
+  rejects_with_message "(id = 1, id = 2)"
+    ~mentions:[ "duplicate field"; "\"id\"" ]
+
+let test_row_literal_rejects_missing_equals () = rejects "(id 1)"
+let test_row_literal_rejects_missing_value () = rejects "(id =)"
+let test_row_literal_rejects_leading_comma () = rejects "(, id = 1)"
+
+let test_row_literal_followed_by_type_step () =
+  parses "(id = 1, name = \"alice\") | type"
+    (Ast.Type
+       {
+         input =
+           Ast.Row_literal
+             [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+       })
+
 (* The DDL keywords are not globally reserved -- [list] and [tables] are
    valid identifiers inside a pipeline. This locks in that the sigil is
    what reserves them, and the reservation is bounded to the DDL body. *)
@@ -823,6 +866,30 @@ let () =
           Alcotest.test_case
             "scalar literal feeds a [| type] step at pipeline-source position"
             `Quick test_scalar_literal_followed_by_type_step;
+        ] );
+      ( "row literal source",
+        [
+          Alcotest.test_case "empty row literal parses" `Quick
+            test_row_literal_empty_parses;
+          Alcotest.test_case "single-field row literal parses" `Quick
+            test_row_literal_single_field_parses;
+          Alcotest.test_case "multi-field row literal parses" `Quick
+            test_row_literal_multiple_fields_parses;
+          Alcotest.test_case "tolerates a trailing comma" `Quick
+            test_row_literal_tolerates_trailing_comma;
+          Alcotest.test_case "tolerates extra whitespace inside the literal"
+            `Quick test_row_literal_tolerates_extra_whitespace;
+          Alcotest.test_case "rejects a literal with a duplicate field" `Quick
+            test_row_literal_rejects_duplicate_field;
+          Alcotest.test_case "rejects a literal missing the equals sign" `Quick
+            test_row_literal_rejects_missing_equals;
+          Alcotest.test_case "rejects a literal with a missing value" `Quick
+            test_row_literal_rejects_missing_value;
+          Alcotest.test_case "rejects a literal with a leading comma" `Quick
+            test_row_literal_rejects_leading_comma;
+          Alcotest.test_case
+            "row literal feeds a [| type] step at pipeline-source position"
+            `Quick test_row_literal_followed_by_type_step;
         ] );
       ( "insert sink syntax",
         [

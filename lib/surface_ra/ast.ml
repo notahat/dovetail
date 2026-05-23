@@ -21,5 +21,6 @@ type t =
   | Insert of { table : string; source : t }
   | Type of { input : t }
   | Scalar_literal of Scalar.value
+  | Row_literal of (string * Scalar.value) list
 
 type program = Pipeline of t | Ddl of Ddl.Statement.t

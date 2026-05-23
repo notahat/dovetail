@@ -206,6 +206,18 @@ let test_scalar_literal_translates_through () =
     "Logical.Scalar_literal -> Physical.Scalar_literal with same value"
     (Physical.Scalar_literal (Scalar.Int64 42L)) physical
 
+let test_row_literal_translates_through () =
+  let logical : Logical.t =
+    Row_literal
+      { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] }
+  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
+  Alcotest.(check physical_testable)
+    "Logical.Row_literal -> Physical.Row_literal with same fields"
+    (Physical.Row_literal
+       { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] })
+    physical
+
 let test_standalone_cross_product_does_not_trigger_join_rewrite () =
   let logical =
     Logical.CrossProduct
@@ -432,6 +444,11 @@ let () =
           Alcotest.test_case
             "translates Logical.Scalar_literal through unchanged" `Quick
             test_scalar_literal_translates_through;
+        ] );
+      ( "row literal",
+        [
+          Alcotest.test_case "translates Logical.Row_literal through unchanged"
+            `Quick test_row_literal_translates_through;
         ] );
       ( "nested loop join rewrite",
         [

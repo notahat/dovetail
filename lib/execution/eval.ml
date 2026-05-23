@@ -116,6 +116,7 @@ let rec eval environment transaction plan continue =
   | Type_op { input } ->
       evaluate_type_op environment transaction ~input continue
   | Scalar_literal value -> continue (Term.Scalar_value value)
+  | Row_literal { fields } -> evaluate_row_literal fields continue
 
 (* Compute [input]'s static kind and hand [continue] the corresponding
    [Term.*_kind] arm. A [Scalar_literal] input is dispatched directly to
@@ -128,12 +129,31 @@ and evaluate_type_op environment transaction ~input continue =
   match input with
   | Plan.Physical.Scalar_literal value ->
       continue (Term.Scalar_kind (Scalar.kind_of value))
+  | Plan.Physical.Row_literal { fields } ->
+      continue (Term.Row_kind (row_kind_of_fields fields))
   | _ ->
       let catalog table_name =
         Storage.Catalog.get environment transaction ~table_name
       in
       let kind = Plan.Physical.kind_of ~catalog input in
       continue (Term.Relation_kind kind)
+
+(* Build a [Row.kind] from a row literal's [(name, value)] pairs by reading
+   each value's scalar kind. Field qualifiers have no surface form on a row
+   literal, so every field carries [qualifier = None]. *)
+and row_kind_of_fields fields : Row.kind =
+  List.map
+    (fun (name, value) : Row.field ->
+      { name; kind = Scalar.kind_of value; qualifier = None })
+    fields
+
+(* Materialise a row literal as a [Row.t] and hand [continue] the
+   [Term.Row_value] arm. The kind is derived eagerly from the values'
+   scalar kinds; no storage is touched. *)
+and evaluate_row_literal fields continue =
+  let kind = row_kind_of_fields fields in
+  let value = Array.of_list (List.map snd fields) in
+  continue (Term.Row_value ({ kind; value } : Row.t))
 
 (* CPS helper for internal recursion: a relational operator's sub-plan always
    produces a [Term.Relation_value]. The [Term.Relation_kind] arm only arises

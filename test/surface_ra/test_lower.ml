@@ -366,6 +366,17 @@ let test_scalar_literal_lowers_through () =
     "Ast.Scalar_literal -> Logical.Scalar_literal with same value"
     (Scalar_literal (Scalar.Int64 42L)) logical
 
+let test_row_literal_lowers_through () =
+  let ast : Ast.t =
+    Row_literal [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ]
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Row_literal -> Logical.Row_literal with same fields"
+    (Row_literal
+       { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] })
+    logical
+
 let test_relation_literal_lowers_through () =
   let ast : Ast.t =
     RelationLiteral
@@ -433,6 +444,11 @@ let () =
           Alcotest.test_case
             "lowers Ast.Scalar_literal to Logical.Scalar_literal" `Quick
             test_scalar_literal_lowers_through;
+        ] );
+      ( "row literal",
+        [
+          Alcotest.test_case "lowers Ast.Row_literal to Logical.Row_literal"
+            `Quick test_row_literal_lowers_through;
         ] );
       ( "type",
         [

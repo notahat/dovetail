@@ -21,6 +21,7 @@ type t =
   | Insert of { table : string; source : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
+  | Row_literal of { fields : (string * Scalar.value) list }
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
@@ -81,6 +82,14 @@ let rec format_at formatter indent plan =
   | Scalar_literal value ->
       Format.fprintf formatter "%sScalarLiteral(%a)@\n" prefix Scalar.format
         value
+  | Row_literal { fields } ->
+      let format_field formatter (name, value) =
+        Format.fprintf formatter "%s=%a" name Scalar.format value
+      in
+      let separator formatter () = Format.pp_print_string formatter ", " in
+      Format.fprintf formatter "%sRowLiteral(%a)@\n" prefix
+        (Format.pp_print_list ~pp_sep:separator format_field)
+        fields
 
 let format formatter plan = format_at formatter 0 plan
 
@@ -149,3 +158,10 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
          caller that asks for a relation kind it can't provide. *)
       failwith
         "Physical.kind_of: Scalar_literal does not produce a relation kind"
+  | Row_literal _ ->
+      (* [Row_literal]'s evaluation result is a row value, not a relation.
+         The [Type_op] evaluator catches a [Row_literal] input before
+         delegating to [kind_of], so this arm is unreachable from the
+         evaluator today; the explicit failure surfaces any future caller
+         that asks for a relation kind it can't provide. *)
+      failwith "Physical.kind_of: Row_literal does not produce a relation kind"

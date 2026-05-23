@@ -166,6 +166,25 @@ let test_scalar_literal_renders_value () =
     "Bool scalar literal renders as keyword" "ScalarLiteral(true)\n"
     (format_to_string bool_plan)
 
+let test_row_literal_requires_read_access () =
+  let plan : Logical.t = Row_literal { fields = [ ("id", Scalar.Int64 1L) ] } in
+  Alcotest.(check bool)
+    "Row_literal requires Read access" true
+    (Logical.required_access plan = `Read)
+
+let test_row_literal_renders_fields () =
+  let plan : Logical.t =
+    Row_literal
+      { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] }
+  in
+  Alcotest.(check string)
+    "Row_literal lists fields comma-separated"
+    "RowLiteral(id=1, name=\"alice\")\n" (format_to_string plan);
+  let empty_plan : Logical.t = Row_literal { fields = [] } in
+  Alcotest.(check string)
+    "Empty Row_literal renders with no inner content" "RowLiteral()\n"
+    (format_to_string empty_plan)
+
 let test_insert_renders_header_with_indented_source () =
   let plan : Logical.t =
     Insert
@@ -197,6 +216,8 @@ let () =
             `Quick test_type_op_required_access_passes_through;
           Alcotest.test_case "Scalar_literal requires Read access" `Quick
             test_scalar_literal_requires_read_access;
+          Alcotest.test_case "Row_literal requires Read access" `Quick
+            test_row_literal_requires_read_access;
         ] );
       ( "format",
         [
@@ -218,5 +239,7 @@ let () =
             test_type_op_renders_header_with_indented_input;
           Alcotest.test_case "ScalarLiteral renders its value inline" `Quick
             test_scalar_literal_renders_value;
+          Alcotest.test_case "RowLiteral renders fields comma-separated" `Quick
+            test_row_literal_renders_fields;
         ] );
     ]
