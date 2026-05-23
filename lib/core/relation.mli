@@ -60,6 +60,20 @@ val format_kind : Format.formatter -> kind -> unit
     [Primary_key columns] renders as [primary key (col1, col2, ...)]. When
     [refinements] is empty the output is identical to the row-type form. *)
 
+val format : Format.formatter -> _ t -> unit
+(** [format formatter relation] writes [relation] to [formatter] in the surface
+    syntax for a relation value: the [relation (T) { rows }] literal form, where
+    [T] is the relation type rendered via {!format_kind} and the rows are
+    rendered via {!Row.format}. An empty relation renders inline as
+    [relation (T) {}]; a relation with rows breaks across lines, with each row
+    indented by two spaces on its own line, comma-separated, and a closing brace
+    on the final line. Materialises the [value] sequence eagerly. Field
+    qualifiers in the row kind are dropped, matching {!format_kind} and
+    {!Row.format}.
+
+    No trailing newline is emitted after the closing brace, matching
+    {!Scalar.format}, {!Row.format}, and {!format_kind}. *)
+
 val print : ?formatter:Format.formatter -> _ t -> unit
 (** [print ?formatter relation] renders [relation] as a table to [formatter]
     (defaulting to [Format.std_formatter]), using Unicode box-drawing characters

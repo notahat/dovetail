@@ -295,6 +295,66 @@ let test_format_kind_drops_field_qualifiers () =
     "(id: int64, name: string, email: string, active: bool, primary key (id))"
     (format_kind_to_string users_kind)
 
+(* Render via [Relation.format] into a string for comparison against the
+   expected surface text. *)
+let format_to_string relation =
+  let buffer = Buffer.create 256 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Relation.format formatter relation;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_renders_empty_relation_inline () =
+  let relation : [ `Bag ] Relation.t =
+    { kind = users_kind; value = Seq.empty }
+  in
+  let expected =
+    "relation (id: int64, name: string, email: string, active: bool, primary \
+     key (id)) {}"
+  in
+  Alcotest.(check string)
+    "empty relation renders with inline braces" expected
+    (format_to_string relation)
+
+let test_format_renders_multi_row_relation_one_row_per_line () =
+  let relation : [ `Bag ] Relation.t =
+    { kind = users_kind; value = List.to_seq two_users }
+  in
+  let expected =
+    String.concat "\n"
+      [
+        "relation (id: int64, name: string, email: string, active: bool, \
+         primary key (id)) {";
+        "  (id = 1, name = \"Alice\", email = \"alice@example.com\", active = \
+         true),";
+        "  (id = 10, name = \"Bob\", email = \"bob@example.com\", active = \
+         false)";
+        "}";
+      ]
+  in
+  Alcotest.(check string)
+    "multi-row relation renders one row per line" expected
+    (format_to_string relation)
+
+let test_format_renders_single_row_relation_on_its_own_line () =
+  let relation : [ `Bag ] Relation.t =
+    {
+      kind = unqualified_kind;
+      value = List.to_seq [ [| Scalar.Int64 1L; Scalar.String "Alice" |] ];
+    }
+  in
+  let expected =
+    String.concat "\n"
+      [
+        "relation (id: int64, name: string) {";
+        "  (id = 1, name = \"Alice\")";
+        "}";
+      ]
+  in
+  Alcotest.(check string)
+    "single-row relation still breaks onto lines" expected
+    (format_to_string relation)
+
 let () =
   Alcotest.run "relation"
     [
@@ -344,5 +404,17 @@ let () =
             test_format_kind_with_composite_primary_key;
           Alcotest.test_case "drops field qualifiers at the surface" `Quick
             test_format_kind_drops_field_qualifiers;
+        ] );
+      ( "format",
+        [
+          Alcotest.test_case
+            "renders an empty relation with inline empty braces" `Quick
+            test_format_renders_empty_relation_inline;
+          Alcotest.test_case
+            "renders a multi-row relation with one row per line" `Quick
+            test_format_renders_multi_row_relation_one_row_per_line;
+          Alcotest.test_case
+            "renders a single-row relation with the row on its own line" `Quick
+            test_format_renders_single_row_relation_on_its_own_line;
         ] );
     ]

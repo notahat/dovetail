@@ -184,6 +184,30 @@ let format_header_separator widths =
   in
   "├" ^ String.concat "┼" segments ^ "┤"
 
+(* Strip field qualifiers from a row kind. The surface row-value syntax has
+   no qualifier form, so {!Row.format} renders by name only; mirror that on
+   the kind side so the row-kind embedded in the relation literal lines up
+   with the row body. *)
+let unqualified_row_kind row_kind =
+  List.map (fun (field : Row.field) -> { field with qualifier = None }) row_kind
+
+let format formatter relation =
+  let row_kind = unqualified_row_kind relation.kind.row_kind in
+  let rows = List.of_seq relation.value in
+  Format.fprintf formatter "relation %a {" format_kind
+    { relation.kind with row_kind };
+  (match rows with
+  | [] -> ()
+  | _ ->
+      let format_row formatter row =
+        Row.format formatter { kind = row_kind; value = row }
+      in
+      let separator formatter () = Format.pp_print_string formatter ",\n  " in
+      Format.pp_print_string formatter "\n  ";
+      Format.pp_print_list ~pp_sep:separator format_row formatter rows;
+      Format.pp_print_string formatter "\n");
+  Format.pp_print_string formatter "}"
+
 let print ?(formatter = Format.std_formatter) relation =
   let row_kind = relation.kind.row_kind in
   let headers = Array.of_list (List.map Row.format_field_name row_kind) in
