@@ -230,6 +230,14 @@ let test_type_lowers_to_type_op () =
     (Type_op { input = Scan { table = "users" } })
     logical
 
+let test_type_over_type_is_rejected () =
+  let ast =
+    Ast.Type { input = Ast.Type { input = Ast.Relation_name "users" } }
+  in
+  Alcotest.check_raises "type applied to a type is rejected at Lower"
+    (Failure "type: input is already a type") (fun () ->
+      ignore (Lower.lower ast))
+
 let test_relation_literal_lowers_through () =
   let ast : Ast.t =
     RelationLiteral
@@ -296,6 +304,8 @@ let () =
         [
           Alcotest.test_case "lowers Ast.Type to Logical.Type_op" `Quick
             test_type_lowers_to_type_op;
+          Alcotest.test_case "rejects Ast.Type applied to Ast.Type" `Quick
+            test_type_over_type_is_rejected;
         ] );
       ( "insert mutation",
         [

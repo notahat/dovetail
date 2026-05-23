@@ -339,12 +339,18 @@ let join_step =
       predicate = parsed_predicate;
     }
 
+(* A type pipeline step: [| type]. Unary with no arguments; the keyword
+   stands alone. Lowering rejects [type] applied to a type, so the
+   nested form ([users | type | type]) parses fine and is caught
+   downstream with a user-facing message. *)
+let type_step = keyword "type" >>| fun () input -> Ast.Type { input }
+
 (* A single pipeline step. Each branch wraps its [Ast.t] argument with
    the step's effect, so the caller can fold a list of steps
    left-to-right over the base. *)
 let pipeline_step =
   whitespace *> char '|' *> whitespace
-  *> (restrict_step <|> project_step <|> cross_step <|> join_step)
+  *> (restrict_step <|> project_step <|> cross_step <|> join_step <|> type_step)
 
 (* A query pipeline: a relation reference followed by zero or more
    query-operator steps, folded left-associatively. The result is an

@@ -236,6 +236,33 @@ let with_query_result query check_rows =
         (expect_relation (fun relation ->
              check_rows (List.of_seq relation.value))))
 
+(** [with_query_kind query check_kind] runs [query] through the full parse /
+    lower / translate / eval pipeline against the standard fixture and calls
+    [check_kind] with the resulting [Relation.kind] from the
+    [Term.Relation_kind] arm. Fails the running test if [Eval] hands back a
+    relation value instead. Mirrors {!with_query_result} for queries that yield
+    a kind rather than rows — currently the [type] operator. *)
+let with_query_kind query check_kind =
+  with_fixture_environment @@ fun environment ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Surface_ra.Parser.parse query with
+        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+        | Ok (Surface_ra.Ast.Ddl _) ->
+            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
+              query
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Surface_ra.Lower.lower ast in
+      let catalog = make_catalog environment transaction in
+      let physical = Plan.Translate.translate ~catalog logical in
+      Execution.Eval.eval environment transaction physical (function
+        | Term.Relation_kind kind -> check_kind kind
+        | Term.Relation_value _ ->
+            Alcotest.failf
+              "expected %S to yield a relation kind but got a relation value"
+              query))
+
 (** [with_query_failure ~label ~expected query] runs [query] through the same
     pipeline as {!with_query_result} but asserts that [Eval.eval] raises
     [expected]. [label] is the description shown in test output. *)

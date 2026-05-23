@@ -355,6 +355,33 @@ let test_restrict_with_non_bool_expression_raises () =
       (Failure "Expression.resolve: predicate position requires Bool, got Int64")
     "users | restrict id"
 
+let test_type_on_users_yields_relation_type () =
+  with_query_kind "users | type" (fun kind ->
+      let rendered =
+        with_captured_formatter (fun formatter ->
+            Relation.format_kind formatter kind)
+      in
+      Alcotest.(check string)
+        "users | type renders the fixture's relation type"
+        "(id: int64, name: string, email: string, active: bool, primary key \
+         (id))"
+        rendered)
+
+let test_type_over_type_raises_at_lower () =
+  (* The rejection lives in [Lower.lower], which runs before [Eval], so
+     [with_query_failure] (whose [check_raises] wraps only the [Eval] call)
+     can't catch it. Walk parse and lower by hand instead. *)
+  let ast =
+    match Surface_ra.Parser.parse "users | type | type" with
+    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+    | Ok (Surface_ra.Ast.Ddl _) ->
+        Alcotest.fail "expected a pipeline but got a DDL statement"
+    | Error message -> Alcotest.failf "parse failed: %s" message
+  in
+  Alcotest.check_raises "type applied to a type"
+    (Failure "type: input is already a type") (fun () ->
+      ignore (Surface_ra.Lower.lower ast))
+
 let test_restrict_with_ordering_on_bool_raises () =
   with_query_failure ~label:"ordering operator on Bool operands"
     ~expected:
@@ -445,6 +472,13 @@ let () =
             "cross with an ordering predicate keeps the NestedLoopJoin path"
             `Quick
             test_cross_with_ordering_predicate_still_uses_nested_loop_join;
+        ] );
+      ( "type",
+        [
+          Alcotest.test_case "users | type yields the fixture's relation type"
+            `Quick test_type_on_users_yields_relation_type;
+          Alcotest.test_case "users | type | type raises at Lower" `Quick
+            test_type_over_type_raises_at_lower;
         ] );
       ( "errors",
         [

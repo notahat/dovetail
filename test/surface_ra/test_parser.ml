@@ -627,6 +627,20 @@ let test_ddl_create_table_rejects_missing_table_name () =
 let test_pipeline_keyword_create_is_a_relation_name () =
   parses "create" (Ast.Relation_name "create")
 
+let test_pipeline_parses_type_step () =
+  parses "users | type" (Ast.Type { input = Ast.Relation_name "users" })
+
+let test_pipeline_parses_nested_type_step () =
+  (* The grammar doesn't restrict where [type] appears; [Lower.lower] is
+     the layer that rejects a type applied to a type. *)
+  parses "users | type | type"
+    (Ast.Type { input = Ast.Type { input = Ast.Relation_name "users" } })
+
+let test_pipeline_keyword_type_is_a_relation_name () =
+  (* [type] is reserved only in pipe-step position; as a pipeline head it's
+     a bare identifier, same as the DDL keywords. *)
+  parses "type" (Ast.Relation_name "type")
+
 (* The DDL keywords are not globally reserved -- [list] and [tables] are
    valid identifiers inside a pipeline. This locks in that the sigil is
    what reserves them, and the reservation is bounded to the DDL body. *)
@@ -775,6 +789,16 @@ let () =
           Alcotest.test_case "rejects a column reference in the value position"
             `Quick
             test_relation_literal_rejects_column_reference_in_value_position;
+        ] );
+      ( "type syntax",
+        [
+          Alcotest.test_case "parses a single type step" `Quick
+            test_pipeline_parses_type_step;
+          Alcotest.test_case
+            "two type steps nest in the AST (Lower catches the nesting)" `Quick
+            test_pipeline_parses_nested_type_step;
+          Alcotest.test_case "[type] is a relation name as a pipeline head"
+            `Quick test_pipeline_keyword_type_is_a_relation_name;
         ] );
       ( "insert sink syntax",
         [
