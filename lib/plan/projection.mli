@@ -3,7 +3,7 @@
     A projection is an ordered list of column references to keep from the input
     relation. Both {!Logical.Project} and {!Physical.Project} carry a
     [Projection.t]; columns are referred to by name (and optional qualifier) so
-    the IR stays human-readable for debugging. Mapping references to tuple
+    the IR stays human-readable for debugging. Mapping references to row
     positions is an executor concern, handled by {!resolve}. *)
 
 module Row = Dovetail_core.Row

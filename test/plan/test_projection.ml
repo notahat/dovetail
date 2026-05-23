@@ -39,9 +39,9 @@ let test_single_column_projection () =
       [| Value.String "Eve" |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "five single-column rows" expected rows
+  Alcotest.(check row_list_testable) "five single-column rows" expected rows
 
-let test_multi_column_projection_in_schema_order () =
+let test_multi_column_projection_in_field_order () =
   let rows =
     project_users [ column_reference "name"; column_reference "email" ]
   in
@@ -54,7 +54,7 @@ let test_multi_column_projection_in_schema_order () =
       [| Value.String "Eve"; Value.String "eve@example.com" |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "five two-column rows" expected rows
+  Alcotest.(check row_list_testable) "five two-column rows" expected rows
 
 let test_projection_reorders_columns () =
   let rows =
@@ -69,11 +69,11 @@ let test_projection_reorders_columns () =
       [| Value.String "eve@example.com"; Value.Int64 5L |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "rows in requested order" expected rows
+  Alcotest.(check row_list_testable) "rows in requested order" expected rows
 
 let test_projection_of_non_leading_column () =
   (* "active" is at field index 3. A miscached position would pull the wrong
-     tuple element. *)
+     row element. *)
   let rows = project_users [ column_reference "active" ] in
   let expected =
     [
@@ -84,7 +84,7 @@ let test_projection_of_non_leading_column () =
       [| Value.Bool false |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "rows in active order" expected rows
+  Alcotest.(check row_list_testable) "rows in active order" expected rows
 
 let test_projection_accepts_qualified_column () =
   (* The qualified form should resolve to the same column as the bare name
@@ -101,7 +101,7 @@ let test_projection_accepts_qualified_column () =
       [| Value.String "Eve" |];
     ]
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "qualified projection yields the same rows" expected rows
 
 let test_projected_kind_has_requested_fields () =
@@ -209,8 +209,8 @@ let () =
         [
           Alcotest.test_case "single column projection" `Quick
             test_single_column_projection;
-          Alcotest.test_case "multi-column projection in schema order" `Quick
-            test_multi_column_projection_in_schema_order;
+          Alcotest.test_case "multi-column projection in field order" `Quick
+            test_multi_column_projection_in_field_order;
           Alcotest.test_case "projection reorders columns" `Quick
             test_projection_reorders_columns;
           Alcotest.test_case "projection of non-leading column" `Quick

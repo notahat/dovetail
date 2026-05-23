@@ -44,14 +44,14 @@ let test_insert_writes_row_and_reports_one_affected () =
           let rows = List.of_seq relation.data in
           let inserted =
             List.find_opt
-              (fun (tuple : Row.data) -> tuple.(0) = Value.Int64 9L)
+              (fun (row : Row.data) -> row.(0) = Value.Int64 9L)
               rows
           in
           match inserted with
           | None -> Alcotest.fail "inserted row not found in orders"
-          | Some tuple ->
-              Alcotest.(check tuple_list_testable)
-                "inserted tuple matches"
+          | Some row ->
+              Alcotest.(check row_list_testable)
+                "inserted row matches"
                 [
                   [|
                     Value.Int64 9L;
@@ -60,7 +60,7 @@ let test_insert_writes_row_and_reports_one_affected () =
                     Value.Int64 9L;
                   |];
                 ]
-                [ tuple ]))
+                [ row ]))
 
 let test_insert_with_existing_primary_key_raises () =
   with_fixture_environment @@ fun environment ->
@@ -88,7 +88,7 @@ let test_insert_with_existing_primary_key_raises () =
         (Plan.Physical.FullScan { table = "orders" })
         (fun relation ->
           let rows = List.of_seq relation.data in
-          Alcotest.(check tuple_list_testable)
+          Alcotest.(check row_list_testable)
             "orders unchanged after aborted insert" expected_orders_rows rows))
 
 let () =

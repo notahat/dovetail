@@ -127,33 +127,31 @@ let expected_users_rows = Fixture.users_rows
     Carol (id 3) each have two. *)
 let expected_orders_rows = Fixture.orders_rows
 
-(** Format a tuple's values using {!Value.format}, comma-separated and wrapped
-    in brackets. So {[Alcotest]} failure diffs read as
-    [\[1, "Alice", true\]] -- the boundaries between values are visible, the
-    kinds are distinguishable at a glance. *)
-let format_tuple formatter tuple =
+(** Format a row's values using {!Value.format}, comma-separated and wrapped in
+    brackets. So {[Alcotest]} failure diffs read as [\[1, "Alice", true\]] --
+    the boundaries between values are visible, the kinds are distinguishable at
+    a glance. *)
+let format_row formatter row =
   Format.fprintf formatter "[";
   Array.iteri
     (fun index value ->
       if index > 0 then Format.fprintf formatter ", ";
       Value.format formatter value)
-    tuple;
+    row;
   Format.fprintf formatter "]"
 
-(** Format a list of tuples one per line, in input order. Alcotest's diff
+(** Format a list of rows one per line, in input order. Alcotest's diff
     machinery does a line-oriented comparison of the rendered strings, so
     per-row newlines mean a mismatch shows up as a single-row delta rather than
     the whole list. *)
-let format_tuple_list formatter tuples =
-  List.iter
-    (fun tuple -> Format.fprintf formatter "%a@\n" format_tuple tuple)
-    tuples
+let format_row_list formatter rows =
+  List.iter (fun row -> Format.fprintf formatter "%a@\n" format_row row) rows
 
 (** Alcotest testable for a list of [Row.data]s. Polymorphic-equality based. The
-    printer renders one tuple per line using {!Value.format} so failure diffs
-    surface the offending row rather than [\<tuples\> vs \<tuples\>]. *)
-let tuple_list_testable : Row.data list Alcotest.testable =
-  Alcotest.testable format_tuple_list ( = )
+    printer renders one row per line using {!Value.format} so failure diffs
+    surface the offending row rather than [\<rows\> vs \<rows\>]. *)
+let row_list_testable : Row.data list Alcotest.testable =
+  Alcotest.testable format_row_list ( = )
 
 (** Alcotest testable for a [Physical.t]. Polymorphic-equality based; the
     printer is {!Physical.format}, so failure diffs show the EXPLAIN-style
@@ -230,7 +228,7 @@ let make_catalog environment transaction table_name =
 
 (** [with_query_result query check_rows] runs [query] through the full parse /
     lower / translate / eval pipeline against the standard fixture and calls
-    [check_rows] with the resulting list of tuples. The temp directory, LMDB
+    [check_rows] with the resulting list of rows. The temp directory, LMDB
     environment, fixture population, and read transaction are all set up and
     torn down around the call. *)
 let with_query_result query check_rows =

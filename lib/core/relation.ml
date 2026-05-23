@@ -34,39 +34,38 @@ let position_of_primary_key_field (row_kind : Row.kind) primary_key_name =
   in
   find 0 row_kind
 
-let split_tuple (kind : kind) tuple =
+let split_row (kind : kind) row =
   let expected_length = List.length kind.row_kind in
-  if Array.length tuple <> expected_length then
+  if Array.length row <> expected_length then
     invalid_arg
       (Printf.sprintf
-         "Relation.split_tuple: tuple has %d value(s) but kind declares %d \
-          field(s)"
-         (Array.length tuple) expected_length);
+         "Relation.split_row: row has %d value(s) but kind declares %d field(s)"
+         (Array.length row) expected_length);
   let primary_key = primary_key_names kind in
   let primary_key_values =
     List.map
       (fun primary_key_name ->
-        tuple.(position_of_primary_key_field kind.row_kind primary_key_name))
+        row.(position_of_primary_key_field kind.row_kind primary_key_name))
       primary_key
   in
   let is_primary_key_name name = List.mem name primary_key in
   let non_primary_key_values =
     List.mapi
       (fun position (field : Row.field) ->
-        if is_primary_key_name field.name then None else Some tuple.(position))
+        if is_primary_key_name field.name then None else Some row.(position))
       kind.row_kind
     |> List.filter_map Fun.id
   in
   (primary_key_values, non_primary_key_values)
 
-let assemble_tuple (kind : kind) ~primary_key_values ~non_primary_key_values =
+let assemble_row (kind : kind) ~primary_key_values ~non_primary_key_values =
   let primary_key = primary_key_names kind in
   let primary_key_array = Array.of_list primary_key_values in
   let expected_primary_key_count = List.length primary_key in
   if Array.length primary_key_array <> expected_primary_key_count then
     invalid_arg
       (Printf.sprintf
-         "Relation.assemble_tuple: expected %d primary-key value(s), got %d"
+         "Relation.assemble_row: expected %d primary-key value(s), got %d"
          expected_primary_key_count
          (Array.length primary_key_array));
   let expected_non_primary_key_count =
@@ -75,7 +74,7 @@ let assemble_tuple (kind : kind) ~primary_key_values ~non_primary_key_values =
   if List.length non_primary_key_values <> expected_non_primary_key_count then
     invalid_arg
       (Printf.sprintf
-         "Relation.assemble_tuple: expected %d non-primary-key value(s), got %d"
+         "Relation.assemble_row: expected %d non-primary-key value(s), got %d"
          expected_non_primary_key_count
          (List.length non_primary_key_values));
   let non_primary_key_remaining = ref non_primary_key_values in
@@ -163,11 +162,13 @@ let format_header_separator widths =
   "├" ^ String.concat "┼" segments ^ "┤"
 
 let print ?(formatter = Format.std_formatter) relation =
-  let fields = relation.kind.row_kind in
-  let headers = Array.of_list (List.map Row.format_field_name fields) in
+  let row_kind = relation.kind.row_kind in
+  let headers = Array.of_list (List.map Row.format_field_name row_kind) in
   let right_aligns =
     Array.of_list
-      (List.map (fun (field : Row.field) -> is_numeric_kind field.kind) fields)
+      (List.map
+         (fun (field : Row.field) -> is_numeric_kind field.kind)
+         row_kind)
   in
   let rendered_rows =
     relation.data

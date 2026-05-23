@@ -9,8 +9,8 @@
 
     Both {!Logical.Restrict} and {!Physical.Filter} carry an [Expression.t];
     expressions refer to columns by name so they stay human-readable for
-    debugging and EXPLAIN-style introspection. Mapping names to tuple positions
-    is an executor concern, handled by {!resolve}.
+    debugging and EXPLAIN-style introspection. Mapping names to row positions is
+    an executor concern, handled by {!resolve}.
 
     "Predicate" is the role an expression plays at the top of a
     {!Logical.Restrict} or {!Physical.Filter}: it must resolve to a value of

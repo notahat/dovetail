@@ -47,17 +47,17 @@ let test_decode_int64_key_rejects_wrong_length () =
     (Invalid_argument "Encoding.decode_int64_key: expected 8 bytes, got 7")
     (fun () -> ignore (Storage.Encoding.decode_int64_key "1234567"))
 
-let test_tuple_value_round_trip () =
+let test_row_value_round_trip () =
   let values : Value.data list =
     [ Int64 42L; String "hello"; Bool true; Int64 (-1L); Bool false ]
   in
-  let encoded = Storage.Encoding.encode_tuple_value values in
-  let decoded = Storage.Encoding.decode_tuple_value encoded in
+  let encoded = Storage.Encoding.encode_row_value values in
+  let decoded = Storage.Encoding.decode_row_value encoded in
   Alcotest.(check bool) "decoded equals original" true (decoded = values)
 
-let test_tuple_value_round_trip_empty () =
-  let encoded = Storage.Encoding.encode_tuple_value [] in
-  let decoded = Storage.Encoding.decode_tuple_value encoded in
+let test_row_value_round_trip_empty () =
+  let encoded = Storage.Encoding.encode_row_value [] in
+  let decoded = Storage.Encoding.decode_row_value encoded in
   Alcotest.(check bool) "empty list round-trips" true (decoded = [])
 
 let () =
@@ -74,11 +74,11 @@ let () =
           Alcotest.test_case "decoding rejects inputs of the wrong length"
             `Quick test_decode_int64_key_rejects_wrong_length;
         ] );
-      ( "tuple value",
+      ( "row value",
         [
           Alcotest.test_case "round-trips a mixed list" `Quick
-            test_tuple_value_round_trip;
+            test_row_value_round_trip;
           Alcotest.test_case "round-trips an empty list" `Quick
-            test_tuple_value_round_trip_empty;
+            test_row_value_round_trip_empty;
         ] );
     ]

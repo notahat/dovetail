@@ -29,7 +29,7 @@ let test_pipeline_yields_fixture_rows () =
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
       Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.data in
-          Alcotest.(check tuple_list_testable)
+          Alcotest.(check row_list_testable)
             "five rows from AST" expected_users_rows rows))
 
 let id_equals_three =
@@ -63,7 +63,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
       let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
       Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.data in
-          Alcotest.(check tuple_list_testable)
+          Alcotest.(check row_list_testable)
             "Carol's row from Ast.Restrict"
             [ List.nth expected_users_rows 2 ]
             rows))
@@ -105,7 +105,7 @@ let test_project_pipeline_yields_projected_rows () =
               [| Value.String "Eve"; Value.String "eve@example.com" |];
             ]
           in
-          Alcotest.(check tuple_list_testable)
+          Alcotest.(check row_list_testable)
             "five projected rows from Ast.Project" expected rows))
 
 let test_cross_product_lowers_to_logical_cross_product () =

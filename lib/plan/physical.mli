@@ -25,7 +25,7 @@ type t =
           downgrades to [`Bag] because dropping columns can introduce duplicates
           that weren't present in the input. *)
   | CrossProduct of { left : t; right : t }
-      (** [CrossProduct { left; right }] yields every (left, right) tuple pair,
+      (** [CrossProduct { left; right }] yields every (left, right) row pair,
           executed as a nested loop with the right side materialised once. The
           result schema is [left]'s fields followed by [right]'s, with
           qualifiers preserved; the [primary_key] is empty. Cross product
@@ -37,7 +37,7 @@ type t =
       (** [IndexLookup { table; key }] fetches the single row in [table] whose
           primary key equals [key], by encoding [key] and calling
           [Storage.Engine.get] on the table's storage subDB. The result is a
-          relation with the table's full schema and either zero or one tuples.
+          relation with the table's full schema and either zero or one rows.
           Always cheaper than a [FullScan] when the predicate fixes the primary
           key.
 
@@ -46,7 +46,7 @@ type t =
           when other key kinds arrive. *)
   | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
-          tuple pair for which [predicate] holds, executed as a nested loop with
+          row pair for which [predicate] holds, executed as a nested loop with
           the right side materialised once and the predicate fused into the
           inner loop. Kind construction matches [CrossProduct]: [left]'s fields
           followed by [right]'s, qualifiers preserved, [primary_key] empty. The
@@ -65,14 +65,14 @@ type t =
     }
       (** [IndexedNestedLoopJoin { outer; inner_table; outer_key_column;
            inner_position }] streams [outer] and probes [inner_table]'s storage
-          subDB once per outer tuple by the value at [outer_key_column], joining
+          subDB once per outer row by the value at [outer_key_column], joining
           on the inner's primary key. Per-row cost is O(log |inner|) rather than
           the O(|inner|) of a plain nested-loop join.
 
           [outer_key_column] names a column in [outer]'s schema; its per-row
           value is encoded with [Storage.Encoding.encode_int64_key] and used as
           the probe key. Its kind must be [Int64] -- the inner's PK kind --
-          checked at eval time. An outer tuple whose probe misses is dropped.
+          checked at eval time. An outer row whose probe misses is dropped.
 
           [inner_position] records where the inner sat in the original logical
           [CrossProduct]: [`Left] produces [inner.fields @ outer.fields],
@@ -84,7 +84,7 @@ type t =
           The output [primary_key] is [], matching [NestedLoopJoin] and
           [CrossProduct]. *)
   | RelationLiteral of { columns : string list; rows : Value.data list list }
-      (** [RelationLiteral { columns; rows }] yields a relation whose tuples are
+      (** [RelationLiteral { columns; rows }] yields a relation whose rows are
           the literal's [rows] -- no storage involved. The output kind is
           {!Dovetail_core.Relation_literal.kind_of} applied to [columns] and the
           first row.

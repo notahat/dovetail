@@ -9,7 +9,7 @@ module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build a Project wrapping [input_plan] over the users fixture, evaluate
-   it, and return the resulting tuples. [column_names] is a list of bare
+   it, and return the resulting rows. [column_names] is a list of bare
    names, wrapped into unqualified {!Row.column_reference}s -- the test
    bodies don't need qualifiers here. *)
 let evaluate_users_project ~input_plan column_names =
@@ -39,7 +39,7 @@ let test_project_single_column () =
       [| Value.String "Eve" |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "five single-column rows" expected rows
+  Alcotest.(check row_list_testable) "five single-column rows" expected rows
 
 let test_project_multi_column () =
   let rows =
@@ -54,7 +54,7 @@ let test_project_multi_column () =
       [| Value.String "Eve"; Value.String "eve@example.com" |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "five two-column rows" expected rows
+  Alcotest.(check row_list_testable) "five two-column rows" expected rows
 
 let test_project_reorders_columns () =
   let rows =
@@ -69,7 +69,7 @@ let test_project_reorders_columns () =
       [| Value.String "eve@example.com"; Value.Int64 5L |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "rows in requested order" expected rows
+  Alcotest.(check row_list_testable) "rows in requested order" expected rows
 
 let test_project_then_filter () =
   (* Build Filter(Project(scan, [name; active]), active = true) by hand.
@@ -107,7 +107,7 @@ let test_project_then_filter () =
               [| Value.String "Dave"; Value.Bool true |];
             ]
           in
-          Alcotest.(check tuple_list_testable)
+          Alcotest.(check row_list_testable)
             "three active projected rows" expected rows))
 
 let test_filter_then_project () =
@@ -130,7 +130,7 @@ let test_filter_then_project () =
       [| Value.String "Dave" |];
     ]
   in
-  Alcotest.(check tuple_list_testable) "three active names" expected rows
+  Alcotest.(check row_list_testable) "three active names" expected rows
 
 let test_project_unknown_column_raises () =
   Alcotest.check_raises "unknown column"
@@ -166,10 +166,10 @@ let () =
             "filter then project narrows the survivors to the named columns"
             `Quick test_filter_then_project;
           Alcotest.test_case
-            "unknown column raises before any tuples are pulled" `Quick
+            "unknown column raises before any rows are pulled" `Quick
             test_project_unknown_column_raises;
           Alcotest.test_case
-            "duplicate column raises before any tuples are pulled" `Quick
+            "duplicate column raises before any rows are pulled" `Quick
             test_project_duplicate_column_raises;
         ] );
     ]

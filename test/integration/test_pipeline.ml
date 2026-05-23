@@ -22,12 +22,12 @@ let six_matched_user_order_pairs = 6
 
 let test_scan_yields_fixture_rows () =
   with_query_result "users" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "five rows from parsed query" expected_users_rows rows)
 
 let test_restrict_equality_yields_one_row () =
   with_query_result "users | restrict id = 3" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Carol's row from parsed restrict"
         [ List.nth expected_users_rows 2 ]
         rows)
@@ -37,20 +37,20 @@ let test_restrict_pk_equality_yields_alice () =
      starts folding it to IndexLookup. The shape of the plan is verified
      in test_translate.ml; this test pins the user-visible behaviour. *)
   with_query_result "users | restrict id = 1" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Alice's row from PK lookup"
         [ List.nth expected_users_rows 0 ]
         rows)
 
 let test_restrict_pk_equality_with_missing_key_yields_no_rows () =
   with_query_result "users | restrict id = 99" (fun rows ->
-      Alcotest.(check tuple_list_testable) "no rows for absent key" [] rows)
+      Alcotest.(check row_list_testable) "no rows for absent key" [] rows)
 
 let test_restrict_pk_equality_with_residual_keeps_matching_row () =
   (* [id = 1 and active] partitions: [id = 1] folds, [active] stays in
      the residual Filter. Alice is active, so the row survives. *)
   with_query_result "users | restrict id = 1 and active" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Alice's row from PK lookup + residual Filter"
         [ List.nth expected_users_rows 0 ]
         rows)
@@ -59,12 +59,12 @@ let test_restrict_pk_equality_with_residual_filters_out_inactive_row () =
   (* [id = 2 and active] looks up Bob, then the residual Filter rejects
      him because [active] is false. *)
   with_query_result "users | restrict id = 2 and active" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Bob's row dropped by the residual Filter" [] rows)
 
 let test_restrict_pk_equality_with_missing_key_and_residual_yields_no_rows () =
   with_query_result "users | restrict id = 99 and active" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "no rows when the PK lookup misses, regardless of the residual" [] rows)
 
 let test_restrict_bare_bool_column_yields_active_rows () =
@@ -74,19 +74,19 @@ let test_restrict_bare_bool_column_yields_active_rows () =
 
 let test_restrict_constant_true_yields_all_rows () =
   with_query_result "users | restrict 5 = 5" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "5 = 5 keeps every row" expected_users_rows rows)
 
 let test_restrict_int64_greater_than_yields_upper_rows () =
   with_query_result "users | restrict id > 3" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Dave and Eve (ids > 3)"
         [ List.nth expected_users_rows 3; List.nth expected_users_rows 4 ]
         rows)
 
 let test_restrict_string_ge_yields_lex_subset () =
   with_query_result "users | restrict name >= \"C\"" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "names lexicographically >= \"C\": Carol, Dave, Eve"
         [
           List.nth expected_users_rows 2;
@@ -97,7 +97,7 @@ let test_restrict_string_ge_yields_lex_subset () =
 
 let test_restrict_and_intersects () =
   with_query_result "users | restrict id > 1 and active" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Carol and Dave (id > 1 and active)"
         [ List.nth expected_users_rows 2; List.nth expected_users_rows 3 ]
         rows)
@@ -105,7 +105,7 @@ let test_restrict_and_intersects () =
 let test_restrict_or_unions () =
   with_query_result "users | restrict name = \"Alice\" or name = \"Bob\""
     (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Alice and Bob (union)"
         [ List.nth expected_users_rows 0; List.nth expected_users_rows 1 ]
         rows)
@@ -113,7 +113,7 @@ let test_restrict_or_unions () =
 let test_restrict_and_chain_is_left_associative () =
   with_query_result "users | restrict id > 1 and id < 4 and active" (fun rows ->
       (* id between 1 and 4 = {2, 3}. Active among those: id 3 (Carol). *)
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Carol (id between 1 and 4, active)"
         [ List.nth expected_users_rows 2 ]
         rows)
@@ -122,7 +122,7 @@ let test_restrict_mixed_and_or_follows_precedence () =
   with_query_result "users | restrict id = 1 or id = 2 and active" (fun rows ->
       (* Parses as [id = 1 or (id = 2 and active)]. Alice (id 1) always
          matches; Bob (id 2, inactive) doesn't. Result: Alice only. *)
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Alice only (precedence)"
         [ List.nth expected_users_rows 0 ]
         rows)
@@ -132,14 +132,14 @@ let test_restrict_parens_override_precedence () =
     (fun rows ->
       (* With parens, [active] applies to both ids. Bob (id 2, inactive)
          drops out, leaving Alice. *)
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Alice only ((id = 1 or id = 2) and active)"
         [ List.nth expected_users_rows 0 ]
         rows)
 
 let test_restrict_not_inverts_the_predicate () =
   with_query_result "users | restrict not active" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "Bob and Eve (not active)"
         [ List.nth expected_users_rows 1; List.nth expected_users_rows 4 ]
         rows)
@@ -155,7 +155,7 @@ let test_project_yields_projected_rows () =
           [| Value.String "Eve"; Value.String "eve@example.com" |];
         ]
       in
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "five projected rows from parsed project" expected rows)
 
 let test_cross_yields_thirty_rows () =
@@ -213,7 +213,7 @@ let test_indexed_join_yields_expected_rows_and_column_order () =
      callers see no shape change. *)
   with_query_result "users | join orders on users.id = orders.user_id"
     (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "matched pairs in users.* / orders.* column order, orders PK row order"
         expected_join_rows rows)
 
@@ -233,7 +233,7 @@ let test_indexed_join_then_project_matches_readme_example () =
           [| Value.String "Eve"; Value.String "Cookie"; Value.Int64 2L |];
         ]
       in
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "projected (name, description, amount) rows from README example"
         expected rows)
 
@@ -257,7 +257,7 @@ let test_indexed_join_with_on_clause_residual_yields_filtered_rows () =
   with_query_result
     "users | join orders on users.id = orders.user_id and orders.amount >= 5"
     (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "PK-eq folded; amount >= 5 applied by wrapping Filter"
         expected_join_rows_with_amount_at_least_five rows)
 
@@ -268,7 +268,7 @@ let test_indexed_join_with_trailing_restrict_yields_same_rows () =
   with_query_result
     "users | join orders on users.id = orders.user_id | restrict orders.amount \
      >= 5" (fun rows ->
-      Alcotest.(check tuple_list_testable)
+      Alcotest.(check row_list_testable)
         "trailing restrict yields the same rows as the on-clause [and] form"
         expected_join_rows_with_amount_at_least_five rows)
 

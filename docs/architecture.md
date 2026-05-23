@@ -1,12 +1,12 @@
 # Architecture
 
 How the pieces of Dovetail fit together: the query pipeline from text to
-tuples, the storage stack underneath it, the shared data types, and the
+rows, the storage stack underneath it, the shared data types, and the
 sub-library layout in `lib/`.
 
 ## Layer diagram
 
-The query pipeline runs top-to-bottom from text to tuples and back to text.
+The query pipeline runs top-to-bottom from text to rows and back to text.
 The storage stack sits below it, used by `Eval` and the catalog.
 
 ```
@@ -33,7 +33,7 @@ The storage stack sits below it, used by `Eval` and the catalog.
          │                                          ▼
          │  Relation.print                      Encoding      — keys (byte-
          ▼                                          │          comparable),
-       output                                       │          tuple values
+       output                                       │          row values
                                                     │          (Marshal)
                                                     │  uses
                                                     ▼
@@ -70,7 +70,7 @@ runs ship no hardcoded rows; the seeder is opt-in.
 | Layer      | Role                                                                                        |
 | ---------- | ------------------------------------------------------------------------------------------- |
 | `Storage`  | Thin wrapper over LMDB. Env, scope-bound read/write transactions, byte-keyed sub-databases. |
-| `Encoding` | Byte-comparable key encoding (sign-flipped BE for `int64`); `Marshal` for tuple values.     |
+| `Encoding` | Byte-comparable key encoding (sign-flipped BE for `int64`); `Marshal` for row values.       |
 | `Catalog`  | Persistent table-name → `Relation.kind` map, backed by a single `catalog` subDB.            |
 
 ### Data types

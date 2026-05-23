@@ -3,8 +3,8 @@ module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
 (* TODO(composite-pk): lift the single-column restriction once the binary
-   key encoding handles multi-column tuples. The [Relation.split_tuple] /
-   [Relation.assemble_tuple] pair already supports composite keys; the
+   key encoding handles multi-column keys. The [Relation.split_row] /
+   [Relation.assemble_row] pair already supports composite keys; the
    blocker is here. *)
 
 (* Validate that [kind]'s primary key is the single [Int64] column the
@@ -30,20 +30,20 @@ let decode_row kind (key_bytes, value_bytes) =
   let primary_key_values =
     [ Value.Int64 (Encoding.decode_int64_key key_bytes) ]
   in
-  let non_primary_key_values = Encoding.decode_tuple_value value_bytes in
-  Relation.assemble_tuple kind ~primary_key_values ~non_primary_key_values
+  let non_primary_key_values = Encoding.decode_row_value value_bytes in
+  Relation.assemble_row kind ~primary_key_values ~non_primary_key_values
 
 let encode_row kind row =
   let _ : Row.field = require_single_int64_primary_key_field kind in
   let primary_key_values, non_primary_key_values =
-    Relation.split_tuple kind row
+    Relation.split_row kind row
   in
   let key_bytes =
     match primary_key_values with
     | [ Value.Int64 key ] -> Encoding.encode_int64_key key
-    (* [require_single_int64_primary_key_field] above plus [split_tuple]'s
+    (* [require_single_int64_primary_key_field] above plus [split_row]'s
        kind-respecting projection guarantee this shape. *)
     | _ -> assert false
   in
-  let value_bytes = Encoding.encode_tuple_value non_primary_key_values in
+  let value_bytes = Encoding.encode_row_value non_primary_key_values in
   (key_bytes, value_bytes)

@@ -48,7 +48,7 @@ let test_equality_on_int64_column () =
          ~right:(expression_literal (Value.Int64 3L)))
   in
   Alcotest.(check int) "one row with id = 3" 1 (List.length matched);
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "row is Carol's"
     [ List.nth users_rows 2 ]
     matched
@@ -59,7 +59,7 @@ let test_equality_on_string_column () =
       (expression_compare ~left:(expression_column "name") ~op:Equal
          ~right:(expression_literal (Value.String "Alice")))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "row is Alice's"
     [ List.nth users_rows 0 ]
     matched
@@ -84,7 +84,7 @@ let test_inequality_on_int64_column () =
 
 let test_predicate_on_non_first_column_uses_correct_position () =
   (* "active" is at field index 3. A miscached position would compare the
-     wrong tuple element and either return wrong results or raise on type
+     wrong row element and either return wrong results or raise on type
      mismatch -- so this test pins the position-cache behaviour. *)
   let matched =
     filter_users
@@ -102,7 +102,7 @@ let test_literal_on_left_and_column_on_right () =
          ~left:(expression_literal (Value.Int64 3L))
          ~op:Equal ~right:(expression_column "id"))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "row is Carol's"
     [ List.nth users_rows 2 ]
     matched
@@ -114,7 +114,7 @@ let test_column_equals_column_on_users_finds_no_matches () =
       (expression_compare ~left:(expression_column "name") ~op:Equal
          ~right:(expression_column "email"))
   in
-  Alcotest.(check tuple_list_testable) "no rows" [] matched
+  Alcotest.(check row_list_testable) "no rows" [] matched
 
 let test_column_equals_column_on_orders_finds_self_referential_rows () =
   (* In the orders fixture, only [(1, 1, ...)] has [id = user_id]. *)
@@ -123,7 +123,7 @@ let test_column_equals_column_on_orders_finds_self_referential_rows () =
       (expression_compare ~left:(expression_column "id") ~op:Equal
          ~right:(expression_column "user_id"))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "single row where id = user_id"
     [ List.nth orders_rows 0 ]
     matched
@@ -143,7 +143,7 @@ let test_int64_less_than_yields_lower_subset () =
       (expression_compare ~left:(expression_column "id") ~op:Less
          ~right:(expression_literal (Value.Int64 3L)))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "ids strictly less than 3"
     [ List.nth users_rows 0; List.nth users_rows 1 ]
     matched
@@ -154,7 +154,7 @@ let test_int64_less_or_equal_yields_lower_inclusive () =
       (expression_compare ~left:(expression_column "id") ~op:LessEqual
          ~right:(expression_literal (Value.Int64 3L)))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "ids less than or equal to 3"
     [ List.nth users_rows 0; List.nth users_rows 1; List.nth users_rows 2 ]
     matched
@@ -165,7 +165,7 @@ let test_int64_greater_than_yields_upper_subset () =
       (expression_compare ~left:(expression_column "id") ~op:Greater
          ~right:(expression_literal (Value.Int64 3L)))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "ids strictly greater than 3"
     [ List.nth users_rows 3; List.nth users_rows 4 ]
     matched
@@ -176,7 +176,7 @@ let test_int64_greater_or_equal_yields_upper_inclusive () =
       (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
          ~right:(expression_literal (Value.Int64 3L)))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "ids greater than or equal to 3"
     [ List.nth users_rows 2; List.nth users_rows 3; List.nth users_rows 4 ]
     matched
@@ -189,7 +189,7 @@ let test_string_greater_or_equal_orders_lexicographically () =
       (expression_compare ~left:(expression_column "name") ~op:GreaterEqual
          ~right:(expression_literal (Value.String "C")))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "names lexicographically >= \"C\""
     [ List.nth users_rows 2; List.nth users_rows 3; List.nth users_rows 4 ]
     matched
@@ -200,7 +200,7 @@ let test_string_less_than_orders_lexicographically () =
       (expression_compare ~left:(expression_column "name") ~op:Less
          ~right:(expression_literal (Value.String "C")))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "names lexicographically < \"C\""
     [ List.nth users_rows 0; List.nth users_rows 1 ]
     matched
@@ -238,7 +238,7 @@ let test_qualified_column_resolves_identically_to_unqualified () =
          ~op:Equal
          ~right:(expression_literal (Value.Int64 3L)))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "Carol's row from qualified id"
     [ List.nth users_rows 2 ]
     matched
@@ -350,7 +350,7 @@ let test_and_returns_intersection () =
   in
   (* id > 1 and active: ids 3 (Carol, active) and 4 (Dave, active). Id 2 is
      active=false; id 5 is active=false. *)
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "Carol and Dave (id > 1 and active)"
     [ List.nth users_rows 2; List.nth users_rows 3 ]
     matched
@@ -366,14 +366,14 @@ let test_or_returns_union () =
            (expression_compare ~left:(expression_column "name") ~op:Equal
               ~right:(expression_literal (Value.String "Bob"))))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "Alice and Bob"
     [ List.nth users_rows 0; List.nth users_rows 1 ]
     matched
 
 let test_and_short_circuits_on_false_left () =
   (* Build [false and active]. The [active] column lives at field index 3,
-     so a tuple too short to contain index 3 would raise [Invalid_argument]
+     so a row too short to contain index 3 would raise [Invalid_argument]
      on array access if the resolver evaluated the right operand. Short-
      circuit means it doesn't. *)
   let predicate =
@@ -403,7 +403,7 @@ let test_or_short_circuits_on_true_left () =
 
 let test_not_inverts_a_bool_column () =
   let matched = filter_users (expression_not (expression_column "active")) in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "Bob and Eve (not active)"
     [ List.nth users_rows 1; List.nth users_rows 4 ]
     matched
@@ -412,7 +412,7 @@ let test_double_not_is_identity () =
   let matched =
     filter_users (expression_not (expression_not (expression_column "active")))
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "active rows (not not active)"
     [ List.nth users_rows 0; List.nth users_rows 2; List.nth users_rows 3 ]
     matched

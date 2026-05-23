@@ -120,7 +120,7 @@ let check_bool_operand operator_name operand (kind : Value.kind) =
    captures only the resolved positions and primitive operators it needs, so
    the per-row caller does no name lookup and pays only array indices plus
    structural compares. Each [Column] is resolved against [schema] here, so
-   per-tuple evaluation is just an array index. Kind mismatches inside a
+   per-row evaluation is just an array index. Kind mismatches inside a
    [Compare] are reported here, naming both operands via
    {!describe_expression}; [And]/[Or] operands are checked for {!Bool} kind
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
@@ -165,22 +165,20 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
         | Greater -> ( > )
         | GreaterEqual -> ( >= )
       in
-      let read tuple =
-        Value.Bool (comparator (read_left tuple) (read_right tuple))
-      in
+      let read row = Value.Bool (comparator (read_left row) (read_right row)) in
       (Value.Bool, read)
   | And (left, right) ->
       let left_kind, read_left = resolve_value row_kind left in
       let right_kind, read_right = resolve_value row_kind right in
       check_bool_operand "and" left left_kind;
       check_bool_operand "and" right right_kind;
-      let read tuple =
+      let read row =
         (* Short-circuit: the right operand is only read when the left is
            true. The two non-Bool cases are unreachable given the kind
            checks above. *)
-        match read_left tuple with
+        match read_left row with
         | Value.Bool false -> Value.Bool false
-        | Value.Bool true -> read_right tuple
+        | Value.Bool true -> read_right row
         | _ -> assert false
       in
       (Value.Bool, read)
@@ -189,13 +187,13 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
       let right_kind, read_right = resolve_value row_kind right in
       check_bool_operand "or" left left_kind;
       check_bool_operand "or" right right_kind;
-      let read tuple =
+      let read row =
         (* Short-circuit: the right operand is only read when the left is
            false. The two non-Bool cases are unreachable given the kind
            checks above. *)
-        match read_left tuple with
+        match read_left row with
         | Value.Bool true -> Value.Bool true
-        | Value.Bool false -> read_right tuple
+        | Value.Bool false -> read_right row
         | _ -> assert false
       in
       (Value.Bool, read)
@@ -207,10 +205,10 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
              "Expression.resolve: not requires a Bool operand: %s is %s"
              (describe_expression operand)
              (Value.kind_to_string operand_kind));
-      let read tuple =
+      let read row =
         (* The operand-kind check above guarantees a Bool value here; the
            non-Bool arm is unreachable. *)
-        match read_operand tuple with
+        match read_operand row with
         | Value.Bool true -> Value.Bool false
         | Value.Bool false -> Value.Bool true
         | _ -> assert false

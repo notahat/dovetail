@@ -21,7 +21,7 @@ let test_full_scan_yields_fixture_rows () =
           Alcotest.(check (list (list string)))
             "kind primary key" [ [ "id" ] ] primary_keys;
           let rows = List.of_seq relation.data in
-          Alcotest.(check tuple_list_testable)
+          Alcotest.(check row_list_testable)
             "five rows in primary-key order" expected_users_rows rows))
 
 let test_full_scan_raises_for_missing_table () =

@@ -12,10 +12,10 @@ let users_cross_orders_plan : Plan.Physical.t =
     }
 
 let test_cross_product_yields_thirty_rows () =
-  let _schema, rows = evaluate_against_fixture users_cross_orders_plan in
+  let _kind, rows = evaluate_against_fixture users_cross_orders_plan in
   Alcotest.(check int) "5 users x 6 orders = 30 rows" 30 (List.length rows)
 
-let test_cross_product_schema_concatenates_with_qualifiers_preserved () =
+let test_cross_product_kind_concatenates_with_qualifiers_preserved () =
   let kind, _rows = evaluate_against_fixture users_cross_orders_plan in
   let qualified_field_names =
     List.map
@@ -58,7 +58,7 @@ let test_cross_product_then_filter_yields_matched_pairs () =
               (expression_qualified_column ~qualifier:"orders" ~name:"user_id");
       }
   in
-  let _schema, rows = evaluate_against_fixture plan in
+  let _kind, rows = evaluate_against_fixture plan in
   Alcotest.(check int) "six matched (user, order) pairs" 6 (List.length rows)
 
 let test_cross_product_with_ambiguous_unqualified_filter_raises () =
@@ -89,10 +89,10 @@ let () =
             "yields one row per (left, right) pair from the inputs" `Quick
             test_cross_product_yields_thirty_rows;
           Alcotest.test_case
-            "result schema concatenates left then right with qualifiers \
+            "result kind concatenates left then right with qualifiers \
              preserved"
             `Quick
-            test_cross_product_schema_concatenates_with_qualifiers_preserved;
+            test_cross_product_kind_concatenates_with_qualifiers_preserved;
           Alcotest.test_case
             "filter on the cross product yields the matched (user, order) pairs"
             `Quick test_cross_product_then_filter_yields_matched_pairs;

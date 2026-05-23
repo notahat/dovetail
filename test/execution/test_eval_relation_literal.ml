@@ -53,10 +53,10 @@ let test_primary_key_is_empty () =
     "derived relations carry no refinements" 0
     (List.length relation.kind.refinements)
 
-let test_tuples_match_the_literals_row () =
+let test_rows_match_the_literals_row () =
   with_literal_relation @@ fun relation ->
   let rows = List.of_seq relation.data in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "one row, values match the literal"
     [ [| Value.Int64 7L; Value.String "Pretzel"; Value.Bool true |] ]
     rows
@@ -74,7 +74,7 @@ let () =
             `Quick test_field_kinds_are_inferred_from_the_first_row;
           Alcotest.test_case "primary key is empty" `Quick
             test_primary_key_is_empty;
-          Alcotest.test_case "tuples match the literal's row" `Quick
-            test_tuples_match_the_literals_row;
+          Alcotest.test_case "rows match the literal's row" `Quick
+            test_rows_match_the_literals_row;
         ] );
     ]

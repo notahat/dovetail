@@ -20,7 +20,7 @@ let users_kind : Relation.kind =
 let test_decode_row_round_trips_a_users_row () =
   let key_bytes = Storage.Encoding.encode_int64_key 7L in
   let value_bytes =
-    Storage.Encoding.encode_tuple_value
+    Storage.Encoding.encode_row_value
       [
         Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true;
       ]
@@ -99,10 +99,10 @@ let test_encode_row_raises_for_composite_primary_key () =
         (Storage.Row_codec.encode_row composite_kind
            [| Value.Int64 1L; Value.Int64 2L |]))
 
-let test_encode_row_raises_for_wrong_arity_tuple () =
-  Alcotest.check_raises "tuple shorter than kind"
+let test_encode_row_raises_for_wrong_arity_row () =
+  Alcotest.check_raises "row shorter than kind"
     (Invalid_argument
-       "Relation.split_tuple: tuple has 2 value(s) but kind declares 4 field(s)")
+       "Relation.split_row: row has 2 value(s) but kind declares 4 field(s)")
     (fun () ->
       ignore
         (Storage.Row_codec.encode_row users_kind
@@ -127,6 +127,6 @@ let () =
           Alcotest.test_case "raises for a composite primary key" `Quick
             test_encode_row_raises_for_composite_primary_key;
           Alcotest.test_case "raises when row length doesn't match kind" `Quick
-            test_encode_row_raises_for_wrong_arity_tuple;
+            test_encode_row_raises_for_wrong_arity_row;
         ] );
     ]

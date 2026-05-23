@@ -36,22 +36,21 @@ val primary_key_names : kind -> string list
     refinements, in declared order, or the empty list when no [Primary_key]
     refinement is present. *)
 
-val split_tuple : kind -> Row.data -> Value.data list * Value.data list
-(** [split_tuple kind tuple] returns
-    [(primary_key_values, non_primary_key_values)], where [primary_key_values]
-    are the values at the primary-key columns (in primary-key order) and
-    [non_primary_key_values] are the values at the remaining columns (in field
-    order). Raises [Invalid_argument] if [tuple] does not have the right length
-    for [kind]. *)
+val split_row : kind -> Row.data -> Value.data list * Value.data list
+(** [split_row kind row] returns [(primary_key_values, non_primary_key_values)],
+    where [primary_key_values] are the values at the primary-key columns (in
+    primary-key order) and [non_primary_key_values] are the values at the
+    remaining columns (in field order). Raises [Invalid_argument] if [row] does
+    not have the right length for [kind]. *)
 
-val assemble_tuple :
+val assemble_row :
   kind ->
   primary_key_values:Value.data list ->
   non_primary_key_values:Value.data list ->
   Row.data
-(** [assemble_tuple kind ~primary_key_values ~non_primary_key_values] is the
-    inverse of {!split_tuple}: it interleaves the two value lists according to
-    the kind's primary key to produce a tuple in field order. Raises
+(** [assemble_row kind ~primary_key_values ~non_primary_key_values] is the
+    inverse of {!split_row}: it interleaves the two value lists according to the
+    kind's primary key to produce a row in field order. Raises
     [Invalid_argument] if either list has the wrong length. *)
 
 val print : ?formatter:Format.formatter -> _ t -> unit
@@ -61,5 +60,5 @@ val print : ?formatter:Format.formatter -> _ t -> unit
 
     Column widths are sized to the wider of the header and the rendered values;
     [Int64] columns are right-aligned and the others left-aligned. Materialises
-    the [tuples] sequence eagerly to compute widths, so all rows are pulled
-    before any output is produced. *)
+    the [data] sequence eagerly to compute widths, so all rows are pulled before
+    any output is produced. *)

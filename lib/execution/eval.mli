@@ -32,7 +32,7 @@ val eval :
     Raises [Failure] if [plan] references a table the catalog has no schema for,
     if a column reference cannot be resolved, or on any other plan-shape or
     schema mismatch surfaced by the operators. Errors are raised eagerly where
-    possible (e.g. predicate resolution runs before any tuples are pulled), so
+    possible (e.g. predicate resolution runs before any rows are pulled), so
     most failure modes surface before [continue] is called. *)
 
 val eval_mutation :
@@ -46,10 +46,10 @@ val eval_mutation :
     number of rows it wrote.
 
     For [Insert { table; source }], the sink evaluates [source] as a relation
-    via {!eval} (inside the same write [transaction]), then for each source
-    tuple performs a [Storage.Engine.get] to detect a primary-key collision
-    against an existing row, and a [Storage.Engine.put] to write the row
-    otherwise. The count handed to [continue] is the number of [put]s performed.
+    via {!eval} (inside the same write [transaction]), then for each source row
+    performs a [Storage.Engine.get] to detect a primary-key collision against an
+    existing row, and a [Storage.Engine.put] to write the row otherwise. The
+    count handed to [continue] is the number of [put]s performed.
 
     The continuation shape mirrors {!eval} so the two entry points dispatch
     uniformly at the call site. The affected-row count is itself a plain value

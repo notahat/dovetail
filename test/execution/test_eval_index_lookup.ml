@@ -7,7 +7,7 @@ module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
 (* Build an [IndexLookup] over [table] with [key], evaluate it against the
-   populated fixture, and return the resulting tuples. *)
+   populated fixture, and return the resulting rows. *)
 let evaluate_index_lookup ~table ~key =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -19,7 +19,7 @@ let evaluate_index_lookup ~table ~key =
 
 let test_index_lookup_returns_the_matching_row () =
   let _kind, rows = evaluate_index_lookup ~table:"users" ~key:1L in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "Alice's row by primary key"
     [ List.nth expected_users_rows 0 ]
     rows
@@ -28,14 +28,14 @@ let test_index_lookup_returns_a_different_row_for_a_different_key () =
   (* A second key, to confirm the helper isn't accidentally hard-coding the
      first fixture row. *)
   let _kind, rows = evaluate_index_lookup ~table:"users" ~key:3L in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "Carol's row by primary key"
     [ List.nth expected_users_rows 2 ]
     rows
 
 let test_index_lookup_returns_no_rows_for_a_missing_key () =
   let _kind, rows = evaluate_index_lookup ~table:"users" ~key:99L in
-  Alcotest.(check tuple_list_testable) "no rows for missing key" [] rows
+  Alcotest.(check row_list_testable) "no rows for missing key" [] rows
 
 let test_index_lookup_preserves_table_kind () =
   (* The resulting relation should carry the table's full kind, including

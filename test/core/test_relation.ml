@@ -96,14 +96,13 @@ let test_renders_header_only_when_empty () =
   in
   Alcotest.(check string) "header-only table" expected (render relation)
 
-let tuple_testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<tuple>")) ( = )
+let row_testable = Alcotest.testable (Fmt.of_to_string (fun _ -> "<row>")) ( = )
 
 let values_list_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<values>")) ( = )
 
 (* A kind where the primary key is in the middle of the row, exercising
-   that [assemble_tuple] interleaves by field order rather than appending. *)
+   that [assemble_row] interleaves by field order rather than appending. *)
 let mid_pk_kind : Relation.kind =
   {
     row_kind =
@@ -128,7 +127,7 @@ let composite_pk_kind : Relation.kind =
 
 let test_assembles_in_field_order_with_leading_pk () =
   let assembled =
-    Relation.assemble_tuple users_kind ~primary_key_values:[ Value.Int64 42L ]
+    Relation.assemble_row users_kind ~primary_key_values:[ Value.Int64 42L ]
       ~non_primary_key_values:
         [
           Value.String "Alice";
@@ -144,31 +143,31 @@ let test_assembles_in_field_order_with_leading_pk () =
       Value.Bool true;
     |]
   in
-  Alcotest.(check tuple_testable) "leading PK" expected assembled
+  Alcotest.(check row_testable) "leading PK" expected assembled
 
 let test_assembles_with_pk_in_the_middle () =
   let assembled =
-    Relation.assemble_tuple mid_pk_kind ~primary_key_values:[ Value.Int64 7L ]
+    Relation.assemble_row mid_pk_kind ~primary_key_values:[ Value.Int64 7L ]
       ~non_primary_key_values:[ Value.String "Bob"; Value.Bool false ]
   in
   let expected : Row.data =
     [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
   in
-  Alcotest.(check tuple_testable) "PK in middle" expected assembled
+  Alcotest.(check row_testable) "PK in middle" expected assembled
 
 let test_assembles_composite_primary_key () =
   let assembled =
-    Relation.assemble_tuple composite_pk_kind
+    Relation.assemble_row composite_pk_kind
       ~primary_key_values:[ Value.String "acme"; Value.Int64 3L ]
       ~non_primary_key_values:[ Value.String "Carol" ]
   in
   let expected : Row.data =
     [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
   in
-  Alcotest.(check tuple_testable) "composite PK" expected assembled
+  Alcotest.(check row_testable) "composite PK" expected assembled
 
-let test_splits_tuple_with_leading_pk () =
-  let tuple : Row.data =
+let test_splits_row_with_leading_pk () =
+  let row : Row.data =
     [|
       Value.Int64 42L;
       Value.String "Alice";
@@ -177,7 +176,7 @@ let test_splits_tuple_with_leading_pk () =
     |]
   in
   let primary_key_values, non_primary_key_values =
-    Relation.split_tuple users_kind tuple
+    Relation.split_row users_kind row
   in
   Alcotest.(check values_list_testable)
     "primary-key values" [ Value.Int64 42L ] primary_key_values;
@@ -186,12 +185,12 @@ let test_splits_tuple_with_leading_pk () =
     [ Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true ]
     non_primary_key_values
 
-let test_splits_tuple_with_pk_in_the_middle () =
-  let tuple : Row.data =
+let test_splits_row_with_pk_in_the_middle () =
+  let row : Row.data =
     [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
   in
   let primary_key_values, non_primary_key_values =
-    Relation.split_tuple mid_pk_kind tuple
+    Relation.split_row mid_pk_kind row
   in
   Alcotest.(check values_list_testable)
     "primary-key values" [ Value.Int64 7L ] primary_key_values;
@@ -200,12 +199,12 @@ let test_splits_tuple_with_pk_in_the_middle () =
     [ Value.String "Bob"; Value.Bool false ]
     non_primary_key_values
 
-let test_splits_tuple_with_composite_primary_key () =
-  let tuple : Row.data =
+let test_splits_row_with_composite_primary_key () =
+  let row : Row.data =
     [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
   in
   let primary_key_values, non_primary_key_values =
-    Relation.split_tuple composite_pk_kind tuple
+    Relation.split_row composite_pk_kind row
   in
   Alcotest.(check values_list_testable)
     "primary-key values in primary-key order"
@@ -215,25 +214,25 @@ let test_splits_tuple_with_composite_primary_key () =
     "non-primary-key values" [ Value.String "Carol" ] non_primary_key_values
 
 let test_split_is_the_inverse_of_assemble () =
-  let tuple : Row.data =
+  let row : Row.data =
     [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
   in
   let primary_key_values, non_primary_key_values =
-    Relation.split_tuple composite_pk_kind tuple
+    Relation.split_row composite_pk_kind row
   in
   let reassembled =
-    Relation.assemble_tuple composite_pk_kind ~primary_key_values
+    Relation.assemble_row composite_pk_kind ~primary_key_values
       ~non_primary_key_values
   in
-  Alcotest.(check tuple_testable)
-    "split then assemble round-trips the tuple" tuple reassembled
+  Alcotest.(check row_testable)
+    "split then assemble round-trips the row" row reassembled
 
-let test_split_rejects_wrong_length_tuple () =
-  let tuple : Row.data = [| Value.Int64 1L; Value.String "Alice" |] in
+let test_split_rejects_wrong_length_row () =
+  let row : Row.data = [| Value.Int64 1L; Value.String "Alice" |] in
   Alcotest.check_raises "raises Invalid_argument"
     (Invalid_argument
-       "Relation.split_tuple: tuple has 2 value(s) but kind declares 4 field(s)")
-    (fun () -> ignore (Relation.split_tuple users_kind tuple))
+       "Relation.split_row: row has 2 value(s) but kind declares 4 field(s)")
+    (fun () -> ignore (Relation.split_row users_kind row))
 
 let () =
   Alcotest.run "relation"
@@ -246,10 +245,10 @@ let () =
             "renders bare headers when fields have no qualifier" `Quick
             test_renders_unqualified_headers_when_fields_have_no_qualifier;
           Alcotest.test_case
-            "renders just the header when the relation has no tuples" `Quick
+            "renders just the header when the relation has no rows" `Quick
             test_renders_header_only_when_empty;
         ] );
-      ( "assemble_tuple",
+      ( "assemble_row",
         [
           Alcotest.test_case "interleaves values in field order with leading PK"
             `Quick test_assembles_in_field_order_with_leading_pk;
@@ -258,18 +257,18 @@ let () =
           Alcotest.test_case "interleaves values for a composite primary key"
             `Quick test_assembles_composite_primary_key;
         ] );
-      ( "split_tuple",
+      ( "split_row",
         [
-          Alcotest.test_case "splits a tuple whose PK is the leading field"
-            `Quick test_splits_tuple_with_leading_pk;
-          Alcotest.test_case "splits a tuple whose PK sits in the middle" `Quick
-            test_splits_tuple_with_pk_in_the_middle;
+          Alcotest.test_case "splits a row whose PK is the leading field" `Quick
+            test_splits_row_with_leading_pk;
+          Alcotest.test_case "splits a row whose PK sits in the middle" `Quick
+            test_splits_row_with_pk_in_the_middle;
           Alcotest.test_case
-            "splits a tuple with a composite primary key in PK order" `Quick
-            test_splits_tuple_with_composite_primary_key;
-          Alcotest.test_case "round-trips through assemble_tuple" `Quick
+            "splits a row with a composite primary key in PK order" `Quick
+            test_splits_row_with_composite_primary_key;
+          Alcotest.test_case "round-trips through assemble_row" `Quick
             test_split_is_the_inverse_of_assemble;
-          Alcotest.test_case "rejects a tuple of the wrong length" `Quick
-            test_split_rejects_wrong_length_tuple;
+          Alcotest.test_case "rejects a row of the wrong length" `Quick
+            test_split_rejects_wrong_length_row;
         ] );
     ]

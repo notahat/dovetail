@@ -55,14 +55,14 @@ let canonical_indexed_join_plan inner_position : Plan.Physical.t =
     }
 
 let test_indexed_join_left_yields_matched_pairs () =
-  let _schema, rows =
+  let _kind, rows =
     evaluate_against_fixture (canonical_indexed_join_plan `Left)
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "six matched (user, order) pairs in outer (orders) order"
     expected_user_then_order_rows rows
 
-let test_indexed_join_left_schema_has_inner_then_outer_fields () =
+let test_indexed_join_left_kind_has_inner_then_outer_fields () =
   let kind, _rows =
     evaluate_against_fixture (canonical_indexed_join_plan `Left)
   in
@@ -85,14 +85,14 @@ let test_indexed_join_left_schema_has_inner_then_outer_fields () =
     (List.length kind.refinements)
 
 let test_indexed_join_right_yields_matched_pairs () =
-  let _schema, rows =
+  let _kind, rows =
     evaluate_against_fixture (canonical_indexed_join_plan `Right)
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "six matched (order, user) pairs in outer (orders) order"
     expected_order_then_user_rows rows
 
-let test_indexed_join_right_schema_has_outer_then_inner_fields () =
+let test_indexed_join_right_kind_has_outer_then_inner_fields () =
   let kind, _rows =
     evaluate_against_fixture (canonical_indexed_join_plan `Right)
   in
@@ -111,13 +111,13 @@ let test_indexed_join_right_schema_has_outer_then_inner_fields () =
     ]
     qualified_field_names
 
-(* When the probe key has no match in the inner, the outer tuple is
+(* When the probe key has no match in the inner, the outer row is
    dropped silently. The fixture's natural join doesn't exercise this --
    every order's user_id resolves to a real user -- so we synthesise a
    plan that probes [users] by [orders.id]. Orders has ids 1..6, users
    has ids 1..5, so order 6 (Cookie) misses and the result has five
    rows instead of six. *)
-let test_indexed_join_drops_outer_tuples_whose_probe_misses () =
+let test_indexed_join_drops_outer_rows_whose_probe_misses () =
   let plan : Plan.Physical.t =
     IndexedNestedLoopJoin
       {
@@ -127,7 +127,7 @@ let test_indexed_join_drops_outer_tuples_whose_probe_misses () =
         inner_position = `Left;
       }
   in
-  let _schema, rows = evaluate_against_fixture plan in
+  let _kind, rows = evaluate_against_fixture plan in
   Alcotest.(check int) "five rows -- order 6 misses" 5 (List.length rows)
 
 let test_indexed_join_raises_when_outer_key_column_is_not_int64 () =
@@ -160,16 +160,16 @@ let () =
             "Left inner_position yields inner.fields @ outer.fields rows" `Quick
             test_indexed_join_left_yields_matched_pairs;
           Alcotest.test_case
-            "Left inner_position schema is users.* then orders.*" `Quick
-            test_indexed_join_left_schema_has_inner_then_outer_fields;
+            "Left inner_position kind is users.* then orders.*" `Quick
+            test_indexed_join_left_kind_has_inner_then_outer_fields;
           Alcotest.test_case
             "Right inner_position yields outer.fields @ inner.fields rows"
             `Quick test_indexed_join_right_yields_matched_pairs;
           Alcotest.test_case
-            "Right inner_position schema is orders.* then users.*" `Quick
-            test_indexed_join_right_schema_has_outer_then_inner_fields;
-          Alcotest.test_case "outer tuples with no matching inner row drop out"
-            `Quick test_indexed_join_drops_outer_tuples_whose_probe_misses;
+            "Right inner_position kind is orders.* then users.*" `Quick
+            test_indexed_join_right_kind_has_outer_then_inner_fields;
+          Alcotest.test_case "outer rows with no matching inner row drop out"
+            `Quick test_indexed_join_drops_outer_rows_whose_probe_misses;
           Alcotest.test_case "raises when the outer key column is not Int64"
             `Quick test_indexed_join_raises_when_outer_key_column_is_not_int64;
         ] );

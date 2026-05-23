@@ -62,27 +62,27 @@ let nested_loop_join_plan predicate : Plan.Physical.t =
     }
 
 let test_nested_loop_join_yields_matched_pairs () =
-  let _schema, rows =
+  let _kind, rows =
     evaluate_against_fixture
       (nested_loop_join_plan users_join_orders_on_id_predicate)
   in
-  Alcotest.(check tuple_list_testable)
+  Alcotest.(check row_list_testable)
     "six matched (user, order) pairs in left-outer-loop order"
     expected_matched_user_order_rows rows
 
 let test_nested_loop_join_with_true_predicate_yields_full_cross () =
-  let _schema, rows =
+  let _kind, rows =
     evaluate_against_fixture (nested_loop_join_plan always_true_predicate)
   in
   Alcotest.(check int) "5 users x 6 orders = 30 rows" 30 (List.length rows)
 
 let test_nested_loop_join_with_false_predicate_yields_no_rows () =
-  let _schema, rows =
+  let _kind, rows =
     evaluate_against_fixture (nested_loop_join_plan always_false_predicate)
   in
-  Alcotest.(check tuple_list_testable) "no rows" [] rows
+  Alcotest.(check row_list_testable) "no rows" [] rows
 
-let test_nested_loop_join_schema_preserves_qualifiers () =
+let test_nested_loop_join_kind_preserves_qualifiers () =
   let kind, _rows =
     evaluate_against_fixture
       (nested_loop_join_plan users_join_orders_on_id_predicate)
@@ -126,8 +126,8 @@ let () =
           Alcotest.test_case "with an always-false predicate yields no rows"
             `Quick test_nested_loop_join_with_false_predicate_yields_no_rows;
           Alcotest.test_case
-            "result schema concatenates left then right with qualifiers \
+            "result kind concatenates left then right with qualifiers \
              preserved"
-            `Quick test_nested_loop_join_schema_preserves_qualifiers;
+            `Quick test_nested_loop_join_kind_preserves_qualifiers;
         ] );
     ]
