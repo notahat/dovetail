@@ -6,6 +6,8 @@ module Execution = Dovetail_execution
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 module Scalar = Dovetail_core.Scalar
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 
 let logical_testable : Plan.Logical.t Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical-plan>")) ( = )
@@ -238,6 +240,125 @@ let test_type_over_type_is_rejected () =
     (Failure "type: input is already a type") (fun () ->
       ignore (Lower.lower ast))
 
+(* Compare row kinds and relation kinds structurally; the formatters render
+   them in surface syntax when a test fails. *)
+let row_kind_testable : Row.kind Alcotest.testable =
+  Alcotest.testable Row.format_kind ( = )
+
+let relation_kind_testable : Relation.kind Alcotest.testable =
+  Alcotest.testable Relation.format_kind ( = )
+
+let type_field name (kind : Scalar.kind) : Ast.type_field = { name; kind }
+
+let test_lower_row_type_empty_is_empty_kind () =
+  let type_expression : Ast.type_expression =
+    { fields = []; refinements = [] }
+  in
+  Alcotest.(check row_kind_testable)
+    "empty row type" []
+    (Lower.lower_row_type type_expression)
+
+let test_lower_row_type_drops_no_fields_and_sets_qualifier_to_none () =
+  let type_expression : Ast.type_expression =
+    {
+      fields =
+        [
+          type_field "id" Int64;
+          type_field "name" String;
+          type_field "active" Bool;
+        ];
+      refinements = [];
+    }
+  in
+  let expected : Row.kind =
+    [
+      { name = "id"; kind = Int64; qualifier = None };
+      { name = "name"; kind = String; qualifier = None };
+      { name = "active"; kind = Bool; qualifier = None };
+    ]
+  in
+  Alcotest.(check row_kind_testable)
+    "fields preserved in order, qualifier None" expected
+    (Lower.lower_row_type type_expression)
+
+let test_lower_relation_type_empty_is_empty_kind () =
+  let type_expression : Ast.type_expression =
+    { fields = []; refinements = [] }
+  in
+  Alcotest.(check relation_kind_testable)
+    "empty relation type"
+    { row_kind = []; refinements = [] }
+    (Lower.lower_relation_type type_expression)
+
+let test_lower_relation_type_without_refinements () =
+  let type_expression : Ast.type_expression =
+    {
+      fields = [ type_field "id" Int64; type_field "name" String ];
+      refinements = [];
+    }
+  in
+  let expected : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
+  Alcotest.(check relation_kind_testable)
+    "fields lowered, refinements empty" expected
+    (Lower.lower_relation_type type_expression)
+
+let test_lower_relation_type_with_single_column_primary_key () =
+  let type_expression : Ast.type_expression =
+    {
+      fields = [ type_field "id" Int64; type_field "name" String ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  let expected : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  Alcotest.(check relation_kind_testable)
+    "single-column PK preserved" expected
+    (Lower.lower_relation_type type_expression)
+
+let test_lower_relation_type_with_compound_primary_key () =
+  let type_expression : Ast.type_expression =
+    {
+      fields =
+        [
+          type_field "user_id" Int64;
+          type_field "order_id" Int64;
+          type_field "qty" Int64;
+        ];
+      refinements = [ Primary_key [ "user_id"; "order_id" ] ];
+    }
+  in
+  let expected : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "user_id"; kind = Int64; qualifier = None };
+          { name = "order_id"; kind = Int64; qualifier = None };
+          { name = "qty"; kind = Int64; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "user_id"; "order_id" ] ];
+    }
+  in
+  Alcotest.(check relation_kind_testable)
+    "compound PK preserved" expected
+    (Lower.lower_relation_type type_expression)
+
 let test_relation_literal_lowers_through () =
   let ast : Ast.t =
     RelationLiteral
@@ -315,5 +436,26 @@ let () =
           Alcotest.test_case
             "lowers a relational source inside Insert through the same path"
             `Quick test_insert_mutation_lowers_relational_source;
+        ] );
+      ( "lower_row_type",
+        [
+          Alcotest.test_case "empty type expression yields the empty row kind"
+            `Quick test_lower_row_type_empty_is_empty_kind;
+          Alcotest.test_case
+            "fields lower in order and pick up qualifier = None" `Quick
+            test_lower_row_type_drops_no_fields_and_sets_qualifier_to_none;
+        ] );
+      ( "lower_relation_type",
+        [
+          Alcotest.test_case
+            "empty type expression yields the empty relation kind" `Quick
+            test_lower_relation_type_empty_is_empty_kind;
+          Alcotest.test_case
+            "fields lower into row_kind; refinements stay empty" `Quick
+            test_lower_relation_type_without_refinements;
+          Alcotest.test_case "single-column primary key flows through" `Quick
+            test_lower_relation_type_with_single_column_primary_key;
+          Alcotest.test_case "compound primary key flows through" `Quick
+            test_lower_relation_type_with_compound_primary_key;
         ] );
     ]

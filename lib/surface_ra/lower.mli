@@ -6,6 +6,22 @@
     query, so later stages can reason in algebraic terms. *)
 
 module Plan = Dovetail_plan
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
+
+val lower_row_type : Ast.type_expression -> Row.kind
+(** [lower_row_type type_expression] turns a parsed row-type expression into a
+    {!Row.kind}. Each {!Ast.type_field} becomes a {!Row.field} with
+    [qualifier = None] — the surface row-type syntax has no qualifier form.
+    [type_expression.refinements] must be empty; {!Parser.parse_row_type}
+    guarantees this for parsed input. Not yet called from anywhere; stands ready
+    for the literal-syntax-flip slice steps that wire it in. *)
+
+val lower_relation_type : Ast.type_expression -> Relation.kind
+(** [lower_relation_type type_expression] turns a parsed relation-type
+    expression into a {!Relation.kind}. The fields become the [row_kind] (each
+    with [qualifier = None]); [type_expression.refinements] flow through to the
+    kind's [refinements] unchanged. *)
 
 val lower : Ast.t -> Plan.Logical.t
 (** [lower ast] rewrites [ast] into an equivalent logical plan.
