@@ -112,5 +112,155 @@ Other arms grow incrementally as later slices need them.
 - Slice 23 grows `Term.t` by two arms (Catalog_value, Catalog_kind)
   and introduces `Core.Catalog`.
 - The doc's note about "type applied to a type is an error" needs a
-  test in this slice. Implementation site is a design call worth
-  resolving in the slice plan.
+  test in this slice. Resolved during planning: the rejection lives in
+  `Lower.lower`, since that's the first layer with the full pipeline
+  shape in hand and the cleanest place to emit a user-facing message
+  before any IR layer carries an invariant about it.
+
+## Steps
+
+Nine steps. The first four are pure additions with no callers; step 5
+is the one big structural change (every operator's eval call shape);
+steps 6–8 build the `type` operator from helper to surface; step 9
+retires `:describe`.
+
+### Step 1 — `Scalar.format_kind` (lowercase keywords)
+
+Add `Scalar.format_kind : Format.formatter -> kind -> unit` printing
+`int64` / `string` / `bool` (lowercase). The existing
+`Scalar.kind_to_string` form (`Int64` / `String` / `Bool`) stays for
+now — its callers in `lib/ddl/` keep producing the capitalised
+canonical form until step 9 removes them.
+
+*Tests:* unit tests in `test/core/` for each constructor.
+
+### Step 2 — `Row.format_kind`
+
+Add `Row.format_kind` rendering a row kind as
+`(name: type, name: type)`, or `()` for the empty row kind. Builds on
+step 1's `Scalar.format_kind` for the type side. Qualifiers are
+dropped (the surface syntax has no qualifier form; see
+[type-system.md §"qualifiers on row fields"](../type-system.md)).
+
+*Tests:* unit tests covering empty, single-field, multi-field, and
+qualifier-stripping cases.
+
+### Step 3 — `Relation.format_kind`
+
+Add `Relation.format_kind` rendering a relation kind as the row-type
+form with refinement clauses interleaved:
+`(id: int64, name: string, primary key (id))`. Empty refinements
+list elides the `primary key` clause. No new callers yet.
+
+*Tests:* unit tests for the no-refinement and `Primary_key` cases,
+including a composite primary key.
+
+### Step 4 — `Core.Term` module
+
+New `lib/core/term.ml{,i}` with the two-arm union
+(`Relation_value`, `Relation_kind`) and `Term.format` dispatching per
+arm — `Relation_value` formats via `Relation.print`-equivalent path,
+`Relation_kind` formats via `Relation.format_kind` from step 3. Not
+yet wired anywhere.
+
+*Tests:* unit tests on `Term.format` for both arms.
+
+### Step 5 — Thread `Term.t` through Eval (structural)
+
+Change `Eval.eval`'s continuation from `[`Bag] Relation.t -> 'a` to
+`Term.t -> 'a`. Every existing operator wraps its relation result as
+`Term.Relation_value` before calling its `continue`. REPL's
+`print_result` callback receives a `Term.t` and pattern-matches; the
+`Relation_kind` arm is `assert false`-with-comment until step 7
+makes it reachable. Atomic change — the layers can't be partially
+migrated.
+
+No user-visible behaviour change. The biggest step in the slice;
+keeping it atomic because the signature change drives the touch list
+mechanically.
+
+*Tests:* the existing Eval test corpus updates from receiving
+`Relation.t` callbacks to receiving `Term.t`. No new behavioural
+tests at this step — step 8's end-to-end test covers the wider shape.
+
+### Step 6 — `Physical.kind_of` helper
+
+Add `Physical.kind_of : t -> Relation.kind`: a pure inspector that
+walks a physical plan and returns its result kind without opening
+cursors. The catalog-touching `FullScan` / `IndexLookup` /
+`IndexedNestedLoopJoin` cases take a `catalog` lookup parameter
+(mirroring `Translate.translate`'s shape).
+
+Existing `Translate.translate` already computes per-operator kinds
+inline; this step factors that knowledge into a reusable helper. The
+old inline computation stays where it is — `kind_of` is a new entry
+point for step 8's `Type_op` evaluator, not a refactor of existing
+call sites.
+
+*Tests:* unit tests for each operator constructor in `test/plan/`.
+
+### Step 7 — `Type` constructor across IR layers + Eval handling
+
+Add the constructor:
+
+- `Ast.Type of { input : t }`
+- `Logical.Type_op of { input : t }` — `required_access` recurses
+  into `input`.
+- `Physical.Type_op of { input : t }`
+- `Lower.lower` and `Translate.translate` pass `Type` through.
+- `Eval.eval` handles `Physical.Type_op { input }` by computing
+  `Physical.kind_of input` (step 6) and calling `continue` with
+  `Term.Relation_kind kind`. No cursors opened.
+- `Logical.format` and `Physical.format` render the new constructor.
+
+Unreachable from the REPL — the parser doesn't know `type` yet — but
+testable at each layer by building values directly.
+
+*Tests:* round-trip + format tests at each layer; an Eval test that
+builds `Type_op (FullScan { table = "users" })` against a seeded
+catalog and asserts the resulting `Term.Relation_kind` carries the
+expected kind. The REPL's `Relation_kind` arm in step 5 becomes
+reachable here — its `assert false` becomes a real `Term.format`
+call, exercised by step 8's end-to-end test.
+
+### Step 8 — Parser keyword + `type | type` rejection + end-to-end
+
+Parser learns `type` as a unary pipe operator (no parens, no
+arguments). `Lower.lower` matches `Ast.Type { input = Ast.Type _ }`
+and raises `failwith "type: input is already a type"`. The check
+lives at Lower because that's the first layer with the full pipeline
+shape and the natural place to emit a user-facing message before any
+IR carries an invariant about non-nested `Type_op`s.
+
+*Tests:*
+
+- Parser unit tests: `users | type` parses to `Ast.Type { input =
+  Relation_name "users" }`; `users | type | type` parses (no
+  syntactic restriction); bare `type` without input is a parse error.
+- Lower unit test for the `type | type` rejection.
+- End-to-end integration test in `test/integration/`:
+  `users | type` prints the relation type in the new surface syntax,
+  matching what `:describe users` produced before the rename
+  (modulo `int64` lowercase and `:` between name and type).
+
+### Step 9 — Retire `:describe`
+
+Remove:
+
+- The `:describe` parser rule in `lib/ddl/parser.ml`.
+- `Statement.Describe` constructor and the `Described` arm of
+  `read_result`.
+- `Ddl_executor`'s `Describe` case.
+- `Ddl_format`'s `Describe` case.
+- `Statement.of_kind` (the canonical-form-from-kind adapter has no
+  remaining caller).
+- The REPL's `Listed | Described` dispatch loses its `Described`
+  arm; `Listed` stays.
+- `Scalar.kind_to_string` if its last caller was the DDL formatter
+  (check at the step; otherwise leave for a later cleanup).
+
+`lib/ddl/` shrinks but stays — `:list tables`, `:drop table`, and
+`:create table` are still around (slice 22 retires the last two).
+
+*Tests:* delete `:describe`-specific tests; round-trip tests for the
+other three DDL statements stay green.
