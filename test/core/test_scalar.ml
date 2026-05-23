@@ -39,6 +39,26 @@ let test_format_bool_renders_lowercase_keywords () =
     "false keyword" "false"
     (format_to_string (Scalar.Bool false))
 
+(* Render via [Scalar.format_kind] into a string for comparison against the
+   expected source text. *)
+let format_kind_to_string kind =
+  let buffer = Buffer.create 16 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Scalar.format_kind formatter kind;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_kind_renders_lowercase_keywords () =
+  Alcotest.(check string)
+    "int64 keyword" "int64"
+    (format_kind_to_string Scalar.Int64);
+  Alcotest.(check string)
+    "string keyword" "string"
+    (format_kind_to_string Scalar.String);
+  Alcotest.(check string)
+    "bool keyword" "bool"
+    (format_kind_to_string Scalar.Bool)
+
 let test_to_string_matches_format_output () =
   Alcotest.(check string)
     "Int64"
@@ -64,6 +84,11 @@ let () =
             test_format_string_quotes_with_double_quotes;
           Alcotest.test_case "Bool renders as the lowercase keyword" `Quick
             test_format_bool_renders_lowercase_keywords;
+        ] );
+      ( "format_kind",
+        [
+          Alcotest.test_case "renders the lowercase type keyword" `Quick
+            test_format_kind_renders_lowercase_keywords;
         ] );
       ( "to_string",
         [

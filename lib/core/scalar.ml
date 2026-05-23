@@ -11,6 +11,12 @@ let kind_to_string : kind -> string = function
   | String -> "String"
   | Bool -> "Bool"
 
+let format_kind formatter (kind : kind) =
+  match kind with
+  | Int64 -> Format.pp_print_string formatter "int64"
+  | String -> Format.pp_print_string formatter "string"
+  | Bool -> Format.pp_print_string formatter "bool"
+
 let format formatter = function
   | Int64 number -> Format.pp_print_string formatter (Int64.to_string number)
   | String text -> Format.fprintf formatter "\"%s\"" text

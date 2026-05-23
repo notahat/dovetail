@@ -33,6 +33,13 @@ val kind_to_string : kind -> string
 (** Render a kind as a short capitalised name ([Int64], [String], [Bool]).
     Intended for type-mismatch error messages and EXPLAIN-style output. *)
 
+val format_kind : Format.formatter -> kind -> unit
+(** [format_kind formatter kind] writes [kind] to [formatter] as the lowercase
+    surface-syntax keyword: [int64], [string], or [bool]. This is the form a
+    user sees when a type appears in the surface language — distinct from
+    {!kind_to_string}'s capitalised form, which is for internal / EXPLAIN-style
+    output. *)
+
 val format : Format.formatter -> value -> unit
 (** [format formatter value] writes [value] to [formatter] in source-like form:
     [Int64] as bare digits (with leading [-] for negatives), [String] wrapped in
