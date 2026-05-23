@@ -29,40 +29,20 @@ val eval :
     sequence must be consumed inside [continue]; using it after [continue]
     returns is undefined behaviour.
 
+    [Insert { table; source }] is just another operator in [plan]: the sink
+    evaluates [source] via the same [eval], then for each source row probes the
+    target's storage for a primary-key collision and writes the row, and hands
+    [continue] a one-row relation with kind [(insert_count : int64)] and value
+    equal to the number of writes performed. Insert requires the [transaction]
+    to be a write transaction; callers route to the right transaction kind via
+    {!Logical.required_access} before calling [eval].
+
     Raises [Failure] if [plan] references a table the catalog has no schema for,
-    if a column reference cannot be resolved, or on any other plan-shape or
-    schema mismatch surfaced by the operators. Errors are raised eagerly where
-    possible (e.g. predicate resolution runs before any rows are pulled), so
-    most failure modes surface before [continue] is called. *)
-
-val eval_mutation :
-  Storage.Engine.environment ->
-  [ `Read | `Write ] Storage.Engine.transaction ->
-  Plan.Physical.mutation ->
-  ([ `Bag ] Relation.t -> 'a) ->
-  'a
-(** [eval_mutation environment transaction mutation continue] runs [mutation]
-    against the database open in [environment] and invokes [continue] with a
-    one-row relation describing what the mutation did.
-
-    For [Insert { table; source }], the sink evaluates [source] as a relation
-    via {!eval} (inside the same write [transaction]), then for each source row
-    performs a [Storage.Engine.get] to detect a primary-key collision against an
-    existing row, and a [Storage.Engine.put] to write the row otherwise. The
-    relation handed to [continue] has kind [(insert_count : int64)] and a single
-    row whose value is the number of [put]s performed.
-
-    The continuation shape mirrors {!eval} so the two entry points dispatch
-    uniformly at the call site, and so the eventual merge into a single
-    pipeline-result type doesn't change the shape again.
-
-    Raises [Failure] under the same conditions as {!eval}, plus on a primary-key
-    collision against an existing row in the target table. A raise aborts the
-    in-flight write transaction via the standard exception path of
-    {!Storage.Engine.with_write_transaction}, so any earlier writes in the same
-    mutation are discarded -- multi-row inserts (once the multi-row literal
-    grammar lands) commit all-or-nothing.
-
-    [transaction] is required to be a write transaction at the type level; there
-    is no perm-coercion machinery inside the sink. Read-only callers keep using
-    {!eval}; the REPL's plan classifier dispatches to the right entry. *)
+    if a column reference cannot be resolved, on a primary-key collision when an
+    [Insert] is reached, or on any other plan-shape or schema mismatch surfaced
+    by the operators. Errors are raised eagerly where possible (e.g. predicate
+    resolution runs before any rows are pulled), so most failure modes surface
+    before [continue] is called. A raise inside an [Insert] aborts the in-flight
+    write transaction via the standard exception path of
+    {!Storage.Engine.with_write_transaction}, so any earlier writes are
+    discarded -- multi-row inserts commit all-or-nothing. *)

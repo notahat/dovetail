@@ -54,8 +54,7 @@ let scan_users_restricted_by predicate : Logical.t =
 let test_pk_equality_literal_folds_to_index_lookup () =
   let logical = scan_users_restricted_by (id_equals_int64_literal 5L) in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "Restrict(Scan, id = 5) -> IndexLookup(users, 5)"
@@ -71,8 +70,7 @@ let test_mirrored_pk_equality_literal_folds () =
          ~op:Equal ~right:(expression_column "id"))
   in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "Restrict(Scan, 5 = id) -> IndexLookup(users, 5)"
@@ -88,8 +86,7 @@ let test_qualified_pk_column_folds () =
          ~right:(expression_literal (Scalar.Int64 5L)))
   in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "Restrict(Scan, users.id = 5) -> IndexLookup(users, 5)"
@@ -108,8 +105,7 @@ let test_mis_qualified_pk_column_does_not_fold () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan)"
@@ -127,8 +123,7 @@ let test_non_int64_literal_on_pk_does_not_fold () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan)"
@@ -143,8 +138,7 @@ let test_non_pk_column_equality_does_not_fold () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan)"
@@ -159,8 +153,7 @@ let test_pk_inequality_does_not_fold () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan)"
@@ -175,8 +168,7 @@ let test_pk_ordering_comparison_does_not_fold () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan)"
@@ -194,8 +186,7 @@ let test_pk_equality_with_residual_conjunct_folds () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "Filter(active, IndexLookup(users, 5))"
@@ -216,8 +207,7 @@ let test_residual_then_pk_equality_folds () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "Filter(active, IndexLookup(users, 5))"
@@ -239,8 +229,7 @@ let test_two_pk_equalities_keep_first_and_drop_rest_into_residual () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "Filter(id = 7, IndexLookup(users, 5))"
@@ -270,8 +259,7 @@ let test_three_way_conjunction_rebuilds_two_conjunct_residual () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   let expected_residual =
     expression_and ~left:name_equals_alice ~right:(expression_column "active")
@@ -304,8 +292,7 @@ let test_right_associative_nesting_flattens () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   let expected_residual =
     expression_and ~left:(expression_column "active") ~right:name_equals_alice
@@ -331,8 +318,7 @@ let test_conjunction_with_no_pk_equality_does_not_fold () =
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:users_catalog (Logical.Query logical))
+    Translate.translate ~catalog:users_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan)"
@@ -346,8 +332,7 @@ let test_unknown_table_skips_folding () =
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
+    Translate.translate ~catalog:noop_catalog logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan) when catalog returns None"
@@ -369,9 +354,7 @@ let test_composite_pk_does_not_fold () =
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:(users_catalog_with kind)
-         (Logical.Query logical))
+    Translate.translate ~catalog:(users_catalog_with kind) logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan) for composite PKs"
@@ -389,9 +372,7 @@ let test_string_pk_does_not_fold () =
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:(users_catalog_with kind)
-         (Logical.Query logical))
+    Translate.translate ~catalog:(users_catalog_with kind) logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan) for non-Int64 PKs"
@@ -409,9 +390,7 @@ let test_missing_pk_does_not_fold () =
   let predicate = id_equals_int64_literal 5L in
   let logical = scan_users_restricted_by predicate in
   let physical =
-    unwrap_query
-      (Translate.translate ~catalog:(users_catalog_with kind)
-         (Logical.Query logical))
+    Translate.translate ~catalog:(users_catalog_with kind) logical
   in
   Alcotest.(check physical_testable)
     "stays as Filter(FullScan) for tables with no PK"
@@ -427,7 +406,7 @@ let test_index_lookup_pipeline_yields_one_row () =
       let logical = scan_users_restricted_by (id_equals_int64_literal 1L) in
       let catalog = make_catalog environment transaction in
       let physical =
-        unwrap_query (Translate.translate ~catalog (Logical.Query logical))
+        Translate.translate ~catalog logical
       in
       Alcotest.(check physical_testable)
         "translates through the real catalog to IndexLookup"

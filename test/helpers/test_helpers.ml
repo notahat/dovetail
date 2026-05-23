@@ -147,8 +147,8 @@ let format_row formatter row =
 let format_row_list formatter rows =
   List.iter (fun row -> Format.fprintf formatter "%a@\n" format_row row) rows
 
-(** Alcotest testable for a list of [Row.value]s. Polymorphic-equality based. The
-    printer renders one row per line using {!Scalar.format} so failure diffs
+(** Alcotest testable for a list of [Row.value]s. Polymorphic-equality based.
+    The printer renders one row per line using {!Scalar.format} so failure diffs
     surface the offending row rather than [\<rows\> vs \<rows\>]. *)
 let row_list_testable : Row.value list Alcotest.testable =
   Alcotest.testable format_row_list ( = )
@@ -158,29 +158,6 @@ let row_list_testable : Row.value list Alcotest.testable =
     operator tree for both expected and actual plans. *)
 let physical_testable : Plan.Physical.t Alcotest.testable =
   Alcotest.testable Plan.Physical.format ( = )
-
-(** Extract the relation sub-plan from a [Physical.plan] that is known to be a
-    [Query]. The translate tests use this to keep their assertions focused on
-    the rewrite-recognised inner plan; [Physical.plan]'s wrapper shape is pinned
-    by [Translate.translate]'s type signature, so no value-level check of the
-    wrapper is needed. A [Mutation] reaching this helper would be a
-    translate-side bug, so we abort the test loudly. *)
-let unwrap_query (plan : Plan.Physical.plan) : Plan.Physical.t =
-  match plan with
-  | Query plan -> plan
-  | Mutation _ -> Alcotest.fail "expected a Query plan, got a Mutation"
-
-(** Extract the relation sub-plan from a [Logical.plan] that is known to be a
-    [Query]. Sibling to {!unwrap_query} for the Logical side: the Lower tests
-    use this to keep their structural assertions aimed at the relation tree
-    while [Lower.lower]'s wrapper shape is pinned by its type signature. A
-    [Mutation] reaching this helper would mean the Ast somehow produced one
-    where the test expected a query. *)
-let unwrap_logical_query (plan : Plan.Logical.plan) : Plan.Logical.t =
-  match plan with
-  | Query plan -> plan
-  | Mutation _ ->
-      Alcotest.fail "expected a Logical.Query plan, got a Logical.Mutation"
 
 (** Build a bare (unqualified) [Row.column_reference]. *)
 let column_reference name : Row.column_reference = { qualifier = None; name }
@@ -244,7 +221,7 @@ let with_query_result query check_rows =
       in
       let logical = Surface_ra.Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
+      let physical = Plan.Translate.translate ~catalog logical in
       Execution.Eval.eval environment transaction physical (fun relation ->
           check_rows (List.of_seq relation.value)))
 
@@ -264,7 +241,7 @@ let with_query_failure ~label ~expected query =
       in
       let logical = Surface_ra.Lower.lower ast in
       let catalog = make_catalog environment transaction in
-      let physical = unwrap_query (Plan.Translate.translate ~catalog logical) in
+      let physical = Plan.Translate.translate ~catalog logical in
       Alcotest.check_raises label expected (fun () ->
           Execution.Eval.eval environment transaction physical (fun _relation ->
               ())))

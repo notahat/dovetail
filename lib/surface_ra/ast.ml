@@ -10,7 +10,6 @@ type t =
   | CrossProduct of { left : t; right : t }
   | Join of { left : t; right : t; predicate : Expression.t }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
+  | Insert of { table : string; source : t }
 
-type mutation = Insert of { table : string; source : t }
-type plan = Query of t | Mutation of mutation
-type program = Pipeline of plan | Ddl of Ddl.Statement.t
+type program = Pipeline of t | Ddl of Ddl.Statement.t

@@ -7,17 +7,14 @@
 
 module Plan = Dovetail_plan
 
-val lower : Ast.plan -> Plan.Logical.plan
-(** [lower plan] rewrites [plan] into an equivalent logical plan.
+val lower : Ast.t -> Plan.Logical.t
+(** [lower ast] rewrites [ast] into an equivalent logical plan.
 
-    The [Query] arm rewrites the relation tree: [Relation_name] becomes [Scan];
-    [Ast.Restrict], [Ast.Project], and [Ast.CrossProduct] map to their
-    like-named [Logical] counterparts; [Ast.Join { left; right; predicate }]
-    desugars to
+    [Relation_name] becomes [Scan]; [Ast.Restrict], [Ast.Project], and
+    [Ast.CrossProduct] map to their like-named [Logical] counterparts;
+    [Ast.Join { left; right; predicate }] desugars to
     [Logical.Restrict (Logical.CrossProduct { left; right }, predicate)] --
     [Logical] has no [Join] node; the join is just sugar at this layer, and
     {!Translate} is responsible for collapsing the
     [Restrict]-over-[CrossProduct] shape into [Physical.NestedLoopJoin].
-
-    The [Mutation] arm carries the sink across: an [Ast.Insert] becomes a
-    [Logical.Insert] with the source's relation tree lowered in place. *)
+    [Ast.Insert] maps to [Logical.Insert] with the source lowered in place. *)

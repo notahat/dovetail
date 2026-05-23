@@ -14,64 +14,46 @@ let prompt = "> "
    one place. *)
 let translate_in environment transaction ~output ~show_logical ~show_physical
     logical_plan =
-  if show_logical then Plan.Logical.format_plan output logical_plan;
+  if show_logical then Plan.Logical.format output logical_plan;
   let catalog table_name =
     Storage.Catalog.get environment transaction ~table_name
   in
   let physical_plan = Plan.Translate.translate ~catalog logical_plan in
-  if show_physical then Plan.Physical.format_plan output physical_plan;
+  if show_physical then Plan.Physical.format output physical_plan;
   physical_plan
 
-(* Inside a read transaction: translate the plan, evaluate the relation it
-   produces, and pretty-print the rows to [output]. The [Mutation] arm is
-   unreachable -- [Logical.classify] chose [`Read] and so [Translate.translate]
-   is contracted to return a [Physical.Query]. *)
-let print_query_result environment transaction ~output ~show_logical
-    ~show_physical logical_plan =
-  match
+(* Translate [logical_plan] inside [transaction], evaluate the resulting
+   physical plan, and pretty-print the relation to [output]. Insert plans
+   produce a one-row [(insert_count : int64)] relation; query plans produce
+   their result relation; both render the same way through [Relation.print]. *)
+let print_result environment transaction ~output ~show_logical ~show_physical
+    logical_plan =
+  let physical_plan =
     translate_in environment transaction ~output ~show_logical ~show_physical
       logical_plan
-  with
-  | Plan.Physical.Query physical ->
-      Execution.Eval.eval environment transaction physical (fun relation ->
-          Relation.print ~formatter:output relation)
-  | Plan.Physical.Mutation _ -> assert false
-
-(* Inside a write transaction: translate the plan, evaluate the mutation,
-   and pretty-print the result relation to [output]. Mutations report their
-   outcome as a one-row relation now, so this prints exactly the way the
-   query path does. The [Query] arm is unreachable for the symmetric reason
-   -- [Logical.classify] chose [`Write] and so [Translate.translate] is
-   contracted to return a [Physical.Mutation]. *)
-let print_mutation_result environment transaction ~output ~show_logical
-    ~show_physical logical_plan =
-  match
-    translate_in environment transaction ~output ~show_logical ~show_physical
-      logical_plan
-  with
-  | Plan.Physical.Mutation mutation ->
-      Execution.Eval.eval_mutation environment transaction mutation
-        (fun relation -> Relation.print ~formatter:output relation)
-  | Plan.Physical.Query _ -> assert false
+  in
+  Execution.Eval.eval environment transaction physical_plan (fun relation ->
+      Relation.print ~formatter:output relation)
 
 (* Run a single parsed query against [environment] and pretty-print the
-   result to [output]. The plan's classification picks the transaction kind
-   (read for queries, write for mutations); translation happens inside the
-   chosen transaction so the catalog lookup shares scope with evaluation.
-   Two helpers rather than one because [with_read_transaction] and
-   [with_write_transaction] carry different permission tags -- unifying them
-   would need a rank-2 type trick the gain doesn't justify. *)
+   result to [output]. The plan's required access picks the transaction
+   kind (read when nothing writes, write when an [Insert] appears anywhere
+   in the tree); translation happens inside the chosen transaction so the
+   catalog lookup shares scope with evaluation. Two helpers rather than
+   one because [with_read_transaction] and [with_write_transaction] carry
+   different permission tags -- unifying them would need a rank-2 type
+   trick the gain doesn't justify. *)
 let evaluate_and_print environment ~output ~show_logical ~show_physical
     logical_plan =
   try
-    match Plan.Logical.classify logical_plan with
+    match Plan.Logical.required_access logical_plan with
     | `Read ->
         Storage.Engine.with_read_transaction environment (fun transaction ->
-            print_query_result environment transaction ~output ~show_logical
+            print_result environment transaction ~output ~show_logical
               ~show_physical logical_plan)
     | `Write ->
         Storage.Engine.with_write_transaction environment (fun transaction ->
-            print_mutation_result environment transaction ~output ~show_logical
+            print_result environment transaction ~output ~show_logical
               ~show_physical logical_plan)
   with Failure message -> Format.fprintf output "error: %s@." message
 
@@ -102,8 +84,8 @@ let print_ddl_write_result ~output = function
    result to [output]. Structural checks via [Statement.validate] run
    before the transaction opens, so a failing validate never pays the
    writer-lock cost for an error it could surface earlier. The classifier
-   then picks the transaction kind, mirroring the [Logical.classify] split
-   above for pipelines; [Failure] raised inside validate or inside
+   then picks the transaction kind, mirroring the
+   [Logical.required_access] dispatch above for pipelines; [Failure] raised inside validate or inside
    [execute_*] lands in the [error: ...] line through the shared guard. *)
 let execute_and_print_ddl environment ~output statement =
   try

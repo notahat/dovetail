@@ -10,10 +10,7 @@ module Scalar = Dovetail_core.Scalar
 
 let test_scan_lowers_to_full_scan () =
   let logical = Logical.Scan { table = "users" } in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Scan -> FullScan"
     (Physical.FullScan { table = "users" })
@@ -26,9 +23,7 @@ let test_pipeline_yields_fixture_rows () =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let logical = Logical.Scan { table = "users" } in
       let catalog = make_catalog environment transaction in
-      let physical =
-        unwrap_query (Translate.translate ~catalog (Logical.Query logical))
-      in
+      let physical = Translate.translate ~catalog logical in
       Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.value in
           Alcotest.(check row_list_testable)
@@ -46,10 +41,7 @@ let test_restrict_translates_to_filter () =
     Logical.Restrict
       { input = Logical.Scan { table = "users" }; predicate = id_equals_three }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Restrict -> Filter wrapping FullScan"
     (Physical.Filter
@@ -72,9 +64,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
           }
       in
       let catalog = make_catalog environment transaction in
-      let physical =
-        unwrap_query (Translate.translate ~catalog (Logical.Query logical))
-      in
+      let physical = Translate.translate ~catalog logical in
       Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.value in
           Alcotest.(check row_list_testable)
@@ -87,10 +77,7 @@ let test_project_translates_to_physical_project () =
     Logical.Project
       { input = Logical.Scan { table = "users" }; columns = name_then_email }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Project -> Project wrapping FullScan"
     (Physical.Project
@@ -113,9 +100,7 @@ let test_project_pipeline_yields_projected_rows () =
           }
       in
       let catalog = make_catalog environment transaction in
-      let physical =
-        unwrap_query (Translate.translate ~catalog (Logical.Query logical))
-      in
+      let physical = Translate.translate ~catalog logical in
       Execution.Eval.eval environment transaction physical (fun relation ->
           let rows = List.of_seq relation.value in
           let expected =
@@ -138,10 +123,7 @@ let test_cross_product_translates_to_physical_cross_product () =
         right = Logical.Scan { table = "orders" };
       }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Logical.CrossProduct -> Physical.CrossProduct wrapping FullScans"
     (Physical.CrossProduct
@@ -170,10 +152,7 @@ let test_restrict_over_cross_product_translates_to_nested_loop_join () =
         predicate = users_id_equals_orders_user_id;
       }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Restrict(CrossProduct(...), pred) -> NestedLoopJoin(..., pred)"
     (Physical.NestedLoopJoin
@@ -189,10 +168,7 @@ let test_standalone_restrict_does_not_trigger_join_rewrite () =
     Logical.Restrict
       { input = Logical.Scan { table = "users" }; predicate = id_equals_three }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Restrict over a non-CrossProduct input still becomes Filter"
     (Physical.Filter
@@ -210,10 +186,7 @@ let test_relation_literal_translates_through () =
         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
       }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "Logical.RelationLiteral -> Physical.RelationLiteral with same payload"
     (Physical.RelationLiteral
@@ -231,10 +204,7 @@ let test_standalone_cross_product_does_not_trigger_join_rewrite () =
         right = Logical.Scan { table = "orders" };
       }
   in
-  let physical =
-    unwrap_query
-      (Translate.translate ~catalog:noop_catalog (Logical.Query logical))
-  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
   Alcotest.(check physical_testable)
     "CrossProduct without an enclosing Restrict stays as CrossProduct"
     (Physical.CrossProduct
@@ -263,22 +233,14 @@ let orders_kind : Relation.kind =
 let orders_catalog table_name =
   if table_name = "orders" then Some orders_kind else None
 
-(* Alcotest testable for a [Physical.plan]. Polymorphic-equality based; the
-   printer is {!Physical.format_plan}, so failure diffs show the EXPLAIN-style
-   plan rendering. Used by the Mutation arm tests, which assert at the plan
-   level rather than peeking past a [Physical.Query] wrapper. *)
-let physical_plan_testable : Physical.plan Alcotest.testable =
-  Alcotest.testable Physical.format_plan ( = )
-
-(* Build a [Logical.plan] that inserts a single-row literal into [table].
+(* Build a [Logical.t] that inserts a single-row literal into [table].
    [pairs] gives the column/value pairs in the order the test wants written;
    the validator sees this order and the per-value kind comes from the
    value's runtime constructor. *)
-let insert_plan ~table ~pairs : Logical.plan =
+let insert_plan ~table ~pairs : Logical.t =
   let columns = List.map fst pairs in
   let values = List.map snd pairs in
-  Mutation
-    (Insert { table; source = RelationLiteral { columns; rows = [ values ] } })
+  Insert { table; source = RelationLiteral { columns; rows = [ values ] } }
 
 let test_mutation_in_target_order_translates_through () =
   let plan =
@@ -292,28 +254,27 @@ let test_mutation_in_target_order_translates_through () =
         ]
   in
   let translated = Translate.translate ~catalog:orders_catalog plan in
-  Alcotest.(check physical_plan_testable)
-    "Logical.Mutation (Insert ...) -> Physical.Mutation (Insert ...) with the \
-     literal source translated through"
-    (Physical.Mutation
-       (Insert
-          {
-            table = "orders";
-            source =
-              Physical.RelationLiteral
-                {
-                  columns = [ "id"; "user_id"; "description"; "amount" ];
-                  rows =
-                    [
-                      [
-                        Scalar.Int64 9L;
-                        Scalar.Int64 1L;
-                        Scalar.String "Pretzel";
-                        Scalar.Int64 9L;
-                      ];
-                    ];
-                };
-          }))
+  Alcotest.(check physical_testable)
+    "Logical.Insert -> Physical.Insert with the literal source translated \
+     through"
+    (Physical.Insert
+       {
+         table = "orders";
+         source =
+           Physical.RelationLiteral
+             {
+               columns = [ "id"; "user_id"; "description"; "amount" ];
+               rows =
+                 [
+                   [
+                     Scalar.Int64 9L;
+                     Scalar.Int64 1L;
+                     Scalar.String "Pretzel";
+                     Scalar.Int64 9L;
+                   ];
+                 ];
+             };
+       })
     translated
 
 let test_mutation_in_permuted_order_translates_through () =
@@ -331,12 +292,10 @@ let test_mutation_in_permuted_order_translates_through () =
   in
   let translated = Translate.translate ~catalog:orders_catalog plan in
   match translated with
-  | Physical.Mutation (Insert { table; source = RelationLiteral _ }) ->
+  | Physical.Insert { table; source = RelationLiteral _ } ->
       Alcotest.(check string)
-        "the target table name reaches the Physical mutation" "orders" table
-  | _ ->
-      Alcotest.fail
-        "expected a Physical.Mutation wrapping a RelationLiteral source"
+        "the target table name reaches the Physical Insert" "orders" table
+  | _ -> Alcotest.fail "expected a Physical.Insert wrapping a RelationLiteral"
 
 let test_mutation_against_unknown_table_raises () =
   let plan =
@@ -383,18 +342,17 @@ let test_mutation_with_row_arity_mismatch_raises () =
   (* Built directly rather than via [insert_plan], because that helper
      derives [columns] and [values] from the same list and so can't
      produce a width mismatch between them. *)
-  let plan : Logical.plan =
-    Mutation
-      (Insert
-         {
-           table = "orders";
-           source =
-             RelationLiteral
-               {
-                 columns = [ "id"; "user_id"; "description"; "amount" ];
-                 rows = [ [ Scalar.Int64 9L; Scalar.Int64 1L; Scalar.Int64 9L ] ];
-               };
-         })
+  let plan : Logical.t =
+    Insert
+      {
+        table = "orders";
+        source =
+          RelationLiteral
+            {
+              columns = [ "id"; "user_id"; "description"; "amount" ];
+              rows = [ [ Scalar.Int64 9L; Scalar.Int64 1L; Scalar.Int64 9L ] ];
+            };
+      }
   in
   Alcotest.check_raises "row arity"
     (Failure

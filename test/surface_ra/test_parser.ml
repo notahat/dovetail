@@ -8,17 +8,16 @@ module Scalar = Dovetail_core.Scalar
 let ast_program_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )
 
-(* Wraps the expected [Ast.t] in [Ast.Pipeline (Ast.Query ...)] before
-   comparing against the parser's [Ast.program] output. Most surface forms
-   parse as pipeline queries; the sink-production tests below use
-   [parses_plan] to assert against a [Mutation], and the DDL tests use
+(* Wraps the expected [Ast.t] in [Ast.Pipeline] before comparing against the
+   parser's [Ast.program] output. The sink-production tests below build an
+   [Ast.Insert] inside the pipeline using {!parses_plan}; the DDL tests use
    [parses_program] to assert against an [Ast.Ddl] directly. *)
 let parses input expected_inner_ast =
   match Parser.parse input with
   | Ok actual_program ->
       Alcotest.(check ast_program_testable)
         (Printf.sprintf "%S parses" input)
-        (Ast.Pipeline (Ast.Query expected_inner_ast)) actual_program
+        (Ast.Pipeline expected_inner_ast) actual_program
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
@@ -259,7 +258,8 @@ let test_relation_literal_parses_multiple_pairs () =
     (Ast.RelationLiteral
        {
          columns = [ "id"; "name"; "active" ];
-         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ] ];
+         rows =
+           [ [ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ] ];
        })
 
 let test_relation_literal_tolerates_trailing_comma () =
@@ -327,8 +327,9 @@ let test_relation_literal_rejects_column_reference_in_value_position () =
   rejects "{id: x}"
 
 (* The sink production. A pipeline that ends in [| insert into <table>]
-   parses as an [Ast.Mutation], with everything before the sink as the
-   upstream relation. Pipelines without a sink parse as [Ast.Query]. *)
+   parses as an [Ast.Insert] with everything before the sink as the
+   upstream relation. Pipelines without a sink parse as the relation
+   expression itself. *)
 
 let parses_plan input expected_plan =
   match Parser.parse input with
@@ -352,37 +353,35 @@ let parses_program input expected_program =
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
-let test_pipeline_ending_in_sink_parses_as_mutation () =
+let test_pipeline_ending_in_sink_parses_as_insert () =
   parses_plan
     "{id: 9, user_id: 1, description: \"Pretzel\", amount: 9} | insert into \
      orders"
-    (Ast.Mutation
-       (Insert
-          {
-            source =
-              Ast.RelationLiteral
-                {
-                  columns = [ "id"; "user_id"; "description"; "amount" ];
-                  rows =
-                    [
-                      [
-                        Scalar.Int64 9L;
-                        Scalar.Int64 1L;
-                        Scalar.String "Pretzel";
-                        Scalar.Int64 9L;
-                      ];
-                    ];
-                };
-            table = "orders";
-          }))
+    (Ast.Insert
+       {
+         source =
+           Ast.RelationLiteral
+             {
+               columns = [ "id"; "user_id"; "description"; "amount" ];
+               rows =
+                 [
+                   [
+                     Scalar.Int64 9L;
+                     Scalar.Int64 1L;
+                     Scalar.String "Pretzel";
+                     Scalar.Int64 9L;
+                   ];
+                 ];
+             };
+         table = "orders";
+       })
 
-let test_pipeline_without_sink_parses_as_query () =
-  parses_plan "users" (Ast.Query (Ast.Relation_name "users"))
+let test_pipeline_without_sink_parses_as_relation () =
+  parses_plan "users" (Ast.Relation_name "users")
 
-let test_pipeline_with_upstream_pipeline_then_sink_parses_as_mutation () =
+let test_pipeline_with_upstream_pipeline_then_sink_parses_as_insert () =
   parses_plan "users | insert into orders"
-    (Ast.Mutation
-       (Insert { source = Ast.Relation_name "users"; table = "orders" }))
+    (Ast.Insert { source = Ast.Relation_name "users"; table = "orders" })
 
 let test_pipeline_rejects_query_op_after_sink () =
   (* The grammar admits at most one sink, in terminal position. A
@@ -780,12 +779,12 @@ let () =
       ( "insert sink syntax",
         [
           Alcotest.test_case "pipeline ending in a sink parses as Mutation"
-            `Quick test_pipeline_ending_in_sink_parses_as_mutation;
+            `Quick test_pipeline_ending_in_sink_parses_as_insert;
           Alcotest.test_case "pipeline without a sink parses as Query" `Quick
-            test_pipeline_without_sink_parses_as_query;
+            test_pipeline_without_sink_parses_as_relation;
           Alcotest.test_case
             "upstream pipeline followed by a sink parses as Mutation" `Quick
-            test_pipeline_with_upstream_pipeline_then_sink_parses_as_mutation;
+            test_pipeline_with_upstream_pipeline_then_sink_parses_as_insert;
           Alcotest.test_case "rejects a query operator after the sink" `Quick
             test_pipeline_rejects_query_op_after_sink;
           Alcotest.test_case "rejects a sink with nothing before it" `Quick

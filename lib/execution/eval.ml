@@ -109,6 +109,9 @@ let rec eval environment transaction plan continue =
         ~inner_table ~outer_key_column ~inner_position continue
   | RelationLiteral { columns; rows } ->
       evaluate_relation_literal ~columns ~rows continue
+  | Insert { table; source } ->
+      evaluate_insert environment transaction ~target_table:table ~source
+        continue
 
 (* Stream the input through [eval], then wrap its value seq in a [Seq.filter]
    guarded by the resolved predicate. The kind is unchanged. Resolution
@@ -265,15 +268,11 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
   in
   continue { kind = combined_kind; value = combined_value }
 
-(* The mutation entry below evaluates its [source] sub-plan through [eval]
-   inside its own write-transaction scope, then writes the resulting rows
-   one per row. *)
-
 (* For each target field, find the position in [source_row_kind] that supplies
    its value. Raises [Failure] if a target field has no matching source
    column. Source columns absent from the target are tolerated here;
    Translate-level validation rejects them upstream. *)
-let build_source_position_map ~target_table ~source_row_kind
+and build_source_position_map ~target_table ~source_row_kind
     ~(target_kind : Relation.kind) =
   List.map
     (fun (target_field : Row.field) ->
@@ -293,7 +292,7 @@ let build_source_position_map ~target_table ~source_row_kind
 (* Reorder [source_row] into a row matching [target_kind]'s field order, by
    indexing through [position_map]. The map has one entry per target field, in
    target order, giving the source position for that field's value. *)
-let project_to_target_order ~position_map source_row =
+and project_to_target_order ~position_map source_row =
   Array.of_list
     (List.map
        (fun source_position -> source_row.(source_position))
@@ -302,7 +301,7 @@ let project_to_target_order ~position_map source_row =
 (* Extract a human-readable string for the primary-key value of a row already
    projected to [target_kind]'s field order. Used only to build the
    PK-collision error message. *)
-let primary_key_value_text (target_kind : Relation.kind) target_row =
+and primary_key_value_text (target_kind : Relation.kind) target_row =
   match Relation.primary_key_names target_kind with
   | [ primary_key_name ] -> (
       match
@@ -319,7 +318,7 @@ let primary_key_value_text (target_kind : Relation.kind) target_row =
 
 (* Encode one source row in target form, fail on PK collision, else write
    it. *)
-let insert_one_row ~target_kind ~target_map ~target_table ~write_transaction
+and insert_one_row ~target_kind ~target_map ~target_table ~write_transaction
     ~position_map source_row =
   let target_row = project_to_target_order ~position_map source_row in
   let key_bytes, value_bytes =
@@ -339,7 +338,7 @@ let insert_one_row ~target_kind ~target_map ~target_table ~write_transaction
 (* The static row shape an insert reports: a one-column [insert_count : int64]
    row. The kind has no refinements -- the relation describes an evaluation
    result, not a stored table. *)
-let insert_result_kind : Relation.kind =
+and insert_result_kind : Relation.kind =
   {
     row_kind =
       [ { name = "insert_count"; kind = Scalar.Int64; qualifier = None } ];
@@ -347,7 +346,7 @@ let insert_result_kind : Relation.kind =
   }
 
 (* Wrap a row count as the one-row [insert_count : int64] relation. *)
-let insert_result_relation count : [ `Bag ] Relation.t =
+and insert_result_relation count : [ `Bag ] Relation.t =
   {
     kind = insert_result_kind;
     value = Seq.return [| Scalar.Int64 (Int64.of_int count) |];
@@ -355,10 +354,21 @@ let insert_result_relation count : [ `Bag ] Relation.t =
 
 (* Evaluate the [source] sub-plan inside its own resource scope and write each
    row it produces into [target_table]. Hands [continue] a one-row relation
-   reporting how many rows were written. *)
-let evaluate_insert environment transaction ~target_table ~source continue =
+   reporting how many rows were written.
+
+   [transaction] is widened to a write transaction here. The invariant that
+   makes this sound: [Logical.required_access] reports [`Write] for any plan
+   containing [Insert], and the REPL routes such plans through
+   [Storage.Engine.with_write_transaction]. So whenever this branch runs,
+   the LMDB handle really does have write permissions -- the phantom type
+   is just lower-precision than the runtime. Same upstream-invariant
+   pattern as the [assert false] arms elsewhere in the codebase. *)
+and evaluate_insert environment transaction ~target_table ~source continue =
+  let write_transaction : [ `Read | `Write ] Storage.Engine.transaction =
+    Obj.magic transaction
+  in
   let target_kind, target_map =
-    lookup_table_resources environment transaction target_table
+    lookup_table_resources environment write_transaction target_table
   in
   (* The row-write is the point of the iteration and the count is
      incidental; [Seq.iter] + [ref] expresses that more honestly than
@@ -372,13 +382,7 @@ let evaluate_insert environment transaction ~target_table ~source continue =
       Seq.iter
         (fun source_row ->
           insert_one_row ~target_kind ~target_map ~target_table
-            ~write_transaction:transaction ~position_map source_row;
+            ~write_transaction ~position_map source_row;
           incr affected_rows)
-        source_relation.value);
-  continue (insert_result_relation !affected_rows)
-
-let eval_mutation environment transaction mutation continue =
-  match (mutation : Plan.Physical.mutation) with
-  | Insert { table; source } ->
-      evaluate_insert environment transaction ~target_table:table ~source
-        continue
+        source_relation.value;
+      continue (insert_result_relation !affected_rows))

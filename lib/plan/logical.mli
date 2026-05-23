@@ -43,37 +43,16 @@ type t =
 
           The parser currently produces single-row literals only; the IR shape
           leaves room for a future multi-row literal grammar. *)
-
-type mutation =
   | Insert of { table : string; source : t }
-      (** A row-writing mutation. [source] is a relation-yielding sub-plan; its
-          rows are what get written to [table]. The {!plan} wrapper below sits
-          above this type so the REPL can dispatch on plan kind: queries open a
-          read transaction and call {!Eval.eval}; mutations open a write
-          transaction and call {!Eval.eval_mutation}. Update and delete are not
-          yet supported. *)
-
-type plan =
-  | Query of t
-  | Mutation of mutation
-      (** A top-level logical plan: either a relation-yielding {!t} or a
-          row-writing {!mutation}. {!Lower.lower} returns this, and the REPL
-          uses {!classify} to pick a transaction kind before handing the plan to
-          {!Translate.translate}. Mutations don't nest, because {!mutation}'s
-          [source] field is a {!t}, not a [plan]. *)
+      (** [Insert { table; source }] writes [source]'s rows to [table] and
+          yields a one-row relation reporting the affected-row count. Insert
+          declares [`Write] in {!required_access}, which is how the REPL knows
+          to open a write transaction for any plan that contains it. *)
 
 val required_access : t -> [ `Read | `Write ]
 (** [required_access plan] walks [plan] and returns the strongest transaction
-    permission any operator in the tree needs. Every operator currently in [t]
-    is read-only, so the result is always [`Read] today; the walker is the seam
-    where future write-capable operators declare their access locally without
-    {!classify}'s callers needing to enumerate them. *)
-
-val classify : plan -> [ `Read | `Write ]
-(** [classify plan] returns the transaction permission the REPL should open for
-    [plan]: [`Read] for a query (delegating to {!required_access} on the inner
-    tree), [`Write] for a mutation. The REPL uses this to choose between
-    {!Dovetail_storage.Engine.with_read_transaction} and
+    permission any operator in the tree needs. The REPL uses the result to
+    choose between {!Dovetail_storage.Engine.with_read_transaction} and
     {!Dovetail_storage.Engine.with_write_transaction} before translation, so a
     read-only query isn't unnecessarily serialised against LMDB's writer lock.
 *)
@@ -84,14 +63,7 @@ val format : Format.formatter -> t -> unit
     further than the operator itself. Operators render their name followed by
     their distinguishing parameters in parentheses ([Scan(table)],
     [Restrict(predicate)], [Project(columns)],
-    [RelationLiteral(columns=..., rows=N)]); [CrossProduct] renders bare for the
-    same reason its physical counterpart does. The output is for EXPLAIN-style
-    debug printing -- the [--show-logical] flag on the binary is the primary
-    consumer. *)
-
-val format_plan : Format.formatter -> plan -> unit
-(** [format_plan formatter plan] writes [plan] to [formatter]. A {!Query}
-    renders exactly as {!format} would render its inner relation tree -- no
-    wrapping header. A {!Mutation} prints its operator header ([Insert(table)])
-    on one line with the [source] indented one level beneath, matching the
-    per-operator indentation convention {!format} uses. *)
+    [RelationLiteral(columns=..., rows=N)], [Insert(table)]); [CrossProduct]
+    renders bare for the same reason its physical counterpart does. The output
+    is for EXPLAIN-style debug printing -- the [--show-logical] flag on the
+    binary is the primary consumer. *)

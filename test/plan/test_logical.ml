@@ -1,8 +1,9 @@
-(** Tests for [Logical.classify] and [Logical.format] / [Logical.format_plan].
+(** Tests for [Logical.required_access] and [Logical.format].
 
-    [classify] reads the wrapper constructor off a [Logical.plan] and returns
-    the transaction permission the REPL should open. The function has two arms
-    and no inner inspection; the tests exercise both arms with minimal plans.
+    [required_access] walks a [Logical.t] and reports the strongest transaction
+    permission any operator in it needs. Every relation-yielding operator is
+    read-only; [Insert] is the one that reports [`Write]. Tests exercise
+    representative trees with and without [Insert].
 
     The pretty-printer is intended for the [--show-logical] debug flag. Format
     tests pin down the rendering of each operator in isolation, plus a couple of
@@ -40,32 +41,21 @@ let test_cross_product_of_scans_requires_read_access () =
     "CrossProduct of two Scans requires Read access" true
     (Logical.required_access plan = `Read)
 
-let test_query_plan_classifies_as_read () =
-  let plan : Logical.plan = Query (Scan { table = "users" }) in
-  Alcotest.(check bool)
-    "Query plan classifies as Read" true
-    (Logical.classify plan = `Read)
-
-let test_mutation_plan_classifies_as_write () =
-  let plan : Logical.plan =
-    Mutation
-      (Insert
-         {
-           table = "orders";
-           source =
-             RelationLiteral
-               { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
-         })
+let test_insert_requires_write_access () =
+  let plan : Logical.t =
+    Insert
+      {
+        table = "orders";
+        source =
+          RelationLiteral { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
+      }
   in
   Alcotest.(check bool)
-    "Mutation plan classifies as Write" true
-    (Logical.classify plan = `Write)
+    "Insert requires Write access" true
+    (Logical.required_access plan = `Write)
 
 let format_to_string plan =
   with_captured_formatter (fun formatter -> Logical.format formatter plan)
-
-let format_plan_to_string plan =
-  with_captured_formatter (fun formatter -> Logical.format_plan formatter plan)
 
 let users_scan : Logical.t = Scan { table = "users" }
 let orders_scan : Logical.t = Scan { table = "orders" }
@@ -144,27 +134,19 @@ let test_nested_indentation_compounds () =
     \    Scan(orders)\n"
     (format_to_string plan)
 
-let test_format_plan_query_renders_inner_tree_bare () =
-  let plan : Logical.plan = Query users_scan in
-  Alcotest.(check string)
-    "Query renders its inner tree with no wrapping header" "Scan(users)\n"
-    (format_plan_to_string plan)
-
-let test_format_plan_mutation_renders_insert_header_with_indented_source () =
-  let plan : Logical.plan =
-    Mutation
-      (Insert
-         {
-           table = "orders";
-           source =
-             RelationLiteral
-               { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
-         })
+let test_insert_renders_header_with_indented_source () =
+  let plan : Logical.t =
+    Insert
+      {
+        table = "orders";
+        source =
+          RelationLiteral { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
+      }
   in
   Alcotest.(check string)
-    "Mutation prints Insert(table) with its source indented one level"
+    "Insert prints Insert(table) with its source indented one level"
     "Insert(orders)\n  RelationLiteral(columns=id, rows=1)\n"
-    (format_plan_to_string plan)
+    (format_to_string plan)
 
 let () =
   Alcotest.run "logical"
@@ -177,13 +159,8 @@ let () =
             test_restrict_over_scan_requires_read_access;
           Alcotest.test_case "CrossProduct of two Scans requires Read access"
             `Quick test_cross_product_of_scans_requires_read_access;
-        ] );
-      ( "classify",
-        [
-          Alcotest.test_case "Query plan classifies as Read" `Quick
-            test_query_plan_classifies_as_read;
-          Alcotest.test_case "Mutation plan classifies as Write" `Quick
-            test_mutation_plan_classifies_as_write;
+          Alcotest.test_case "Insert requires Write access" `Quick
+            test_insert_requires_write_access;
         ] );
       ( "format",
         [
@@ -199,11 +176,7 @@ let () =
             `Quick test_relation_literal_renders_columns_and_row_count;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
-          Alcotest.test_case "format_plan on a Query renders the inner tree"
-            `Quick test_format_plan_query_renders_inner_tree_bare;
-          Alcotest.test_case
-            "format_plan on a Mutation prints Insert with indented source"
-            `Quick
-            test_format_plan_mutation_renders_insert_header_with_indented_source;
+          Alcotest.test_case "Insert prints header with indented source" `Quick
+            test_insert_renders_header_with_indented_source;
         ] );
     ]

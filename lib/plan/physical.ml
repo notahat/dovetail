@@ -16,20 +16,18 @@ type t =
       inner_position : [ `Left | `Right ];
     }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
-
-type mutation = Insert of { table : string; source : t }
-type plan = Query of t | Mutation of mutation
+  | Insert of { table : string; source : t }
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
    its inputs at one more level of indent. The recursion terminates at
-   [FullScan], the only nullary operator.
+   [FullScan] and [IndexLookup], the nullary operators.
 
    The 35-line guideline is treated as a deliberate exception here: this is
    one dispatch over the [Physical.t] constructors, where each arm is a
    single [fprintf] tailored to its operator's parameters. Splitting per
-   operator would add seven trivial helpers without making any individual
-   line clearer. Matches the precedent set by {!Parser.expression}. *)
+   operator would add trivial helpers without making any individual line
+   clearer. Matches the precedent set by {!Parser.expression}. *)
 let rec format_at formatter indent plan =
   let prefix = String.make (indent * 2) ' ' in
   match plan with
@@ -70,17 +68,8 @@ let rec format_at formatter indent plan =
         prefix
         (String.concat ", " columns)
         (List.length rows)
+  | Insert { table; source } ->
+      Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
+      format_at formatter (indent + 1) source
 
 let format formatter plan = format_at formatter 0 plan
-
-(* Render a mutation as a one-line header with its source sub-plan indented
-   one level beneath. Mirrors [format_at]'s style so a [Mutation] and a bare
-   [t] read consistently to a user looking at [--show-physical] output. *)
-let format_mutation_at formatter indent (Insert { table; source }) =
-  let prefix = String.make (indent * 2) ' ' in
-  Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
-  format_at formatter (indent + 1) source
-
-let format_plan formatter = function
-  | Query plan -> format formatter plan
-  | Mutation mutation -> format_mutation_at formatter 0 mutation

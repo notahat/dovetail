@@ -348,34 +348,35 @@ let pipeline_step =
 
 (* A query pipeline: a relation reference followed by zero or more
    query-operator steps, folded left-associatively. The result is an
-   [Ast.t]; the outer [plan] wrapper is applied by [plan_parser] below
-   depending on whether a sink follows. *)
+   [Ast.t]; [pipeline_parser] below optionally wraps it in an [Insert]
+   when a sink follows. *)
 let query_pipeline =
   whitespace *> relation_expr >>= fun base ->
   many pipeline_step >>| fun steps ->
   List.fold_left (fun current step -> step current) base steps
 
 (* An insert sink: [insert into <identifier>]. Returned as a function
-   from the upstream relation to an [Ast.mutation], so the caller can
-   thread the upstream pipeline through. Currently the only sink the
-   grammar admits; future sinks (delete, ...) sit alongside this one
-   inside a [sink_step] disjunction. *)
+   from the upstream relation to an [Ast.Insert] node, so the caller
+   can thread the upstream pipeline through. Currently the only sink
+   the grammar admits; future sinks (delete, ...) sit alongside this
+   one inside a [sink_step] disjunction. *)
 let insert_sink =
   keyword "insert" *> whitespace *> keyword "into" *> whitespace *> identifier
   >>| fun target_table source -> Ast.Insert { source; table = target_table }
 
 (* The pipeline grammar: a query pipeline, optionally terminated by a
-   single sink step. A sink lifts the result into [Ast.Mutation];
-   absent a sink the result is an [Ast.Query]. The "at most one sink, in
-   terminal position" rule is enforced by [program_parser]'s trailing
-   [end_of_input], which rejects any further input after the pipeline. *)
+   single sink step. With the sink, the result is an [Ast.Insert] node
+   wrapping the upstream pipeline; without it, the upstream pipeline is
+   the whole [Ast.t]. The "at most one sink, in terminal position" rule
+   is enforced by [program_parser]'s trailing [end_of_input], which
+   rejects any further input after the pipeline. *)
 let pipeline_parser =
   query_pipeline >>= fun upstream ->
   let with_sink =
     whitespace *> char '|' *> whitespace *> insert_sink >>| fun build_sink ->
-    Ast.Mutation (build_sink upstream)
+    build_sink upstream
   in
-  let without_sink = return (Ast.Query upstream) in
+  let without_sink = return upstream in
   with_sink <|> without_sink
 
 (* The DDL body grammar: the productions admitted after the [:]

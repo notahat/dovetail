@@ -1,8 +1,9 @@
-(** End-to-end tests for [Eval.eval_mutation] on [Physical.Insert].
+(** End-to-end tests for [Eval.eval] on [Physical.Insert].
 
-    The insert sink has a dedicated entry point separate from the read-only
-    [Eval.eval]. These tests construct the mutation by hand and call
-    [Eval.eval_mutation] inside a write transaction. *)
+    Insert is a regular operator in [Physical.t] post-collapse, so it runs
+    through the same [Eval.eval] entry as every other operator. These tests
+    construct the Insert plan by hand and call [Eval.eval] inside a write
+    transaction. *)
 
 open Dovetail_execution
 open Test_helpers
@@ -13,7 +14,7 @@ module Storage = Dovetail_storage
 
 (* Build a [Physical.Insert] sourced from a multi-row literal in target
    schema order, so the count-reporting tests can vary the source size. *)
-let insert_mutation_multi ~table ~columns ~rows : Plan.Physical.mutation =
+let insert_mutation_multi ~table ~columns ~rows : Plan.Physical.t =
   Insert { table; source = RelationLiteral { columns; rows } }
 
 (* Build a [Physical.Insert] whose source is a single-row [RelationLiteral]
@@ -21,7 +22,7 @@ let insert_mutation_multi ~table ~columns ~rows : Plan.Physical.mutation =
    this keeps the tests focused on the sink itself and not on column
    reordering (Translate-level permutation validation lets the sink trust
    its input). *)
-let insert_mutation ~table ~pairs : Plan.Physical.mutation =
+let insert_mutation ~table ~pairs : Plan.Physical.t =
   let columns = List.map fst pairs in
   let values = List.map snd pairs in
   Insert { table; source = RelationLiteral { columns; rows = [ values ] } }
@@ -39,7 +40,7 @@ let test_insert_writes_row_and_reports_one_affected () =
         ]
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
-      Eval.eval_mutation environment transaction mutation
+      Eval.eval environment transaction mutation
         (fun (relation : [ `Bag ] Relation.t) ->
           Alcotest.(check (list string))
             "result kind has one insert_count column" [ "insert_count" ]
@@ -105,7 +106,7 @@ let test_insert_three_rows_reports_count_of_three () =
         ]
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
-      Eval.eval_mutation environment transaction mutation
+      Eval.eval environment transaction mutation
         (fun (relation : [ `Bag ] Relation.t) ->
           Alcotest.(check row_list_testable)
             "three rows inserted yields insert_count = 3"
@@ -130,7 +131,7 @@ let test_insert_with_existing_primary_key_raises () =
        "Eval: insert into \"orders\": row with primary key 1 already exists")
     (fun () ->
       Storage.Engine.with_write_transaction environment (fun transaction ->
-          Eval.eval_mutation environment transaction mutation (fun _ -> ())));
+          Eval.eval environment transaction mutation (fun _ -> ())));
   (* The transaction aborted on the raised exception, so the table should
      be unchanged. *)
   Storage.Engine.with_read_transaction environment (fun transaction ->

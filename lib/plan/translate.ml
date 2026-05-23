@@ -276,47 +276,6 @@ let rewrite_indexed_nested_loop_join ~translate_outer ~catalog ~left ~right
       | Some residual ->
           Some (Physical.Filter { input = join; predicate = residual }))
 
-let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
-  match plan with
-  | Scan { table } -> FullScan { table }
-  (* Inner-join rewrite: must precede the general [Restrict] case below.
-     Try the indexed strategy first; fall through to [NestedLoopJoin]
-     when no side has a PK-equality match against the predicate. *)
-  | Restrict { input = CrossProduct { left; right }; predicate } -> (
-      match
-        rewrite_indexed_nested_loop_join
-          ~translate_outer:(translate_relation ~catalog)
-          ~catalog ~left ~right ~predicate
-      with
-      | Some plan -> plan
-      | None ->
-          NestedLoopJoin
-            {
-              left = translate_relation ~catalog left;
-              right = translate_relation ~catalog right;
-              predicate;
-            })
-  (* PK point-lookup rewrite: fires when [predicate] is a bare equality
-     between the scanned table's PK column and an [Int64] literal. Falls
-     through to the general [Filter (FullScan ...)] form when the catalog
-     doesn't recognise the table, the PK isn't a single [Int64] column, or
-     the predicate isn't shaped right. *)
-  | Restrict { input = Scan { table }; predicate } -> (
-      match rewrite_point_lookup ~catalog ~table ~predicate with
-      | Some plan -> plan
-      | None -> Filter { input = FullScan { table }; predicate })
-  | Restrict { input; predicate } ->
-      Filter { input = translate_relation ~catalog input; predicate }
-  | Project { input; columns } ->
-      Project { input = translate_relation ~catalog input; columns }
-  | CrossProduct { left; right } ->
-      CrossProduct
-        {
-          left = translate_relation ~catalog left;
-          right = translate_relation ~catalog right;
-        }
-  | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
-
 (* Compare two string lists as multisets: returns the names present in
    [expected] but not in [actual] and the names present in [actual] but not
    in [expected]. Used by the literal/schema permutation check; the
@@ -419,12 +378,53 @@ let validate_mutation_source ~target_table ~target_kind (source : Logical.t) =
                target_table))
   | _ -> ()
 
+let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
+  match plan with
+  | Scan { table } -> FullScan { table }
+  (* Inner-join rewrite: must precede the general [Restrict] case below.
+     Try the indexed strategy first; fall through to [NestedLoopJoin]
+     when no side has a PK-equality match against the predicate. *)
+  | Restrict { input = CrossProduct { left; right }; predicate } -> (
+      match
+        rewrite_indexed_nested_loop_join
+          ~translate_outer:(translate_relation ~catalog)
+          ~catalog ~left ~right ~predicate
+      with
+      | Some plan -> plan
+      | None ->
+          NestedLoopJoin
+            {
+              left = translate_relation ~catalog left;
+              right = translate_relation ~catalog right;
+              predicate;
+            })
+  (* PK point-lookup rewrite: fires when [predicate] is a bare equality
+     between the scanned table's PK column and an [Int64] literal. Falls
+     through to the general [Filter (FullScan ...)] form when the catalog
+     doesn't recognise the table, the PK isn't a single [Int64] column, or
+     the predicate isn't shaped right. *)
+  | Restrict { input = Scan { table }; predicate } -> (
+      match rewrite_point_lookup ~catalog ~table ~predicate with
+      | Some plan -> plan
+      | None -> Filter { input = FullScan { table }; predicate })
+  | Restrict { input; predicate } ->
+      Filter { input = translate_relation ~catalog input; predicate }
+  | Project { input; columns } ->
+      Project { input = translate_relation ~catalog input; columns }
+  | CrossProduct { left; right } ->
+      CrossProduct
+        {
+          left = translate_relation ~catalog left;
+          right = translate_relation ~catalog right;
+        }
+  | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
+  | Insert { table; source } -> translate_insert ~catalog ~table ~source
+
 (* Look up [target_table]'s kind in the catalog and validate the literal
    source's columns and value kinds against it. Returns the translated
-   physical mutation. Raises [Failure] if the catalog has no kind for the
+   physical [Insert]. Raises [Failure] if the catalog has no kind for the
    table or any validation check fails. *)
-let translate_mutation ~catalog (Logical.Insert { table; source }) :
-    Physical.mutation =
+and translate_insert ~catalog ~table ~source : Physical.t =
   let target_kind =
     match catalog table with
     | Some kind -> kind
@@ -435,7 +435,4 @@ let translate_mutation ~catalog (Logical.Insert { table; source }) :
   validate_mutation_source ~target_table:table ~target_kind source;
   Insert { table; source = translate_relation ~catalog source }
 
-let translate ~catalog (plan : Logical.plan) : Physical.plan =
-  match plan with
-  | Query relation -> Query (translate_relation ~catalog relation)
-  | Mutation mutation -> Mutation (translate_mutation ~catalog mutation)
+let translate = translate_relation

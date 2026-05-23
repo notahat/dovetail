@@ -42,8 +42,8 @@ type t =
           key.
 
           The [key] field is [int64] for now: every primary key in dovetail is a
-          single [int64] column at this point. The field widens to [Scalar.value]
-          when other key kinds arrive. *)
+          single [int64] column at this point. The field widens to
+          [Scalar.value] when other key kinds arrive. *)
   | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
           row pair for which [predicate] holds, executed as a nested loop with
@@ -93,27 +93,11 @@ type t =
           currently produces single-row literals only, so [rows] always has
           length one in user-driven plans; the IR shape leaves room for a future
           multi-row literal grammar. *)
-
-type mutation =
   | Insert of { table : string; source : t }
-      (** A mutation produces no relation -- only a count of affected rows.
-          {!Eval.eval_mutation} is the executor entry. The [source] field is a
-          relation-yielding sub-plan: its rows are what get written.
-
-          The {!plan} wrapper below sits above this type so the REPL can
-          dispatch on plan kind between {!Eval.eval} (for queries) and
-          {!Eval.eval_mutation} (for mutations). Further mutations (update,
-          delete) will land additively. *)
-
-type plan =
-  | Query of t
-  | Mutation of mutation
-      (** A top-level physical plan: either a relation-yielding {!t} or a
-          row-writing {!mutation}. {!Translate.translate} returns this, and the
-          REPL dispatches on it to pick a transaction kind and the right {!Eval}
-          entry point. Mutations don't nest, because the wrapper's {!Mutation}
-          constructor only appears at the top: [Insert]'s [source] is a {!t},
-          not a [plan]. *)
+      (** [Insert { table; source }] writes [source]'s rows to [table] and
+          yields a one-row relation reporting the affected-row count. {!Eval}
+          handles it as a regular case, writing rows inside the active write
+          transaction and producing the (insert_count : int64) result. *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter plan] writes [plan] to [formatter] as an indented tree,
@@ -123,14 +107,7 @@ val format : Format.formatter -> t -> unit
     [Filter(predicate)], [Project(columns)], [IndexLookup(table, key=KEY)],
     [NestedLoopJoin(predicate)],
     [IndexedNestedLoopJoin(inner=..., outer_key=..., inner_position=...)],
-    [RelationLiteral(columns=..., rows=N)]). [CrossProduct] is the only operator
-    that renders bare, because its two children are themselves the interesting
-    information. The output is for EXPLAIN-style debug printing -- the
-    [--show-physical] flag on the binary is the primary consumer. *)
-
-val format_plan : Format.formatter -> plan -> unit
-(** [format_plan formatter plan] writes [plan] to [formatter]. For a {!Query},
-    the inner relation tree renders exactly as {!format} would render it -- no
-    wrapping header. For a {!Mutation}, the mutation prints its operator header
-    ([Insert(table)]) on one line with the [source] indented one level beneath,
-    matching the per-operator indentation convention {!format} uses. *)
+    [RelationLiteral(columns=..., rows=N)], [Insert(table)]). [CrossProduct] is
+    the only operator that renders bare, because its two children are themselves
+    the interesting information. The output is for EXPLAIN-style debug printing
+    -- the [--show-physical] flag on the binary is the primary consumer. *)

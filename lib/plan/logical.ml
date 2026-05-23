@@ -7,16 +7,13 @@ type t =
   | Project of { input : t; columns : Projection.t }
   | CrossProduct of { left : t; right : t }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
+  | Insert of { table : string; source : t }
 
-type mutation = Insert of { table : string; source : t }
-type plan = Query of t | Mutation of mutation
-
-(* Walks a relation tree and reports the strongest transaction access any
-   operator in it needs. Every operator that exists today is read-only, so
-   the walk currently just bottoms out at [`Read]; the structure is here so
-   that future write-capable operators (Insert, once it joins [t]) declare
-   their access locally and the caller never needs to know which operators
-   are write-capable. *)
+(* Walks a plan and reports the strongest transaction access any operator
+   in it needs. Insert is the only write operator today; every other
+   operator threads its inputs' access through unchanged. The walker is
+   the seam where future write-capable operators declare their access
+   locally, without callers needing to enumerate them. *)
 let rec required_access = function
   | Scan _ -> `Read
   | Restrict { input; _ } -> required_access input
@@ -24,13 +21,10 @@ let rec required_access = function
   | CrossProduct { left; right } ->
       access_max (required_access left) (required_access right)
   | RelationLiteral _ -> `Read
+  | Insert { source; _ } -> access_max `Write (required_access source)
 
 and access_max left right =
   match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
-
-let classify = function
-  | Query plan -> required_access plan
-  | Mutation _ -> `Write
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Mirrors [Physical.format_at]: one header line per operator, inputs
@@ -59,14 +53,8 @@ let rec format_at formatter indent plan =
         prefix
         (String.concat ", " columns)
         (List.length rows)
+  | Insert { table; source } ->
+      Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
+      format_at formatter (indent + 1) source
 
 let format formatter plan = format_at formatter 0 plan
-
-let format_mutation_at formatter indent (Insert { table; source }) =
-  let prefix = String.make (indent * 2) ' ' in
-  Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
-  format_at formatter (indent + 1) source
-
-let format_plan formatter = function
-  | Query plan -> format formatter plan
-  | Mutation mutation -> format_mutation_at formatter 0 mutation
