@@ -125,6 +125,30 @@ how you name which side of the join each column comes from.
 │        1 │ Alice      │ alice@example.com │ true         │         2 │              1 │ Bagel              │             4 │
 ```
 
+## type
+
+**Syntax:** `<input> | type`
+
+Yields `<input>`'s relation type rather than its rows -- no cursors
+open, no rows are pulled. The output is a one-line rendering of the
+type in the same surface syntax used by `:create table`: a
+parenthesised, comma-separated list of `<name>: <kind>` field
+declarations, followed by any refinements (today just
+`primary key (...)`).
+
+`type` only applies at the relation rung; piping its output back
+through `type` (`<input> | type | type`) is rejected -- the second
+`type`'s input is already a type, not a relation.
+
+This is the replacement for the retired `:describe` statement; see
+[`<name> | type` in the data-definition reference](query-language-data-definition.md)
+for the catalog-inspection use.
+
+```
+> users | type
+(id: int64, name: string, email: string, active: bool, primary key (id))
+```
+
 ## insert into
 
 **Syntax:** `<input> | insert into <table-name>`

@@ -29,9 +29,9 @@ The storage stack sits below it, used by `Eval` and the catalog.
          │
          │  Eval ────────────────────────────►  Catalog       — name → Relation.kind
          ▼                                          │
-     Relation.t     — kind + Seq.t of Row.value     │  uses
+     Term.t       — Relation_value or Relation_kind │  uses
          │                                          ▼
-         │  Relation.print                      Encoding      — keys (byte-
+         │  Term.format                         Encoding      — keys (byte-
          ▼                                          │          comparable),
        output                                       │          row values
                                                     │          (Marshal)
@@ -55,14 +55,15 @@ runs ship no hardcoded rows; the seeder is opt-in.
 | Layer       | Type                                     | Role                                                                                                                       |
 | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `Parser`    | `string -> (Ast.program, error) result`        | Surface syntax → AST, built on `angstrom`. `Ast.program = Pipeline of Ast.t \| Ddl of Statement.t` discriminates a relational pipeline from a `:`-sigil DDL statement. |
-| `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| Join \| RelationLiteral \| Insert \| ...` | What the user typed, structured. No semantics yet. `Insert` is a regular operator in `t`; the parser enforces that it appears only as the terminal step of a pipeline. |
+| `Ast`       | `t = Relation_name \| Restrict \| Project \| CrossProduct \| Join \| RelationLiteral \| Insert \| Type \| ...` | What the user typed, structured. No semantics yet. `Insert` is a regular operator in `t`; the parser enforces that it appears only as the terminal step of a pipeline. `Type` is the `\| type` inspection operator. |
 | `Lower`     | `Ast.t -> Logical.t`                           | Replace each syntactic node with the algebraic operator it denotes. `Ast.Join` desugars to `Logical.Restrict (Logical.CrossProduct ..., predicate)`. |
-| `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| RelationLiteral \| Insert \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×. `Insert` carries its source subtree and the target table name. `Logical.required_access` walks the tree and returns `` `Read `` or `` `Write `` so the REPL can pick the right transaction. |
+| `Logical`   | `t = Scan \| Restrict \| Project \| CrossProduct \| RelationLiteral \| Insert \| Type_op \| ...` | Algebra: *what* the query computes, with no execution detail. `Restrict` is σ; `Project` is π; `CrossProduct` is ×. `Insert` carries its source subtree and the target table name. `Type_op` carries its input subtree and yields its input's relation type. `Logical.required_access` walks the tree and returns `` `Read `` or `` `Write `` so the REPL can pick the right transaction. |
 | `Translate` | `catalog:(string -> Relation.kind option) -> Logical.t -> Physical.t` | Pick a physical strategy per operator. Folds `Restrict` over `CrossProduct` into a single `NestedLoopJoin`; folds `Restrict (Scan, pk = literal)` into an `IndexLookup` when the catalog says the PK matches. Future home of further optimisation. |
-| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| IndexLookup \| NestedLoopJoin \| RelationLiteral \| Insert \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, primary-key point lookups, future hash joins, etc. `Insert` writes each source row through to storage and hands downstream a one-row `(insert_count: int64)` relation. |
-| `Predicate` | `t = Compare {...}`                            | Predicate sublanguage shared by `Logical.Restrict` and `Physical.Filter`. Each side is a column ref (bare or `qualifier.name`) or a literal. `Predicate.resolve` validates and caches lookup. |
+| `Physical`  | `t = FullScan \| Filter \| Project \| CrossProduct \| IndexLookup \| NestedLoopJoin \| RelationLiteral \| Insert \| Type_op \| ...` | Concrete execution plan: cursors, filters, projections, nested-loop cross product and join, primary-key point lookups, future hash joins, etc. `Insert` writes each source row through to storage and hands downstream a one-row `(insert_count: int64)` relation. `Type_op` carries its input subtree; `Physical.kind_of` walks it against the catalog to produce a `Relation.kind` without opening cursors. |
+| `Expression`| `t = Literal \| Column \| Compare \| And \| Or \| Not` | Expression tree used in predicate positions (`Logical.Restrict`, `Physical.Filter`, `Logical.Join`'s `on` clause). Leaves are literals and column references (bare or `qualifier.name`); internal nodes are comparisons and boolean composition. `Expression.resolve` validates kinds and enforces a Bool result at predicate positions. |
 | `Projection`| `t = Row.column_reference list`             | Projection sublanguage shared by `Logical.Project` and `Physical.Project`. `Projection.resolve` validates and returns a row-rewriter.|
-| `Eval`      | `env -> txn -> Physical.t -> ([\`Bag] Relation.t -> 'a) -> 'a` | CPS-shaped streaming executor. Each operator opens its inputs through `eval`, composes a relation in the innermost callback, and hands it to its own `continue`. Cursors live only inside the continuation. |
+| `Eval`      | `env -> txn -> Physical.t -> ([\`Bag] Term.t -> 'a) -> 'a` | CPS-shaped streaming executor. Each operator opens its inputs through `eval`, composes a `Term.t` in the innermost callback, and hands it to its own `continue`. Cursors live only inside the continuation. The `Term.t` envelope carries either a `Relation_value` (the usual case) or a `Relation_kind` (from `Type_op`). |
+| `Term`      | `'tag t = Relation_value of 'tag Relation.t \| Relation_kind of Relation.kind` | Unified pipeline payload: the thing an evaluated plan hands back. `Term.format` renders either arm so the REPL can print without caring which it got. |
 | `Relation`  | `'tag t = { kind; value }`               | Kind-tagged stream of rows. Phantom `'tag` distinguishes set vs bag semantics.                                             |
 
 ### Storage stack
