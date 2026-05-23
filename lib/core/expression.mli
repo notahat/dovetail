@@ -1,6 +1,6 @@
 (** Expression tree used in predicate positions across the IRs.
 
-    An [Expression.t] is an algebraic expression that produces a {!Scalar.data}
+    An [Expression.t] is an algebraic expression that produces a {!Scalar.value}
     when evaluated against a {!Row.data}. The tree's leaves are literals and
     column references; its internal nodes are comparisons and boolean
     composition ([and], [or], [not]). Column references carry a
@@ -35,7 +35,7 @@ type comparison_op =
 
 (** An expression node. *)
 type t =
-  | Literal of Scalar.data  (** A constant value. *)
+  | Literal of Scalar.value  (** A constant value. *)
   | Column of Row.column_reference
       (** A reference to a column in the surrounding row kind. The qualifier is
           set when the schema exposes same-named columns from different inputs.

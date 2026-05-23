@@ -100,7 +100,7 @@ let literal_value =
    a source-span field doesn't force every destructure site to change. *)
 type literal_pair = {
   column_key : string;
-  value : Scalar.data;
+  value : Scalar.value;
   key_is_qualified : bool;
 }
 

@@ -7,7 +7,7 @@ type comparison_op =
   | GreaterEqual
 
 type t =
-  | Literal of Scalar.data
+  | Literal of Scalar.value
   | Column of Row.column_reference
   | Compare of { left : t; op : comparison_op; right : t }
   | And of t * t
@@ -126,7 +126,7 @@ let check_bool_operand operator_name operand (kind : Scalar.kind) =
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
    the produced closure: the right operand is only read when the left's
    verdict doesn't determine the result. *)
-let rec resolve_value row_kind : t -> Scalar.kind * (Row.data -> Scalar.data) =
+let rec resolve_value row_kind : t -> Scalar.kind * (Row.data -> Scalar.value) =
  fun expression ->
   match expression with
   | Literal value ->

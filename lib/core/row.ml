@@ -1,6 +1,6 @@
 type field = { name : string; kind : Scalar.kind; qualifier : string option }
 type kind = field list
-type data = Scalar.data array
+type data = Scalar.value array
 type column_reference = { qualifier : string option; name : string }
 
 (* Render a [column_reference] in dotted form (or bare, when unqualified) for

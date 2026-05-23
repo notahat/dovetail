@@ -20,11 +20,11 @@ val decode_int64_key : string -> int64
 (** Inverse of {!encode_int64_key}. Raises [Invalid_argument] if the input is
     not exactly 8 bytes. *)
 
-val encode_row_value : Scalar.data list -> string
+val encode_row_value : Scalar.value list -> string
 (** Encode a list of values as bytes via [Marshal]. Used to serialise the non-PK
     columns of a row. *)
 
-val decode_row_value : string -> Scalar.data list
+val decode_row_value : string -> Scalar.value list
 (** Inverse of {!encode_row_value}. Trusts that the input was produced by
-    {!encode_row_value} for a [Scalar.data list]; supplying mismatched bytes is
+    {!encode_row_value} for a [Scalar.value list]; supplying mismatched bytes is
     undefined behaviour, per [Marshal]'s contract. *)

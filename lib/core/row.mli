@@ -17,7 +17,7 @@ type field = { name : string; kind : Scalar.kind; qualifier : string option }
 type kind = field list
 (** The shape of a row: an ordered list of fields. *)
 
-type data = Scalar.data array
+type data = Scalar.value array
 (** A row's values, in field order. *)
 
 type column_reference = { qualifier : string option; name : string }

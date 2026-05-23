@@ -42,7 +42,7 @@ type t =
           key.
 
           The [key] field is [int64] for now: every primary key in dovetail is a
-          single [int64] column at this point. The field widens to [Scalar.data]
+          single [int64] column at this point. The field widens to [Scalar.value]
           when other key kinds arrive. *)
   | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
@@ -83,7 +83,7 @@ type t =
 
           The output [primary_key] is [], matching [NestedLoopJoin] and
           [CrossProduct]. *)
-  | RelationLiteral of { columns : string list; rows : Scalar.data list list }
+  | RelationLiteral of { columns : string list; rows : Scalar.value list list }
       (** [RelationLiteral { columns; rows }] yields a relation whose rows are
           the literal's [rows] -- no storage involved. The output kind is
           {!Dovetail_core.Relation_literal.kind_of} applied to [columns] and the

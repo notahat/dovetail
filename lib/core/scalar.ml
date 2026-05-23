@@ -1,7 +1,7 @@
 type kind = Int64 | String | Bool
-type data = Int64 of int64 | String of string | Bool of bool
+type value = Int64 of int64 | String of string | Bool of bool
 
-let kind_of : data -> kind = function
+let kind_of : value -> kind = function
   | Int64 _ -> Int64
   | String _ -> String
   | Bool _ -> Bool
