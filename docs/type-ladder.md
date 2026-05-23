@@ -145,13 +145,24 @@ The ladder framing came from asking what a *literal* at each rung
 would look like (see [`literals-as-a-ladder.md`](literals-as-a-ladder.md)).
 The realized literals so far:
 
-- **Scalar literal** — `42`, `"alice"`, `true` in expression position,
-  parsed straight into `Scalar.value`.
-- **Row literal** — the parenthesised tuple form inside a relation
-  literal, e.g. `(1, "alice", true)`.
-- **Relation literal** — the `{cols | rows}` form parsed by
-  `Surface_ra.Parser` and lowered into `Relation_literal.t`. Carries
-  a `Row.kind` and a list of `Row.value`.
+- **Scalar literal** — `42`, `"alice"`, `true`. Appears in expression
+  position (a predicate's right-hand side, a projected value) and as a
+  pipeline source in its own right; the latter parses straight into
+  `Ast.Scalar_literal` and threads through `Logical.Scalar_literal` /
+  `Physical.Scalar_literal` to `Term.Scalar_value`.
+- **Row literal** — the named-field tuple form `(name = value, ...)`,
+  e.g. `(id = 1, name = "alice", active = true)`. Used as the rows
+  inside a relation literal, and on its own as a pipeline source that
+  yields a single row; the standalone form threads through
+  `Ast.Row_literal` → `Logical.Row_literal` → `Physical.Row_literal`
+  → `Term.Row_value`.
+- **Relation literal** — the typed form
+  `relation (id: int64, name: string) { (id = 1, name = "alice"), ... }`.
+  The `relation (...)` head declares the relation's kind (row fields
+  plus any refinements); the brace-delimited body is a comma-separated
+  list of row literals validated against that kind during lowering.
+  Lowers to `Logical.Relation_literal { kind; rows }` and on to
+  `Physical.Relation_literal`.
 
 - **Catalog literal** — DDL as text that denotes a catalog value:
   sketched in [`literals-as-a-ladder.md`](literals-as-a-ladder.md),
