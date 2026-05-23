@@ -62,11 +62,17 @@ type plan =
           {!Translate.translate}. Mutations don't nest, because {!mutation}'s
           [source] field is a {!t}, not a [plan]. *)
 
+val required_access : t -> [ `Read | `Write ]
+(** [required_access plan] walks [plan] and returns the strongest transaction
+    permission any operator in the tree needs. Every operator currently in [t]
+    is read-only, so the result is always [`Read] today; the walker is the seam
+    where future write-capable operators declare their access locally without
+    {!classify}'s callers needing to enumerate them. *)
+
 val classify : plan -> [ `Read | `Write ]
 (** [classify plan] returns the transaction permission the REPL should open for
-    [plan]: [`Read] for a query, [`Write] for a mutation. The wrapper
-    constructor is the only thing inspected -- the inner relation tree or
-    mutation isn't walked. The REPL uses this to choose between
+    [plan]: [`Read] for a query (delegating to {!required_access} on the inner
+    tree), [`Write] for a mutation. The REPL uses this to choose between
     {!Dovetail_storage.Engine.with_read_transaction} and
     {!Dovetail_storage.Engine.with_write_transaction} before translation, so a
     read-only query isn't unnecessarily serialised against LMDB's writer lock.

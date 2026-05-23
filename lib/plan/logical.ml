@@ -11,7 +11,26 @@ type t =
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation
 
-let classify = function Query _ -> `Read | Mutation _ -> `Write
+(* Walks a relation tree and reports the strongest transaction access any
+   operator in it needs. Every operator that exists today is read-only, so
+   the walk currently just bottoms out at [`Read]; the structure is here so
+   that future write-capable operators (Insert, once it joins [t]) declare
+   their access locally and the caller never needs to know which operators
+   are write-capable. *)
+let rec required_access = function
+  | Scan _ -> `Read
+  | Restrict { input; _ } -> required_access input
+  | Project { input; _ } -> required_access input
+  | CrossProduct { left; right } ->
+      access_max (required_access left) (required_access right)
+  | RelationLiteral _ -> `Read
+
+and access_max left right =
+  match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
+
+let classify = function
+  | Query plan -> required_access plan
+  | Mutation _ -> `Write
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Mirrors [Physical.format_at]: one header line per operator, inputs

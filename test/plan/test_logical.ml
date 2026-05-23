@@ -13,6 +13,33 @@ open Dovetail_plan
 open Test_helpers
 module Scalar = Dovetail_core.Scalar
 
+let test_scan_requires_read_access () =
+  let plan : Logical.t = Scan { table = "users" } in
+  Alcotest.(check bool)
+    "Scan requires Read access" true
+    (Logical.required_access plan = `Read)
+
+let test_restrict_over_scan_requires_read_access () =
+  let predicate =
+    expression_compare ~left:(expression_column "id") ~op:Equal
+      ~right:(expression_literal (Scalar.Int64 1L))
+  in
+  let plan : Logical.t =
+    Restrict { input = Scan { table = "users" }; predicate }
+  in
+  Alcotest.(check bool)
+    "Restrict over Scan requires Read access" true
+    (Logical.required_access plan = `Read)
+
+let test_cross_product_of_scans_requires_read_access () =
+  let plan : Logical.t =
+    CrossProduct
+      { left = Scan { table = "users" }; right = Scan { table = "orders" } }
+  in
+  Alcotest.(check bool)
+    "CrossProduct of two Scans requires Read access" true
+    (Logical.required_access plan = `Read)
+
 let test_query_plan_classifies_as_read () =
   let plan : Logical.plan = Query (Scan { table = "users" }) in
   Alcotest.(check bool)
@@ -142,6 +169,15 @@ let test_format_plan_mutation_renders_insert_header_with_indented_source () =
 let () =
   Alcotest.run "logical"
     [
+      ( "required_access",
+        [
+          Alcotest.test_case "Scan requires Read access" `Quick
+            test_scan_requires_read_access;
+          Alcotest.test_case "Restrict over Scan requires Read access" `Quick
+            test_restrict_over_scan_requires_read_access;
+          Alcotest.test_case "CrossProduct of two Scans requires Read access"
+            `Quick test_cross_product_of_scans_requires_read_access;
+        ] );
       ( "classify",
         [
           Alcotest.test_case "Query plan classifies as Read" `Quick
