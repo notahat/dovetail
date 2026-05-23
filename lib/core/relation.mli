@@ -68,4 +68,8 @@ val print : ?formatter:Format.formatter -> _ t -> unit
     Column widths are sized to the wider of the header and the rendered values;
     [Int64] columns are right-aligned and the others left-aligned. Materialises
     the [value] sequence eagerly to compute widths, so all rows are pulled
-    before any output is produced. *)
+    before any output is produced.
+
+    Lines are joined by [\n]; no trailing newline is emitted after the last
+    line, matching {!Scalar.format} and {!Row.format}. Callers that need a
+    terminator (the REPL, for instance) append one of their own. *)

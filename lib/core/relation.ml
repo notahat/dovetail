@@ -199,9 +199,9 @@ let print ?(formatter = Format.std_formatter) relation =
     |> List.of_seq
   in
   let widths = column_widths headers rendered_rows in
-  Format.fprintf formatter "%s@\n" (format_row ~widths ~right_aligns headers);
-  Format.fprintf formatter "%s@\n" (format_header_separator widths);
-  List.iter
-    (fun row ->
-      Format.fprintf formatter "%s@\n" (format_row ~widths ~right_aligns row))
-    rendered_rows
+  let lines =
+    format_row ~widths ~right_aligns headers
+    :: format_header_separator widths
+    :: List.map (format_row ~widths ~right_aligns) rendered_rows
+  in
+  Format.pp_print_string formatter (String.concat "\n" lines)

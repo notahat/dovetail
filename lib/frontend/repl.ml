@@ -34,7 +34,7 @@ let print_result environment transaction ~output ~show_logical ~show_physical
       logical_plan
   in
   Execution.Eval.eval environment transaction physical_plan (fun term ->
-      Term.format output term)
+      Format.fprintf output "%a@\n" Term.format term)
 
 (* Run a single parsed query against [environment] and pretty-print the
    result to [output]. The plan's required access picks the transaction
