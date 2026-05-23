@@ -18,6 +18,10 @@ type t =
       inner_position : [ `Left | `Right ];
     }
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
+  | Relation_literal_typed of {
+      kind : Relation.kind;
+      rows : Scalar.value list list;
+    }
   | Insert of { table : string; source : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
@@ -70,6 +74,14 @@ let rec format_at formatter indent plan =
       format_at formatter (indent + 1) outer
   | RelationLiteral { columns; rows } ->
       Format.fprintf formatter "%sRelationLiteral(columns=%s, rows=%d)@\n"
+        prefix
+        (String.concat ", " columns)
+        (List.length rows)
+  | Relation_literal_typed { kind; rows } ->
+      let columns =
+        List.map (fun (field : Row.field) -> field.name) kind.row_kind
+      in
+      Format.fprintf formatter "%sRelationLiteralTyped(columns=%s, rows=%d)@\n"
         prefix
         (String.concat ", " columns)
         (List.length rows)
@@ -143,6 +155,7 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
               "Physical.kind_of: relation literal must have at least one row"
       in
       Relation_literal.kind_of ~columns ~first_row
+  | Relation_literal_typed { kind; rows = _ } -> kind
   | Insert _ -> insert_result_kind
   | Type_op _ ->
       (* [Type_op]'s evaluation result is a relation kind, not a relation

@@ -192,13 +192,94 @@ let check_for_duplicate_row_fields fields =
   in
   walk StringSet.empty fields
 
-(* A row literal at pipeline-source position: [(name = value, ...)]. The
-   empty form [()] parses to an empty field list. The grammar is
-   disambiguated from a future grouped expression by the [=] inside each
-   field; at pipeline-source position only the row-literal form is
-   admitted, so any non-empty parens that doesn't contain a [name = value]
-   binding is a parse error. *)
-let row_literal =
+(* The lowercase kind keywords [int64], [string], and [bool] inside a type
+   expression. Distinct from the capitalised identifiers [Int64] / [String]
+   / [Bool] used by the [:create table] grammar; the two surfaces are
+   converging on the lowercase form but the legacy DDL parser still owns
+   the capitalised one. *)
+let type_expression_kind_keyword =
+  keyword "int64" *> return (Scalar.Int64 : Scalar.kind)
+  <|> keyword "string" *> return (Scalar.String : Scalar.kind)
+  <|> keyword "bool" *> return (Scalar.Bool : Scalar.kind)
+
+(* Reserved words inside a type expression: the kind keywords and the
+   refinement-clause keywords. A field name matching one of these is a parse
+   error so the surface stays unambiguous as more refinement clauses arrive. *)
+let type_expression_reserved_words =
+  StringSet.of_list [ "int64"; "string"; "bool"; "primary"; "key" ]
+
+(* The body of a [primary key (col, col, ...)] refinement: a non-empty,
+   comma-separated list of column names with a permitted trailing comma. *)
+let primary_key_columns =
+  identifier >>= fun first_column ->
+  many (whitespace *> char ',' *> whitespace *> identifier)
+  >>= fun more_columns ->
+  whitespace *> option false (char ',' *> return true) *> return ()
+  >>| fun () -> first_column :: more_columns
+
+(* A single item inside a type expression: either a field binding
+   ([name: kind]) or a [primary key (...)] refinement. The two are
+   disambiguated by the first identifier — [primary] introduces the refinement
+   clause; anything else is a field name. Reserved words are rejected at the
+   field-name position. *)
+let type_expression_item =
+  identifier >>= fun first_word ->
+  if first_word = "primary" then
+    whitespace *> keyword "key" *> whitespace *> char '(' *> whitespace
+    *> primary_key_columns
+    <* whitespace <* char ')'
+    >>| fun columns -> `Refinement (Relation.Primary_key columns)
+  else if StringSet.mem first_word type_expression_reserved_words then
+    fail
+      (Printf.sprintf "%S is reserved as a keyword inside a type expression"
+         first_word)
+  else
+    whitespace *> char ':' *> whitespace *> type_expression_kind_keyword
+    >>| fun field_kind ->
+    `Field ({ name = first_word; kind = field_kind } : Ast.type_field)
+
+(* A parenthesised type-expression body: zero or more comma-separated items
+   with a permitted trailing comma, or the empty form [()]. Returns the items
+   in source order so the row-type entry point can scan for refinements. *)
+let type_expression_items =
+  whitespace
+  *> ( peek_char >>= function
+       | Some ')' -> return []
+       | _ ->
+           type_expression_item >>= fun first_item ->
+           many (whitespace *> char ',' *> whitespace *> type_expression_item)
+           >>= fun more_items ->
+           whitespace *> option false (char ',' *> return true) *> return ()
+           >>| fun () -> first_item :: more_items )
+
+(* The shared parenthesised type-expression grammar. The row / relation
+   distinction lives in the caller, which decides whether refinements are
+   tolerated. *)
+let type_expression_body =
+  char '(' *> type_expression_items <* whitespace <* char ')'
+
+(* Split the item list into fields and refinements, preserving source order
+   within each bucket. The interleaved surface form means refinements can
+   appear anywhere in the list, but the AST keeps the two buckets separate. *)
+let partition_type_expression_items items =
+  let fields =
+    List.filter_map
+      (function `Field field -> Some field | `Refinement _ -> None)
+      items
+  in
+  let refinements =
+    List.filter_map
+      (function `Refinement refinement -> Some refinement | `Field _ -> None)
+      items
+  in
+  (fields, refinements)
+
+(* The parenthesised body of a row literal: [(name = value, ...)]. Returns
+   the parsed fields without wrapping them in an AST node, so callers can
+   either build an [Ast.Row_literal] (at pipeline-source position) or use
+   the fields as a row payload inside a [relation (...) { ... }] literal.
+   The empty form [()] parses to an empty field list. *)
+let row_literal_body =
   char '(' *> whitespace
   *> ( peek_char >>= function
        | Some ')' -> return []
@@ -210,24 +291,66 @@ let row_literal =
            >>| fun () -> first_field :: more_fields )
   <* whitespace <* char ')'
   >>= fun fields ->
-  check_for_duplicate_row_fields fields >>| fun () -> Ast.Row_literal fields
+  check_for_duplicate_row_fields fields >>| fun () -> fields
 
-(* A bare identifier at pipeline-source position: either a [true] / [false]
-   scalar literal or a relation name. The two share the leading-letter
-   character class, so we parse the identifier eagerly and dispatch on its
-   spelling — no backtracking required. *)
+(* A row literal at pipeline-source position. Disambiguated from a future
+   grouped expression by the [=] inside each field; at pipeline-source
+   position only the row-literal form is admitted, so any non-empty parens
+   that doesn't contain a [name = value] binding is a parse error. *)
+let row_literal = row_literal_body >>| fun fields -> Ast.Row_literal fields
+
+(* The body of a typed relation literal that follows the [relation] keyword:
+   a parenthesised relation-type expression, then a brace-delimited list of
+   row literals separated by commas with an optional trailing comma. The
+   empty form [relation (T) {}] parses to [rows = []]. Field-name validation
+   against the declared kind happens in {!Lower}; the parser checks only
+   syntactic shape and per-row duplicates. *)
+let relation_literal_typed_body =
+  whitespace *> type_expression_body >>= fun items ->
+  let fields, refinements = partition_type_expression_items items in
+  let kind : Relation.kind =
+    {
+      row_kind =
+        List.map
+          (fun ({ name; kind } : Ast.type_field) : Row.field ->
+            { name; kind; qualifier = None })
+          fields;
+      refinements;
+    }
+  in
+  whitespace *> char '{' *> whitespace
+  *> ( peek_char >>= function
+       | Some '}' -> return []
+       | _ ->
+           row_literal_body >>= fun first_row ->
+           many (whitespace *> char ',' *> whitespace *> row_literal_body)
+           >>= fun more_rows ->
+           whitespace *> option false (char ',' *> return true) *> return ()
+           >>| fun () -> first_row :: more_rows )
+  <* whitespace <* char '}'
+  >>| fun rows -> Ast.Relation_literal_typed { kind; rows }
+
+(* A bare identifier at pipeline-source position: a [true] / [false] scalar
+   literal, the [relation] keyword introducing a typed relation literal, or
+   a relation name. The leading-letter character class is shared, so we parse
+   the identifier eagerly and dispatch on its spelling. The [relation] case
+   commits to the typed-literal grammar: a table called [relation] is now a
+   parse error in source position, on the assumption that the migration in
+   the same slice will have flipped any such fixture. *)
 let identifier_relation_or_bool_literal =
-  identifier >>| function
-  | "true" -> Ast.Scalar_literal (Scalar.Bool true)
-  | "false" -> Ast.Scalar_literal (Scalar.Bool false)
-  | name -> Ast.Relation_name name
+  identifier >>= function
+  | "true" -> return (Ast.Scalar_literal (Scalar.Bool true))
+  | "false" -> return (Ast.Scalar_literal (Scalar.Bool false))
+  | "relation" -> relation_literal_typed_body
+  | name -> return (Ast.Relation_name name)
 
 (* The leading position of a pipeline: a relation literal, a row literal, a
-   bare scalar literal, or a relation name. Dispatched by lookahead on the
-   leading character: a brace introduces a relation literal; an open paren
-   introduces a row literal; a double quote, a minus, or a digit introduces
-   a scalar literal; a letter is either a [true] / [false] scalar literal
-   or a relation name. *)
+   bare scalar literal, the [relation] keyword introducing a typed relation
+   literal, or a relation name. Dispatched by lookahead on the leading
+   character: a brace introduces the old curly relation literal; an open
+   paren introduces a row literal; a double quote, a minus, or a digit
+   introduces a scalar literal; a letter is one of [true], [false],
+   [relation], or a relation name. *)
 let relation_expr =
   peek_char >>= function
   | Some '{' -> relation_literal
@@ -547,88 +670,6 @@ let parse input = parse_string ~consume:All program_parser input
    consumption. *)
 let expression_query = whitespace *> expression <* whitespace <* end_of_input
 let parse_expression input = parse_string ~consume:All expression_query input
-
-(* The lowercase kind keywords [int64], [string], and [bool] inside a type
-   expression. Distinct from the capitalised identifiers [Int64] / [String]
-   / [Bool] used by the [:create table] grammar; the two surfaces are
-   converging on the lowercase form but the legacy DDL parser still owns
-   the capitalised one. *)
-let type_expression_kind_keyword =
-  keyword "int64" *> return (Scalar.Int64 : Scalar.kind)
-  <|> keyword "string" *> return (Scalar.String : Scalar.kind)
-  <|> keyword "bool" *> return (Scalar.Bool : Scalar.kind)
-
-(* Reserved words inside a type expression: the kind keywords and the
-   refinement-clause keywords. A field name matching one of these is a parse
-   error so the surface stays unambiguous as more refinement clauses arrive. *)
-let type_expression_reserved_words =
-  StringSet.of_list [ "int64"; "string"; "bool"; "primary"; "key" ]
-
-(* The body of a [primary key (col, col, ...)] refinement: a non-empty,
-   comma-separated list of column names with a permitted trailing comma. *)
-let primary_key_columns =
-  identifier >>= fun first_column ->
-  many (whitespace *> char ',' *> whitespace *> identifier)
-  >>= fun more_columns ->
-  whitespace *> option false (char ',' *> return true) *> return ()
-  >>| fun () -> first_column :: more_columns
-
-(* A single item inside a type expression: either a field binding
-   ([name: kind]) or a [primary key (...)] refinement. The two are
-   disambiguated by the first identifier — [primary] introduces the refinement
-   clause; anything else is a field name. Reserved words are rejected at the
-   field-name position. *)
-let type_expression_item =
-  identifier >>= fun first_word ->
-  if first_word = "primary" then
-    whitespace *> keyword "key" *> whitespace *> char '(' *> whitespace
-    *> primary_key_columns
-    <* whitespace <* char ')'
-    >>| fun columns -> `Refinement (Relation.Primary_key columns)
-  else if StringSet.mem first_word type_expression_reserved_words then
-    fail
-      (Printf.sprintf "%S is reserved as a keyword inside a type expression"
-         first_word)
-  else
-    whitespace *> char ':' *> whitespace *> type_expression_kind_keyword
-    >>| fun field_kind ->
-    `Field ({ name = first_word; kind = field_kind } : Ast.type_field)
-
-(* A parenthesised type-expression body: zero or more comma-separated items
-   with a permitted trailing comma, or the empty form [()]. Returns the items
-   in source order so the row-type entry point can scan for refinements. *)
-let type_expression_items =
-  whitespace
-  *> ( peek_char >>= function
-       | Some ')' -> return []
-       | _ ->
-           type_expression_item >>= fun first_item ->
-           many (whitespace *> char ',' *> whitespace *> type_expression_item)
-           >>= fun more_items ->
-           whitespace *> option false (char ',' *> return true) *> return ()
-           >>| fun () -> first_item :: more_items )
-
-(* The shared parenthesised type-expression grammar. The row / relation
-   distinction lives in the caller, which decides whether refinements are
-   tolerated. *)
-let type_expression_body =
-  char '(' *> type_expression_items <* whitespace <* char ')'
-
-(* Split the item list into fields and refinements, preserving source order
-   within each bucket. The interleaved surface form means refinements can
-   appear anywhere in the list, but the AST keeps the two buckets separate. *)
-let partition_type_expression_items items =
-  let fields =
-    List.filter_map
-      (function `Field field -> Some field | `Refinement _ -> None)
-      items
-  in
-  let refinements =
-    List.filter_map
-      (function `Refinement refinement -> Some refinement | `Field _ -> None)
-      items
-  in
-  (fields, refinements)
 
 let row_type_query =
   whitespace *> type_expression_body <* whitespace <* end_of_input

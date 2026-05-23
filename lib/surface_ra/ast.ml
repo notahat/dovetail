@@ -22,5 +22,9 @@ type t =
   | Type of { input : t }
   | Scalar_literal of Scalar.value
   | Row_literal of (string * Scalar.value) list
+  | Relation_literal_typed of {
+      kind : Relation.kind;
+      rows : (string * Scalar.value) list list;
+    }
 
 type program = Pipeline of t | Ddl of Ddl.Statement.t

@@ -418,6 +418,8 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
           right = translate_relation ~catalog right;
         }
   | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
+  | Relation_literal_typed { kind; rows } ->
+      Relation_literal_typed { kind; rows }
   | Insert { table; source } -> translate_insert ~catalog ~table ~source
   | Type_op { input } -> Type_op { input = translate_relation ~catalog input }
   | Scalar_literal value -> Scalar_literal value

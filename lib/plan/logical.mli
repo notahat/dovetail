@@ -12,6 +12,7 @@
 
 module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
+module Relation = Dovetail_core.Relation
 
 type t =
   | Scan of { table : string }
@@ -43,6 +44,17 @@ type t =
 
           The parser currently produces single-row literals only; the IR shape
           leaves room for a future multi-row literal grammar. *)
+  | Relation_literal_typed of {
+      kind : Relation.kind;
+      rows : Scalar.value list list;
+    }
+      (** [Relation_literal_typed { kind; rows }] is a relation given directly
+          by its contents, with the row kind declared up front rather than
+          inferred from the first row. Each row in [rows] is a list of values in
+          the order of [kind.row_kind]'s fields. The empty form ([rows = []]) is
+          valid because the kind no longer depends on a first row. Coexists with
+          {!RelationLiteral} while the curly-brace surface syntax is still
+          parseable; the next slice step collapses both arms into one. *)
   | Insert of { table : string; source : t }
       (** [Insert { table; source }] writes [source]'s rows to [table] and
           yields a one-row relation reporting the affected-row count. Insert

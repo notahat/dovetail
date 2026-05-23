@@ -114,6 +114,19 @@ type t =
           parser rejects duplicate field names. Evaluation hands the row down
           the pipe as a {!Term.Row_value}, and [| type] over a row literal
           yields the corresponding {!Row.kind}. *)
+  | Relation_literal_typed of {
+      kind : Relation.kind;
+      rows : (string * Scalar.value) list list;
+    }
+      (** [Relation_literal_typed { kind; rows }] is the surface form
+          [relation (id: int64, name: string) { (id = 1, name = "alice"), ... }]
+          — a relation whose type is declared up front and whose rows are
+          self-describing row literals. The empty form [relation (...) {}]
+          parses with [rows = []]. Field names inside each row come straight
+          from the surface; {!Lower} checks each row against [kind] and reorders
+          the values to [kind]'s field order, then emits a
+          {!Plan.Logical.RelationLiteral}. Coexists with {!RelationLiteral}
+          while the old [{col: val}] form is still in the grammar. *)
 
 type program =
   | Pipeline of t

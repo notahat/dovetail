@@ -4,6 +4,8 @@ open Dovetail_surface_ra
 open Test_helpers
 module Ddl = Dovetail_ddl
 module Scalar = Dovetail_core.Scalar
+module Row = Dovetail_core.Row
+module Relation = Dovetail_core.Relation
 
 let ast_program_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )
@@ -690,6 +692,112 @@ let test_row_literal_followed_by_type_step () =
              [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
        })
 
+(* Typed relation literals: [relation (T) { rows }]. *)
+
+let id_int64_name_string_kind : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+      ];
+    refinements = [];
+  }
+
+let test_relation_literal_typed_empty_parses () =
+  parses "relation (id: int64, name: string) {}"
+    (Ast.Relation_literal_typed { kind = id_int64_name_string_kind; rows = [] })
+
+let test_relation_literal_typed_single_row_parses () =
+  parses "relation (id: int64, name: string) { (id = 1, name = \"alice\") }"
+    (Ast.Relation_literal_typed
+       {
+         kind = id_int64_name_string_kind;
+         rows = [ [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] ];
+       })
+
+let test_relation_literal_typed_multiple_rows_parses () =
+  parses
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
+     name = \"bob\") }"
+    (Ast.Relation_literal_typed
+       {
+         kind = id_int64_name_string_kind;
+         rows =
+           [
+             [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+             [ ("id", Scalar.Int64 2L); ("name", Scalar.String "bob") ];
+           ];
+       })
+
+let test_relation_literal_typed_tolerates_trailing_comma () =
+  parses
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
+     name = \"bob\"), }"
+    (Ast.Relation_literal_typed
+       {
+         kind = id_int64_name_string_kind;
+         rows =
+           [
+             [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+             [ ("id", Scalar.Int64 2L); ("name", Scalar.String "bob") ];
+           ];
+       })
+
+let test_relation_literal_typed_with_primary_key_refinement_parses () =
+  parses "relation (id: int64, name: string, primary key (id)) {}"
+    (Ast.Relation_literal_typed
+       {
+         kind =
+           {
+             row_kind =
+               [
+                 { name = "id"; kind = Int64; qualifier = None };
+                 { name = "name"; kind = String; qualifier = None };
+               ];
+             refinements = [ Primary_key [ "id" ] ];
+           };
+         rows = [];
+       })
+
+let test_relation_literal_typed_tolerates_extra_whitespace () =
+  parses "  relation  (  id : int64  )  {  ( id = 1 )  ,  ( id = 2 )  }  "
+    (Ast.Relation_literal_typed
+       {
+         kind =
+           {
+             row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+             refinements = [];
+           };
+         rows = [ [ ("id", Scalar.Int64 1L) ]; [ ("id", Scalar.Int64 2L) ] ];
+       })
+
+let test_relation_literal_typed_rejects_duplicate_field_in_row () =
+  rejects_with_message "relation (id: int64) { (id = 1, id = 2) }"
+    ~mentions:[ "duplicate field"; "\"id\"" ]
+
+let test_relation_literal_typed_rejects_missing_type_expression () =
+  rejects "relation { (id = 1) }"
+
+let test_relation_literal_typed_rejects_missing_brace_block () =
+  rejects "relation (id: int64)"
+
+let test_relation_literal_typed_followed_by_type_step () =
+  parses
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\") } | type"
+    (Ast.Type
+       {
+         input =
+           Ast.Relation_literal_typed
+             {
+               kind = id_int64_name_string_kind;
+               rows =
+                 [
+                   [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+                 ];
+             };
+       })
+
 (* The DDL keywords are not globally reserved -- [list] and [tables] are
    valid identifiers inside a pipeline. This locks in that the sigil is
    what reserves them, and the reservation is bounded to the DDL body. *)
@@ -890,6 +998,30 @@ let () =
           Alcotest.test_case
             "row literal feeds a [| type] step at pipeline-source position"
             `Quick test_row_literal_followed_by_type_step;
+        ] );
+      ( "relation literal typed",
+        [
+          Alcotest.test_case "empty form parses with rows = []" `Quick
+            test_relation_literal_typed_empty_parses;
+          Alcotest.test_case "single-row form parses" `Quick
+            test_relation_literal_typed_single_row_parses;
+          Alcotest.test_case "multi-row form parses" `Quick
+            test_relation_literal_typed_multiple_rows_parses;
+          Alcotest.test_case "tolerates a trailing comma after the last row"
+            `Quick test_relation_literal_typed_tolerates_trailing_comma;
+          Alcotest.test_case "accepts a primary-key refinement on the kind"
+            `Quick
+            test_relation_literal_typed_with_primary_key_refinement_parses;
+          Alcotest.test_case "tolerates extra whitespace throughout" `Quick
+            test_relation_literal_typed_tolerates_extra_whitespace;
+          Alcotest.test_case "rejects a row with a duplicate field name" `Quick
+            test_relation_literal_typed_rejects_duplicate_field_in_row;
+          Alcotest.test_case "rejects the [relation] keyword without a type"
+            `Quick test_relation_literal_typed_rejects_missing_type_expression;
+          Alcotest.test_case "rejects a typed literal without the brace block"
+            `Quick test_relation_literal_typed_rejects_missing_brace_block;
+          Alcotest.test_case "typed literal feeds a [| type] step" `Quick
+            test_relation_literal_typed_followed_by_type_step;
         ] );
       ( "insert sink syntax",
         [

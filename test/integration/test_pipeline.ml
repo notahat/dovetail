@@ -496,6 +496,69 @@ let test_row_literal_type_over_type_raises_at_lower () =
     (Failure "type: input is already a type") (fun () ->
       ignore (Surface_ra.Lower.lower ast))
 
+(* Typed relation literals: [relation (T) { rows }]. The new shape coexists
+   with the curly-brace form for now; both lower to the same logical node. *)
+
+let test_typed_relation_literal_single_row_yields_one_row () =
+  with_query_result
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\") }"
+    (fun rows ->
+      Alcotest.(check row_list_testable)
+        "single-row typed literal yields one row"
+        [ [| Scalar.Int64 1L; Scalar.String "alice" |] ]
+        rows)
+
+let test_typed_relation_literal_multiple_rows_yields_all_rows () =
+  with_query_result
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
+     name = \"bob\"), (id = 3, name = \"carol\") }" (fun rows ->
+      Alcotest.(check row_list_testable)
+        "multi-row typed literal yields every row in source order"
+        [
+          [| Scalar.Int64 1L; Scalar.String "alice" |];
+          [| Scalar.Int64 2L; Scalar.String "bob" |];
+          [| Scalar.Int64 3L; Scalar.String "carol" |];
+        ]
+        rows)
+
+let test_typed_relation_literal_empty_yields_no_rows () =
+  with_query_result "relation (id: int64, name: string) {}" (fun rows ->
+      Alcotest.(check row_list_testable)
+        "empty typed literal yields no rows" [] rows)
+
+let test_typed_relation_literal_restrict_filters_rows () =
+  with_query_result
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
+     name = \"bob\") } | restrict id = 2" (fun rows ->
+      Alcotest.(check row_list_testable)
+        "restrict over a typed literal keeps only the matching row"
+        [ [| Scalar.Int64 2L; Scalar.String "bob" |] ]
+        rows)
+
+let test_typed_relation_literal_project_narrows_columns () =
+  with_query_result
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
+     name = \"bob\") } | project name" (fun rows ->
+      Alcotest.(check row_list_testable)
+        "project over a typed literal narrows to the named column"
+        [ [| Scalar.String "alice" |]; [| Scalar.String "bob" |] ]
+        rows)
+
+let test_typed_relation_literal_rejects_kind_mismatch_at_lower () =
+  let ast =
+    match
+      Surface_ra.Parser.parse "relation (id: int64) { (id = \"oops\") }"
+    with
+    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+    | Ok (Surface_ra.Ast.Ddl _) ->
+        Alcotest.fail "expected a pipeline but got a DDL statement"
+    | Error message -> Alcotest.failf "parse failed: %s" message
+  in
+  Alcotest.check_raises "row value kind doesn't match the declared kind"
+    (Failure
+       "Lower: relation literal: field \"id\" expected int64 but got string")
+    (fun () -> ignore (Surface_ra.Lower.lower ast))
+
 let test_scalar_literal_type_over_type_raises_at_lower () =
   (* The Lower-time rejection of [type | type] now triggers on a scalar
      source too. Walk parse and lower by hand since the rejection happens
@@ -635,6 +698,22 @@ let () =
             test_empty_row_literal_then_type_yields_empty_row_kind;
           Alcotest.test_case "(id = 1) | type | type raises at Lower" `Quick
             test_row_literal_type_over_type_raises_at_lower;
+        ] );
+      ( "typed relation literal source",
+        [
+          Alcotest.test_case
+            "single-row typed literal yields one row through Eval" `Quick
+            test_typed_relation_literal_single_row_yields_one_row;
+          Alcotest.test_case "multi-row typed literal yields every row" `Quick
+            test_typed_relation_literal_multiple_rows_yields_all_rows;
+          Alcotest.test_case "empty typed literal yields no rows" `Quick
+            test_typed_relation_literal_empty_yields_no_rows;
+          Alcotest.test_case "restrict over a typed literal filters rows" `Quick
+            test_typed_relation_literal_restrict_filters_rows;
+          Alcotest.test_case "project over a typed literal narrows columns"
+            `Quick test_typed_relation_literal_project_narrows_columns;
+          Alcotest.test_case "value/kind mismatch in a row is rejected at Lower"
+            `Quick test_typed_relation_literal_rejects_kind_mismatch_at_lower;
         ] );
       ( "errors",
         [

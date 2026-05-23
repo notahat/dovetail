@@ -377,6 +377,117 @@ let test_row_literal_lowers_through () =
        { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] })
     logical
 
+let users_kind : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+      ];
+    refinements = [];
+  }
+
+let test_relation_literal_typed_lowers_to_relation_literal_typed () =
+  let ast : Ast.t =
+    Relation_literal_typed
+      {
+        kind = users_kind;
+        rows =
+          [
+            [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+            [ ("id", Scalar.Int64 2L); ("name", Scalar.String "bob") ];
+          ];
+      }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "typed relation literal lowers to Logical.Relation_literal_typed with the \
+     declared kind"
+    (Relation_literal_typed
+       {
+         kind = users_kind;
+         rows =
+           [
+             [ Scalar.Int64 1L; Scalar.String "alice" ];
+             [ Scalar.Int64 2L; Scalar.String "bob" ];
+           ];
+       })
+    logical
+
+let test_relation_literal_typed_reorders_row_fields_to_kind_order () =
+  let ast : Ast.t =
+    Relation_literal_typed
+      {
+        kind = users_kind;
+        rows =
+          [
+            (* Fields appear in reverse order from the kind; Lower reorders
+               them to match the kind so the logical-plan row aligns with
+               [kind.row_kind]. *)
+            [ ("name", Scalar.String "alice"); ("id", Scalar.Int64 1L) ];
+          ];
+      }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "row values land in kind order"
+    (Relation_literal_typed
+       {
+         kind = users_kind;
+         rows = [ [ Scalar.Int64 1L; Scalar.String "alice" ] ];
+       })
+    logical
+
+let test_relation_literal_typed_rejects_extra_field_in_row () =
+  let ast : Ast.t =
+    Relation_literal_typed
+      {
+        kind = users_kind;
+        rows =
+          [
+            [
+              ("id", Scalar.Int64 1L);
+              ("name", Scalar.String "alice");
+              ("extra", Scalar.Bool true);
+            ];
+          ];
+      }
+  in
+  Alcotest.check_raises "row with an unexpected field is rejected"
+    (Failure "Lower: relation literal: unexpected field \"extra\"") (fun () ->
+      ignore (Lower.lower ast))
+
+let test_relation_literal_typed_rejects_missing_field_in_row () =
+  let ast : Ast.t =
+    Relation_literal_typed
+      { kind = users_kind; rows = [ [ ("id", Scalar.Int64 1L) ] ] }
+  in
+  Alcotest.check_raises "row missing a declared field is rejected"
+    (Failure "Lower: relation literal: missing field \"name\"") (fun () ->
+      ignore (Lower.lower ast))
+
+let test_relation_literal_typed_rejects_kind_mismatch () =
+  let ast : Ast.t =
+    Relation_literal_typed
+      {
+        kind = users_kind;
+        rows =
+          [ [ ("id", Scalar.String "wrong"); ("name", Scalar.String "alice") ] ];
+      }
+  in
+  Alcotest.check_raises "row with a kind mismatch is rejected"
+    (Failure
+       "Lower: relation literal: field \"id\" expected int64 but got string")
+    (fun () -> ignore (Lower.lower ast))
+
+let test_relation_literal_typed_empty_rows_lowers_to_empty_rows () =
+  let ast : Ast.t = Relation_literal_typed { kind = users_kind; rows = [] } in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "empty rows preserves the kind and yields an empty row list"
+    (Relation_literal_typed { kind = users_kind; rows = [] })
+    logical
+
 let test_relation_literal_lowers_through () =
   let ast : Ast.t =
     RelationLiteral
@@ -438,6 +549,24 @@ let () =
           Alcotest.test_case
             "lowers Ast.RelationLiteral to Logical.RelationLiteral" `Quick
             test_relation_literal_lowers_through;
+        ] );
+      ( "relation literal typed",
+        [
+          Alcotest.test_case
+            "lowers Ast.Relation_literal_typed to \
+             Logical.Relation_literal_typed"
+            `Quick test_relation_literal_typed_lowers_to_relation_literal_typed;
+          Alcotest.test_case "reorders row values into the kind's field order"
+            `Quick test_relation_literal_typed_reorders_row_fields_to_kind_order;
+          Alcotest.test_case "rejects a row whose fields include an extra"
+            `Quick test_relation_literal_typed_rejects_extra_field_in_row;
+          Alcotest.test_case "rejects a row missing a declared field" `Quick
+            test_relation_literal_typed_rejects_missing_field_in_row;
+          Alcotest.test_case
+            "rejects a row whose value kind doesn't match the declared kind"
+            `Quick test_relation_literal_typed_rejects_kind_mismatch;
+          Alcotest.test_case "empty rows yields an empty RelationLiteral" `Quick
+            test_relation_literal_typed_empty_rows_lowers_to_empty_rows;
         ] );
       ( "scalar literal",
         [

@@ -110,6 +110,8 @@ let rec eval environment transaction plan continue =
         ~inner_table ~outer_key_column ~inner_position continue
   | RelationLiteral { columns; rows } ->
       evaluate_relation_literal ~columns ~rows continue
+  | Relation_literal_typed { kind; rows } ->
+      evaluate_relation_literal_typed ~kind ~rows continue
   | Insert { table; source } ->
       evaluate_insert environment transaction ~target_table:table ~source
         continue
@@ -146,6 +148,13 @@ and row_kind_of_fields fields : Row.kind =
     (fun (name, value) : Row.field ->
       { name; kind = Scalar.kind_of value; qualifier = None })
     fields
+
+(* Materialise a [Relation_literal_typed] as a [Relation.t] using the kind
+   declared up front. The empty form ([rows = []]) is valid here because
+   the kind doesn't need a first row to derive from. *)
+and evaluate_relation_literal_typed ~kind ~rows continue =
+  let value = rows |> List.to_seq |> Seq.map Array.of_list in
+  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
 
 (* Materialise a row literal as a [Row.t] and hand [continue] the
    [Term.Row_value] arm. The kind is derived eagerly from the values'
