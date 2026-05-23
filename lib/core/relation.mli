@@ -53,6 +53,13 @@ val assemble_row :
     kind's primary key to produce a row in field order. Raises
     [Invalid_argument] if either list has the wrong length. *)
 
+val format_kind : Format.formatter -> kind -> unit
+(** [format_kind formatter kind] writes [kind] to [formatter] in the surface
+    syntax for a relation type: the row-type form (via {!Row.format_kind}) with
+    refinement clauses interleaved as additional comma-separated entries.
+    [Primary_key columns] renders as [primary key (col1, col2, ...)]. When
+    [refinements] is empty the output is identical to the row-type form. *)
+
 val print : ?formatter:Format.formatter -> _ t -> unit
 (** [print ?formatter relation] renders [relation] as a table to [formatter]
     (defaulting to [Format.std_formatter]), using Unicode box-drawing characters

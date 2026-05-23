@@ -94,6 +94,29 @@ let assemble_row (kind : kind) ~primary_key_values ~non_primary_key_values =
   in
   Array.of_list (List.map resolve_field kind.row_kind)
 
+(* Render a single refinement clause in the surface syntax. *)
+let format_refinement formatter = function
+  | Primary_key columns ->
+      Format.fprintf formatter "primary key (%s)" (String.concat ", " columns)
+
+let format_kind formatter (kind : kind) =
+  let format_field formatter (field : Row.field) =
+    Format.fprintf formatter "%s: %a" field.name Scalar.format_kind field.kind
+  in
+  let separator formatter () = Format.pp_print_string formatter ", " in
+  Format.pp_print_string formatter "(";
+  Format.pp_print_list ~pp_sep:separator format_field formatter kind.row_kind;
+  (match (kind.row_kind, kind.refinements) with
+  | [], [] | _ :: _, [] -> ()
+  | [], _ :: _ ->
+      Format.pp_print_list ~pp_sep:separator format_refinement formatter
+        kind.refinements
+  | _ :: _, _ :: _ ->
+      separator formatter ();
+      Format.pp_print_list ~pp_sep:separator format_refinement formatter
+        kind.refinements);
+  Format.pp_print_string formatter ")"
+
 (* Render a single value as the cell text that will appear in a table. No
    quoting, no escaping; the pretty-print is illustrative. This is
    deliberately distinct from {!Scalar.format}, which quotes strings so the

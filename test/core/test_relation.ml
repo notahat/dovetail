@@ -182,7 +182,9 @@ let test_splits_row_with_leading_pk () =
     "primary-key values" [ Scalar.Int64 42L ] primary_key_values;
   Alcotest.(check values_list_testable)
     "non-primary-key values"
-    [ Scalar.String "Alice"; Scalar.String "alice@example.com"; Scalar.Bool true ]
+    [
+      Scalar.String "Alice"; Scalar.String "alice@example.com"; Scalar.Bool true;
+    ]
     non_primary_key_values
 
 let test_splits_row_with_pk_in_the_middle () =
@@ -234,6 +236,68 @@ let test_split_rejects_wrong_length_row () =
        "Relation.split_row: row has 2 value(s) but kind declares 4 field(s)")
     (fun () -> ignore (Relation.split_row users_kind row))
 
+(* Render via [Relation.format_kind] into a string for comparison against
+   the expected surface text. *)
+let format_kind_to_string kind =
+  let buffer = Buffer.create 64 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Relation.format_kind formatter kind;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_kind_without_refinements_is_a_row_type () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
+  Alcotest.(check string)
+    "no refinements" "(id: int64, name: string)"
+    (format_kind_to_string kind)
+
+let test_format_kind_with_single_column_primary_key () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  Alcotest.(check string)
+    "single-column primary key" "(id: int64, name: string, primary key (id))"
+    (format_kind_to_string kind)
+
+let test_format_kind_with_composite_primary_key () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "order_id"; kind = Int64; qualifier = None };
+          { name = "line"; kind = Int64; qualifier = None };
+          { name = "sku"; kind = String; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "order_id"; "line" ] ];
+    }
+  in
+  Alcotest.(check string)
+    "composite primary key"
+    "(order_id: int64, line: int64, sku: string, primary key (order_id, line))"
+    (format_kind_to_string kind)
+
+let test_format_kind_drops_field_qualifiers () =
+  Alcotest.(check string)
+    "qualifiers stripped from surface output"
+    "(id: int64, name: string, email: string, active: bool, primary key (id))"
+    (format_kind_to_string users_kind)
+
 let () =
   Alcotest.run "relation"
     [
@@ -270,5 +334,18 @@ let () =
             test_split_is_the_inverse_of_assemble;
           Alcotest.test_case "rejects a row of the wrong length" `Quick
             test_split_rejects_wrong_length_row;
+        ] );
+      ( "format_kind",
+        [
+          Alcotest.test_case "without refinements renders as a row type" `Quick
+            test_format_kind_without_refinements_is_a_row_type;
+          Alcotest.test_case
+            "with a single-column primary key appends a primary key clause"
+            `Quick test_format_kind_with_single_column_primary_key;
+          Alcotest.test_case
+            "with a composite primary key lists key columns in order" `Quick
+            test_format_kind_with_composite_primary_key;
+          Alcotest.test_case "drops field qualifiers at the surface" `Quick
+            test_format_kind_drops_field_qualifiers;
         ] );
     ]
