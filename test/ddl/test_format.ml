@@ -1,12 +1,11 @@
 (** Tests for [Dovetail_ddl.Format].
 
-    Pins the canonical-form printer for every [Statement.t] constructor: the
-    three one-liner shapes ([:list tables], [:drop table <name>],
-    [:describe <name>]) and the multi-line [:create table ...] form. The [users]
-    and [order_items] examples are taken verbatim from
-    [docs/plans/ddl-design.md] so the canonical form stays anchored to the
-    design document; future changes to the printer have to touch this file and
-    the doc together. *)
+    Pins the canonical-form printer for every [Statement.t] constructor: the two
+    one-liner shapes ([:list tables], [:drop table <name>]) and the multi-line
+    [:create table ...] form. The [users] and [order_items] examples are taken
+    verbatim from [docs/plans/ddl-design.md] so the canonical form stays
+    anchored to the design document; future changes to the printer have to touch
+    this file and the doc together. *)
 
 module Ddl = Dovetail_ddl
 module Scalar = Dovetail_core.Scalar
@@ -20,11 +19,6 @@ let test_format_drop_table () =
   Alcotest.(check string)
     "Drop_table renders as :drop table <name>" ":drop table widgets"
     (Ddl.Format.statement (Ddl.Statement.Drop_table { table_name = "widgets" }))
-
-let test_format_describe () =
-  Alcotest.(check string)
-    "Describe renders as :describe <name>" ":describe widgets"
-    (Ddl.Format.statement (Ddl.Statement.Describe { table_name = "widgets" }))
 
 (* Build a [Create_table] statement for the canonical-form tests below. *)
 let make_create_table ~table_name ~fields ~primary_key : Ddl.Statement.t =
@@ -132,7 +126,6 @@ let () =
         [
           Alcotest.test_case "List_tables" `Quick test_format_list_tables;
           Alcotest.test_case "Drop_table" `Quick test_format_drop_table;
-          Alcotest.test_case "Describe" `Quick test_format_describe;
         ] );
       ( "create table",
         [

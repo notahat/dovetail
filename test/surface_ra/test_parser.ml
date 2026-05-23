@@ -459,28 +459,10 @@ let test_ddl_rejects_trailing_garbage () = rejects ":list tables xyz"
 let test_ddl_sigil_mid_pipeline_is_parse_error () =
   rejects "users | :drop table x"
 
-let test_ddl_describe_parses () =
-  parses_program ":describe users"
-    (Ast.Ddl (Ddl.Statement.Describe { table_name = "users" }))
-
-let test_ddl_describe_tolerates_extra_whitespace () =
-  parses_program ":describe    users"
-    (Ast.Ddl (Ddl.Statement.Describe { table_name = "users" }))
-
-let test_ddl_describe_accepts_identifier_with_digits () =
-  parses_program ":describe users_2"
-    (Ast.Ddl (Ddl.Statement.Describe { table_name = "users_2" }))
-
-let test_ddl_describe_rejects_missing_target () = rejects ":describe"
-let test_ddl_describe_rejects_quoted_name () = rejects ":describe \"users\""
-
-let test_ddl_describe_rejects_trailing_garbage () =
-  rejects ":describe users xyz"
-
-(* The DDL keyword [describe] is not globally reserved -- matches the
-   [list] / [tables] / [drop] / [table] cases above. *)
-let test_pipeline_keyword_describe_is_a_relation_name () =
-  parses "describe" (Ast.Relation_name "describe")
+let test_ddl_describe_is_no_longer_recognised () =
+  (* [:describe] used to be a DDL statement; the [type] pipe operator
+     replaces it. The parser should now reject the sigil form. *)
+  rejects ":describe users"
 
 (* [:create table <name> (col: kind, ...) primary key
    (col, ...)] parses to [Statement.Create_table { table_name; fields;
@@ -623,7 +605,7 @@ let test_ddl_create_table_rejects_missing_table_name () =
   rejects ":create table (id: Int64) primary key (id)"
 
 (* The DDL keyword [create] is not globally reserved -- matches the
-   [list] / [tables] / [drop] / [table] / [describe] cases above. *)
+   [list] / [tables] / [drop] / [table] cases above. *)
 let test_pipeline_keyword_create_is_a_relation_name () =
   parses "create" (Ast.Relation_name "create")
 
@@ -867,22 +849,8 @@ let () =
             test_pipeline_keyword_drop_is_a_relation_name;
           Alcotest.test_case "[table] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_table_is_a_relation_name;
-          Alcotest.test_case ":describe <name> parses to Ddl Describe" `Quick
-            test_ddl_describe_parses;
-          Alcotest.test_case
-            ":describe tolerates extra whitespace between keywords" `Quick
-            test_ddl_describe_tolerates_extra_whitespace;
-          Alcotest.test_case
-            ":describe accepts an identifier with digits and underscores" `Quick
-            test_ddl_describe_accepts_identifier_with_digits;
-          Alcotest.test_case ":describe without a target rejects" `Quick
-            test_ddl_describe_rejects_missing_target;
-          Alcotest.test_case ":describe with a quoted name rejects" `Quick
-            test_ddl_describe_rejects_quoted_name;
-          Alcotest.test_case ":describe with trailing garbage rejects" `Quick
-            test_ddl_describe_rejects_trailing_garbage;
-          Alcotest.test_case "[describe] is a relation name in a pipeline"
-            `Quick test_pipeline_keyword_describe_is_a_relation_name;
+          Alcotest.test_case ":describe is no longer a recognised statement"
+            `Quick test_ddl_describe_is_no_longer_recognised;
           Alcotest.test_case
             ":create table single-column Int64 PK parses to Ddl Create_table"
             `Quick test_ddl_create_table_int64_pk_parses;

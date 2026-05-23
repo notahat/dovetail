@@ -35,7 +35,7 @@ let render_relation relation =
 let render_kind kind =
   let buffer = Buffer.create 64 in
   let formatter = Format.formatter_of_buffer buffer in
-  Relation.format_kind formatter kind;
+  Format.fprintf formatter "%a@\n" Relation.format_kind kind;
   Format.pp_print_flush formatter ();
   Buffer.contents buffer
 

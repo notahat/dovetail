@@ -5,4 +5,5 @@ type 'tag t =
 
 let format formatter = function
   | Relation_value relation -> Relation.print ~formatter relation
-  | Relation_kind kind -> Relation.format_kind formatter kind
+  | Relation_kind kind ->
+      Format.fprintf formatter "%a@\n" Relation.format_kind kind

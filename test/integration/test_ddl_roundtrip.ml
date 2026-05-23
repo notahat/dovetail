@@ -8,9 +8,9 @@
     the test fails before the change reaches downstream code.
 
     The corpus is hand-rolled (no [qcheck]) and covers one case per constructor:
-    [List_tables], [Drop_table], [Describe] for the one-liners, and a small set
-    of [Create_table] shapes (each value kind in turn, a compound primary key,
-    plus the design doc's [users] and [order_items] canonical examples). *)
+    [List_tables] and [Drop_table] for the one-liners, and a small set of
+    [Create_table] shapes (each value kind in turn, a compound primary key, plus
+    the design doc's [users] and [order_items] canonical examples). *)
 
 module Surface_ra = Dovetail_surface_ra
 module Ddl = Dovetail_ddl
@@ -54,9 +54,6 @@ let test_round_trip_list_tables () = check_round_trip Ddl.Statement.List_tables
 
 let test_round_trip_drop_table () =
   check_round_trip (Ddl.Statement.Drop_table { table_name = "widgets" })
-
-let test_round_trip_describe () =
-  check_round_trip (Ddl.Statement.Describe { table_name = "widgets" })
 
 let test_round_trip_create_table_int64_pk () =
   check_round_trip
@@ -141,7 +138,6 @@ let () =
         [
           Alcotest.test_case "List_tables" `Quick test_round_trip_list_tables;
           Alcotest.test_case "Drop_table" `Quick test_round_trip_drop_table;
-          Alcotest.test_case "Describe" `Quick test_round_trip_describe;
         ] );
       ( "create table",
         [

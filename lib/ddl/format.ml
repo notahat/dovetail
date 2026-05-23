@@ -20,6 +20,5 @@ let format_create_table ~table_name ~fields ~primary_key =
 let statement = function
   | Statement.List_tables -> ":list tables"
   | Statement.Drop_table { table_name } -> ":drop table " ^ table_name
-  | Statement.Describe { table_name } -> ":describe " ^ table_name
   | Statement.Create_table { table_name; fields; primary_key } ->
       format_create_table ~table_name ~fields ~primary_key

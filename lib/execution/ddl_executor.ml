@@ -3,17 +3,6 @@ module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module Storage = Dovetail_storage
 
-(* Look up [table_name] in the catalog and return its kind wrapped in
-   [Described]. The catalog-aware "no such table" check happens here so
-   the user-facing error names the operation they typed with the
-   [DDL: describe ...] prefix. *)
-let describe_table environment transaction table_name :
-    Ddl.Statement.read_result =
-  match Storage.Catalog.get environment transaction ~table_name with
-  | Some kind -> Described { table_name; kind }
-  | None ->
-      failwith (Printf.sprintf "DDL: describe %S: no such table" table_name)
-
 let execute_read environment transaction :
     Ddl.Statement.t -> Ddl.Statement.read_result = function
   | List_tables ->
@@ -23,7 +12,6 @@ let execute_read environment transaction :
          statements; the REPL must classify and route them to
          execute_write. *)
       assert false
-  | Describe { table_name } -> describe_table environment transaction table_name
 
 (* Drop both halves of [table_name] (catalog entry and storage subDB)
    inside the caller's write transaction. The catalog-aware "no such
@@ -88,9 +76,9 @@ let create_table environment transaction ~table_name ~fields ~primary_key :
 
 let execute_write environment transaction :
     Ddl.Statement.t -> Ddl.Statement.write_result = function
-  | List_tables | Describe _ ->
-      (* Routing invariant: List_tables and Describe are read statements;
-         the REPL must classify and route them to execute_read. *)
+  | List_tables ->
+      (* Routing invariant: List_tables is a read statement; the REPL
+         must classify and route it to execute_read. *)
       assert false
   | Drop_table { table_name } -> drop_table environment transaction table_name
   | Create_table { table_name; fields; primary_key } ->

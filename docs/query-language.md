@@ -22,8 +22,8 @@ The guide is in several parts:
   `on` clause of `join`.
 - [Data definition reference](query-language-data-definition.md) --
   the `:`-prefixed statements that inspect and modify the catalog
-  (`:list tables`, `:describe <name>`, `:create table <name>
-  (...)`, `:drop table <name>`).
+  (`:list tables`, `:create table <name> (...)`, `:drop table
+  <name>`).
 
 ## Running the REPL
 

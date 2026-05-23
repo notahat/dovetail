@@ -13,9 +13,11 @@
     a future surface (SQL, scripting) can build {!t} values without pulling the
     executor in.
 
-    The constructors are [List_tables], [Drop_table], [Describe], and
-    [Create_table]. The canonical-form printer that pairs with the parser lives
-    in {!Dovetail_ddl.Format} and satisfies the round-trip property
+    The constructors are [List_tables], [Drop_table], and [Create_table]. The
+    table-type-introspection statement [:describe] was retired once the [type]
+    pipe operator gave the surface language a uniform way to ask the same
+    question. The canonical-form printer that pairs with the parser lives in
+    {!Dovetail_ddl.Format} and satisfies the round-trip property
     [parse(format(s)) = s].
 
     DDL does not pass through [Lower] / [Translate] / [Physical] / [Eval] —
@@ -24,7 +26,6 @@
     {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}. *)
 
 module Scalar = Dovetail_core.Scalar
-module Relation = Dovetail_core.Relation
 
 type field = { name : string; kind : Scalar.kind }
 (** A single column declaration in a [Create_table] statement. Deliberately
@@ -44,13 +45,6 @@ type t =
           single write transaction. The catalog-aware "no such table" check
           lives inside {!Ddl_executor.execute_write}, where it shares scope with
           the writes it guards. *)
-  | Describe of { table_name : string }
-      (** [Describe { table_name }] is the surface form [:describe <name>].
-          Reads the named table's kind from the catalog and returns it as a
-          {!read_result}. The REPL renders the result through
-          {!Dovetail_ddl.Format.statement} so the output round-trips through the
-          parser. The catalog-aware "no such table" check lives inside
-          {!Ddl_executor.execute_read}, where it shares scope with the read. *)
   | Create_table of {
       table_name : string;
       fields : field list;
@@ -70,12 +64,6 @@ type read_result =
       (** A read DDL statement's outcome. [Listed names] is the result of
           [List_tables]: every table name from the catalog, in cursor
           (byte-sorted) order. *)
-  | Described of { table_name : string; kind : Relation.kind }
-      (** [Described { table_name; kind }] is the result of [Describe]: the kind
-          bound to [table_name] in the catalog, returned alongside the name
-          itself. The name is carried explicitly so the renderer does not have
-          to recover it from per-field qualifiers — a recovery that would be
-          fragile if the catalog ever stored qualifier-less kinds. *)
 
 type write_result =
   | Dropped of string
@@ -111,11 +99,3 @@ val validate : t -> (unit, string) result
     [DDL: create table "<name>": <detail>] and are intended to be raised at the
     REPL between parse and transaction so structural failures do not pay the
     cost of a writer-lock acquisition. *)
-
-val of_kind : table_name:string -> Relation.kind -> t
-(** [of_kind ~table_name kind] adapts a stored [Relation.kind] into a
-    [Create_table]-shaped statement: per-field qualifiers are stripped, the
-    field order and primary-key order are preserved exactly, and [table_name] is
-    carried on the result. Used by the REPL renderer for [Described] to feed the
-    canonical-form printer, so that [:describe <name>] output is the
-    [:create table <name> (...)] that would reproduce the kind. *)

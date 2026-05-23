@@ -16,7 +16,8 @@ module Storage = Dovetail_storage
 
 let users_kind : Relation.kind =
   {
-    row_kind = [ { name = "id"; kind = Scalar.Int64; qualifier = Some "users" } ];
+    row_kind =
+      [ { name = "id"; kind = Scalar.Int64; qualifier = Some "users" } ];
     refinements = [ Primary_key [ "id" ] ];
   }
 
@@ -44,10 +45,7 @@ let test_execute_read_list_tables_returns_byte_sorted_names () =
       with
       | Listed names ->
           Alcotest.(check (list string))
-            "byte-sorted table names" [ "orders"; "users" ] names
-      | Described _ ->
-          (* List_tables produces Listed, never Described. *)
-          assert false)
+            "byte-sorted table names" [ "orders"; "users" ] names)
 
 let test_execute_read_list_tables_on_empty_catalog () =
   with_temp_dir @@ fun dir ->
@@ -59,41 +57,7 @@ let test_execute_read_list_tables_on_empty_catalog () =
       with
       | Listed names ->
           Alcotest.(check (list string))
-            "empty list when catalog absent" [] names
-      | Described _ ->
-          (* List_tables produces Listed, never Described. *)
-          assert false)
-
-let test_execute_read_describe_returns_stored_schema () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      Storage.Catalog.put environment transaction ~table_name:"users" users_kind);
-  Storage.Engine.with_read_transaction environment (fun transaction ->
-      match
-        Ddl_executor.execute_read environment transaction
-          (Ddl.Statement.Describe { table_name = "users" })
-      with
-      | Described { table_name; kind } ->
-          Alcotest.(check string)
-            "result names the described table" "users" table_name;
-          Alcotest.(check kind_testable)
-            "result carries the stored kind" users_kind kind
-      | Listed _ ->
-          (* Describe produces Described, never Listed. *)
-          assert false)
-
-let test_execute_read_describe_no_such_table_raises () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Alcotest.check_raises "no such table raises Failure with DDL: prefix"
-    (Failure "DDL: describe \"nonexistent\": no such table") (fun () ->
-      Storage.Engine.with_read_transaction environment (fun transaction ->
-          let _result =
-            Ddl_executor.execute_read environment transaction
-              (Ddl.Statement.Describe { table_name = "nonexistent" })
-          in
-          ()))
+            "empty list when catalog absent" [] names)
 
 (* Seed [environment] with a single table named [table_name]: a catalog
    entry under [kind] and a storage subDB with one row, so Drop_table
@@ -306,10 +270,6 @@ let () =
             test_execute_read_list_tables_returns_byte_sorted_names;
           Alcotest.test_case "List_tables on empty catalog returns []" `Quick
             test_execute_read_list_tables_on_empty_catalog;
-          Alcotest.test_case "Describe returns the stored schema" `Quick
-            test_execute_read_describe_returns_stored_schema;
-          Alcotest.test_case "Describe on a missing table raises Failure" `Quick
-            test_execute_read_describe_no_such_table_raises;
         ] );
       ( "execute_write",
         [

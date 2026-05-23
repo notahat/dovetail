@@ -216,32 +216,6 @@ let test_drop_nonexistent_table_reports_error_and_continues () =
   check_contains "loop continues after drop error" output "users";
   check_contains "loop continues after drop error" output "orders"
 
-(* End-to-end: [:describe <name>] parses, classifies
-   as a read, looks the schema up in the catalog inside a read
-   transaction, and prints the canonical form via [Format.statement] on
-   the [Statement.of_schema] adapter. The fixture seeds [users] with
-   four fields and a single-column primary key, so the output matches
-   the design doc's canonical form verbatim. *)
-let test_describe_prints_canonical_form_for_fixture_table () =
-  let output = run_with_input [ ":describe users" ] in
-  check_contains ":describe canonical form" output
-    ":create table users (\n\
-    \  id: Int64,\n\
-    \  name: String,\n\
-    \  email: String,\n\
-    \  active: Bool,\n\
-     ) primary key (id)"
-
-(* The "no such table" error path for describe: the executor raises with
-   the [DDL: describe ...: no such table] prefix, the REPL catches it
-   via its generic error guard, and the loop continues. *)
-let test_describe_nonexistent_table_reports_error_and_continues () =
-  let output = run_with_input [ ":describe nonexistent"; ":list tables" ] in
-  check_contains "no-such-table error" output
-    "DDL: describe \"nonexistent\": no such table";
-  check_contains "loop continues after describe error" output "users";
-  check_contains "loop continues after describe error" output "orders"
-
 (* [Statement.validate] runs between parse and the transaction. All five
    validate rules are reachable from the REPL -- the empty-list cases
    surface as validate errors so the user sees the friendly
@@ -319,24 +293,24 @@ let test_create_table_duplicate_primary_key_column_reports_validate_error () =
 (* The [Created] renderer plus the end-to-end
    exercise of [:create table]. The sequence creates [widgets], lists
    the catalog (the new table appears alongside the fixture tables),
-   describes [widgets] (the canonical form matches the input the user
-   typed verbatim), drops it, and lists again (it is gone). The fixture
-   tables (orders, users) remain present throughout so the test also
-   sees that the create did not disturb the sibling tables. *)
+   inspects [widgets]'s type via [widgets | type], drops it, and lists
+   again (it is gone). The fixture tables (orders, users) remain
+   present throughout so the test also sees that the create did not
+   disturb the sibling tables. *)
 let test_create_table_end_to_end_sequence () =
   let output =
     run_with_input
       [
         ":create table widgets (id: Int64, name: String) primary key (id)";
         ":list tables";
-        ":describe widgets";
+        "widgets | type";
         ":drop table widgets";
         ":list tables";
       ]
   in
   check_contains "create status line" output "created table \"widgets\"";
-  check_contains ":describe widgets canonical form" output
-    ":create table widgets (\n  id: Int64,\n  name: String,\n) primary key (id)";
+  check_contains "widgets | type renders the relation type" output
+    "(id: int64, name: string, primary key (id))";
   check_contains "drop status line" output "dropped table \"widgets\"";
   (* The substring [\nwidgets\n] is the listing-line shape: a table name
      on its own line in a [:list tables] block. It appears exactly once
@@ -417,12 +391,6 @@ let () =
             ":drop table on a missing table reports the error and continues"
             `Quick test_drop_nonexistent_table_reports_error_and_continues;
           Alcotest.test_case
-            ":describe prints the canonical form for a fixture table" `Quick
-            test_describe_prints_canonical_form_for_fixture_table;
-          Alcotest.test_case
-            ":describe on a missing table reports the error and continues"
-            `Quick test_describe_nonexistent_table_reports_error_and_continues;
-          Alcotest.test_case
             ":create table with an empty column list reports a validate error"
             `Quick test_create_table_empty_column_list_reports_validate_error;
           Alcotest.test_case
@@ -444,8 +412,8 @@ let () =
             `Quick
             test_create_table_duplicate_primary_key_column_reports_validate_error;
           Alcotest.test_case
-            ":create table followed by list/describe/drop/list round-trips"
-            `Quick test_create_table_end_to_end_sequence;
+            ":create table followed by list/type/drop/list round-trips" `Quick
+            test_create_table_end_to_end_sequence;
           Alcotest.test_case
             ":create table on an existing table reports the error and continues"
             `Quick test_create_table_already_exists_reports_error_and_continues;

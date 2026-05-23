@@ -1,16 +1,14 @@
 (** Tests for [Statement].
 
     Covers the pure parts of the DDL AST: [classify] for each constructor (the
-    read/write routing decision that drives transaction selection in the REPL),
-    and [of_kind] (the adapter from a stored [Relation.kind] back to a
-    [Create_table]-shaped statement, used by the describe renderer to feed the
-    canonical-form printer). The constructor surface itself is exercised through
-    the parser ({!Test_parser}) and the executor ({!Test_ddl_executor}); this
-    file pins the structural behaviour that lives in [Statement] alone. *)
+    read/write routing decision that drives transaction selection in the REPL)
+    and [validate] (structural checks against [Create_table] shapes). The
+    constructor surface itself is exercised through the parser ({!Test_parser})
+    and the executor ({!Test_ddl_executor}); this file pins the structural
+    behaviour that lives in [Statement] alone. *)
 
 module Ddl = Dovetail_ddl
 module Scalar = Dovetail_core.Scalar
-module Relation = Dovetail_core.Relation
 
 let test_list_tables_classifies_as_read () =
   Alcotest.(check bool)
@@ -23,12 +21,6 @@ let test_drop_table_classifies_as_write () =
     (Ddl.Statement.classify (Ddl.Statement.Drop_table { table_name = "users" })
     = `Write)
 
-let test_describe_classifies_as_read () =
-  Alcotest.(check bool)
-    "Describe classifies as Read" true
-    (Ddl.Statement.classify (Ddl.Statement.Describe { table_name = "users" })
-    = `Read)
-
 let test_create_table_classifies_as_write () =
   Alcotest.(check bool)
     "Create_table classifies as Write" true
@@ -40,38 +32,6 @@ let test_create_table_classifies_as_write () =
             primary_key = [ "id" ];
           })
     = `Write)
-
-(* A fixture-shaped kind for [users]: every field carries
-   [qualifier = Some "users"], matching how [Fixture] and the
-   [Create_table] executor store kinds. *)
-let users_kind : Relation.kind =
-  {
-    row_kind =
-      [
-        { name = "id"; kind = Scalar.Int64; qualifier = Some "users" };
-        { name = "name"; kind = Scalar.String; qualifier = Some "users" };
-        { name = "active"; kind = Scalar.Bool; qualifier = Some "users" };
-      ];
-    refinements = [ Primary_key [ "id" ] ];
-  }
-
-let test_of_kind_strips_qualifiers () =
-  let expected : Ddl.Statement.t =
-    Create_table
-      {
-        table_name = "users";
-        fields =
-          [
-            { name = "id"; kind = Scalar.Int64 };
-            { name = "name"; kind = Scalar.String };
-            { name = "active"; kind = Scalar.Bool };
-          ];
-        primary_key = [ "id" ];
-      }
-  in
-  Alcotest.(check bool)
-    "of_kind produces Create_table with stripped qualifiers" true
-    (Ddl.Statement.of_kind ~table_name:"users" users_kind = expected)
 
 (* Build a [Create_table] statement for [table_name] with the given [fields]
    and [primary_key]. The fields default to the well-formed [(id: Int64,
@@ -140,10 +100,7 @@ let test_validate_passes_non_create_table_constructors () =
     (Ddl.Statement.validate Ddl.Statement.List_tables);
   Alcotest.(check validate_result)
     "Drop_table is Ok ()" (Ok ())
-    (Ddl.Statement.validate (Ddl.Statement.Drop_table { table_name = "users" }));
-  Alcotest.(check validate_result)
-    "Describe is Ok ()" (Ok ())
-    (Ddl.Statement.validate (Ddl.Statement.Describe { table_name = "users" }))
+    (Ddl.Statement.validate (Ddl.Statement.Drop_table { table_name = "users" }))
 
 let () =
   Alcotest.run "statement"
@@ -154,16 +111,8 @@ let () =
             test_list_tables_classifies_as_read;
           Alcotest.test_case "Drop_table classifies as Write" `Quick
             test_drop_table_classifies_as_write;
-          Alcotest.test_case "Describe classifies as Read" `Quick
-            test_describe_classifies_as_read;
           Alcotest.test_case "Create_table classifies as Write" `Quick
             test_create_table_classifies_as_write;
-        ] );
-      ( "of_kind",
-        [
-          Alcotest.test_case
-            "of_kind produces Create_table with stripped qualifiers" `Quick
-            test_of_kind_strips_qualifiers;
         ] );
       ( "validate",
         [

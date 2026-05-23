@@ -388,9 +388,8 @@ let pipeline_parser =
 (* The DDL body grammar: the productions admitted after the [:]
    sigil has been consumed. The disjunction relies on [<|>]'s backtracking
    on inner failure: each branch starts with a distinct keyword
-   ([list]/[drop]/[describe]/[create]), so a failed first branch rewinds to
-   the start of the body and the next branch tries from the same
-   position. *)
+   ([list]/[drop]/[create]), so a failed first branch rewinds to the
+   start of the body and the next branch tries from the same position. *)
 let ddl_list_tables =
   keyword "list" *> whitespace *> keyword "tables"
   *> return Ddl.Statement.List_tables
@@ -398,10 +397,6 @@ let ddl_list_tables =
 let ddl_drop_table =
   keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
   >>| fun table_name -> Ddl.Statement.Drop_table { table_name }
-
-let ddl_describe =
-  keyword "describe" *> whitespace *> identifier >>| fun table_name ->
-  Ddl.Statement.Describe { table_name }
 
 (* Resolve a [:create table] column kind at parse time. The surface kind
    position carries an identifier ([Int64], [String], [Bool]) and the
@@ -468,8 +463,7 @@ let ddl_create_table =
   whitespace *> char ')'
   *> return (Ddl.Statement.Create_table { table_name; fields; primary_key })
 
-let ddl_body =
-  ddl_list_tables <|> ddl_drop_table <|> ddl_describe <|> ddl_create_table
+let ddl_body = ddl_list_tables <|> ddl_drop_table <|> ddl_create_table
 
 (* The top-level grammar: optional leading whitespace, then dispatch on the
    first non-whitespace character. A leading [:] introduces a DDL statement
