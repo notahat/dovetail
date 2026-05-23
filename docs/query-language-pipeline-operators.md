@@ -9,16 +9,21 @@ and projection sublanguages that appear inside `restrict`,
 `project`, and the `on` clause of `join`, see the
 [expression and projection reference](query-language-expressions.md).
 
+A pipeline starts with one of four source forms: a relation
+reference (a bare table name) or a literal at any of the scalar,
+row, or relation rungs. The literal forms let you feed a value
+into the pipeline without first putting it in a table -- useful
+for trying out operators, asking `| type` what a value's type is,
+and (for relation literals) seeding tables through `insert into`.
+
 ## Relation references
 
 **Syntax:** `<table-name>`
 
 A bare identifier reads every row of the named table in primary-
-key order. This is the only way to introduce a relation into a
-pipeline; every other operator takes one as input. The output
-schema is the table's schema, with each column's qualifier set to
-the table name -- so a later operator can disambiguate columns
-that share a name across tables.
+key order. The output schema is the table's schema, with each
+column's qualifier set to the table name -- so a later operator
+can disambiguate columns that share a name across tables.
 
 ```
 > users
@@ -29,6 +34,77 @@ that share a name across tables.
 │        3 │ Carol      │ carol@example.com │ true         │
 │        4 │ Dave       │ dave@example.com  │ true         │
 │        5 │ Eve        │ eve@example.com   │ false        │
+```
+
+## Scalar literals
+
+**Syntax:** `<int64-literal>` | `"<string-literal>"` | `true` | `false`
+
+A bare scalar at the head of a pipeline yields that scalar value.
+The supported forms are the same three kinds the
+[expression reference](query-language-expressions.md#literals)
+describes: signed decimal integers, double-quoted strings (with
+`\"` and `\\` escapes), and the keywords `true` and `false`. The
+only operator that consumes a scalar is `type`, which yields the
+scalar's kind.
+
+```
+> 42
+42
+> "hello"
+"hello"
+> true
+true
+> 42 | type
+int64
+```
+
+## Row literals
+
+**Syntax:** `(<name> = <scalar>, ...)`
+
+A parenthesised, comma-separated list of `<name> = <value>`
+bindings yields a single row whose fields are those bindings, in
+written order. The empty form `()` yields the empty row. Field
+names must be unique within the literal; values are scalar
+literals (no expressions or column references at the row-literal
+level). The only operator that consumes a row is `type`, which
+yields the row's kind.
+
+```
+> (id = 1, name = "alice")
+(id = 1, name = "alice")
+> (id = 1, name = "alice") | type
+(id: int64, name: string)
+> ()
+()
+```
+
+## Relation literals
+
+**Syntax:** `relation (<row-type> [, <refinement>...]) { <row-literal>, ... }`
+
+A `relation` keyword followed by a parenthesised relation type and
+a brace-delimited body of row literals yields a relation of that
+type. The head's parenthesised list is a row type (`<name>: <kind>`
+declarations) optionally interleaved with refinements (today just
+`primary key (...)`); the body is zero or more row literals,
+comma-separated, with a permitted trailing comma. Every row's
+fields must be a permutation of the declared row type's fields,
+and each value must match its field's kind. The empty body is
+allowed and produces a header-only table.
+
+Relation literals are the form `insert into` accepts as its
+upstream; see [`insert into`](#insert-into) below.
+
+```
+> relation (id: int64, name: string) { (id = 1, name = "alice"), (id = 2, name = "bob") }
+│ id │ name  │
+├────┼───────┤
+│  1 │ alice │
+│  2 │ bob   │
+> relation (id: int64, name: string) {} | type
+(id: int64, name: string)
 ```
 
 ## restrict
