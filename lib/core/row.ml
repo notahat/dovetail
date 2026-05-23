@@ -1,6 +1,7 @@
 type field = { name : string; kind : Scalar.kind; qualifier : string option }
 type kind = field list
 type value = Scalar.value array
+type t = { kind : kind; value : value }
 type column_reference = { qualifier : string option; name : string }
 
 (* Render a [column_reference] in dotted form (or bare, when unqualified) for
@@ -19,6 +20,16 @@ let format_kind formatter (kind : kind) =
   let separator formatter () = Format.pp_print_string formatter ", " in
   Format.pp_print_string formatter "(";
   Format.pp_print_list ~pp_sep:separator format_field formatter kind;
+  Format.pp_print_string formatter ")"
+
+let format formatter (row : t) =
+  let pairs = List.combine row.kind (Array.to_list row.value) in
+  let format_pair formatter ((field : field), value) =
+    Format.fprintf formatter "%s = %a" field.name Scalar.format value
+  in
+  let separator formatter () = Format.pp_print_string formatter ", " in
+  Format.pp_print_string formatter "(";
+  Format.pp_print_list ~pp_sep:separator format_pair formatter pairs;
   Format.pp_print_string formatter ")"
 
 (* Walk [row_kind], pairing each field with its zero-based position and

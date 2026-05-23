@@ -198,8 +198,9 @@ let expression_not operand : Expression.t = Not operand
     use against [Eval.eval], which hands its continuation a [Term.t]. *)
 let expect_relation callback : [ `Bag ] Term.t -> 'a = function
   | Term.Relation_value relation -> callback relation
-  | Term.Relation_kind _ ->
-      Alcotest.fail "expected a relation value but got a relation kind"
+  | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
+  | Term.Row_value _ | Term.Row_kind _ ->
+      Alcotest.fail "expected a relation value but got a different term arm"
 
 (** A catalog callback that knows about no tables. Use in [Translate]-level unit
     tests that don't exercise schema-dependent rewrites; the catalog is
@@ -258,9 +259,11 @@ let with_query_kind query check_kind =
       let physical = Plan.Translate.translate ~catalog logical in
       Execution.Eval.eval environment transaction physical (function
         | Term.Relation_kind kind -> check_kind kind
-        | Term.Relation_value _ ->
+        | Term.Relation_value _ | Term.Scalar_value _ | Term.Scalar_kind _
+        | Term.Row_value _ | Term.Row_kind _ ->
             Alcotest.failf
-              "expected %S to yield a relation kind but got a relation value"
+              "expected %S to yield a relation kind but got a different term \
+               arm"
               query))
 
 (** [with_query_failure ~label ~expected query] runs [query] through the same

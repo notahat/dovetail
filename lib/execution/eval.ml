@@ -136,8 +136,11 @@ and evaluate_type_op environment transaction ~input continue =
 and eval_input environment transaction plan continue =
   eval environment transaction plan (function
     | Term.Relation_value relation -> continue relation
-    | Term.Relation_kind _ ->
-        (* By construction relational sub-plans don't carry kinds. *)
+    | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
+    | Term.Row_value _ | Term.Row_kind _ ->
+        (* By construction relational sub-plans only ever produce relation
+           values. Kinds arise from [Type_op]; the scalar and row arms have no
+           constructors that wire into a relational sub-plan today. *)
         assert false)
 
 (* Stream the input through [eval], then wrap its value seq in a [Seq.filter]

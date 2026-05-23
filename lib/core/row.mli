@@ -20,6 +20,11 @@ type kind = field list
 type value = Scalar.value array
 (** A row's cells, in field order. *)
 
+type t = { kind : kind; value : value }
+(** A row paired with the {!kind} that describes its shape. The companion to
+    {!Relation.t} at the row rung — values and shapes travel together so a row
+    can be rendered or type-checked without separate plumbing. *)
+
 type column_reference = { qualifier : string option; name : string }
 (** A reference to a column by name, with an optional qualifier. The parser
     produces [{ qualifier = None; name }] for the bare form [name] and
@@ -39,6 +44,13 @@ val format_kind : Format.formatter -> kind -> unit
     bindings, or [()] when [kind] is empty. Field qualifiers are dropped — the
     surface row-type syntax has no qualifier form. Field kinds render via
     {!Scalar.format_kind} (lowercase keywords). *)
+
+val format : Format.formatter -> t -> unit
+(** [format formatter row] writes [row] to [formatter] in the surface syntax for
+    a row value: a parenthesised, comma-separated list of [name = value]
+    bindings, or [()] when the row is empty. Field qualifiers are dropped — the
+    surface row-value syntax has no qualifier form. Cell values render via
+    {!Scalar.format}. *)
 
 val find_field : kind -> column_reference -> (int * field, string) result
 (** [find_field row_kind reference] resolves [reference] against [row_kind] and

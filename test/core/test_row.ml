@@ -143,6 +143,59 @@ let test_format_kind_drops_qualifiers () =
     "qualifiers are dropped at the surface" "(id: int64, name: string)"
     (format_kind_to_string kind)
 
+(* Render via [Row.format] into a string for comparison with the expected
+   surface form. *)
+let format_value_to_string row =
+  let buffer = Buffer.create 32 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Row.format formatter row;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_empty_renders_bare_parens () =
+  let row : Row.t = { kind = []; value = [||] } in
+  Alcotest.(check string) "empty row" "()" (format_value_to_string row)
+
+let test_format_single_field_renders_name_equals_value () =
+  let row : Row.t =
+    {
+      kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+      value = [| Scalar.Int64 1L |];
+    }
+  in
+  Alcotest.(check string) "single field" "(id = 1)" (format_value_to_string row)
+
+let test_format_multi_field_comma_separates () =
+  let row : Row.t =
+    {
+      kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+          { name = "active"; kind = Bool; qualifier = None };
+        ];
+      value = [| Scalar.Int64 1L; Scalar.String "Alice"; Scalar.Bool true |];
+    }
+  in
+  Alcotest.(check string)
+    "multi-field row" "(id = 1, name = \"Alice\", active = true)"
+    (format_value_to_string row)
+
+let test_format_drops_qualifiers () =
+  let row : Row.t =
+    {
+      kind =
+        [
+          { name = "id"; kind = Int64; qualifier = Some "users" };
+          { name = "name"; kind = String; qualifier = Some "users" };
+        ];
+      value = [| Scalar.Int64 1L; Scalar.String "Alice" |];
+    }
+  in
+  Alcotest.(check string)
+    "qualifiers are dropped at the surface" "(id = 1, name = \"Alice\")"
+    (format_value_to_string row)
+
 let () =
   Alcotest.run "row"
     [
@@ -194,5 +247,16 @@ let () =
             test_format_kind_multi_field_comma_separates;
           Alcotest.test_case "qualifiers are dropped at the surface" `Quick
             test_format_kind_drops_qualifiers;
+        ] );
+      ( "format",
+        [
+          Alcotest.test_case "empty row renders as bare parens" `Quick
+            test_format_empty_renders_bare_parens;
+          Alcotest.test_case "single field renders as name = value" `Quick
+            test_format_single_field_renders_name_equals_value;
+          Alcotest.test_case "multiple fields are comma-separated" `Quick
+            test_format_multi_field_comma_separates;
+          Alcotest.test_case "qualifiers are dropped at the surface" `Quick
+            test_format_drops_qualifiers;
         ] );
     ]
