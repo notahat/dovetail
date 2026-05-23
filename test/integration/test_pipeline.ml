@@ -7,7 +7,7 @@
 *)
 
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Relation = Dovetail_core.Relation
 module Plan = Dovetail_plan
 module Execution = Dovetail_execution
@@ -148,11 +148,11 @@ let test_project_yields_projected_rows () =
   with_query_result "users | project name, email" (fun rows ->
       let expected =
         [
-          [| Value.String "Alice"; Value.String "alice@example.com" |];
-          [| Value.String "Bob"; Value.String "bob@example.com" |];
-          [| Value.String "Carol"; Value.String "carol@example.com" |];
-          [| Value.String "Dave"; Value.String "dave@example.com" |];
-          [| Value.String "Eve"; Value.String "eve@example.com" |];
+          [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
+          [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
+          [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
+          [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
+          [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
         ]
       in
       Alcotest.(check row_list_testable)
@@ -225,12 +225,12 @@ let test_indexed_join_then_project_matches_readme_example () =
      description, amount" (fun rows ->
       let expected : Row.data list =
         [
-          [| Value.String "Alice"; Value.String "Coffee"; Value.Int64 5L |];
-          [| Value.String "Alice"; Value.String "Bagel"; Value.Int64 4L |];
-          [| Value.String "Bob"; Value.String "Tea"; Value.Int64 3L |];
-          [| Value.String "Carol"; Value.String "Sandwich"; Value.Int64 8L |];
-          [| Value.String "Carol"; Value.String "Cake"; Value.Int64 6L |];
-          [| Value.String "Eve"; Value.String "Cookie"; Value.Int64 2L |];
+          [| Scalar.String "Alice"; Scalar.String "Coffee"; Scalar.Int64 5L |];
+          [| Scalar.String "Alice"; Scalar.String "Bagel"; Scalar.Int64 4L |];
+          [| Scalar.String "Bob"; Scalar.String "Tea"; Scalar.Int64 3L |];
+          [| Scalar.String "Carol"; Scalar.String "Sandwich"; Scalar.Int64 8L |];
+          [| Scalar.String "Carol"; Scalar.String "Cake"; Scalar.Int64 6L |];
+          [| Scalar.String "Eve"; Scalar.String "Cookie"; Scalar.Int64 2L |];
         ]
       in
       Alcotest.(check row_list_testable)

@@ -36,7 +36,7 @@ val primary_key_names : kind -> string list
     refinements, in declared order, or the empty list when no [Primary_key]
     refinement is present. *)
 
-val split_row : kind -> Row.data -> Value.data list * Value.data list
+val split_row : kind -> Row.data -> Scalar.data list * Scalar.data list
 (** [split_row kind row] returns [(primary_key_values, non_primary_key_values)],
     where [primary_key_values] are the values at the primary-key columns (in
     primary-key order) and [non_primary_key_values] are the values at the
@@ -45,8 +45,8 @@ val split_row : kind -> Row.data -> Value.data list * Value.data list
 
 val assemble_row :
   kind ->
-  primary_key_values:Value.data list ->
-  non_primary_key_values:Value.data list ->
+  primary_key_values:Scalar.data list ->
+  non_primary_key_values:Scalar.data list ->
   Row.data
 (** [assemble_row kind ~primary_key_values ~non_primary_key_values] is the
     inverse of {!split_row}: it interleaves the two value lists according to the

@@ -8,7 +8,7 @@
 open Dovetail_surface_ra
 open Test_helpers
 module Expression = Dovetail_core.Expression
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let predicate_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<predicate>")) ( = )
@@ -40,57 +40,57 @@ let rejects_predicate input =
 let test_int64_equality () =
   parses_predicate "id = 3"
     (expression_compare ~left:(expression_column "id") ~op:Equal
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_negative_int64 () =
   parses_predicate "id = -1"
     (expression_compare ~left:(expression_column "id") ~op:Equal
-       ~right:(expression_literal (Value.Int64 (-1L))))
+       ~right:(expression_literal (Scalar.Int64 (-1L))))
 
 let test_string_equality () =
   parses_predicate "name = \"Alice\""
     (expression_compare ~left:(expression_column "name") ~op:Equal
-       ~right:(expression_literal (Value.String "Alice")))
+       ~right:(expression_literal (Scalar.String "Alice")))
 
 let test_string_with_escaped_quotes () =
   parses_predicate "name = \"with \\\"quotes\\\"\""
     (expression_compare ~left:(expression_column "name") ~op:Equal
-       ~right:(expression_literal (Value.String "with \"quotes\"")))
+       ~right:(expression_literal (Scalar.String "with \"quotes\"")))
 
 let test_string_with_escaped_backslash () =
   parses_predicate "name = \"a\\\\b\""
     (expression_compare ~left:(expression_column "name") ~op:Equal
-       ~right:(expression_literal (Value.String "a\\b")))
+       ~right:(expression_literal (Scalar.String "a\\b")))
 
 let test_bool_true () =
   parses_predicate "active = true"
     (expression_compare
        ~left:(expression_column "active")
        ~op:Equal
-       ~right:(expression_literal (Value.Bool true)))
+       ~right:(expression_literal (Scalar.Bool true)))
 
 let test_bool_false () =
   parses_predicate "active = false"
     (expression_compare
        ~left:(expression_column "active")
        ~op:Equal
-       ~right:(expression_literal (Value.Bool false)))
+       ~right:(expression_literal (Scalar.Bool false)))
 
 let test_inequality () =
   parses_predicate "id <> 3"
     (expression_compare ~left:(expression_column "id") ~op:NotEqual
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_tolerates_extra_whitespace () =
   parses_predicate "  id   =   3  "
     (expression_compare ~left:(expression_column "id") ~op:Equal
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_literal_on_the_left () =
   (* Either side of the comparison can be a column or a literal. *)
   parses_predicate "3 = id"
     (expression_compare
-       ~left:(expression_literal (Value.Int64 3L))
+       ~left:(expression_literal (Scalar.Int64 3L))
        ~op:Equal ~right:(expression_column "id"))
 
 let test_column_equals_column () =
@@ -113,41 +113,41 @@ let test_bare_qualified_column () =
     (expression_qualified_column ~qualifier:"users" ~name:"active")
 
 let test_bare_bool_literal () =
-  parses_predicate "true" (expression_literal (Value.Bool true))
+  parses_predicate "true" (expression_literal (Scalar.Bool true))
 
 let test_less_than () =
   parses_predicate "id < 3"
     (expression_compare ~left:(expression_column "id") ~op:Less
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_less_or_equal () =
   parses_predicate "id <= 3"
     (expression_compare ~left:(expression_column "id") ~op:LessEqual
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_greater_than () =
   parses_predicate "id > 3"
     (expression_compare ~left:(expression_column "id") ~op:Greater
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_greater_or_equal () =
   parses_predicate "id >= 3"
     (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_compare_two_literals () =
   parses_predicate "5 = 5"
     (expression_compare
-       ~left:(expression_literal (Value.Int64 5L))
+       ~left:(expression_literal (Scalar.Int64 5L))
        ~op:Equal
-       ~right:(expression_literal (Value.Int64 5L)))
+       ~right:(expression_literal (Scalar.Int64 5L)))
 
 let test_qualified_column_against_literal () =
   parses_predicate "users.id = 3"
     (expression_compare
        ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
        ~op:Equal
-       ~right:(expression_literal (Value.Int64 3L)))
+       ~right:(expression_literal (Scalar.Int64 3L)))
 
 let test_qualified_column_against_qualified_column () =
   parses_predicate "users.id = orders.user_id"
@@ -200,7 +200,7 @@ let test_comparison_binds_tighter_than_and () =
     (expression_and
        ~left:
          (expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Value.Int64 1L)))
+            ~right:(expression_literal (Scalar.Int64 1L)))
        ~right:(expression_column "active"))
 
 let test_mixed_and_or_with_comparison () =
@@ -211,12 +211,12 @@ let test_mixed_and_or_with_comparison () =
     (expression_or
        ~left:
          (expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Value.Int64 1L)))
+            ~right:(expression_literal (Scalar.Int64 1L)))
        ~right:
          (expression_and
             ~left:
               (expression_compare ~left:(expression_column "id") ~op:Equal
-                 ~right:(expression_literal (Value.Int64 2L)))
+                 ~right:(expression_literal (Scalar.Int64 2L)))
             ~right:(expression_column "active")))
 
 let test_not_of_a_column () =
@@ -228,7 +228,7 @@ let test_not_binds_looser_than_comparison () =
   parses_predicate "not id = 5"
     (expression_not
        (expression_compare ~left:(expression_column "id") ~op:Equal
-          ~right:(expression_literal (Value.Int64 5L))))
+          ~right:(expression_literal (Scalar.Int64 5L))))
 
 let test_not_binds_tighter_than_and () =
   (* [not a and b] parses as [(not a) and b] -- [not] binds tighter than
@@ -248,10 +248,10 @@ let test_not_of_parenthesised_expression () =
        (expression_and
           ~left:
             (expression_compare ~left:(expression_column "a") ~op:Greater
-               ~right:(expression_literal (Value.Int64 5L)))
+               ~right:(expression_literal (Scalar.Int64 5L)))
           ~right:
             (expression_compare ~left:(expression_column "b") ~op:Less
-               ~right:(expression_literal (Value.Int64 10L)))))
+               ~right:(expression_literal (Scalar.Int64 10L)))))
 
 let test_not_keyword_prefix_is_a_column_name () =
   (* [notation] starts with "not" but is a single identifier, so the parser
@@ -271,12 +271,12 @@ let test_parens_override_precedence () =
 let test_redundant_parens_are_accepted () =
   parses_predicate "((id = 1))"
     (expression_compare ~left:(expression_column "id") ~op:Equal
-       ~right:(expression_literal (Value.Int64 1L)))
+       ~right:(expression_literal (Scalar.Int64 1L)))
 
 let test_parens_tolerate_whitespace_inside () =
   parses_predicate "(  id = 1  )"
     (expression_compare ~left:(expression_column "id") ~op:Equal
-       ~right:(expression_literal (Value.Int64 1L)))
+       ~right:(expression_literal (Scalar.Int64 1L)))
 
 let test_parens_around_an_atom () =
   parses_predicate "(active)" (expression_column "active")
@@ -291,10 +291,10 @@ let test_format_parse_roundtrip_through_mixed_logic () =
         (expression_or
            ~left:
              (expression_compare ~left:(expression_column "id") ~op:Equal
-                ~right:(expression_literal (Value.Int64 1L)))
+                ~right:(expression_literal (Scalar.Int64 1L)))
            ~right:
              (expression_compare ~left:(expression_column "id") ~op:Equal
-                ~right:(expression_literal (Value.Int64 2L))))
+                ~right:(expression_literal (Scalar.Int64 2L))))
       ~right:(expression_column "active")
   in
   let formatted = format_to_string original in

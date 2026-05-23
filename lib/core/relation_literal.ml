@@ -10,7 +10,7 @@ let kind_of ~columns ~first_row : Relation.kind =
   let row_kind : Row.kind =
     List.map2
       (fun column_name row_value : Row.field ->
-        { name = column_name; kind = Value.kind_of row_value; qualifier = None })
+        { name = column_name; kind = Scalar.kind_of row_value; qualifier = None })
       columns first_row
   in
   { row_kind; refinements = [] }

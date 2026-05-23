@@ -3,7 +3,7 @@
 open Dovetail_surface_ra
 open Test_helpers
 module Ddl = Dovetail_ddl
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let ast_program_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )
@@ -68,13 +68,13 @@ let test_rejects_two_identifiers () =
 
 let id_equals_three =
   expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Value.Int64 3L))
+    ~right:(expression_literal (Scalar.Int64 3L))
 
 let active_equals_true =
   expression_compare
     ~left:(expression_column "active")
     ~op:Equal
-    ~right:(expression_literal (Value.Bool true))
+    ~right:(expression_literal (Scalar.Bool true))
 
 let test_pipeline_parses_single_restrict () =
   parses "users | restrict id = 3"
@@ -252,14 +252,14 @@ let test_pipeline_join_on_keyword_prefix_is_a_column_name () =
 
 let test_relation_literal_parses_single_pair () =
   parses "{id: 7}"
-    (Ast.RelationLiteral { columns = [ "id" ]; rows = [ [ Value.Int64 7L ] ] })
+    (Ast.RelationLiteral { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] })
 
 let test_relation_literal_parses_multiple_pairs () =
   parses "{id: 7, name: \"Pretzel\", active: true}"
     (Ast.RelationLiteral
        {
          columns = [ "id"; "name"; "active" ];
-         rows = [ [ Value.Int64 7L; Value.String "Pretzel"; Value.Bool true ] ];
+         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ] ];
        })
 
 let test_relation_literal_tolerates_trailing_comma () =
@@ -267,7 +267,7 @@ let test_relation_literal_tolerates_trailing_comma () =
     (Ast.RelationLiteral
        {
          columns = [ "id"; "name" ];
-         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
        })
 
 let test_relation_literal_tolerates_extra_whitespace () =
@@ -275,13 +275,13 @@ let test_relation_literal_tolerates_extra_whitespace () =
     (Ast.RelationLiteral
        {
          columns = [ "id"; "name" ];
-         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
        })
 
 let test_relation_literal_accepts_negative_int () =
   parses "{amount: -5}"
     (Ast.RelationLiteral
-       { columns = [ "amount" ]; rows = [ [ Value.Int64 (-5L) ] ] })
+       { columns = [ "amount" ]; rows = [ [ Scalar.Int64 (-5L) ] ] })
 
 let test_relation_literal_alone_is_a_valid_pipeline_head () =
   parses "{id: 7} | restrict id = 7"
@@ -289,10 +289,10 @@ let test_relation_literal_alone_is_a_valid_pipeline_head () =
        {
          input =
            Ast.RelationLiteral
-             { columns = [ "id" ]; rows = [ [ Value.Int64 7L ] ] };
+             { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
          predicate =
            expression_compare ~left:(expression_column "id") ~op:Equal
-             ~right:(expression_literal (Value.Int64 7L));
+             ~right:(expression_literal (Scalar.Int64 7L));
        })
 
 let test_relation_literal_rejects_empty () = rejects "{}"
@@ -366,10 +366,10 @@ let test_pipeline_ending_in_sink_parses_as_mutation () =
                   rows =
                     [
                       [
-                        Value.Int64 9L;
-                        Value.Int64 1L;
-                        Value.String "Pretzel";
-                        Value.Int64 9L;
+                        Scalar.Int64 9L;
+                        Scalar.Int64 1L;
+                        Scalar.String "Pretzel";
+                        Scalar.Int64 9L;
                       ];
                     ];
                 };
@@ -486,7 +486,7 @@ let test_pipeline_keyword_describe_is_a_relation_name () =
 (* [:create table <name> (col: kind, ...) primary key
    (col, ...)] parses to [Statement.Create_table { table_name; fields;
    primary_key }]. Kind names are resolved at parse time to
-   [Value.kind]; unknown kind names raise a parse error. Whitespace
+   [Scalar.kind]; unknown kind names raise a parse error. Whitespace
    and trailing commas are flexible inside the parentheses, matching
    the canonical printer's output so [parse (format s) = Ok (Ddl s)]
    holds for hand-built [Create_table] values. *)

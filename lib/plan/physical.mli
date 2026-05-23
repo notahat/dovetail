@@ -5,7 +5,7 @@
     lookups, and so on. The earlier IRs ({!Logical}, {!Ast}) are progressively
     translated down into this one. *)
 
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 
@@ -42,7 +42,7 @@ type t =
           key.
 
           The [key] field is [int64] for now: every primary key in dovetail is a
-          single [int64] column at this point. The field widens to [Value.data]
+          single [int64] column at this point. The field widens to [Scalar.data]
           when other key kinds arrive. *)
   | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
       (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
@@ -83,7 +83,7 @@ type t =
 
           The output [primary_key] is [], matching [NestedLoopJoin] and
           [CrossProduct]. *)
-  | RelationLiteral of { columns : string list; rows : Value.data list list }
+  | RelationLiteral of { columns : string list; rows : Scalar.data list list }
       (** [RelationLiteral { columns; rows }] yields a relation whose rows are
           the literal's [rows] -- no storage involved. The output kind is
           {!Dovetail_core.Relation_literal.kind_of} applied to [columns] and the

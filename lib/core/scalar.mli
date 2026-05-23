@@ -1,7 +1,7 @@
 (** Database values.
 
-    [Value.data] is a runtime value -- one of the v1 supported types carrying
-    its payload. [Value.kind] is the static tag used in schemas to declare the
+    [Scalar.data] is a runtime value -- one of the v1 supported types carrying
+    its payload. [Scalar.kind] is the static tag used in schemas to declare the
     type of a column. The two are deliberately separated so schemas can be
     described without committing to any particular value.
 

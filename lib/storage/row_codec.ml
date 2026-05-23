@@ -1,4 +1,4 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
@@ -28,7 +28,7 @@ let require_single_int64_primary_key_field (kind : Relation.kind) : Row.field =
 let decode_row kind (key_bytes, value_bytes) =
   let _ : Row.field = require_single_int64_primary_key_field kind in
   let primary_key_values =
-    [ Value.Int64 (Encoding.decode_int64_key key_bytes) ]
+    [ Scalar.Int64 (Encoding.decode_int64_key key_bytes) ]
   in
   let non_primary_key_values = Encoding.decode_row_value value_bytes in
   Relation.assemble_row kind ~primary_key_values ~non_primary_key_values
@@ -40,7 +40,7 @@ let encode_row kind row =
   in
   let key_bytes =
     match primary_key_values with
-    | [ Value.Int64 key ] -> Encoding.encode_int64_key key
+    | [ Scalar.Int64 key ] -> Encoding.encode_int64_key key
     (* [require_single_int64_primary_key_field] above plus [split_row]'s
        kind-respecting projection guarantee this shape. *)
     | _ -> assert false

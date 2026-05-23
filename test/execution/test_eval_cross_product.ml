@@ -1,7 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.CrossProduct]. *)
 
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Plan = Dovetail_plan
 
 let users_cross_orders_plan : Plan.Physical.t =
@@ -70,7 +70,7 @@ let test_cross_product_with_ambiguous_unqualified_filter_raises () =
         input = users_cross_orders_plan;
         predicate =
           expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Value.Int64 3L));
+            ~right:(expression_literal (Scalar.Int64 3L));
       }
   in
   Alcotest.check_raises "ambiguous unqualified column"

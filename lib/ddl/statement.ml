@@ -1,8 +1,8 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
-type field = { name : string; kind : Value.kind }
+type field = { name : string; kind : Scalar.kind }
 
 type t =
   | List_tables

@@ -5,7 +5,7 @@ open Test_helpers
 module Execution = Dovetail_execution
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let logical_plan_testable : Plan.Logical.plan Alcotest.testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical-plan>")) ( = )
@@ -34,7 +34,7 @@ let test_pipeline_yields_fixture_rows () =
 
 let id_equals_three =
   expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Value.Int64 3L))
+    ~right:(expression_literal (Scalar.Int64 3L))
 
 let test_restrict_lowers_to_logical_restrict () =
   let ast =
@@ -98,11 +98,11 @@ let test_project_pipeline_yields_projected_rows () =
           let rows = List.of_seq relation.data in
           let expected =
             [
-              [| Value.String "Alice"; Value.String "alice@example.com" |];
-              [| Value.String "Bob"; Value.String "bob@example.com" |];
-              [| Value.String "Carol"; Value.String "carol@example.com" |];
-              [| Value.String "Dave"; Value.String "dave@example.com" |];
-              [| Value.String "Eve"; Value.String "eve@example.com" |];
+              [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
+              [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
+              [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
+              [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
+              [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
             ]
           in
           Alcotest.(check row_list_testable)
@@ -160,10 +160,10 @@ let test_insert_mutation_lowers_through () =
         rows =
           [
             [
-              Value.Int64 9L;
-              Value.Int64 1L;
-              Value.String "Pretzel";
-              Value.Int64 9L;
+              Scalar.Int64 9L;
+              Scalar.Int64 1L;
+              Scalar.String "Pretzel";
+              Scalar.Int64 9L;
             ];
           ];
       }
@@ -183,10 +183,10 @@ let test_insert_mutation_lowers_through () =
                   rows =
                     [
                       [
-                        Value.Int64 9L;
-                        Value.Int64 1L;
-                        Value.String "Pretzel";
-                        Value.Int64 9L;
+                        Scalar.Int64 9L;
+                        Scalar.Int64 1L;
+                        Scalar.String "Pretzel";
+                        Scalar.Int64 9L;
                       ];
                     ];
                 };
@@ -204,7 +204,7 @@ let test_insert_mutation_lowers_relational_source () =
         input = Relation_name "orders";
         predicate =
           expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Value.Int64 1L));
+            ~right:(expression_literal (Scalar.Int64 1L));
       }
   in
   let plan : Ast.plan = Mutation (Insert { source; table = "orders" }) in
@@ -221,7 +221,7 @@ let test_insert_mutation_lowers_relational_source () =
                   input = Scan { table = "orders" };
                   predicate =
                     expression_compare ~left:(expression_column "id") ~op:Equal
-                      ~right:(expression_literal (Value.Int64 1L));
+                      ~right:(expression_literal (Scalar.Int64 1L));
                 };
           }))
     logical
@@ -231,7 +231,7 @@ let test_relation_literal_lowers_through () =
     RelationLiteral
       {
         columns = [ "id"; "name" ];
-        rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+        rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
       }
   in
   let logical = Lower.lower (Ast.Query ast) in
@@ -241,7 +241,7 @@ let test_relation_literal_lowers_through () =
        (RelationLiteral
           {
             columns = [ "id"; "name" ];
-            rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+            rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
           }))
     logical
 

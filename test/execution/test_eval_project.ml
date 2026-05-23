@@ -4,7 +4,7 @@
 
 open Dovetail_execution
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
@@ -32,11 +32,11 @@ let test_project_single_column () =
   let rows = evaluate_users_project ~input_plan:users_full_scan [ "name" ] in
   let expected =
     [
-      [| Value.String "Alice" |];
-      [| Value.String "Bob" |];
-      [| Value.String "Carol" |];
-      [| Value.String "Dave" |];
-      [| Value.String "Eve" |];
+      [| Scalar.String "Alice" |];
+      [| Scalar.String "Bob" |];
+      [| Scalar.String "Carol" |];
+      [| Scalar.String "Dave" |];
+      [| Scalar.String "Eve" |];
     ]
   in
   Alcotest.(check row_list_testable) "five single-column rows" expected rows
@@ -47,11 +47,11 @@ let test_project_multi_column () =
   in
   let expected =
     [
-      [| Value.String "Alice"; Value.String "alice@example.com" |];
-      [| Value.String "Bob"; Value.String "bob@example.com" |];
-      [| Value.String "Carol"; Value.String "carol@example.com" |];
-      [| Value.String "Dave"; Value.String "dave@example.com" |];
-      [| Value.String "Eve"; Value.String "eve@example.com" |];
+      [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
+      [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
+      [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
+      [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
+      [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
     ]
   in
   Alcotest.(check row_list_testable) "five two-column rows" expected rows
@@ -62,11 +62,11 @@ let test_project_reorders_columns () =
   in
   let expected =
     [
-      [| Value.String "alice@example.com"; Value.Int64 1L |];
-      [| Value.String "bob@example.com"; Value.Int64 2L |];
-      [| Value.String "carol@example.com"; Value.Int64 3L |];
-      [| Value.String "dave@example.com"; Value.Int64 4L |];
-      [| Value.String "eve@example.com"; Value.Int64 5L |];
+      [| Scalar.String "alice@example.com"; Scalar.Int64 1L |];
+      [| Scalar.String "bob@example.com"; Scalar.Int64 2L |];
+      [| Scalar.String "carol@example.com"; Scalar.Int64 3L |];
+      [| Scalar.String "dave@example.com"; Scalar.Int64 4L |];
+      [| Scalar.String "eve@example.com"; Scalar.Int64 5L |];
     ]
   in
   Alcotest.(check row_list_testable) "rows in requested order" expected rows
@@ -95,16 +95,16 @@ let test_project_then_filter () =
               expression_compare
                 ~left:(expression_column "active")
                 ~op:Equal
-                ~right:(expression_literal (Value.Bool true));
+                ~right:(expression_literal (Scalar.Bool true));
           }
       in
       Eval.eval environment transaction plan (fun relation ->
           let rows = List.of_seq relation.data in
           let expected =
             [
-              [| Value.String "Alice"; Value.Bool true |];
-              [| Value.String "Carol"; Value.Bool true |];
-              [| Value.String "Dave"; Value.Bool true |];
+              [| Scalar.String "Alice"; Scalar.Bool true |];
+              [| Scalar.String "Carol"; Scalar.Bool true |];
+              [| Scalar.String "Dave"; Scalar.Bool true |];
             ]
           in
           Alcotest.(check row_list_testable)
@@ -119,15 +119,15 @@ let test_filter_then_project () =
           expression_compare
             ~left:(expression_column "active")
             ~op:Equal
-            ~right:(expression_literal (Value.Bool true));
+            ~right:(expression_literal (Scalar.Bool true));
       }
   in
   let rows = evaluate_users_project ~input_plan:filter_active_true [ "name" ] in
   let expected =
     [
-      [| Value.String "Alice" |];
-      [| Value.String "Carol" |];
-      [| Value.String "Dave" |];
+      [| Scalar.String "Alice" |];
+      [| Scalar.String "Carol" |];
+      [| Scalar.String "Dave" |];
     ]
   in
   Alcotest.(check row_list_testable) "three active names" expected rows

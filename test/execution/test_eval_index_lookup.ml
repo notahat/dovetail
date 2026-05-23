@@ -2,7 +2,7 @@
 
 open Dovetail_execution
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 

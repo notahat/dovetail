@@ -2,7 +2,7 @@
 
 open Dovetail_execution
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
@@ -19,7 +19,7 @@ let with_literal_relation f =
           {
             columns = [ "id"; "name"; "active" ];
             rows =
-              [ [ Value.Int64 7L; Value.String "Pretzel"; Value.Bool true ] ];
+              [ [ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ] ];
           }
       in
       Eval.eval environment transaction plan f)
@@ -44,7 +44,7 @@ let test_field_kinds_are_inferred_from_the_first_row () =
     "field kinds match the first row's value kinds"
     [ "Int64"; "String"; "Bool" ]
     (List.map
-       (fun (field : Row.field) -> Value.kind_to_string field.kind)
+       (fun (field : Row.field) -> Scalar.kind_to_string field.kind)
        relation.kind.row_kind)
 
 let test_primary_key_is_empty () =
@@ -58,7 +58,7 @@ let test_rows_match_the_literals_row () =
   let rows = List.of_seq relation.data in
   Alcotest.(check row_list_testable)
     "one row, values match the literal"
-    [ [| Value.Int64 7L; Value.String "Pretzel"; Value.Bool true |] ]
+    [ [| Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true |] ]
     rows
 
 let () =

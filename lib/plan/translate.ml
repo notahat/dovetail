@@ -1,4 +1,4 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
@@ -381,14 +381,14 @@ let check_value_kinds ~target_table ~(target_kind : Relation.kind)
           (fun (field : Row.field) -> field.name = column_name)
           target_kind.row_kind
       in
-      let actual_kind = Value.kind_of value in
+      let actual_kind = Scalar.kind_of value in
       if actual_kind <> target_field.kind then
         failwith
           (Printf.sprintf
              "Translate: insert into %S: column %S expects %s, got %s"
              target_table column_name
-             (Value.kind_to_string target_field.kind)
-             (Value.kind_to_string actual_kind)))
+             (Scalar.kind_to_string target_field.kind)
+             (Scalar.kind_to_string actual_kind)))
     literal_columns first_row
 
 (* Run the three literal/target checks in the order the later ones depend

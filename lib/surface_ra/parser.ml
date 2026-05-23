@@ -1,6 +1,6 @@
 open Angstrom
 module StringSet = Set.Make (String)
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 module Ddl = Dovetail_ddl
@@ -50,14 +50,14 @@ let int64_literal =
   option "" (string "-") >>= fun sign ->
   take_while1 is_digit >>= fun digits ->
   match Int64.of_string_opt (sign ^ digits) with
-  | Some number -> return (Value.Int64 number)
+  | Some number -> return (Scalar.Int64 number)
   | None -> fail "int64 literal out of range"
 
 (* A bool literal. The [keyword] helper enforces a word break after the
    literal text, so [trueish] doesn't sneakily match [true]. *)
 let bool_literal =
-  keyword "true" *> return (Value.Bool true)
-  <|> keyword "false" *> return (Value.Bool false)
+  keyword "true" *> return (Scalar.Bool true)
+  <|> keyword "false" *> return (Scalar.Bool false)
 
 (* A character inside a string literal: either a recognised escape
    (backslash-quote or double-backslash) or any non-quote,
@@ -76,7 +76,7 @@ let string_literal =
   char '"' *> many string_literal_character <* char '"' >>| fun characters ->
   let buffer = Buffer.create 16 in
   List.iter (Buffer.add_char buffer) characters;
-  Value.String (Buffer.contents buffer)
+  Scalar.String (Buffer.contents buffer)
 
 (* A single literal value in a relation literal's value position: int,
    string, or bool. The dispatch on the leading character matches the
@@ -100,7 +100,7 @@ let literal_value =
    a source-span field doesn't force every destructure site to change. *)
 type literal_pair = {
   column_key : string;
-  value : Value.data;
+  value : Scalar.data;
   key_is_qualified : bool;
 }
 
@@ -398,15 +398,15 @@ let ddl_describe =
 
 (* Resolve a [:create table] column kind at parse time. The surface kind
    position carries an identifier ([Int64], [String], [Bool]) and the
-   parser maps it to {!Value.kind} directly -- downstream code never
+   parser maps it to {!Scalar.kind} directly -- downstream code never
    sees a raw kind string. An unknown identifier here raises a parse
    error rather than deferring the diagnostic to validate, so
    [Statement.t] values never carry a phantom kind. *)
-let create_table_kind : Value.kind Angstrom.t =
+let create_table_kind : Scalar.kind Angstrom.t =
   identifier >>= function
-  | "Int64" -> return (Value.Int64 : Value.kind)
-  | "String" -> return (Value.String : Value.kind)
-  | "Bool" -> return (Value.Bool : Value.kind)
+  | "Int64" -> return (Scalar.Int64 : Scalar.kind)
+  | "String" -> return (Scalar.String : Scalar.kind)
+  | "Bool" -> return (Scalar.Bool : Scalar.kind)
   | other -> fail (Printf.sprintf "unknown kind %S" other)
 
 (* A single column declaration: [<identifier> : <kind>]. Whitespace

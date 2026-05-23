@@ -2,7 +2,7 @@
 
 open Dovetail_execution
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
@@ -24,7 +24,7 @@ let test_filter_equality_on_int64_yields_one_row () =
   let rows =
     evaluate_users_filter
       (expression_compare ~left:(expression_column "id") ~op:Equal
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check row_list_testable)
     "Carol's row"
@@ -35,7 +35,7 @@ let test_filter_equality_on_string_yields_one_row () =
   let rows =
     evaluate_users_filter
       (expression_compare ~left:(expression_column "name") ~op:Equal
-         ~right:(expression_literal (Value.String "Alice")))
+         ~right:(expression_literal (Scalar.String "Alice")))
   in
   Alcotest.(check row_list_testable)
     "Alice's row"
@@ -48,7 +48,7 @@ let test_filter_equality_on_bool_yields_active_rows () =
       (expression_compare
          ~left:(expression_column "active")
          ~op:Equal
-         ~right:(expression_literal (Value.Bool true)))
+         ~right:(expression_literal (Scalar.Bool true)))
   in
   Alcotest.(check int) "three active rows" 3 (List.length rows)
 
@@ -56,7 +56,7 @@ let test_filter_inequality_yields_complement () =
   let rows =
     evaluate_users_filter
       (expression_compare ~left:(expression_column "id") ~op:NotEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check int) "four rows with id <> 3" 4 (List.length rows)
 
@@ -64,7 +64,7 @@ let test_filter_matches_all_rows () =
   let rows =
     evaluate_users_filter
       (expression_compare ~left:(expression_column "id") ~op:NotEqual
-         ~right:(expression_literal (Value.Int64 999L)))
+         ~right:(expression_literal (Scalar.Int64 999L)))
   in
   Alcotest.(check row_list_testable)
     "all five fixture rows" expected_users_rows rows
@@ -73,7 +73,7 @@ let test_filter_matches_zero_rows () =
   let rows =
     evaluate_users_filter
       (expression_compare ~left:(expression_column "id") ~op:Equal
-         ~right:(expression_literal (Value.Int64 999L)))
+         ~right:(expression_literal (Scalar.Int64 999L)))
   in
   Alcotest.(check row_list_testable) "no rows" [] rows
 
@@ -93,7 +93,7 @@ let test_filter_unknown_column_raises () =
           (expression_compare
              ~left:(expression_column "unknown_col")
              ~op:Equal
-             ~right:(expression_literal (Value.Int64 3L)))
+             ~right:(expression_literal (Scalar.Int64 3L)))
       in
       ())
 
@@ -105,7 +105,7 @@ let test_filter_type_mismatch_raises () =
       let _ =
         evaluate_users_filter
           (expression_compare ~left:(expression_column "name") ~op:Equal
-             ~right:(expression_literal (Value.Int64 1L)))
+             ~right:(expression_literal (Scalar.Int64 1L)))
       in
       ())
 

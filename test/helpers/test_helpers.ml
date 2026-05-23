@@ -20,7 +20,7 @@
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
@@ -127,7 +127,7 @@ let expected_users_rows = Fixture.users_rows
     Carol (id 3) each have two. *)
 let expected_orders_rows = Fixture.orders_rows
 
-(** Format a row's values using {!Value.format}, comma-separated and wrapped in
+(** Format a row's values using {!Scalar.format}, comma-separated and wrapped in
     brackets. So {[Alcotest]} failure diffs read as [\[1, "Alice", true\]] --
     the boundaries between values are visible, the kinds are distinguishable at
     a glance. *)
@@ -136,7 +136,7 @@ let format_row formatter row =
   Array.iteri
     (fun index value ->
       if index > 0 then Format.fprintf formatter ", ";
-      Value.format formatter value)
+      Scalar.format formatter value)
     row;
   Format.fprintf formatter "]"
 
@@ -148,7 +148,7 @@ let format_row_list formatter rows =
   List.iter (fun row -> Format.fprintf formatter "%a@\n" format_row row) rows
 
 (** Alcotest testable for a list of [Row.data]s. Polymorphic-equality based. The
-    printer renders one row per line using {!Value.format} so failure diffs
+    printer renders one row per line using {!Scalar.format} so failure diffs
     surface the offending row rather than [\<rows\> vs \<rows\>]. *)
 let row_list_testable : Row.data list Alcotest.testable =
   Alcotest.testable format_row_list ( = )

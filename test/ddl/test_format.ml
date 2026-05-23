@@ -9,7 +9,7 @@
     the doc together. *)
 
 module Ddl = Dovetail_ddl
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let test_format_list_tables () =
   Alcotest.(check string)
@@ -33,7 +33,7 @@ let make_create_table ~table_name ~fields ~primary_key : Ddl.Statement.t =
 let test_format_create_table_int64 () =
   let statement =
     make_create_table ~table_name:"widgets"
-      ~fields:[ { name = "id"; kind = Value.Int64 } ]
+      ~fields:[ { name = "id"; kind = Scalar.Int64 } ]
       ~primary_key:[ "id" ]
   in
   Alcotest.(check string)
@@ -44,7 +44,7 @@ let test_format_create_table_int64 () =
 let test_format_create_table_string () =
   let statement =
     make_create_table ~table_name:"widgets"
-      ~fields:[ { name = "name"; kind = Value.String } ]
+      ~fields:[ { name = "name"; kind = Scalar.String } ]
       ~primary_key:[ "name" ]
   in
   Alcotest.(check string)
@@ -55,7 +55,7 @@ let test_format_create_table_string () =
 let test_format_create_table_bool () =
   let statement =
     make_create_table ~table_name:"widgets"
-      ~fields:[ { name = "active"; kind = Value.Bool } ]
+      ~fields:[ { name = "active"; kind = Scalar.Bool } ]
       ~primary_key:[ "active" ]
   in
   Alcotest.(check string)
@@ -68,8 +68,8 @@ let test_format_create_table_compound_primary_key () =
     make_create_table ~table_name:"pairs"
       ~fields:
         [
-          { name = "left"; kind = Value.Int64 };
-          { name = "right"; kind = Value.Int64 };
+          { name = "left"; kind = Scalar.Int64 };
+          { name = "right"; kind = Scalar.Int64 };
         ]
       ~primary_key:[ "left"; "right" ]
   in
@@ -87,10 +87,10 @@ let test_format_create_table_users_example () =
     make_create_table ~table_name:"users"
       ~fields:
         [
-          { name = "id"; kind = Value.Int64 };
-          { name = "name"; kind = Value.String };
-          { name = "email"; kind = Value.String };
-          { name = "active"; kind = Value.Bool };
+          { name = "id"; kind = Scalar.Int64 };
+          { name = "name"; kind = Scalar.String };
+          { name = "email"; kind = Scalar.String };
+          { name = "active"; kind = Scalar.Bool };
         ]
       ~primary_key:[ "id" ]
   in
@@ -110,9 +110,9 @@ let test_format_create_table_order_items_example () =
     make_create_table ~table_name:"order_items"
       ~fields:
         [
-          { name = "order_id"; kind = Value.Int64 };
-          { name = "product_id"; kind = Value.Int64 };
-          { name = "quantity"; kind = Value.Int64 };
+          { name = "order_id"; kind = Scalar.Int64 };
+          { name = "product_id"; kind = Scalar.Int64 };
+          { name = "quantity"; kind = Scalar.Int64 };
         ]
       ~primary_key:[ "order_id"; "product_id" ]
   in

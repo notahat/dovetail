@@ -45,7 +45,7 @@ let test_equality_on_int64_column () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "id") ~op:Equal
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check int) "one row with id = 3" 1 (List.length matched);
   Alcotest.(check row_list_testable)
@@ -57,7 +57,7 @@ let test_equality_on_string_column () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "name") ~op:Equal
-         ~right:(expression_literal (Value.String "Alice")))
+         ~right:(expression_literal (Scalar.String "Alice")))
   in
   Alcotest.(check row_list_testable)
     "row is Alice's"
@@ -70,7 +70,7 @@ let test_equality_on_bool_column () =
       (expression_compare
          ~left:(expression_column "active")
          ~op:Equal
-         ~right:(expression_literal (Value.Bool true)))
+         ~right:(expression_literal (Scalar.Bool true)))
   in
   Alcotest.(check int) "three active rows" 3 (List.length matched)
 
@@ -78,7 +78,7 @@ let test_inequality_on_int64_column () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "id") ~op:NotEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check int) "four rows with id <> 3" 4 (List.length matched)
 
@@ -91,7 +91,7 @@ let test_predicate_on_non_first_column_uses_correct_position () =
       (expression_compare
          ~left:(expression_column "active")
          ~op:Equal
-         ~right:(expression_literal (Value.Bool false)))
+         ~right:(expression_literal (Scalar.Bool false)))
   in
   Alcotest.(check int) "two inactive rows" 2 (List.length matched)
 
@@ -99,7 +99,7 @@ let test_literal_on_left_and_column_on_right () =
   let matched =
     filter_users
       (expression_compare
-         ~left:(expression_literal (Value.Int64 3L))
+         ~left:(expression_literal (Scalar.Int64 3L))
          ~op:Equal ~right:(expression_column "id"))
   in
   Alcotest.(check row_list_testable)
@@ -141,7 +141,7 @@ let test_int64_less_than_yields_lower_subset () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "id") ~op:Less
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check row_list_testable)
     "ids strictly less than 3"
@@ -152,7 +152,7 @@ let test_int64_less_or_equal_yields_lower_inclusive () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "id") ~op:LessEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check row_list_testable)
     "ids less than or equal to 3"
@@ -163,7 +163,7 @@ let test_int64_greater_than_yields_upper_subset () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "id") ~op:Greater
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check row_list_testable)
     "ids strictly greater than 3"
@@ -174,7 +174,7 @@ let test_int64_greater_or_equal_yields_upper_inclusive () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check row_list_testable)
     "ids greater than or equal to 3"
@@ -187,7 +187,7 @@ let test_string_greater_or_equal_orders_lexicographically () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "name") ~op:GreaterEqual
-         ~right:(expression_literal (Value.String "C")))
+         ~right:(expression_literal (Scalar.String "C")))
   in
   Alcotest.(check row_list_testable)
     "names lexicographically >= \"C\""
@@ -198,7 +198,7 @@ let test_string_less_than_orders_lexicographically () =
   let matched =
     filter_users
       (expression_compare ~left:(expression_column "name") ~op:Less
-         ~right:(expression_literal (Value.String "C")))
+         ~right:(expression_literal (Scalar.String "C")))
   in
   Alcotest.(check row_list_testable)
     "names lexicographically < \"C\""
@@ -222,7 +222,7 @@ let test_bare_bool_literal_resolves_as_predicate () =
   (* A standalone Bool literal is a valid (degenerate) predicate; the
      verdict is constant across all rows. *)
   let always_true =
-    Expression.resolve users_row_kind (expression_literal (Value.Bool true))
+    Expression.resolve users_row_kind (expression_literal (Scalar.Bool true))
   in
   Alcotest.(check bool)
     "true literal is true for every row" true
@@ -236,7 +236,7 @@ let test_qualified_column_resolves_identically_to_unqualified () =
       (expression_compare
          ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
          ~op:Equal
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check row_list_testable)
     "Carol's row from qualified id"
@@ -251,7 +251,7 @@ let test_unknown_qualifier_raises () =
           (expression_compare
              ~left:(expression_qualified_column ~qualifier:"orders" ~name:"id")
              ~op:Equal
-             ~right:(expression_literal (Value.Int64 3L)))
+             ~right:(expression_literal (Scalar.Int64 3L)))
       in
       ())
 
@@ -263,7 +263,7 @@ let test_unknown_column_on_left_raises () =
           (expression_compare
              ~left:(expression_column "unknown_col")
              ~op:Equal
-             ~right:(expression_literal (Value.Int64 3L)))
+             ~right:(expression_literal (Scalar.Int64 3L)))
       in
       ())
 
@@ -285,7 +285,7 @@ let test_type_mismatch_column_vs_literal_raises () =
       let (_ : Row.data -> bool) =
         Expression.resolve users_row_kind
           (expression_compare ~left:(expression_column "name") ~op:Equal
-             ~right:(expression_literal (Value.Int64 1L)))
+             ~right:(expression_literal (Scalar.Int64 1L)))
       in
       ())
 
@@ -301,7 +301,7 @@ let test_ordering_on_bool_column_raises () =
           (expression_compare
              ~left:(expression_column "active")
              ~op:Greater
-             ~right:(expression_literal (Value.Bool false)))
+             ~right:(expression_literal (Scalar.Bool false)))
       in
       ())
 
@@ -323,7 +323,7 @@ let test_non_bool_literal_predicate_raises () =
     (fun () ->
       let (_ : Row.data -> bool) =
         Expression.resolve users_row_kind
-          (expression_literal (Value.String "hello"))
+          (expression_literal (Scalar.String "hello"))
       in
       ())
 
@@ -345,7 +345,7 @@ let test_and_returns_intersection () =
       (expression_and
          ~left:
            (expression_compare ~left:(expression_column "id") ~op:Greater
-              ~right:(expression_literal (Value.Int64 1L)))
+              ~right:(expression_literal (Scalar.Int64 1L)))
          ~right:(expression_column "active"))
   in
   (* id > 1 and active: ids 3 (Carol, active) and 4 (Dave, active). Id 2 is
@@ -361,10 +361,10 @@ let test_or_returns_union () =
       (expression_or
          ~left:
            (expression_compare ~left:(expression_column "name") ~op:Equal
-              ~right:(expression_literal (Value.String "Alice")))
+              ~right:(expression_literal (Scalar.String "Alice")))
          ~right:
            (expression_compare ~left:(expression_column "name") ~op:Equal
-              ~right:(expression_literal (Value.String "Bob"))))
+              ~right:(expression_literal (Scalar.String "Bob"))))
   in
   Alcotest.(check row_list_testable)
     "Alice and Bob"
@@ -378,11 +378,11 @@ let test_and_short_circuits_on_false_left () =
      circuit means it doesn't. *)
   let predicate =
     expression_and
-      ~left:(expression_literal (Value.Bool false))
+      ~left:(expression_literal (Scalar.Bool false))
       ~right:(expression_column "active")
   in
   let evaluator = Expression.resolve users_row_kind predicate in
-  let too_short_to_contain_active = [| Value.Int64 1L |] in
+  let too_short_to_contain_active = [| Scalar.Int64 1L |] in
   Alcotest.(check bool)
     "short-circuits to false without reading right operand" false
     (evaluator too_short_to_contain_active)
@@ -392,11 +392,11 @@ let test_or_short_circuits_on_true_left () =
      read the right operand. *)
   let predicate =
     expression_or
-      ~left:(expression_literal (Value.Bool true))
+      ~left:(expression_literal (Scalar.Bool true))
       ~right:(expression_column "active")
   in
   let evaluator = Expression.resolve users_row_kind predicate in
-  let too_short_to_contain_active = [| Value.Int64 1L |] in
+  let too_short_to_contain_active = [| Scalar.Int64 1L |] in
   Alcotest.(check bool)
     "short-circuits to true without reading right operand" true
     (evaluator too_short_to_contain_active)

@@ -1,6 +1,6 @@
 (tests
  (names
-  test_value
+  test_scalar
   test_row
   test_expression
   test_expression_format

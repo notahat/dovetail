@@ -22,16 +22,16 @@ let test_decode_row_round_trips_a_users_row () =
   let value_bytes =
     Storage.Encoding.encode_row_value
       [
-        Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true;
+        Scalar.String "Alice"; Scalar.String "alice@example.com"; Scalar.Bool true;
       ]
   in
   let row = Storage.Row_codec.decode_row users_kind (key_bytes, value_bytes) in
   let expected : Row.data =
     [|
-      Value.Int64 7L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
+      Scalar.Int64 7L;
+      Scalar.String "Alice";
+      Scalar.String "alice@example.com";
+      Scalar.Bool true;
     |]
   in
   Alcotest.(check bool) "row matches expected" true (row = expected)
@@ -69,10 +69,10 @@ let test_decode_row_raises_for_non_int64_primary_key () =
 let test_encode_row_round_trips_through_decode_row () =
   let row : Row.data =
     [|
-      Value.Int64 42L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
+      Scalar.Int64 42L;
+      Scalar.String "Alice";
+      Scalar.String "alice@example.com";
+      Scalar.Bool true;
     |]
   in
   let key_bytes, value_bytes = Storage.Row_codec.encode_row users_kind row in
@@ -97,7 +97,7 @@ let test_encode_row_raises_for_composite_primary_key () =
     (fun () ->
       ignore
         (Storage.Row_codec.encode_row composite_kind
-           [| Value.Int64 1L; Value.Int64 2L |]))
+           [| Scalar.Int64 1L; Scalar.Int64 2L |]))
 
 let test_encode_row_raises_for_wrong_arity_row () =
   Alcotest.check_raises "row shorter than kind"
@@ -106,7 +106,7 @@ let test_encode_row_raises_for_wrong_arity_row () =
     (fun () ->
       ignore
         (Storage.Row_codec.encode_row users_kind
-           [| Value.Int64 7L; Value.String "Alice" |]))
+           [| Scalar.Int64 7L; Scalar.String "Alice" |]))
 
 let () =
   Alcotest.run "row_codec"

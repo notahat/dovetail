@@ -18,7 +18,7 @@
 open Dovetail_plan
 open Test_helpers
 module Relation = Dovetail_core.Relation
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 (* A users kind with a single int64 primary key, identical to
    [Fixture.users_kind] but rebuilt in-test so unit tests don't need
@@ -440,7 +440,7 @@ let test_nested_and_tree_flattens_before_partitioning () =
     expression_compare
       ~left:(expression_qualified_column ~qualifier:"orders" ~name:"amount")
       ~op:Greater
-      ~right:(expression_literal (Value.Int64 5L))
+      ~right:(expression_literal (Scalar.Int64 5L))
   in
   let predicate =
     expression_and
@@ -582,7 +582,7 @@ let test_on_clause_and_trailing_restrict_produce_the_same_plan () =
     expression_compare
       ~left:(expression_qualified_column ~qualifier:"orders" ~name:"amount")
       ~op:Greater
-      ~right:(expression_literal (Value.Int64 5L))
+      ~right:(expression_literal (Scalar.Int64 5L))
   in
   let cross_product : Logical.t =
     CrossProduct
@@ -639,7 +639,7 @@ let test_conjunction_with_no_pk_equality_falls_back () =
     expression_compare
       ~left:(expression_qualified_column ~qualifier:"orders" ~name:"amount")
       ~op:Greater
-      ~right:(expression_literal (Value.Int64 5L))
+      ~right:(expression_literal (Scalar.Int64 5L))
   in
   let predicate = expression_and ~left:conjunct_a ~right:conjunct_b in
   let logical : Logical.t =

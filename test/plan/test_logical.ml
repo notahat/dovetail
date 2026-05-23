@@ -11,7 +11,7 @@
 
 open Dovetail_plan
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let test_query_plan_classifies_as_read () =
   let plan : Logical.plan = Query (Scan { table = "users" }) in
@@ -27,7 +27,7 @@ let test_mutation_plan_classifies_as_write () =
            table = "orders";
            source =
              RelationLiteral
-               { columns = [ "id" ]; rows = [ [ Value.Int64 7L ] ] };
+               { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
          })
   in
   Alcotest.(check bool)
@@ -45,7 +45,7 @@ let orders_scan : Logical.t = Scan { table = "orders" }
 
 let id_equals_three =
   expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Value.Int64 3L))
+    ~right:(expression_literal (Scalar.Int64 3L))
 
 let users_id_equals_orders_user_id =
   expression_compare
@@ -91,7 +91,7 @@ let test_relation_literal_renders_columns_and_row_count () =
     RelationLiteral
       {
         columns = [ "id"; "name" ];
-        rows = [ [ Value.Int64 1L; Value.String "Alice" ] ];
+        rows = [ [ Scalar.Int64 1L; Scalar.String "Alice" ] ];
       }
   in
   Alcotest.(check string)
@@ -131,7 +131,7 @@ let test_format_plan_mutation_renders_insert_header_with_indented_source () =
            table = "orders";
            source =
              RelationLiteral
-               { columns = [ "id" ]; rows = [ [ Value.Int64 7L ] ] };
+               { columns = [ "id" ]; rows = [ [ Scalar.Int64 7L ] ] };
          })
   in
   Alcotest.(check string)

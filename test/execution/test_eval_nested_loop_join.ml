@@ -1,7 +1,7 @@
 (** End-to-end tests for [Eval] on [Physical.NestedLoopJoin]. *)
 
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Plan = Dovetail_plan
 
 (* The matched (user, order) pairs that a join on
@@ -37,15 +37,15 @@ let expected_matched_user_order_rows : Row.data list =
    resolver. *)
 let always_true_predicate =
   expression_compare
-    ~left:(expression_literal (Value.Int64 1L))
+    ~left:(expression_literal (Scalar.Int64 1L))
     ~op:Equal
-    ~right:(expression_literal (Value.Int64 1L))
+    ~right:(expression_literal (Scalar.Int64 1L))
 
 let always_false_predicate =
   expression_compare
-    ~left:(expression_literal (Value.Int64 1L))
+    ~left:(expression_literal (Scalar.Int64 1L))
     ~op:NotEqual
-    ~right:(expression_literal (Value.Int64 1L))
+    ~right:(expression_literal (Scalar.Int64 1L))
 
 let users_join_orders_on_id_predicate =
   expression_compare

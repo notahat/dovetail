@@ -10,7 +10,7 @@ open Dovetail_core
 let test_kind_of_infers_kinds_from_first_row () =
   let kind =
     Relation_literal.kind_of ~columns:[ "id"; "name"; "active" ]
-      ~first_row:[ Value.Int64 7L; Value.String "Pretzel"; Value.Bool true ]
+      ~first_row:[ Scalar.Int64 7L; Scalar.String "Pretzel"; Scalar.Bool true ]
   in
   Alcotest.(check (list string))
     "field names come from columns" [ "id"; "name"; "active" ]
@@ -19,12 +19,12 @@ let test_kind_of_infers_kinds_from_first_row () =
     "field kinds come from the first row's values"
     [ "Int64"; "String"; "Bool" ]
     (List.map
-       (fun (field : Row.field) -> Value.kind_to_string field.kind)
+       (fun (field : Row.field) -> Scalar.kind_to_string field.kind)
        kind.row_kind)
 
 let test_kind_of_leaves_qualifiers_absent () =
   let kind =
-    Relation_literal.kind_of ~columns:[ "id" ] ~first_row:[ Value.Int64 1L ]
+    Relation_literal.kind_of ~columns:[ "id" ] ~first_row:[ Scalar.Int64 1L ]
   in
   Alcotest.(check (list (option string)))
     "every field's qualifier is None" [ None ]
@@ -32,7 +32,7 @@ let test_kind_of_leaves_qualifiers_absent () =
 
 let test_kind_of_yields_no_refinements () =
   let kind =
-    Relation_literal.kind_of ~columns:[ "id" ] ~first_row:[ Value.Int64 1L ]
+    Relation_literal.kind_of ~columns:[ "id" ] ~first_row:[ Scalar.Int64 1L ]
   in
   Alcotest.(check int)
     "derived relations carry no refinements" 0
@@ -45,14 +45,14 @@ let test_kind_of_with_arity_mismatch_raises () =
     (fun () ->
       ignore
         (Relation_literal.kind_of ~columns:[ "id"; "name" ]
-           ~first_row:[ Value.Int64 1L ]));
+           ~first_row:[ Scalar.Int64 1L ]));
   Alcotest.check_raises "row wider than columns"
     (Invalid_argument
        "Relation_literal.kind_of: row has 3 value(s) but 1 column(s) declared")
     (fun () ->
       ignore
         (Relation_literal.kind_of ~columns:[ "id" ]
-           ~first_row:[ Value.Int64 1L; Value.String "x"; Value.Bool true ]))
+           ~first_row:[ Scalar.Int64 1L; Scalar.String "x"; Scalar.Bool true ]))
 
 let () =
   Alcotest.run "relation_literal"

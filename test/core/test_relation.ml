@@ -33,16 +33,16 @@ let unqualified_kind : Relation.kind =
 let two_users : Row.data list =
   [
     [|
-      Value.Int64 1L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
+      Scalar.Int64 1L;
+      Scalar.String "Alice";
+      Scalar.String "alice@example.com";
+      Scalar.Bool true;
     |];
     [|
-      Value.Int64 10L;
-      Value.String "Bob";
-      Value.String "bob@example.com";
-      Value.Bool false;
+      Scalar.Int64 10L;
+      Scalar.String "Bob";
+      Scalar.String "bob@example.com";
+      Scalar.Bool false;
     |];
   ]
 
@@ -73,7 +73,7 @@ let test_renders_unqualified_headers_when_fields_have_no_qualifier () =
   let relation : [ `Bag ] Relation.t =
     {
       kind = unqualified_kind;
-      data = List.to_seq [ [| Value.Int64 1L; Value.String "Alice" |] ];
+      data = List.to_seq [ [| Scalar.Int64 1L; Scalar.String "Alice" |] ];
     }
   in
   let expected =
@@ -127,95 +127,95 @@ let composite_pk_kind : Relation.kind =
 
 let test_assembles_in_field_order_with_leading_pk () =
   let assembled =
-    Relation.assemble_row users_kind ~primary_key_values:[ Value.Int64 42L ]
+    Relation.assemble_row users_kind ~primary_key_values:[ Scalar.Int64 42L ]
       ~non_primary_key_values:
         [
-          Value.String "Alice";
-          Value.String "alice@example.com";
-          Value.Bool true;
+          Scalar.String "Alice";
+          Scalar.String "alice@example.com";
+          Scalar.Bool true;
         ]
   in
   let expected : Row.data =
     [|
-      Value.Int64 42L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
+      Scalar.Int64 42L;
+      Scalar.String "Alice";
+      Scalar.String "alice@example.com";
+      Scalar.Bool true;
     |]
   in
   Alcotest.(check row_testable) "leading PK" expected assembled
 
 let test_assembles_with_pk_in_the_middle () =
   let assembled =
-    Relation.assemble_row mid_pk_kind ~primary_key_values:[ Value.Int64 7L ]
-      ~non_primary_key_values:[ Value.String "Bob"; Value.Bool false ]
+    Relation.assemble_row mid_pk_kind ~primary_key_values:[ Scalar.Int64 7L ]
+      ~non_primary_key_values:[ Scalar.String "Bob"; Scalar.Bool false ]
   in
   let expected : Row.data =
-    [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
+    [| Scalar.String "Bob"; Scalar.Int64 7L; Scalar.Bool false |]
   in
   Alcotest.(check row_testable) "PK in middle" expected assembled
 
 let test_assembles_composite_primary_key () =
   let assembled =
     Relation.assemble_row composite_pk_kind
-      ~primary_key_values:[ Value.String "acme"; Value.Int64 3L ]
-      ~non_primary_key_values:[ Value.String "Carol" ]
+      ~primary_key_values:[ Scalar.String "acme"; Scalar.Int64 3L ]
+      ~non_primary_key_values:[ Scalar.String "Carol" ]
   in
   let expected : Row.data =
-    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+    [| Scalar.String "acme"; Scalar.String "Carol"; Scalar.Int64 3L |]
   in
   Alcotest.(check row_testable) "composite PK" expected assembled
 
 let test_splits_row_with_leading_pk () =
   let row : Row.data =
     [|
-      Value.Int64 42L;
-      Value.String "Alice";
-      Value.String "alice@example.com";
-      Value.Bool true;
+      Scalar.Int64 42L;
+      Scalar.String "Alice";
+      Scalar.String "alice@example.com";
+      Scalar.Bool true;
     |]
   in
   let primary_key_values, non_primary_key_values =
     Relation.split_row users_kind row
   in
   Alcotest.(check values_list_testable)
-    "primary-key values" [ Value.Int64 42L ] primary_key_values;
+    "primary-key values" [ Scalar.Int64 42L ] primary_key_values;
   Alcotest.(check values_list_testable)
     "non-primary-key values"
-    [ Value.String "Alice"; Value.String "alice@example.com"; Value.Bool true ]
+    [ Scalar.String "Alice"; Scalar.String "alice@example.com"; Scalar.Bool true ]
     non_primary_key_values
 
 let test_splits_row_with_pk_in_the_middle () =
   let row : Row.data =
-    [| Value.String "Bob"; Value.Int64 7L; Value.Bool false |]
+    [| Scalar.String "Bob"; Scalar.Int64 7L; Scalar.Bool false |]
   in
   let primary_key_values, non_primary_key_values =
     Relation.split_row mid_pk_kind row
   in
   Alcotest.(check values_list_testable)
-    "primary-key values" [ Value.Int64 7L ] primary_key_values;
+    "primary-key values" [ Scalar.Int64 7L ] primary_key_values;
   Alcotest.(check values_list_testable)
     "non-primary-key values in field order"
-    [ Value.String "Bob"; Value.Bool false ]
+    [ Scalar.String "Bob"; Scalar.Bool false ]
     non_primary_key_values
 
 let test_splits_row_with_composite_primary_key () =
   let row : Row.data =
-    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+    [| Scalar.String "acme"; Scalar.String "Carol"; Scalar.Int64 3L |]
   in
   let primary_key_values, non_primary_key_values =
     Relation.split_row composite_pk_kind row
   in
   Alcotest.(check values_list_testable)
     "primary-key values in primary-key order"
-    [ Value.String "acme"; Value.Int64 3L ]
+    [ Scalar.String "acme"; Scalar.Int64 3L ]
     primary_key_values;
   Alcotest.(check values_list_testable)
-    "non-primary-key values" [ Value.String "Carol" ] non_primary_key_values
+    "non-primary-key values" [ Scalar.String "Carol" ] non_primary_key_values
 
 let test_split_is_the_inverse_of_assemble () =
   let row : Row.data =
-    [| Value.String "acme"; Value.String "Carol"; Value.Int64 3L |]
+    [| Scalar.String "acme"; Scalar.String "Carol"; Scalar.Int64 3L |]
   in
   let primary_key_values, non_primary_key_values =
     Relation.split_row composite_pk_kind row
@@ -228,7 +228,7 @@ let test_split_is_the_inverse_of_assemble () =
     "split then assemble round-trips the row" row reassembled
 
 let test_split_rejects_wrong_length_row () =
-  let row : Row.data = [| Value.Int64 1L; Value.String "Alice" |] in
+  let row : Row.data = [| Scalar.Int64 1L; Scalar.String "Alice" |] in
   Alcotest.check_raises "raises Invalid_argument"
     (Invalid_argument
        "Relation.split_row: row has 2 value(s) but kind declares 4 field(s)")

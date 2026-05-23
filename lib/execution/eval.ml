@@ -1,4 +1,4 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
@@ -182,7 +182,7 @@ and resolve_int64_outer_key_position outer_row_kind outer_key_column =
         (Printf.sprintf
            "Eval: IndexedNestedLoopJoin: requires Int64 outer key column, got \
             %s for %S"
-           (Value.kind_to_string other_kind)
+           (Scalar.kind_to_string other_kind)
            (Row.format_column_reference outer_key_column))
 
 (* Stream the [outer] sub-plan and probe [inner_table]'s storage by the
@@ -215,7 +215,7 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
   in
   let probe_outer_row outer_row =
     match outer_row.(outer_key_position) with
-    | Value.Int64 key -> (
+    | Scalar.Int64 key -> (
         let encoded_key = Storage.Encoding.encode_int64_key key in
         match
           Storage.Engine.get inner_table_map transaction ~key:encoded_key
@@ -309,7 +309,7 @@ let primary_key_value_text (target_kind : Relation.kind) target_row =
         Row.find_field target_kind.row_kind
           { qualifier = None; name = primary_key_name }
       with
-      | Ok (position, _field) -> Value.to_string target_row.(position)
+      | Ok (position, _field) -> Scalar.to_string target_row.(position)
       (* Internal invariant: by the time we're rendering an error for a row
          we just encoded, the PK column is in the kind. *)
       | Error _ -> assert false)

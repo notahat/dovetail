@@ -1,11 +1,11 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 (* Render one column declaration on its own indented line, with the
    trailing comma the canonical form puts on every column (including
    the last). The two-space indent and the [name: Kind] separator are
    the canonical form's two formatting decisions for a column line. *)
 let format_field (field : Statement.field) =
-  Printf.sprintf "  %s: %s,\n" field.name (Value.kind_to_string field.kind)
+  Printf.sprintf "  %s: %s,\n" field.name (Scalar.kind_to_string field.kind)
 
 (* Render a [Create_table] in the canonical multi-line form. The columns
    block is one [format_field] line per field; the closing line opens

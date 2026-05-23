@@ -17,7 +17,7 @@
     structurally: a mutation can only appear at the top of a pipeline, and its
     source field is a {!t}, not a {!plan}, so sinks cannot nest. *)
 
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
 module Ddl = Dovetail_ddl
 module Plan = Dovetail_plan
@@ -51,7 +51,7 @@ type t =
           [CrossProduct] -- both inputs' fields, each retaining its qualifier --
           so a [predicate] like [users.id = orders.user_id] resolves
           unambiguously across the combined schema. *)
-  | RelationLiteral of { columns : string list; rows : Value.data list list }
+  | RelationLiteral of { columns : string list; rows : Scalar.data list list }
       (** [RelationLiteral { columns; rows }] is the surface form
           [{col: val, col: val, ...}] -- a relation whose contents the user gave
           directly, instead of a reference to a stored table. The parser

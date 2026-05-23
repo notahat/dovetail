@@ -7,7 +7,7 @@ type comparison_op =
   | GreaterEqual
 
 type t =
-  | Literal of Value.data
+  | Literal of Scalar.data
   | Column of Row.column_reference
   | Compare of { left : t; op : comparison_op; right : t }
   | And of t * t
@@ -27,7 +27,7 @@ let describe_expression = function
   | Column reference ->
       Printf.sprintf "column %S" (Row.format_column_reference reference)
   | Literal value ->
-      Printf.sprintf "literal %s" (Value.kind_to_string (Value.kind_of value))
+      Printf.sprintf "literal %s" (Scalar.kind_to_string (Scalar.kind_of value))
   | Compare _ -> "comparison expression"
   | And _ -> "and expression"
   | Or _ -> "or expression"
@@ -43,7 +43,7 @@ let render_op = function
 
 (* Ordering operators only apply to kinds with a meaningful order. Today
    that is [Int64] and [String]; [Bool] is excluded. *)
-let is_ordered_kind : Value.kind -> bool = function
+let is_ordered_kind : Scalar.kind -> bool = function
   | Int64 | String -> true
   | Bool -> false
 
@@ -82,7 +82,7 @@ let rec format_at min_precedence formatter expression =
     Format.fprintf formatter "(%a)" (format_at 0) expression
   else
     match expression with
-    | Literal value -> Value.format formatter value
+    | Literal value -> Scalar.format formatter value
     | Column reference ->
         Format.pp_print_string formatter (Row.format_column_reference reference)
     | Compare { left; op; right } ->
@@ -106,13 +106,13 @@ let format formatter expression = format_at 0 formatter expression
 
 (* Common helper for [And] and [Or]: the operator name (for the error
    message) and the kind check on a single operand. *)
-let check_bool_operand operator_name operand (kind : Value.kind) =
-  if kind <> Value.Bool then
+let check_bool_operand operator_name operand (kind : Scalar.kind) =
+  if kind <> Scalar.Bool then
     failwith
       (Printf.sprintf "Expression.resolve: %s requires Bool operands: %s is %s"
          operator_name
          (describe_expression operand)
-         (Value.kind_to_string kind))
+         (Scalar.kind_to_string kind))
 
 (* Walk [expression] once, producing the value-producing closure paired with
    the value's static kind. The closure shape is the whole point: name
@@ -126,11 +126,11 @@ let check_bool_operand operator_name operand (kind : Value.kind) =
    in the same way. Short-circuit evaluation for [And]/[Or] is built into
    the produced closure: the right operand is only read when the left's
    verdict doesn't determine the result. *)
-let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
+let rec resolve_value row_kind : t -> Scalar.kind * (Row.data -> Scalar.data) =
  fun expression ->
   match expression with
   | Literal value ->
-      let kind = Value.kind_of value in
+      let kind = Scalar.kind_of value in
       let read (_row : Row.data) = value in
       (kind, read)
   | Column reference -> (
@@ -147,15 +147,15 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
           (Printf.sprintf
              "Expression.resolve: type mismatch: %s is %s, %s is %s"
              (describe_expression left)
-             (Value.kind_to_string left_kind)
+             (Scalar.kind_to_string left_kind)
              (describe_expression right)
-             (Value.kind_to_string right_kind));
+             (Scalar.kind_to_string right_kind));
       if is_ordering_op op && not (is_ordered_kind left_kind) then
         failwith
           (Printf.sprintf
              "Expression.resolve: ordering operator %s is not defined for %s"
              (render_op op)
-             (Value.kind_to_string left_kind));
+             (Scalar.kind_to_string left_kind));
       let comparator =
         match op with
         | Equal -> ( = )
@@ -165,8 +165,8 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
         | Greater -> ( > )
         | GreaterEqual -> ( >= )
       in
-      let read row = Value.Bool (comparator (read_left row) (read_right row)) in
-      (Value.Bool, read)
+      let read row = Scalar.Bool (comparator (read_left row) (read_right row)) in
+      (Scalar.Bool, read)
   | And (left, right) ->
       let left_kind, read_left = resolve_value row_kind left in
       let right_kind, read_right = resolve_value row_kind right in
@@ -177,11 +177,11 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
            true. The two non-Bool cases are unreachable given the kind
            checks above. *)
         match read_left row with
-        | Value.Bool false -> Value.Bool false
-        | Value.Bool true -> read_right row
+        | Scalar.Bool false -> Scalar.Bool false
+        | Scalar.Bool true -> read_right row
         | _ -> assert false
       in
-      (Value.Bool, read)
+      (Scalar.Bool, read)
   | Or (left, right) ->
       let left_kind, read_left = resolve_value row_kind left in
       let right_kind, read_right = resolve_value row_kind right in
@@ -192,38 +192,38 @@ let rec resolve_value row_kind : t -> Value.kind * (Row.data -> Value.data) =
            false. The two non-Bool cases are unreachable given the kind
            checks above. *)
         match read_left row with
-        | Value.Bool true -> Value.Bool true
-        | Value.Bool false -> read_right row
+        | Scalar.Bool true -> Scalar.Bool true
+        | Scalar.Bool false -> read_right row
         | _ -> assert false
       in
-      (Value.Bool, read)
+      (Scalar.Bool, read)
   | Not operand ->
       let operand_kind, read_operand = resolve_value row_kind operand in
-      if operand_kind <> Value.Bool then
+      if operand_kind <> Scalar.Bool then
         failwith
           (Printf.sprintf
              "Expression.resolve: not requires a Bool operand: %s is %s"
              (describe_expression operand)
-             (Value.kind_to_string operand_kind));
+             (Scalar.kind_to_string operand_kind));
       let read row =
         (* The operand-kind check above guarantees a Bool value here; the
            non-Bool arm is unreachable. *)
         match read_operand row with
-        | Value.Bool true -> Value.Bool false
-        | Value.Bool false -> Value.Bool true
+        | Scalar.Bool true -> Scalar.Bool false
+        | Scalar.Bool false -> Scalar.Bool true
         | _ -> assert false
       in
-      (Value.Bool, read)
+      (Scalar.Bool, read)
 
 let resolve row_kind expression =
   let kind, read_value = resolve_value row_kind expression in
-  if kind <> Value.Bool then
+  if kind <> Scalar.Bool then
     failwith
       (Printf.sprintf
          "Expression.resolve: predicate position requires Bool, got %s"
-         (Value.kind_to_string kind));
+         (Scalar.kind_to_string kind));
   fun (row : Row.data) ->
     (* The resolve-time kind check above guarantees a Bool value here. *)
     match read_value row with
-    | Value.Bool flag -> flag
+    | Scalar.Bool flag -> flag
     | _ -> assert false

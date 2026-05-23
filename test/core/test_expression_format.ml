@@ -18,7 +18,7 @@ let test_format_column_equals_int64_literal () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "id") ~op:Equal
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check string) "id = 3" "id = 3" rendered
 
@@ -26,7 +26,7 @@ let test_format_column_equals_string_literal_quotes_string () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "name") ~op:Equal
-         ~right:(expression_literal (Value.String "Alice")))
+         ~right:(expression_literal (Scalar.String "Alice")))
   in
   Alcotest.(check string)
     "string literal is double-quoted" "name = \"Alice\"" rendered
@@ -37,7 +37,7 @@ let test_format_column_equals_bool_literal () =
       (expression_compare
          ~left:(expression_column "active")
          ~op:Equal
-         ~right:(expression_literal (Value.Bool true)))
+         ~right:(expression_literal (Scalar.Bool true)))
   in
   Alcotest.(check string) "bool literal as keyword" "active = true" rendered
 
@@ -45,7 +45,7 @@ let test_format_inequality_uses_angle_brackets () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "id") ~op:NotEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check string) "id <> 3" "id <> 3" rendered
 
@@ -54,7 +54,7 @@ let test_format_bare_column_renders_as_column_name () =
   Alcotest.(check string) "bare column renders as its name" "active" rendered
 
 let test_format_bare_literal_renders_as_literal () =
-  let rendered = format_to_string (expression_literal (Value.Bool true)) in
+  let rendered = format_to_string (expression_literal (Scalar.Bool true)) in
   Alcotest.(check string)
     "bare bool literal renders as the keyword" "true" rendered
 
@@ -62,7 +62,7 @@ let test_format_less_than () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "id") ~op:Less
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check string) "id < 3" "id < 3" rendered
 
@@ -70,7 +70,7 @@ let test_format_less_equal () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "id") ~op:LessEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check string) "id <= 3" "id <= 3" rendered
 
@@ -78,7 +78,7 @@ let test_format_greater_than () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "id") ~op:Greater
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check string) "id > 3" "id > 3" rendered
 
@@ -86,7 +86,7 @@ let test_format_greater_equal () =
   let rendered =
     format_to_string
       (expression_compare ~left:(expression_column "id") ~op:GreaterEqual
-         ~right:(expression_literal (Value.Int64 3L)))
+         ~right:(expression_literal (Scalar.Int64 3L)))
   in
   Alcotest.(check string) "id >= 3" "id >= 3" rendered
 
@@ -101,7 +101,7 @@ let test_format_not_of_comparison () =
     format_to_string
       (expression_not
          (expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Value.Int64 5L))))
+            ~right:(expression_literal (Scalar.Int64 5L))))
   in
   Alcotest.(check string) "not id = 5" "not id = 5" rendered
 
@@ -132,7 +132,7 @@ let test_format_and_renders_with_keyword () =
          ~left:(expression_column "active")
          ~right:
            (expression_compare ~left:(expression_column "id") ~op:Greater
-              ~right:(expression_literal (Value.Int64 3L))))
+              ~right:(expression_literal (Scalar.Int64 3L))))
   in
   Alcotest.(check string)
     "and binds looser than comparison: no parens around id > 3"

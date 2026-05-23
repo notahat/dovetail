@@ -7,7 +7,7 @@
 
 open Dovetail_plan
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let format_to_string plan =
   let buffer = Buffer.create 128 in
@@ -21,7 +21,7 @@ let orders_full_scan : Physical.t = FullScan { table = "orders" }
 
 let id_equals_three =
   expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Value.Int64 3L))
+    ~right:(expression_literal (Scalar.Int64 3L))
 
 let users_id_equals_orders_user_id =
   expression_compare

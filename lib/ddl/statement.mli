@@ -23,14 +23,14 @@
     opens the matching transaction kind, and hands the statement straight to
     {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}. *)
 
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Relation = Dovetail_core.Relation
 
-type field = { name : string; kind : Value.kind }
+type field = { name : string; kind : Scalar.kind }
 (** A single column declaration in a [Create_table] statement. Deliberately
     distinct from {!Row.field}: the DDL surface has no notion of qualified
     columns, so the qualifier is absent here. The parser resolves the kind name
-    ([Int64], [String], [Bool]) to a {!Value.kind} at parse time, so every
+    ([Int64], [String], [Bool]) to a {!Scalar.kind} at parse time, so every
     [field] value already carries a real kind. *)
 
 type t =

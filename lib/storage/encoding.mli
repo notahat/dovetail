@@ -9,7 +9,7 @@
     OCaml's runtime representation is accepted for now and will be replaced with
     hand-rolled binary alongside composite-key encoding. *)
 
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 val encode_int64_key : int64 -> string
 (** Encode an [int64] as 8 bytes, big-endian with the sign bit flipped, so that
@@ -20,11 +20,11 @@ val decode_int64_key : string -> int64
 (** Inverse of {!encode_int64_key}. Raises [Invalid_argument] if the input is
     not exactly 8 bytes. *)
 
-val encode_row_value : Value.data list -> string
+val encode_row_value : Scalar.data list -> string
 (** Encode a list of values as bytes via [Marshal]. Used to serialise the non-PK
     columns of a row. *)
 
-val decode_row_value : string -> Value.data list
+val decode_row_value : string -> Scalar.data list
 (** Inverse of {!encode_row_value}. Trusts that the input was produced by
-    {!encode_row_value} for a [Value.data list]; supplying mismatched bytes is
+    {!encode_row_value} for a [Scalar.data list]; supplying mismatched bytes is
     undefined behaviour, per [Marshal]'s contract. *)

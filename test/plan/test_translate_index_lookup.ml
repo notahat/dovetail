@@ -16,7 +16,7 @@ open Test_helpers
 module Execution = Dovetail_execution
 module Relation = Dovetail_core.Relation
 module Storage = Dovetail_storage
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 (* A users kind with a single int64 primary key. Matches what
    [Fixture.users_kind] writes, but rebuilt in-test so the unit tests
@@ -46,7 +46,7 @@ let users_catalog_with kind table_name =
 
 let id_equals_int64_literal value =
   expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Value.Int64 value))
+    ~right:(expression_literal (Scalar.Int64 value))
 
 let scan_users_restricted_by predicate : Logical.t =
   Restrict { input = Scan { table = "users" }; predicate }
@@ -67,7 +67,7 @@ let test_mirrored_pk_equality_literal_folds () =
   let logical =
     scan_users_restricted_by
       (expression_compare
-         ~left:(expression_literal (Value.Int64 5L))
+         ~left:(expression_literal (Scalar.Int64 5L))
          ~op:Equal ~right:(expression_column "id"))
   in
   let physical =
@@ -85,7 +85,7 @@ let test_qualified_pk_column_folds () =
       (expression_compare
          ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
          ~op:Equal
-         ~right:(expression_literal (Value.Int64 5L)))
+         ~right:(expression_literal (Scalar.Int64 5L)))
   in
   let physical =
     unwrap_query
@@ -104,7 +104,7 @@ let test_mis_qualified_pk_column_does_not_fold () =
     expression_compare
       ~left:(expression_qualified_column ~qualifier:"orders" ~name:"id")
       ~op:Equal
-      ~right:(expression_literal (Value.Int64 5L))
+      ~right:(expression_literal (Scalar.Int64 5L))
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
@@ -123,7 +123,7 @@ let test_non_int64_literal_on_pk_does_not_fold () =
      a non-int64 literal into IndexLookup's [int64 key] field. *)
   let predicate =
     expression_compare ~left:(expression_column "id") ~op:Equal
-      ~right:(expression_literal (Value.String "five"))
+      ~right:(expression_literal (Scalar.String "five"))
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
@@ -139,7 +139,7 @@ let test_non_int64_literal_on_pk_does_not_fold () =
 let test_non_pk_column_equality_does_not_fold () =
   let predicate =
     expression_compare ~left:(expression_column "name") ~op:Equal
-      ~right:(expression_literal (Value.String "Alice"))
+      ~right:(expression_literal (Scalar.String "Alice"))
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
@@ -155,7 +155,7 @@ let test_non_pk_column_equality_does_not_fold () =
 let test_pk_inequality_does_not_fold () =
   let predicate =
     expression_compare ~left:(expression_column "id") ~op:NotEqual
-      ~right:(expression_literal (Value.Int64 5L))
+      ~right:(expression_literal (Scalar.Int64 5L))
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
@@ -171,7 +171,7 @@ let test_pk_inequality_does_not_fold () =
 let test_pk_ordering_comparison_does_not_fold () =
   let predicate =
     expression_compare ~left:(expression_column "id") ~op:Less
-      ~right:(expression_literal (Value.Int64 5L))
+      ~right:(expression_literal (Scalar.Int64 5L))
   in
   let logical = scan_users_restricted_by predicate in
   let physical =
@@ -258,7 +258,7 @@ let test_three_way_conjunction_rebuilds_two_conjunct_residual () =
      [name = "Alice" and active] (left-associative). *)
   let name_equals_alice =
     expression_compare ~left:(expression_column "name") ~op:Equal
-      ~right:(expression_literal (Value.String "Alice"))
+      ~right:(expression_literal (Scalar.String "Alice"))
   in
   let predicate =
     expression_and
@@ -292,7 +292,7 @@ let test_right_associative_nesting_flattens () =
      found. *)
   let name_equals_alice =
     expression_compare ~left:(expression_column "name") ~op:Equal
-      ~right:(expression_literal (Value.String "Alice"))
+      ~right:(expression_literal (Scalar.String "Alice"))
   in
   let predicate =
     expression_and
@@ -324,7 +324,7 @@ let test_conjunction_with_no_pk_equality_does_not_fold () =
      keep the original predicate intact for [Filter (FullScan ...)]. *)
   let name_equals_alice =
     expression_compare ~left:(expression_column "name") ~op:Equal
-      ~right:(expression_literal (Value.String "Alice"))
+      ~right:(expression_literal (Scalar.String "Alice"))
   in
   let predicate =
     expression_and ~left:name_equals_alice ~right:(expression_column "active")

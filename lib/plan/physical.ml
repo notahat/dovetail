@@ -1,4 +1,4 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 
@@ -15,7 +15,7 @@ type t =
       outer_key_column : Row.column_reference;
       inner_position : [ `Left | `Right ];
     }
-  | RelationLiteral of { columns : string list; rows : Value.data list list }
+  | RelationLiteral of { columns : string list; rows : Scalar.data list list }
 
 type mutation = Insert of { table : string; source : t }
 type plan = Query of t | Mutation of mutation

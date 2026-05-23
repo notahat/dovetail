@@ -6,7 +6,7 @@
 
 open Dovetail_execution
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Plan = Dovetail_plan
 module Storage = Dovetail_storage
 
@@ -26,10 +26,10 @@ let test_insert_writes_row_and_reports_one_affected () =
     insert_mutation ~table:"orders"
       ~pairs:
         [
-          ("id", Value.Int64 9L);
-          ("user_id", Value.Int64 1L);
-          ("description", Value.String "Pretzel");
-          ("amount", Value.Int64 9L);
+          ("id", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
+          ("description", Scalar.String "Pretzel");
+          ("amount", Scalar.Int64 9L);
         ]
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
@@ -44,7 +44,7 @@ let test_insert_writes_row_and_reports_one_affected () =
           let rows = List.of_seq relation.data in
           let inserted =
             List.find_opt
-              (fun (row : Row.data) -> row.(0) = Value.Int64 9L)
+              (fun (row : Row.data) -> row.(0) = Scalar.Int64 9L)
               rows
           in
           match inserted with
@@ -54,10 +54,10 @@ let test_insert_writes_row_and_reports_one_affected () =
                 "inserted row matches"
                 [
                   [|
-                    Value.Int64 9L;
-                    Value.Int64 1L;
-                    Value.String "Pretzel";
-                    Value.Int64 9L;
+                    Scalar.Int64 9L;
+                    Scalar.Int64 1L;
+                    Scalar.String "Pretzel";
+                    Scalar.Int64 9L;
                   |];
                 ]
                 [ row ]))
@@ -69,10 +69,10 @@ let test_insert_with_existing_primary_key_raises () =
       ~pairs:
         [
           (* Order id 1 is the first fixture row -- guaranteed collision. *)
-          ("id", Value.Int64 1L);
-          ("user_id", Value.Int64 1L);
-          ("description", Value.String "Duplicate");
-          ("amount", Value.Int64 1L);
+          ("id", Scalar.Int64 1L);
+          ("user_id", Scalar.Int64 1L);
+          ("description", Scalar.String "Duplicate");
+          ("amount", Scalar.Int64 1L);
         ]
   in
   Alcotest.check_raises "primary-key collision"

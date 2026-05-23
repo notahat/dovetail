@@ -9,21 +9,21 @@
 
 open Dovetail_execution
 open Test_helpers
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Relation = Dovetail_core.Relation
 module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
 
 let users_kind : Relation.kind =
   {
-    row_kind = [ { name = "id"; kind = Value.Int64; qualifier = Some "users" } ];
+    row_kind = [ { name = "id"; kind = Scalar.Int64; qualifier = Some "users" } ];
     refinements = [ Primary_key [ "id" ] ];
   }
 
 let orders_kind : Relation.kind =
   {
     row_kind =
-      [ { name = "id"; kind = Value.Int64; qualifier = Some "orders" } ];
+      [ { name = "id"; kind = Scalar.Int64; qualifier = Some "orders" } ];
     refinements = [ Primary_key [ "id" ] ];
   }
 
@@ -179,7 +179,7 @@ let widgets_create_statement : Ddl.Statement.t =
   Create_table
     {
       table_name = "widgets";
-      fields = [ { name = "id"; kind = Value.Int64 } ];
+      fields = [ { name = "id"; kind = Scalar.Int64 } ];
       primary_key = [ "id" ];
     }
 
@@ -189,7 +189,7 @@ let widgets_create_statement : Ddl.Statement.t =
 let widgets_expected_kind : Relation.kind =
   {
     row_kind =
-      [ { name = "id"; kind = Value.Int64; qualifier = Some "widgets" } ];
+      [ { name = "id"; kind = Scalar.Int64; qualifier = Some "widgets" } ];
     refinements = [ Primary_key [ "id" ] ];
   }
 
@@ -226,9 +226,9 @@ let test_execute_write_create_table_qualifier_per_field () =
         table_name = "widgets";
         fields =
           [
-            { name = "id"; kind = Value.Int64 };
-            { name = "name"; kind = Value.String };
-            { name = "active"; kind = Value.Bool };
+            { name = "id"; kind = Scalar.Int64 };
+            { name = "name"; kind = Scalar.String };
+            { name = "active"; kind = Scalar.Bool };
           ];
         primary_key = [ "id" ];
       }
@@ -237,9 +237,9 @@ let test_execute_write_create_table_qualifier_per_field () =
     {
       row_kind =
         [
-          { name = "id"; kind = Value.Int64; qualifier = Some "widgets" };
-          { name = "name"; kind = Value.String; qualifier = Some "widgets" };
-          { name = "active"; kind = Value.Bool; qualifier = Some "widgets" };
+          { name = "id"; kind = Scalar.Int64; qualifier = Some "widgets" };
+          { name = "name"; kind = Scalar.String; qualifier = Some "widgets" };
+          { name = "active"; kind = Scalar.Bool; qualifier = Some "widgets" };
         ];
       refinements = [ Primary_key [ "id" ] ];
     }

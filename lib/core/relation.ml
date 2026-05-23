@@ -96,17 +96,17 @@ let assemble_row (kind : kind) ~primary_key_values ~non_primary_key_values =
 
 (* Render a single value as the cell text that will appear in a table. No
    quoting, no escaping; the pretty-print is illustrative. This is
-   deliberately distinct from {!Value.format}, which quotes strings so the
+   deliberately distinct from {!Scalar.format}, which quotes strings so the
    value boundary is visible -- a presentational choice that fits an
    error message or a debug log but is wrong for cells laid out in a
    bordered grid where the column itself is the boundary. *)
 let render_value = function
-  | Value.Int64 number -> Int64.to_string number
-  | Value.String text -> text
-  | Value.Bool true -> "true"
-  | Value.Bool false -> "false"
+  | Scalar.Int64 number -> Int64.to_string number
+  | Scalar.String text -> text
+  | Scalar.Bool true -> "true"
+  | Scalar.Bool false -> "false"
 
-let is_numeric_kind : Value.kind -> bool = function
+let is_numeric_kind : Scalar.kind -> bool = function
   | Int64 -> true
   | String | Bool -> false
 

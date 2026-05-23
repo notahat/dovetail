@@ -6,7 +6,7 @@ open Dovetail_plan
 open Test_helpers
 module Execution = Dovetail_execution
 module Storage = Dovetail_storage
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 let test_scan_lowers_to_full_scan () =
   let logical = Logical.Scan { table = "users" } in
@@ -36,7 +36,7 @@ let test_pipeline_yields_fixture_rows () =
 
 let id_equals_three =
   expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Value.Int64 3L))
+    ~right:(expression_literal (Scalar.Int64 3L))
 
 let name_then_email : Projection.t =
   [ column_reference "name"; column_reference "email" ]
@@ -120,11 +120,11 @@ let test_project_pipeline_yields_projected_rows () =
           let rows = List.of_seq relation.data in
           let expected =
             [
-              [| Value.String "Alice"; Value.String "alice@example.com" |];
-              [| Value.String "Bob"; Value.String "bob@example.com" |];
-              [| Value.String "Carol"; Value.String "carol@example.com" |];
-              [| Value.String "Dave"; Value.String "dave@example.com" |];
-              [| Value.String "Eve"; Value.String "eve@example.com" |];
+              [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
+              [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
+              [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
+              [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
+              [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
             ]
           in
           Alcotest.(check row_list_testable)
@@ -207,7 +207,7 @@ let test_relation_literal_translates_through () =
     RelationLiteral
       {
         columns = [ "id"; "name" ];
-        rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+        rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
       }
   in
   let physical =
@@ -219,7 +219,7 @@ let test_relation_literal_translates_through () =
     (Physical.RelationLiteral
        {
          columns = [ "id"; "name" ];
-         rows = [ [ Value.Int64 7L; Value.String "Pretzel" ] ];
+         rows = [ [ Scalar.Int64 7L; Scalar.String "Pretzel" ] ];
        })
     physical
 
@@ -285,10 +285,10 @@ let test_mutation_in_target_order_translates_through () =
     insert_plan ~table:"orders"
       ~pairs:
         [
-          ("id", Value.Int64 9L);
-          ("user_id", Value.Int64 1L);
-          ("description", Value.String "Pretzel");
-          ("amount", Value.Int64 9L);
+          ("id", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
+          ("description", Scalar.String "Pretzel");
+          ("amount", Scalar.Int64 9L);
         ]
   in
   let translated = Translate.translate ~catalog:orders_catalog plan in
@@ -306,10 +306,10 @@ let test_mutation_in_target_order_translates_through () =
                   rows =
                     [
                       [
-                        Value.Int64 9L;
-                        Value.Int64 1L;
-                        Value.String "Pretzel";
-                        Value.Int64 9L;
+                        Scalar.Int64 9L;
+                        Scalar.Int64 1L;
+                        Scalar.String "Pretzel";
+                        Scalar.Int64 9L;
                       ];
                     ];
                 };
@@ -323,10 +323,10 @@ let test_mutation_in_permuted_order_translates_through () =
     insert_plan ~table:"orders"
       ~pairs:
         [
-          ("description", Value.String "Pretzel");
-          ("amount", Value.Int64 9L);
-          ("user_id", Value.Int64 1L);
-          ("id", Value.Int64 9L);
+          ("description", Scalar.String "Pretzel");
+          ("amount", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
+          ("id", Scalar.Int64 9L);
         ]
   in
   let translated = Translate.translate ~catalog:orders_catalog plan in
@@ -341,7 +341,7 @@ let test_mutation_in_permuted_order_translates_through () =
 let test_mutation_against_unknown_table_raises () =
   let plan =
     insert_plan ~table:"widgets"
-      ~pairs:[ ("id", Value.Int64 1L); ("name", Value.String "x") ]
+      ~pairs:[ ("id", Scalar.Int64 1L); ("name", Scalar.String "x") ]
   in
   Alcotest.check_raises "unknown table"
     (Failure "Translate: insert into \"widgets\": unknown table") (fun () ->
@@ -352,8 +352,8 @@ let test_mutation_with_missing_column_raises () =
     insert_plan ~table:"orders"
       ~pairs:
         [
-          ("id", Value.Int64 9L);
-          ("user_id", Value.Int64 1L);
+          ("id", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
           (* description and amount missing. *)
         ]
   in
@@ -368,11 +368,11 @@ let test_mutation_with_unknown_column_raises () =
     insert_plan ~table:"orders"
       ~pairs:
         [
-          ("id", Value.Int64 9L);
-          ("user_id", Value.Int64 1L);
-          ("description", Value.String "Pretzel");
-          ("amount", Value.Int64 9L);
-          ("colour", Value.String "blue");
+          ("id", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
+          ("description", Scalar.String "Pretzel");
+          ("amount", Scalar.Int64 9L);
+          ("colour", Scalar.String "blue");
         ]
   in
   Alcotest.check_raises "unknown column"
@@ -392,7 +392,7 @@ let test_mutation_with_row_arity_mismatch_raises () =
              RelationLiteral
                {
                  columns = [ "id"; "user_id"; "description"; "amount" ];
-                 rows = [ [ Value.Int64 9L; Value.Int64 1L; Value.Int64 9L ] ];
+                 rows = [ [ Scalar.Int64 9L; Scalar.Int64 1L; Scalar.Int64 9L ] ];
                };
          })
   in
@@ -407,11 +407,11 @@ let test_mutation_with_kind_mismatch_raises () =
     insert_plan ~table:"orders"
       ~pairs:
         [
-          ("id", Value.Int64 9L);
-          ("user_id", Value.Int64 1L);
-          ("description", Value.String "Pretzel");
+          ("id", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
+          ("description", Scalar.String "Pretzel");
           (* amount expects Int64; supply a String. *)
-          ("amount", Value.String "nine");
+          ("amount", Scalar.String "nine");
         ]
   in
   Alcotest.check_raises "kind mismatch"

@@ -4,7 +4,7 @@ open Dovetail_plan
 open Test_helpers
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 (* The fixture's [users] kind, repeated here so the projection tests are
    self-contained and don't need to spin up an LMDB environment. The
@@ -32,11 +32,11 @@ let test_single_column_projection () =
   let rows = project_users [ column_reference "name" ] in
   let expected =
     [
-      [| Value.String "Alice" |];
-      [| Value.String "Bob" |];
-      [| Value.String "Carol" |];
-      [| Value.String "Dave" |];
-      [| Value.String "Eve" |];
+      [| Scalar.String "Alice" |];
+      [| Scalar.String "Bob" |];
+      [| Scalar.String "Carol" |];
+      [| Scalar.String "Dave" |];
+      [| Scalar.String "Eve" |];
     ]
   in
   Alcotest.(check row_list_testable) "five single-column rows" expected rows
@@ -47,11 +47,11 @@ let test_multi_column_projection_in_field_order () =
   in
   let expected =
     [
-      [| Value.String "Alice"; Value.String "alice@example.com" |];
-      [| Value.String "Bob"; Value.String "bob@example.com" |];
-      [| Value.String "Carol"; Value.String "carol@example.com" |];
-      [| Value.String "Dave"; Value.String "dave@example.com" |];
-      [| Value.String "Eve"; Value.String "eve@example.com" |];
+      [| Scalar.String "Alice"; Scalar.String "alice@example.com" |];
+      [| Scalar.String "Bob"; Scalar.String "bob@example.com" |];
+      [| Scalar.String "Carol"; Scalar.String "carol@example.com" |];
+      [| Scalar.String "Dave"; Scalar.String "dave@example.com" |];
+      [| Scalar.String "Eve"; Scalar.String "eve@example.com" |];
     ]
   in
   Alcotest.(check row_list_testable) "five two-column rows" expected rows
@@ -62,11 +62,11 @@ let test_projection_reorders_columns () =
   in
   let expected =
     [
-      [| Value.String "alice@example.com"; Value.Int64 1L |];
-      [| Value.String "bob@example.com"; Value.Int64 2L |];
-      [| Value.String "carol@example.com"; Value.Int64 3L |];
-      [| Value.String "dave@example.com"; Value.Int64 4L |];
-      [| Value.String "eve@example.com"; Value.Int64 5L |];
+      [| Scalar.String "alice@example.com"; Scalar.Int64 1L |];
+      [| Scalar.String "bob@example.com"; Scalar.Int64 2L |];
+      [| Scalar.String "carol@example.com"; Scalar.Int64 3L |];
+      [| Scalar.String "dave@example.com"; Scalar.Int64 4L |];
+      [| Scalar.String "eve@example.com"; Scalar.Int64 5L |];
     ]
   in
   Alcotest.(check row_list_testable) "rows in requested order" expected rows
@@ -77,11 +77,11 @@ let test_projection_of_non_leading_column () =
   let rows = project_users [ column_reference "active" ] in
   let expected =
     [
-      [| Value.Bool true |];
-      [| Value.Bool false |];
-      [| Value.Bool true |];
-      [| Value.Bool true |];
-      [| Value.Bool false |];
+      [| Scalar.Bool true |];
+      [| Scalar.Bool false |];
+      [| Scalar.Bool true |];
+      [| Scalar.Bool true |];
+      [| Scalar.Bool false |];
     ]
   in
   Alcotest.(check row_list_testable) "rows in active order" expected rows
@@ -94,11 +94,11 @@ let test_projection_accepts_qualified_column () =
   in
   let expected =
     [
-      [| Value.String "Alice" |];
-      [| Value.String "Bob" |];
-      [| Value.String "Carol" |];
-      [| Value.String "Dave" |];
-      [| Value.String "Eve" |];
+      [| Scalar.String "Alice" |];
+      [| Scalar.String "Bob" |];
+      [| Scalar.String "Carol" |];
+      [| Scalar.String "Dave" |];
+      [| Scalar.String "Eve" |];
     ]
   in
   Alcotest.(check row_list_testable)
@@ -119,7 +119,7 @@ let test_projected_kind_has_requested_fields () =
   in
   Alcotest.(check bool)
     "first field kind is String" true
-    (field_kinds = ([ String; Int64 ] : Value.kind list))
+    (field_kinds = ([ String; Int64 ] : Scalar.kind list))
 
 let test_projected_kind_preserves_qualifiers () =
   let projected_kind, _project_row =

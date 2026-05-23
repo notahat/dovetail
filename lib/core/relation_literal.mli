@@ -5,10 +5,10 @@
     same at every layer and lives here so the IR doc comments can point at a
     single definition rather than each restating the wording. *)
 
-val kind_of : columns:string list -> first_row:Value.data list -> Relation.kind
+val kind_of : columns:string list -> first_row:Scalar.data list -> Relation.kind
 (** [kind_of ~columns ~first_row] builds the {!Relation.kind} implied by a
     relation literal. Field names come from [columns] in order; each field's
-    [Value.kind] is inferred from the value at the same position in [first_row];
+    [Scalar.kind] is inferred from the value at the same position in [first_row];
     every field has [qualifier = None]; the kind carries no refinements,
     matching the convention for derived relations.
 

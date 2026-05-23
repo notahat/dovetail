@@ -10,7 +10,7 @@
     [Project], × → [CrossProduct]) rather than SQL keywords, leaving room for a
     SQL front end to map its vocabulary onto the same IR. *)
 
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
 
 type t =
@@ -34,7 +34,7 @@ type t =
           fields followed by [right]'s, with qualifiers preserved. The output
           [primary_key] is empty: derived relations don't carry PK information
           at this point in the project. *)
-  | RelationLiteral of { columns : string list; rows : Value.data list list }
+  | RelationLiteral of { columns : string list; rows : Scalar.data list list }
       (** [RelationLiteral { columns; rows }] is a relation given directly by
           its contents, with no scan or storage involved. Each row in [rows] is
           a list of values, one per declared column, in column order. The output

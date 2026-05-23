@@ -1,4 +1,4 @@
-module Value = Dovetail_core.Value
+module Scalar = Dovetail_core.Scalar
 
 (* Map an int64 between signed-comparison order and unsigned-comparison
    order. Big-endian bytes of an unsigned 64-bit value sort under memcmp the
@@ -21,5 +21,5 @@ let decode_int64_key bytes =
          (String.length bytes));
   signed_to_unsigned_order (String.get_int64_be bytes 0)
 
-let encode_row_value values = Marshal.to_string (values : Value.data list) []
-let decode_row_value bytes : Value.data list = Marshal.from_string bytes 0
+let encode_row_value values = Marshal.to_string (values : Scalar.data list) []
+let decode_row_value bytes : Scalar.data list = Marshal.from_string bytes 0
