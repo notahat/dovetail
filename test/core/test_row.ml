@@ -102,6 +102,47 @@ let test_format_field_name_bare_when_unqualified () =
   let field : Row.field = { name = "id"; kind = Int64; qualifier = None } in
   Alcotest.(check string) "unqualified" "id" (Row.format_field_name field)
 
+(* Render via [Row.format_kind] into a string for comparison against the
+   expected surface text. *)
+let format_kind_to_string kind =
+  let buffer = Buffer.create 32 in
+  let formatter = Format.formatter_of_buffer buffer in
+  Row.format_kind formatter kind;
+  Format.pp_print_flush formatter ();
+  Buffer.contents buffer
+
+let test_format_kind_empty_renders_bare_parens () =
+  Alcotest.(check string) "empty row kind" "()" (format_kind_to_string [])
+
+let test_format_kind_single_field_renders_name_colon_type () =
+  let kind : Row.kind = [ { name = "id"; kind = Int64; qualifier = None } ] in
+  Alcotest.(check string)
+    "single field" "(id: int64)"
+    (format_kind_to_string kind)
+
+let test_format_kind_multi_field_comma_separates () =
+  let kind : Row.kind =
+    [
+      { name = "id"; kind = Int64; qualifier = None };
+      { name = "name"; kind = String; qualifier = None };
+      { name = "active"; kind = Bool; qualifier = None };
+    ]
+  in
+  Alcotest.(check string)
+    "multi-field row" "(id: int64, name: string, active: bool)"
+    (format_kind_to_string kind)
+
+let test_format_kind_drops_qualifiers () =
+  let kind : Row.kind =
+    [
+      { name = "id"; kind = Int64; qualifier = Some "users" };
+      { name = "name"; kind = String; qualifier = Some "users" };
+    ]
+  in
+  Alcotest.(check string)
+    "qualifiers are dropped at the surface" "(id: int64, name: string)"
+    (format_kind_to_string kind)
+
 let () =
   Alcotest.run "row"
     [
@@ -142,5 +183,16 @@ let () =
             `Quick test_format_field_name_dotted_when_qualified;
           Alcotest.test_case "renders bare form when field is unqualified"
             `Quick test_format_field_name_bare_when_unqualified;
+        ] );
+      ( "format_kind",
+        [
+          Alcotest.test_case "empty row kind renders as bare parens" `Quick
+            test_format_kind_empty_renders_bare_parens;
+          Alcotest.test_case "single field renders as name: type" `Quick
+            test_format_kind_single_field_renders_name_colon_type;
+          Alcotest.test_case "multiple fields are comma-separated" `Quick
+            test_format_kind_multi_field_comma_separates;
+          Alcotest.test_case "qualifiers are dropped at the surface" `Quick
+            test_format_kind_drops_qualifiers;
         ] );
     ]

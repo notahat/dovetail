@@ -33,6 +33,13 @@ val format_field_name : field -> string
 (** Render a [field]'s display name in source form: dotted [qualifier.name] when
     the field carries a qualifier, bare [name] otherwise. *)
 
+val format_kind : Format.formatter -> kind -> unit
+(** [format_kind formatter kind] writes [kind] to [formatter] in the surface
+    syntax for a row type: a parenthesised, comma-separated list of [name: type]
+    bindings, or [()] when [kind] is empty. Field qualifiers are dropped — the
+    surface row-type syntax has no qualifier form. Field kinds render via
+    {!Scalar.format_kind} (lowercase keywords). *)
+
 val find_field : kind -> column_reference -> (int * field, string) result
 (** [find_field row_kind reference] resolves [reference] against [row_kind] and
     returns the matching field's zero-based position together with the field

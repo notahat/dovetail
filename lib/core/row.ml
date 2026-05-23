@@ -12,6 +12,15 @@ let format_column_reference = function
 let format_field_name (field : field) =
   format_column_reference { qualifier = field.qualifier; name = field.name }
 
+let format_kind formatter (kind : kind) =
+  let format_field formatter (field : field) =
+    Format.fprintf formatter "%s: %a" field.name Scalar.format_kind field.kind
+  in
+  let separator formatter () = Format.pp_print_string formatter ", " in
+  Format.pp_print_string formatter "(";
+  Format.pp_print_list ~pp_sep:separator format_field formatter kind;
+  Format.pp_print_string formatter ")"
+
 (* Walk [row_kind], pairing each field with its zero-based position and
    keeping the ones whose name matches [name]. *)
 let fields_with_position_matching_name (row_kind : kind) name =
