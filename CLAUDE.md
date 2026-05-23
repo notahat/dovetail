@@ -79,7 +79,7 @@ Apply the split deliberately:
   throughout because that's the code's vocabulary.
 
 When introducing a new module or value at this rung, follow the
-existing code convention (`kind` / `data` / `t`). When writing a new
+existing code convention (`kind` / `value` / `t`). When writing a new
 user-facing string, pick `type`. If a piece of prose lives in both
 worlds — say, a doc comment that describes an operator a user
 invokes — write for the user (`type`) and add a parenthetical
