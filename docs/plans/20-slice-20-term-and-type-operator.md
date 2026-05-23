@@ -89,6 +89,20 @@ Other arms grow incrementally as later slices need them.
 - **No `Core.Catalog` in this slice.** Slice 23 introduces it
   alongside the operators that consume it.
 
+## Gotchas surfaced in slice 19
+
+- **CPS continuation placement.** Changing `Eval.eval`'s return type
+  from `'a` parameterised by a `Relation.t -> 'a` continuation to
+  `'a` parameterised by a `Term.t -> 'a` continuation touches every
+  operator. The subtle one: when an operator calls `eval` recursively
+  (as `Insert` does on its `source`), `continue` must sit *inside*
+  the inner eval's callback, not after it. Putting `continue` after
+  constrains the outer eval's return type to whatever the preceding
+  statement returns (typically `unit`), defeating polymorphism.
+  Slice 19's `evaluate_insert` is the worked example. The same shape
+  applies to any future operator that recurses on a sub-tree before
+  handing a result downstream.
+
 ## Notes for follow-on slices
 
 - Slice 21 grows `Term.t` by four arms (Scalar_value, Scalar_kind,

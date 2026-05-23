@@ -57,6 +57,17 @@ all work. `:create table` and `:drop table` are gone.
 - **Transaction classification.** The three new operators all
   require `[`Write]`. Existing tree-walk from slice 19 picks them up
   by declaring their required access.
+- **Permission contravariance: reuse the slice 19 `Obj.magic`
+  template.** `Eval.eval`'s transaction parameter is `[> `Read]`, but
+  any storage `put` / `create_map` / `drop_map` needs
+  `[`Read | `Write]`. Slice 19's `evaluate_insert` solved this by
+  locally coercing with `Obj.magic` inside the write branch, justified
+  by the invariant that `Logical.required_access` made the REPL pick a
+  write transaction whenever an `Insert` appeared in the tree. The
+  same template applies to `Create_table_*` and `Drop_table`: coerce
+  locally, with a comment naming `required_access` as the upstream
+  invariant. Don't relax `Eval.eval`'s signature to `[`Read | `Write]`
+  — that would force pure-read pipelines to open a write transaction.
 
 ## Out of scope
 
