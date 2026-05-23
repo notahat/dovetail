@@ -8,6 +8,7 @@
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
+module Relation = Dovetail_core.Relation
 
 type t =
   | FullScan of { table : string }
@@ -98,6 +99,19 @@ type t =
           yields a one-row relation reporting the affected-row count. {!Eval}
           handles it as a regular case, writing rows inside the active write
           transaction and producing the (insert_count : int64) result. *)
+
+val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
+(** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}
+    {!Eval} would hand its continuation, without opening any cursors or pulling
+    any rows.
+
+    [catalog] supplies the kind for the [FullScan] / [IndexLookup] /
+    [IndexedNestedLoopJoin] cases that reference a stored table; the other
+    operators compute their kind from their inputs alone. Raises [Failure] when
+    [catalog] has no kind for a referenced table.
+
+    Used by the [type] operator's evaluator to report the type of its input
+    without materialising the input. *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter plan] writes [plan] to [formatter] as an indented tree,

@@ -2,6 +2,7 @@
  (names
   test_logical
   test_physical
+  test_physical_kind_of
   test_projection
   test_translate
   test_translate_index_lookup

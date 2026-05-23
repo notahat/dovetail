@@ -1,6 +1,8 @@
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
+module Relation = Dovetail_core.Relation
+module Relation_literal = Dovetail_core.Relation_literal
 
 type t =
   | FullScan of { table : string }
@@ -73,3 +75,55 @@ let rec format_at formatter indent plan =
       format_at formatter (indent + 1) source
 
 let format formatter plan = format_at formatter 0 plan
+
+(* The static result kind of an [Insert]: a one-column
+   [insert_count : int64] row. Mirrors the runtime value [Eval.evaluate_insert]
+   produces. *)
+let insert_result_kind : Relation.kind =
+  {
+    row_kind =
+      [ { name = "insert_count"; kind = Scalar.Int64; qualifier = None } ];
+    refinements = [];
+  }
+
+(* Look up [table] in [catalog] or raise a user-readable [Failure]. *)
+let lookup_table_kind ~catalog table =
+  match catalog table with
+  | Some kind -> kind
+  | None -> failwith (Printf.sprintf "Physical.kind_of: unknown table %S" table)
+
+(* Build a [Relation.kind] that concatenates two row kinds in order and
+   carries no refinements. Joins and the cross product all use this shape:
+   derived relations don't keep refinements from their inputs. *)
+let concatenated_kind left_row_kind right_row_kind : Relation.kind =
+  { row_kind = left_row_kind @ right_row_kind; refinements = [] }
+
+let rec kind_of ~catalog (plan : t) : Relation.kind =
+  match plan with
+  | FullScan { table } | IndexLookup { table; _ } ->
+      lookup_table_kind ~catalog table
+  | Filter { input; _ } -> kind_of ~catalog input
+  | Project { input; columns } ->
+      let projected_kind, _project_row =
+        Projection.resolve (kind_of ~catalog input) columns
+      in
+      projected_kind
+  | CrossProduct { left; right } | NestedLoopJoin { left; right; _ } ->
+      concatenated_kind (kind_of ~catalog left).row_kind
+        (kind_of ~catalog right).row_kind
+  | IndexedNestedLoopJoin { outer; inner_table; inner_position; _ } -> (
+      let outer_row_kind = (kind_of ~catalog outer).row_kind in
+      let inner_row_kind = (lookup_table_kind ~catalog inner_table).row_kind in
+      match inner_position with
+      | `Left -> concatenated_kind inner_row_kind outer_row_kind
+      | `Right -> concatenated_kind outer_row_kind inner_row_kind)
+  | RelationLiteral { columns; rows } ->
+      let first_row =
+        match rows with
+        | first :: _ -> first
+        | [] ->
+            failwith
+              "Physical.kind_of: relation literal must have at least one row"
+      in
+      Relation_literal.kind_of ~columns ~first_row
+  | Insert _ -> insert_result_kind
