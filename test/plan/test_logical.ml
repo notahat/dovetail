@@ -60,6 +60,12 @@ let test_type_op_required_access_passes_through () =
     "Type_op over a read-only input is read-only" true
     (Logical.required_access plan = `Read)
 
+let test_scalar_literal_requires_read_access () =
+  let plan : Logical.t = Scalar_literal (Scalar.Int64 42L) in
+  Alcotest.(check bool)
+    "Scalar_literal requires Read access" true
+    (Logical.required_access plan = `Read)
+
 let format_to_string plan =
   with_captured_formatter (fun formatter -> Logical.format formatter plan)
 
@@ -146,6 +152,20 @@ let test_type_op_renders_header_with_indented_input () =
     "Type prints a bare header with its input indented one level"
     "Type\n  Scan(users)\n" (format_to_string plan)
 
+let test_scalar_literal_renders_value () =
+  let int_plan : Logical.t = Scalar_literal (Scalar.Int64 42L) in
+  Alcotest.(check string)
+    "Int64 scalar literal renders bare digits" "ScalarLiteral(42)\n"
+    (format_to_string int_plan);
+  let string_plan : Logical.t = Scalar_literal (Scalar.String "hi") in
+  Alcotest.(check string)
+    "String scalar literal renders quoted" "ScalarLiteral(\"hi\")\n"
+    (format_to_string string_plan);
+  let bool_plan : Logical.t = Scalar_literal (Scalar.Bool true) in
+  Alcotest.(check string)
+    "Bool scalar literal renders as keyword" "ScalarLiteral(true)\n"
+    (format_to_string bool_plan)
+
 let test_insert_renders_header_with_indented_source () =
   let plan : Logical.t =
     Insert
@@ -175,6 +195,8 @@ let () =
             test_insert_requires_write_access;
           Alcotest.test_case "Type_op required_access passes through input"
             `Quick test_type_op_required_access_passes_through;
+          Alcotest.test_case "Scalar_literal requires Read access" `Quick
+            test_scalar_literal_requires_read_access;
         ] );
       ( "format",
         [
@@ -194,5 +216,7 @@ let () =
             test_insert_renders_header_with_indented_source;
           Alcotest.test_case "Type renders header with indented input" `Quick
             test_type_op_renders_header_with_indented_input;
+          Alcotest.test_case "ScalarLiteral renders its value inline" `Quick
+            test_scalar_literal_renders_value;
         ] );
     ]

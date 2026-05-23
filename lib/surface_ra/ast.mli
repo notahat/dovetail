@@ -100,6 +100,12 @@ type t =
           input is a type, not a relation. The parser does not yet produce this
           node — until it does, the only way to reach it is by building one
           directly. *)
+  | Scalar_literal of Scalar.value
+      (** [Scalar_literal value] is the surface form of a bare scalar at the
+          head of a pipeline: [42], ["hello"], [true]. The pipeline's source is
+          the value itself; evaluation hands the value down the pipe as a
+          {!Term.Scalar_value}, and [| type] over a scalar literal yields the
+          corresponding {!Scalar.kind}. *)
 
 type program =
   | Pipeline of t

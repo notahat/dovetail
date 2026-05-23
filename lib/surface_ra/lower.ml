@@ -40,3 +40,4 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
   | Insert { table; source } -> Insert { table; source = lower source }
   | Type { input = Type _ } -> failwith "type: input is already a type"
   | Type { input } -> Type_op { input = lower input }
+  | Scalar_literal value -> Scalar_literal value

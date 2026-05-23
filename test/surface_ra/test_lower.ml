@@ -359,6 +359,13 @@ let test_lower_relation_type_with_compound_primary_key () =
     "compound PK preserved" expected
     (Lower.lower_relation_type type_expression)
 
+let test_scalar_literal_lowers_through () =
+  let ast : Ast.t = Scalar_literal (Scalar.Int64 42L) in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Scalar_literal -> Logical.Scalar_literal with same value"
+    (Scalar_literal (Scalar.Int64 42L)) logical
+
 let test_relation_literal_lowers_through () =
   let ast : Ast.t =
     RelationLiteral
@@ -420,6 +427,12 @@ let () =
           Alcotest.test_case
             "lowers Ast.RelationLiteral to Logical.RelationLiteral" `Quick
             test_relation_literal_lowers_through;
+        ] );
+      ( "scalar literal",
+        [
+          Alcotest.test_case
+            "lowers Ast.Scalar_literal to Logical.Scalar_literal" `Quick
+            test_scalar_literal_lowers_through;
         ] );
       ( "type",
         [

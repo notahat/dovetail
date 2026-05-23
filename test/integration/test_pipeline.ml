@@ -388,6 +388,57 @@ let test_restrict_with_ordering_on_bool_raises () =
       (Failure "Expression.resolve: ordering operator > is not defined for Bool")
     "users | restrict active > false"
 
+let scalar_value_testable : Scalar.value Alcotest.testable =
+  Alcotest.testable Scalar.format ( = )
+
+let scalar_kind_testable : Scalar.kind Alcotest.testable =
+  Alcotest.testable Scalar.format_kind ( = )
+
+let test_bare_int64_literal_yields_its_value () =
+  with_query_scalar_value "42" (fun value ->
+      Alcotest.(check scalar_value_testable)
+        "42 yields the Int64 value" (Scalar.Int64 42L) value)
+
+let test_bare_string_literal_yields_its_value () =
+  with_query_scalar_value "\"hello\"" (fun value ->
+      Alcotest.(check scalar_value_testable)
+        "\"hello\" yields the String value" (Scalar.String "hello") value)
+
+let test_bare_bool_literal_yields_its_value () =
+  with_query_scalar_value "true" (fun value ->
+      Alcotest.(check scalar_value_testable)
+        "true yields the Bool value" (Scalar.Bool true) value)
+
+let test_int64_literal_then_type_yields_int64_kind () =
+  with_query_scalar_kind "42 | type" (fun kind ->
+      Alcotest.(check scalar_kind_testable)
+        "42 | type yields Int64" Scalar.Int64 kind)
+
+let test_string_literal_then_type_yields_string_kind () =
+  with_query_scalar_kind "\"hello\" | type" (fun kind ->
+      Alcotest.(check scalar_kind_testable)
+        "\"hello\" | type yields String" Scalar.String kind)
+
+let test_bool_literal_then_type_yields_bool_kind () =
+  with_query_scalar_kind "true | type" (fun kind ->
+      Alcotest.(check scalar_kind_testable)
+        "true | type yields Bool" Scalar.Bool kind)
+
+let test_scalar_literal_type_over_type_raises_at_lower () =
+  (* The Lower-time rejection of [type | type] now triggers on a scalar
+     source too. Walk parse and lower by hand since the rejection happens
+     before Eval. *)
+  let ast =
+    match Surface_ra.Parser.parse "42 | type | type" with
+    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+    | Ok (Surface_ra.Ast.Ddl _) ->
+        Alcotest.fail "expected a pipeline but got a DDL statement"
+    | Error message -> Alcotest.failf "parse failed: %s" message
+  in
+  Alcotest.check_raises "type applied to a scalar's type"
+    (Failure "type: input is already a type") (fun () ->
+      ignore (Surface_ra.Lower.lower ast))
+
 let () =
   Alcotest.run "pipeline"
     [
@@ -479,6 +530,23 @@ let () =
             `Quick test_type_on_users_yields_relation_type;
           Alcotest.test_case "users | type | type raises at Lower" `Quick
             test_type_over_type_raises_at_lower;
+        ] );
+      ( "scalar literal source",
+        [
+          Alcotest.test_case "42 yields the Int64 value" `Quick
+            test_bare_int64_literal_yields_its_value;
+          Alcotest.test_case "\"hello\" yields the String value" `Quick
+            test_bare_string_literal_yields_its_value;
+          Alcotest.test_case "true yields the Bool value" `Quick
+            test_bare_bool_literal_yields_its_value;
+          Alcotest.test_case "42 | type yields the Int64 scalar kind" `Quick
+            test_int64_literal_then_type_yields_int64_kind;
+          Alcotest.test_case "\"hello\" | type yields the String scalar kind"
+            `Quick test_string_literal_then_type_yields_string_kind;
+          Alcotest.test_case "true | type yields the Bool scalar kind" `Quick
+            test_bool_literal_then_type_yields_bool_kind;
+          Alcotest.test_case "42 | type | type raises at Lower" `Quick
+            test_scalar_literal_type_over_type_raises_at_lower;
         ] );
       ( "errors",
         [

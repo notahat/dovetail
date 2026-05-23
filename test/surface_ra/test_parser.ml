@@ -623,6 +623,30 @@ let test_pipeline_keyword_type_is_a_relation_name () =
      a bare identifier, same as the DDL keywords. *)
   parses "type" (Ast.Relation_name "type")
 
+(* Bare scalar literals at pipeline-source position. *)
+
+let test_scalar_literal_int64_parses_as_pipeline_source () =
+  parses "42" (Ast.Scalar_literal (Scalar.Int64 42L))
+
+let test_scalar_literal_negative_int64_parses () =
+  parses "-7" (Ast.Scalar_literal (Scalar.Int64 (-7L)))
+
+let test_scalar_literal_string_parses () =
+  parses "\"hello\"" (Ast.Scalar_literal (Scalar.String "hello"))
+
+let test_scalar_literal_true_parses_as_bool () =
+  parses "true" (Ast.Scalar_literal (Scalar.Bool true))
+
+let test_scalar_literal_false_parses_as_bool () =
+  parses "false" (Ast.Scalar_literal (Scalar.Bool false))
+
+let test_scalar_literal_tolerates_surrounding_whitespace () =
+  parses "   42\n" (Ast.Scalar_literal (Scalar.Int64 42L))
+
+let test_scalar_literal_followed_by_type_step () =
+  parses "42 | type"
+    (Ast.Type { input = Ast.Scalar_literal (Scalar.Int64 42L) })
+
 (* The DDL keywords are not globally reserved -- [list] and [tables] are
    valid identifiers inside a pipeline. This locks in that the sigil is
    what reserves them, and the reservation is bounded to the DDL body. *)
@@ -781,6 +805,24 @@ let () =
             test_pipeline_parses_nested_type_step;
           Alcotest.test_case "[type] is a relation name as a pipeline head"
             `Quick test_pipeline_keyword_type_is_a_relation_name;
+        ] );
+      ( "scalar literal source",
+        [
+          Alcotest.test_case "int64 literal parses as a pipeline source" `Quick
+            test_scalar_literal_int64_parses_as_pipeline_source;
+          Alcotest.test_case "negative int64 literal parses" `Quick
+            test_scalar_literal_negative_int64_parses;
+          Alcotest.test_case "string literal parses" `Quick
+            test_scalar_literal_string_parses;
+          Alcotest.test_case "[true] parses as a bool scalar literal" `Quick
+            test_scalar_literal_true_parses_as_bool;
+          Alcotest.test_case "[false] parses as a bool scalar literal" `Quick
+            test_scalar_literal_false_parses_as_bool;
+          Alcotest.test_case "tolerates surrounding whitespace" `Quick
+            test_scalar_literal_tolerates_surrounding_whitespace;
+          Alcotest.test_case
+            "scalar literal feeds a [| type] step at pipeline-source position"
+            `Quick test_scalar_literal_followed_by_type_step;
         ] );
       ( "insert sink syntax",
         [

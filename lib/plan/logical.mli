@@ -56,6 +56,13 @@ type t =
           [Type_op { input = Type_op _ }] with a user-facing error.
           {!required_access} recurses into [input], so a [Type_op] over a
           read-only sub-plan stays read-only. *)
+  | Scalar_literal of Scalar.value
+      (** [Scalar_literal value] is a pipeline whose source is the literal
+          [value] itself, with no scan or storage involved. Sits at a pipeline's
+          root only; the relational operators (Restrict, Project, …) expect
+          relation-typed inputs, so a scalar source flows through rungs that
+          match it ([Type_op] today; row-level operators in later slices).
+          Reports [`Read] from {!required_access}. *)
 
 val required_access : t -> [ `Read | `Write ]
 (** [required_access plan] walks [plan] and returns the strongest transaction

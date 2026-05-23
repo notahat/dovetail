@@ -209,6 +209,12 @@ let test_type_op_raises_because_result_is_a_kind () =
     (Failure "Physical.kind_of: Type_op does not produce a relation kind")
     (fun () -> ignore (Physical.kind_of ~catalog:fixture_catalog plan))
 
+let test_scalar_literal_raises_because_result_is_a_scalar () =
+  let plan : Physical.t = Scalar_literal (Dovetail_core.Scalar.Int64 42L) in
+  Alcotest.check_raises "Scalar_literal has no relation kind"
+    (Failure "Physical.kind_of: Scalar_literal does not produce a relation kind")
+    (fun () -> ignore (Physical.kind_of ~catalog:fixture_catalog plan))
+
 let () =
   Alcotest.run "physical_kind_of"
     [
@@ -242,5 +248,8 @@ let () =
             test_insert_returns_insert_count_kind;
           Alcotest.test_case "Type_op raises because its result is a kind"
             `Quick test_type_op_raises_because_result_is_a_kind;
+          Alcotest.test_case
+            "Scalar_literal raises because its result is a scalar" `Quick
+            test_scalar_literal_raises_because_result_is_a_scalar;
         ] );
     ]

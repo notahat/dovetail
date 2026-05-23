@@ -420,6 +420,7 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   | RelationLiteral { columns; rows } -> RelationLiteral { columns; rows }
   | Insert { table; source } -> translate_insert ~catalog ~table ~source
   | Type_op { input } -> Type_op { input = translate_relation ~catalog input }
+  | Scalar_literal value -> Scalar_literal value
 
 (* Look up [target_table]'s kind in the catalog and validate the literal
    source's columns and value kinds against it. Returns the translated

@@ -9,6 +9,7 @@ type t =
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
   | Type_op of { input : t }
+  | Scalar_literal of Scalar.value
 
 (* Walks a plan and reports the strongest transaction access any operator
    in it needs. Insert is the only write operator today; every other
@@ -24,6 +25,7 @@ let rec required_access = function
   | RelationLiteral _ -> `Read
   | Insert { source; _ } -> access_max `Write (required_access source)
   | Type_op { input } -> required_access input
+  | Scalar_literal _ -> `Read
 
 and access_max left right =
   match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
@@ -61,5 +63,8 @@ let rec format_at formatter indent plan =
   | Type_op { input } ->
       Format.fprintf formatter "%sType@\n" prefix;
       format_at formatter (indent + 1) input
+  | Scalar_literal value ->
+      Format.fprintf formatter "%sScalarLiteral(%a)@\n" prefix Scalar.format
+        value
 
 let format formatter plan = format_at formatter 0 plan

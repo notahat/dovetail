@@ -266,6 +266,60 @@ let with_query_kind query check_kind =
                arm"
               query))
 
+(** [with_query_scalar_value query check_value] runs [query] through the full
+    parse / lower / translate / eval pipeline and calls [check_value] with the
+    {!Scalar.value} from the [Term.Scalar_value] arm. Fails the running test if
+    [Eval] hands back any other arm. Mirrors {!with_query_result} for queries
+    whose pipeline source is a scalar literal. *)
+let with_query_scalar_value query check_value =
+  with_fixture_environment @@ fun environment ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Surface_ra.Parser.parse query with
+        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+        | Ok (Surface_ra.Ast.Ddl _) ->
+            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
+              query
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Surface_ra.Lower.lower ast in
+      let catalog = make_catalog environment transaction in
+      let physical = Plan.Translate.translate ~catalog logical in
+      Execution.Eval.eval environment transaction physical (function
+        | Term.Scalar_value value -> check_value value
+        | Term.Scalar_kind _ | Term.Row_value _ | Term.Row_kind _
+        | Term.Relation_value _ | Term.Relation_kind _ ->
+            Alcotest.failf
+              "expected %S to yield a scalar value but got a different term arm"
+              query))
+
+(** [with_query_scalar_kind query check_kind] runs [query] through the full
+    parse / lower / translate / eval pipeline and calls [check_kind] with the
+    {!Scalar.kind} from the [Term.Scalar_kind] arm. Fails the running test if
+    [Eval] hands back any other arm. Mirrors {!with_query_kind} for queries
+    whose [| type] step sits over a scalar source. *)
+let with_query_scalar_kind query check_kind =
+  with_fixture_environment @@ fun environment ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Surface_ra.Parser.parse query with
+        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+        | Ok (Surface_ra.Ast.Ddl _) ->
+            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
+              query
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Surface_ra.Lower.lower ast in
+      let catalog = make_catalog environment transaction in
+      let physical = Plan.Translate.translate ~catalog logical in
+      Execution.Eval.eval environment transaction physical (function
+        | Term.Scalar_kind kind -> check_kind kind
+        | Term.Scalar_value _ | Term.Row_value _ | Term.Row_kind _
+        | Term.Relation_value _ | Term.Relation_kind _ ->
+            Alcotest.failf
+              "expected %S to yield a scalar kind but got a different term arm"
+              query))
+
 (** [with_query_failure ~label ~expected query] runs [query] through the same
     pipeline as {!with_query_result} but asserts that [Eval.eval] raises
     [expected]. [label] is the description shown in test output. *)

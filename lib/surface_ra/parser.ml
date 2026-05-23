@@ -31,8 +31,6 @@ let identifier =
   take_while is_identifier_continuation >>| fun continuation ->
   String.make 1 first_character ^ continuation
 
-let relation_name = identifier >>| fun name -> Ast.Relation_name name
-
 (* Match a keyword: the literal [name], plus a word break (a non-identifier
    character or end of input) afterwards. The break is what stops
    [restrict_user] from sneakily matching the [restrict] keyword. *)
@@ -175,11 +173,31 @@ let relation_literal =
   let values = List.map (fun pair -> pair.value) pairs in
   Ast.RelationLiteral { columns; rows = [ values ] }
 
-(* The leading position of a pipeline: either a bare table reference or a
-   relation literal. Disjoint on the first character ([{] vs a letter), so
-   no backtracking is required. *)
+(* A bare identifier at pipeline-source position: either a [true] / [false]
+   scalar literal or a relation name. The two share the leading-letter
+   character class, so we parse the identifier eagerly and dispatch on its
+   spelling — no backtracking required. *)
+let identifier_relation_or_bool_literal =
+  identifier >>| function
+  | "true" -> Ast.Scalar_literal (Scalar.Bool true)
+  | "false" -> Ast.Scalar_literal (Scalar.Bool false)
+  | name -> Ast.Relation_name name
+
+(* The leading position of a pipeline: a relation literal, a bare scalar
+   literal, or a relation name. Dispatched by lookahead on the leading
+   character: a brace introduces a relation literal; a double quote, a
+   minus, or a digit introduces a scalar literal; a letter is either a
+   [true] / [false] scalar literal or a relation name. *)
 let relation_expr =
-  peek_char >>= function Some '{' -> relation_literal | _ -> relation_name
+  peek_char >>= function
+  | Some '{' -> relation_literal
+  | Some '"' ->
+      string_literal >>| fun literal_value -> Ast.Scalar_literal literal_value
+  | Some '-' ->
+      int64_literal >>| fun literal_value -> Ast.Scalar_literal literal_value
+  | Some character when is_digit character ->
+      int64_literal >>| fun literal_value -> Ast.Scalar_literal literal_value
+  | _ -> identifier_relation_or_bool_literal
 
 (* The six comparison operators. Dispatched by lookahead on the leading
    character, then for [<] and [>] by a second lookahead at the byte that

@@ -105,6 +105,13 @@ type t =
           cursors. The node sits at the root of a plan only; {!kind_of} raises
           [Failure] if called on a [Type_op] directly, since the operator's
           evaluation result is a kind, not a relation. *)
+  | Scalar_literal of Scalar.value
+      (** [Scalar_literal value] yields the literal [value] directly — no
+          storage, no cursors. {!Eval} hands it down the pipe as a
+          {!Term.Scalar_value}. Sits at a plan's root only; {!kind_of} raises
+          [Failure] because the operator's result is a scalar value, not a
+          relation. The [Type_op] evaluator handles a [Scalar_literal] input
+          specially, computing the corresponding {!Scalar.kind} directly. *)
 
 val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
 (** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}

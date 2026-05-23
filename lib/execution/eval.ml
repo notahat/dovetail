@@ -115,19 +115,25 @@ let rec eval environment transaction plan continue =
         continue
   | Type_op { input } ->
       evaluate_type_op environment transaction ~input continue
+  | Scalar_literal value -> continue (Term.Scalar_value value)
 
-(* Compute [input]'s static [Relation.kind] via [Physical.kind_of] and hand
-   [continue] the kind wrapped as [Term.Relation_kind]. No cursors are
-   opened; the answer comes from the plan alone. The catalog callback
-   reads from the live [Storage.Catalog], so a missing-table reference
-   inside [input] surfaces with the same wording the relational cases
-   produce at scan time. *)
+(* Compute [input]'s static kind and hand [continue] the corresponding
+   [Term.*_kind] arm. A [Scalar_literal] input is dispatched directly to
+   {!Scalar.kind_of}; every other shape is a relation, so the kind comes
+   from {!Plan.Physical.kind_of}. No cursors are opened in either case.
+   The catalog callback reads from the live [Storage.Catalog], so a
+   missing-table reference inside [input] surfaces with the same wording
+   the relational cases produce at scan time. *)
 and evaluate_type_op environment transaction ~input continue =
-  let catalog table_name =
-    Storage.Catalog.get environment transaction ~table_name
-  in
-  let kind = Plan.Physical.kind_of ~catalog input in
-  continue (Term.Relation_kind kind)
+  match input with
+  | Plan.Physical.Scalar_literal value ->
+      continue (Term.Scalar_kind (Scalar.kind_of value))
+  | _ ->
+      let catalog table_name =
+        Storage.Catalog.get environment transaction ~table_name
+      in
+      let kind = Plan.Physical.kind_of ~catalog input in
+      continue (Term.Relation_kind kind)
 
 (* CPS helper for internal recursion: a relational operator's sub-plan always
    produces a [Term.Relation_value]. The [Term.Relation_kind] arm only arises

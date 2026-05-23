@@ -20,5 +20,6 @@ type t =
   | RelationLiteral of { columns : string list; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
   | Type of { input : t }
+  | Scalar_literal of Scalar.value
 
 type program = Pipeline of t | Ddl of Ddl.Statement.t
