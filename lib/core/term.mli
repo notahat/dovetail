@@ -36,6 +36,6 @@ val format : Format.formatter -> 'tag t -> unit
 (** [format formatter term] writes [term] to [formatter], dispatching on its
     arm. [Scalar_value] renders via {!Scalar.format}; [Scalar_kind] via
     {!Scalar.format_kind}; [Row_value] via {!Row.format}; [Row_kind] via
-    {!Row.format_kind}; [Relation_value] as a table (via {!Relation.print});
-    [Relation_kind] in the surface relation-type syntax (via
-    {!Relation.format_kind}). *)
+    {!Row.format_kind}; [Relation_value] in the canonical relation-literal
+    syntax (via {!Relation.format}); [Relation_kind] in the surface
+    relation-type syntax (via {!Relation.format_kind}). *)

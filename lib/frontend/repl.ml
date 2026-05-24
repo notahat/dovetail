@@ -26,7 +26,7 @@ let translate_in environment transaction ~output ~show_logical ~show_physical
 (* Translate [logical_plan] inside [transaction], evaluate the resulting
    physical plan, and pretty-print the relation to [output]. Insert plans
    produce a one-row [(insert_count : int64)] relation; query plans produce
-   their result relation; both render the same way through [Relation.print]. *)
+   their result relation; both render the same way through [Term.format]. *)
 let print_result environment transaction ~output ~show_logical ~show_physical
     logical_plan =
   let physical_plan =

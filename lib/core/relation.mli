@@ -73,17 +73,3 @@ val format : Format.formatter -> _ t -> unit
 
     No trailing newline is emitted after the closing brace, matching
     {!Scalar.format}, {!Row.format}, and {!format_kind}. *)
-
-val print : ?formatter:Format.formatter -> _ t -> unit
-(** [print ?formatter relation] renders [relation] as a table to [formatter]
-    (defaulting to [Format.std_formatter]), using Unicode box-drawing characters
-    for the cell dividers and the header rule.
-
-    Column widths are sized to the wider of the header and the rendered values;
-    [Int64] columns are right-aligned and the others left-aligned. Materialises
-    the [value] sequence eagerly to compute widths, so all rows are pulled
-    before any output is produced.
-
-    Lines are joined by [\n]; no trailing newline is emitted after the last
-    line, matching {!Scalar.format} and {!Row.format}. Callers that need a
-    terminator (the REPL, for instance) append one of their own. *)

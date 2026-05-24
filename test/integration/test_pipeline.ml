@@ -296,12 +296,12 @@ let render_plan_against_fixture plan =
       Execution.Eval.eval environment transaction plan
         (expect_relation (fun relation ->
              with_captured_formatter @@ fun formatter ->
-             Relation.print ~formatter relation)))
+             Relation.format formatter relation)))
 
 let test_indexed_nested_loop_join_renders_matched_pairs () =
   (* Hand-built plan: stream [orders], probe [users] by
      [orders.user_id]. No parser path yet, so this test exercises Eval
-     + Relation.print without going through the parser. The assertions
+     + Relation.format without going through the parser. The assertions
      cover the rendered column headers and every (user, order) pair
      the join should produce. *)
   let plan : Plan.Physical.t =

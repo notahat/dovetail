@@ -96,7 +96,7 @@ let with_demo_seeded_environment f =
 (** [with_captured_formatter write_to_formatter] runs [write_to_formatter]
     against a fresh buffered formatter, flushes it, and returns the captured
     string. The shape every test that compares formatted output (REPL
-    transcripts, [Relation.print] renderings, plan dumps) starts with. *)
+    transcripts, [Relation.format] renderings, plan dumps) starts with. *)
 let with_captured_formatter write_to_formatter =
   let buffer = Buffer.create 512 in
   let formatter = Format.formatter_of_buffer buffer in

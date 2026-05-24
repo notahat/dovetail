@@ -354,6 +354,19 @@ let test_relation_literal_alone_prints_one_row () =
   check_contains "literal row values" output " 7 ";
   check_contains "literal row values" output " 9 "
 
+(* End-to-end proof that the REPL's [Relation_value] dispatch produces the
+   canonical relation-literal form (not table form) and that the embedded
+   row kind and per-row literals carry the join's qualifiers. *)
+let test_post_join_renders_canonical_qualified_literal () =
+  let output =
+    run_with_input [ "users | join orders on users.id = orders.user_id" ]
+  in
+  check_contains "canonical literal preamble with qualified row kind" output
+    "relation (users.id: int64, users.name: string,";
+  check_contains "qualified field on the join's left side" output "users.id = ";
+  check_contains "qualified field on the join's right side" output
+    "orders.user_id = "
+
 let () =
   Alcotest.run "repl"
     [
@@ -424,5 +437,8 @@ let () =
           Alcotest.test_case
             ":create table on an existing table reports the error and continues"
             `Quick test_create_table_already_exists_reports_error_and_continues;
+          Alcotest.test_case
+            "a post-join relation renders as the canonical qualified literal"
+            `Quick test_post_join_renders_canonical_qualified_literal;
         ] );
     ]

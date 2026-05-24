@@ -119,73 +119,6 @@ let format_kind formatter (kind : kind) =
         kind.refinements);
   Format.pp_print_string formatter ")"
 
-(* Render a single value as the cell text that will appear in a table. No
-   quoting, no escaping; the pretty-print is illustrative. This is
-   deliberately distinct from {!Scalar.format}, which quotes strings so the
-   value boundary is visible -- a presentational choice that fits an
-   error message or a debug log but is wrong for cells laid out in a
-   bordered grid where the column itself is the boundary. *)
-let render_value = function
-  | Scalar.Int64 number -> Int64.to_string number
-  | Scalar.String text -> text
-  | Scalar.Bool true -> "true"
-  | Scalar.Bool false -> "false"
-
-let is_numeric_kind : Scalar.kind -> bool = function
-  | Int64 -> true
-  | String | Bool -> false
-
-(* Pad [text] with trailing or leading spaces to reach [width], depending on
-   whether the column is right-aligned. *)
-let pad_cell ~width ~right_align text =
-  let padding = String.make (width - String.length text) ' ' in
-  if right_align then padding ^ text else text ^ padding
-
-(* Per-column maximum of header length and any cell length. *)
-let column_widths headers rendered_rows =
-  let widths = Array.map String.length headers in
-  List.iter
-    (fun row ->
-      Array.iteri
-        (fun column_index cell ->
-          let cell_width = String.length cell in
-          if cell_width > widths.(column_index) then
-            widths.(column_index) <- cell_width)
-        row)
-    rendered_rows;
-  widths
-
-(* Repeat [piece] [count] times. The horizontal border glyph [─] is three
-   UTF-8 bytes, so [String.make] -- which takes a single byte -- can't
-   build the runs we need. *)
-let repeat piece count =
-  let buffer = Buffer.create (String.length piece * count) in
-  for _ = 1 to count do
-    Buffer.add_string buffer piece
-  done;
-  Buffer.contents buffer
-
-let format_row ~widths ~right_aligns cells =
-  let parts =
-    Array.mapi
-      (fun column_index cell ->
-        pad_cell ~width:widths.(column_index)
-          ~right_align:right_aligns.(column_index)
-          cell)
-      cells
-    |> Array.to_list
-  in
-  "│ " ^ String.concat " │ " parts ^ " │"
-
-(* Build the horizontal rule under the header. The segments between
-   corners are [─] runs two wider than the column to span the
-   single-space padding inside each cell. *)
-let format_header_separator widths =
-  let segments =
-    Array.map (fun width -> repeat "─" (width + 2)) widths |> Array.to_list
-  in
-  "├" ^ String.concat "┼" segments ^ "┤"
-
 let format formatter relation =
   let row_kind = relation.kind.row_kind in
   let rows = List.of_seq relation.value in
@@ -201,25 +134,3 @@ let format formatter relation =
       Format.pp_print_list ~pp_sep:separator format_row formatter rows;
       Format.pp_print_string formatter "\n");
   Format.pp_print_string formatter "}"
-
-let print ?(formatter = Format.std_formatter) relation =
-  let row_kind = relation.kind.row_kind in
-  let headers = Array.of_list (List.map Row.format_field_name row_kind) in
-  let right_aligns =
-    Array.of_list
-      (List.map
-         (fun (field : Row.field) -> is_numeric_kind field.kind)
-         row_kind)
-  in
-  let rendered_rows =
-    relation.value
-    |> Seq.map (fun row -> Array.map render_value row)
-    |> List.of_seq
-  in
-  let widths = column_widths headers rendered_rows in
-  let lines =
-    format_row ~widths ~right_aligns headers
-    :: format_header_separator widths
-    :: List.map (format_row ~widths ~right_aligns) rendered_rows
-  in
-  Format.pp_print_string formatter (String.concat "\n" lines)

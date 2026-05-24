@@ -23,12 +23,12 @@ let format_to_string term =
   Format.pp_print_flush formatter ();
   Buffer.contents buffer
 
-(* Render a relation through [Relation.print] for direct comparison with the
+(* Render a relation through [Relation.format] for direct comparison with the
    [Relation_value] arm. *)
 let render_relation relation =
   let buffer = Buffer.create 64 in
   let formatter = Format.formatter_of_buffer buffer in
-  Relation.print ~formatter relation;
+  Relation.format formatter relation;
   Format.pp_print_flush formatter ();
   Buffer.contents buffer
 
@@ -39,10 +39,10 @@ let render_kind kind =
   Format.pp_print_flush formatter ();
   Buffer.contents buffer
 
-let test_relation_value_renders_as_a_table () =
+let test_relation_value_renders_via_relation_format () =
   let relation : [ `Bag ] Relation.t = { kind; value = one_row } in
   Alcotest.(check string)
-    "Relation_value matches Relation.print output" (render_relation relation)
+    "Relation_value matches Relation.format output" (render_relation relation)
     (format_to_string (Term.Relation_value relation))
 
 let test_relation_kind_renders_in_surface_syntax () =
@@ -115,8 +115,8 @@ let () =
     [
       ( "format",
         [
-          Alcotest.test_case "Relation_value renders as a table" `Quick
-            test_relation_value_renders_as_a_table;
+          Alcotest.test_case "Relation_value renders via Relation.format" `Quick
+            test_relation_value_renders_via_relation_format;
           Alcotest.test_case
             "Relation_kind renders in the surface relation-type syntax" `Quick
             test_relation_kind_renders_in_surface_syntax;

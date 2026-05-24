@@ -12,5 +12,5 @@ let format formatter = function
   | Scalar_kind kind -> Scalar.format_kind formatter kind
   | Row_value row -> Row.format formatter row
   | Row_kind kind -> Row.format_kind formatter kind
-  | Relation_value relation -> Relation.print ~formatter relation
+  | Relation_value relation -> Relation.format formatter relation
   | Relation_kind kind -> Relation.format_kind formatter kind
