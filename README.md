@@ -44,14 +44,14 @@ projects:
 
 ```
 > users | join orders on users.id = orders.user_id | project name, description, amount
-│ users.name │ orders.description │ orders.amount │
-├────────────┼────────────────────┼───────────────┤
-│ Alice      │ Coffee             │             5 │
-│ Alice      │ Bagel              │             4 │
-│ Bob        │ Tea                │             3 │
-│ Carol      │ Sandwich           │             8 │
-│ Carol      │ Cake               │             6 │
-│ Eve        │ Cookie             │             2 │
+relation (users.name: string, orders.description: string, orders.amount: int64) {
+  (users.name = "Alice", orders.description = "Coffee", orders.amount = 5),
+  (users.name = "Alice", orders.description = "Bagel", orders.amount = 4),
+  (users.name = "Bob", orders.description = "Tea", orders.amount = 3),
+  (users.name = "Carol", orders.description = "Sandwich", orders.amount = 8),
+  (users.name = "Carol", orders.description = "Cake", orders.amount = 6),
+  (users.name = "Eve", orders.description = "Cookie", orders.amount = 2)
+}
 ```
 
 See [`docs/query-language.md`](docs/query-language.md) for the full

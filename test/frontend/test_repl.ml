@@ -157,9 +157,9 @@ let test_insert_into_orders_writes_row_and_reports_count () =
       ]
   in
   check_contains "insert result column header" output "insert_count";
-  check_contains "insert result count cell" output " 1 ";
+  check_contains "insert result count cell" output "insert_count = 1";
   check_contains "inserted row's description" output "Pretzel";
-  check_contains "inserted row's id column" output " 9 "
+  check_contains "inserted row's id field" output "orders.id = 9"
 
 (* [:list tables] runs through Parser → REPL DDL
    dispatch → Ddl_executor.execute_read → Catalog.list_table_names and
@@ -346,17 +346,17 @@ let test_relation_literal_alone_prints_one_row () =
          \"Pretzel\", amount = 9) }";
       ]
   in
-  (* Bare column headers, no qualifier prefix. *)
-  check_contains "literal column headers" output "│ id │ name";
-  check_contains "literal column headers" output "amount";
-  (* The literal's own values appear in the row. *)
-  check_contains "literal row values" output "Pretzel";
-  check_contains "literal row values" output " 7 ";
-  check_contains "literal row values" output " 9 "
+  (* Bare field names, no qualifier prefix, in the literal's row kind. *)
+  check_contains "literal row kind" output
+    "relation (id: int64, name: string, amount: int64)";
+  (* The literal's own values appear in the row, qualifier-free. *)
+  check_contains "literal row id" output "id = 7";
+  check_contains "literal row name" output "name = \"Pretzel\"";
+  check_contains "literal row amount" output "amount = 9"
 
 (* End-to-end proof that the REPL's [Relation_value] dispatch produces the
-   canonical relation-literal form (not table form) and that the embedded
-   row kind and per-row literals carry the join's qualifiers. *)
+   canonical relation-literal form and that the embedded row kind and
+   per-row literals carry the join's qualifiers. *)
 let test_post_join_renders_canonical_qualified_literal () =
   let output =
     run_with_input [ "users | join orders on users.id = orders.user_id" ]

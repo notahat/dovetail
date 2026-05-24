@@ -27,13 +27,13 @@ can disambiguate columns that share a name across tables.
 
 ```
 > users
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
-│        2 │ Bob        │ bob@example.com   │ false        │
-│        3 │ Carol      │ carol@example.com │ true         │
-│        4 │ Dave       │ dave@example.com  │ true         │
-│        5 │ Eve        │ eve@example.com   │ false        │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true),
+  (users.id = 2, users.name = "Bob", users.email = "bob@example.com", users.active = false),
+  (users.id = 3, users.name = "Carol", users.email = "carol@example.com", users.active = true),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true),
+  (users.id = 5, users.name = "Eve", users.email = "eve@example.com", users.active = false)
+}
 ```
 
 ## Scalar literals
@@ -99,10 +99,10 @@ upstream; see [`insert into`](#insert-into) below.
 
 ```
 > relation (id: int64, name: string) { (id = 1, name = "alice"), (id = 2, name = "bob") }
-│ id │ name  │
-├────┼───────┤
-│  1 │ alice │
-│  2 │ bob   │
+relation (id: int64, name: string) {
+  (id = 1, name = "alice"),
+  (id = 2, name = "bob")
+}
 > relation (id: int64, name: string) {} | type
 (id: int64, name: string)
 ```
@@ -121,9 +121,9 @@ are `<input>`'s, unchanged.
 
 ```
 > users | restrict id = 1
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true)
+}
 ```
 
 ## project
@@ -141,13 +141,13 @@ rejected, and each retained column keeps its qualifier from
 
 ```
 > users | project name, email
-│ users.name │ users.email       │
-├────────────┼───────────────────┤
-│ Alice      │ alice@example.com │
-│ Bob        │ bob@example.com   │
-│ Carol      │ carol@example.com │
-│ Dave       │ dave@example.com  │
-│ Eve        │ eve@example.com   │
+relation (users.name: string, users.email: string) {
+  (users.name = "Alice", users.email = "alice@example.com"),
+  (users.name = "Bob", users.email = "bob@example.com"),
+  (users.name = "Carol", users.email = "carol@example.com"),
+  (users.name = "Dave", users.email = "dave@example.com"),
+  (users.name = "Eve", users.email = "eve@example.com")
+}
 ```
 
 ## cross
@@ -168,14 +168,14 @@ placed any of them, since `cross` doesn't know about foreign keys.
 
 ```
 > users | restrict id = 4 | cross orders
-│ users.id │ users.name │ users.email      │ users.active │ orders.id │ orders.user_id │ orders.description │ orders.amount │
-├──────────┼────────────┼──────────────────┼──────────────┼───────────┼────────────────┼────────────────────┼───────────────┤
-│        4 │ Dave       │ dave@example.com │ true         │         1 │              1 │ Coffee             │             5 │
-│        4 │ Dave       │ dave@example.com │ true         │         2 │              1 │ Bagel              │             4 │
-│        4 │ Dave       │ dave@example.com │ true         │         3 │              2 │ Tea                │             3 │
-│        4 │ Dave       │ dave@example.com │ true         │         4 │              3 │ Sandwich           │             8 │
-│        4 │ Dave       │ dave@example.com │ true         │         5 │              3 │ Cake               │             6 │
-│        4 │ Dave       │ dave@example.com │ true         │         6 │              5 │ Cookie             │             2 │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, orders.id: int64, orders.user_id: int64, orders.description: string, orders.amount: int64) {
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true, orders.id = 1, orders.user_id = 1, orders.description = "Coffee", orders.amount = 5),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true, orders.id = 2, orders.user_id = 1, orders.description = "Bagel", orders.amount = 4),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true, orders.id = 3, orders.user_id = 2, orders.description = "Tea", orders.amount = 3),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true, orders.id = 4, orders.user_id = 3, orders.description = "Sandwich", orders.amount = 8),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true, orders.id = 5, orders.user_id = 3, orders.description = "Cake", orders.amount = 6),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true, orders.id = 6, orders.user_id = 5, orders.description = "Cookie", orders.amount = 2)
+}
 ```
 
 ## join
@@ -195,10 +195,10 @@ how you name which side of the join each column comes from.
 
 ```
 > users | restrict id = 1 | join orders on users.id = orders.user_id
-│ users.id │ users.name │ users.email       │ users.active │ orders.id │ orders.user_id │ orders.description │ orders.amount │
-├──────────┼────────────┼───────────────────┼──────────────┼───────────┼────────────────┼────────────────────┼───────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │         1 │              1 │ Coffee             │             5 │
-│        1 │ Alice      │ alice@example.com │ true         │         2 │              1 │ Bagel              │             4 │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, orders.id: int64, orders.user_id: int64, orders.description: string, orders.amount: int64) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true, orders.id = 1, orders.user_id = 1, orders.description = "Coffee", orders.amount = 5),
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true, orders.id = 2, orders.user_id = 1, orders.description = "Bagel", orders.amount = 4)
+}
 ```
 
 ## type
@@ -222,7 +222,7 @@ for the catalog-inspection use.
 
 ```
 > users | type
-(id: int64, name: string, email: string, active: bool, primary key (id))
+(users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id))
 ```
 
 ## insert into
@@ -245,7 +245,7 @@ the transaction and the table is unchanged.
 
 ```
 > relation (id: int64, user_id: int64, description: string, amount: int64) { (id = 7, user_id = 4, description = "Muffin", amount = 2) } | insert into orders
-│ insert_count │
-├──────────────┤
-│            1 │
+relation (insert_count: int64) {
+  (insert_count = 1)
+}
 ```

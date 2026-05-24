@@ -86,17 +86,16 @@ Another paragraph, no fences.
   ()
 
 let test_trailing_ellipsis_accepts_extra_actual_rows () =
-  (* `users` prints a header, a separator, and five data rows. The doc
-     here shows only the first two data rows followed by `...`, which
-     should be treated as "anything that follows in actual output is
-     accepted without further checking." *)
+  (* `users` prints a relation literal with five rows. The doc here
+     shows the preamble and only the first two rows followed by `...`,
+     which should be treated as "anything that follows in actual output
+     is accepted without further checking." *)
   let markdown =
     {|```
 > users
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
-│        2 │ Bob        │ bob@example.com   │ false        │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true),
+  (users.id = 2, users.name = "Bob", users.email = "bob@example.com", users.active = false),
 ...
 ```
 |}
@@ -118,9 +117,8 @@ let test_ellipsis_only_recognised_on_its_own_line () =
   let markdown =
     {|```
 > users
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice ...  │ alice@example.com │ true         │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice ...", users.email = "alice@example.com", users.active = true),
 ```
 |}
   in

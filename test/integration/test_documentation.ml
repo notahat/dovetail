@@ -1,4 +1,4 @@
-(** End-to-end doctest verification for project markdown.
+(** End-to-end doctest verification for the project's markdown.
 
     Each markdown path in [verified_files] is parsed for REPL sessions, run
     through {!Repl.run} against a fresh demo-data-seeded environment, and

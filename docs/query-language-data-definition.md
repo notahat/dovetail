@@ -68,7 +68,7 @@ orders
 users
 widgets
 > widgets | type
-(id: int64, name: string, primary key (id))
+(widgets.id: int64, widgets.name: string, primary key (id))
 > :drop table widgets
 dropped table "widgets"
 ```

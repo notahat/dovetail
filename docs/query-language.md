@@ -45,13 +45,13 @@ A first query: every row of the `users` table.
 
 ```
 > users
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
-│        2 │ Bob        │ bob@example.com   │ false        │
-│        3 │ Carol      │ carol@example.com │ true         │
-│        4 │ Dave       │ dave@example.com  │ true         │
-│        5 │ Eve        │ eve@example.com   │ false        │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true),
+  (users.id = 2, users.name = "Bob", users.email = "bob@example.com", users.active = false),
+  (users.id = 3, users.name = "Carol", users.email = "carol@example.com", users.active = true),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true),
+  (users.id = 5, users.name = "Eve", users.email = "eve@example.com", users.active = false)
+}
 ```
 
 ## The example tables
@@ -73,13 +73,13 @@ puts them in your data directory.
 
 ```
 > users
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
-│        2 │ Bob        │ bob@example.com   │ false        │
-│        3 │ Carol      │ carol@example.com │ true         │
-│        4 │ Dave       │ dave@example.com  │ true         │
-│        5 │ Eve        │ eve@example.com   │ false        │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true),
+  (users.id = 2, users.name = "Bob", users.email = "bob@example.com", users.active = false),
+  (users.id = 3, users.name = "Carol", users.email = "carol@example.com", users.active = true),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true),
+  (users.id = 5, users.name = "Eve", users.email = "eve@example.com", users.active = false)
+}
 ```
 
 ### `orders`
@@ -97,12 +97,12 @@ sections produce visibly interesting output.
 
 ```
 > orders
-│ orders.id │ orders.user_id │ orders.description │ orders.amount │
-├───────────┼────────────────┼────────────────────┼───────────────┤
-│         1 │              1 │ Coffee             │             5 │
-│         2 │              1 │ Bagel              │             4 │
-│         3 │              2 │ Tea                │             3 │
-│         4 │              3 │ Sandwich           │             8 │
-│         5 │              3 │ Cake               │             6 │
-│         6 │              5 │ Cookie             │             2 │
+relation (orders.id: int64, orders.user_id: int64, orders.description: string, orders.amount: int64, primary key (id)) {
+  (orders.id = 1, orders.user_id = 1, orders.description = "Coffee", orders.amount = 5),
+  (orders.id = 2, orders.user_id = 1, orders.description = "Bagel", orders.amount = 4),
+  (orders.id = 3, orders.user_id = 2, orders.description = "Tea", orders.amount = 3),
+  (orders.id = 4, orders.user_id = 3, orders.description = "Sandwich", orders.amount = 8),
+  (orders.id = 5, orders.user_id = 3, orders.description = "Cake", orders.amount = 6),
+  (orders.id = 6, orders.user_id = 5, orders.description = "Cookie", orders.amount = 2)
+}
 ```

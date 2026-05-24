@@ -29,9 +29,9 @@ A literal evaluates to itself at every row.
 
 ```
 > users | restrict name = "Alice"
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true)
+}
 ```
 
 ## Column references
@@ -52,9 +52,9 @@ same column.
 
 ```
 > users | restrict users.id = 1
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true)
+}
 ```
 
 ## Comparisons
@@ -75,11 +75,11 @@ associative; chains like `a < b < c` don't parse.
 
 ```
 > orders | restrict amount >= 5
-│ orders.id │ orders.user_id │ orders.description │ orders.amount │
-├───────────┼────────────────┼────────────────────┼───────────────┤
-│         1 │              1 │ Coffee             │             5 │
-│         4 │              3 │ Sandwich           │             8 │
-│         5 │              3 │ Cake               │             6 │
+relation (orders.id: int64, orders.user_id: int64, orders.description: string, orders.amount: int64, primary key (id)) {
+  (orders.id = 1, orders.user_id = 1, orders.description = "Coffee", orders.amount = 5),
+  (orders.id = 4, orders.user_id = 3, orders.description = "Sandwich", orders.amount = 8),
+  (orders.id = 5, orders.user_id = 3, orders.description = "Cake", orders.amount = 6)
+}
 ```
 
 ## Boolean operators
@@ -97,10 +97,10 @@ prefix unary operator and stacks (`not not active` parses).
 
 ```
 > users | restrict active and not id = 4
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        1 │ Alice      │ alice@example.com │ true         │
-│        3 │ Carol      │ carol@example.com │ true         │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true),
+  (users.id = 3, users.name = "Carol", users.email = "carol@example.com", users.active = true)
+}
 ```
 
 ## Parentheses
@@ -118,11 +118,11 @@ The example below restricts to users whose id is *neither* 1 nor
 
 ```
 > users | restrict not (id = 1 or id = 2)
-│ users.id │ users.name │ users.email       │ users.active │
-├──────────┼────────────┼───────────────────┼──────────────┤
-│        3 │ Carol      │ carol@example.com │ true         │
-│        4 │ Dave       │ dave@example.com  │ true         │
-│        5 │ Eve        │ eve@example.com   │ false        │
+relation (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) {
+  (users.id = 3, users.name = "Carol", users.email = "carol@example.com", users.active = true),
+  (users.id = 4, users.name = "Dave", users.email = "dave@example.com", users.active = true),
+  (users.id = 5, users.name = "Eve", users.email = "eve@example.com", users.active = false)
+}
 ```
 
 ## Precedence and associativity
@@ -161,12 +161,12 @@ as duplicates of each other.
 
 ```
 > orders | project description, amount, id
-│ orders.description │ orders.amount │ orders.id │
-├────────────────────┼───────────────┼───────────┤
-│ Coffee             │             5 │         1 │
-│ Bagel              │             4 │         2 │
-│ Tea                │             3 │         3 │
-│ Sandwich           │             8 │         4 │
-│ Cake               │             6 │         5 │
-│ Cookie             │             2 │         6 │
+relation (orders.description: string, orders.amount: int64, orders.id: int64) {
+  (orders.description = "Coffee", orders.amount = 5, orders.id = 1),
+  (orders.description = "Bagel", orders.amount = 4, orders.id = 2),
+  (orders.description = "Tea", orders.amount = 3, orders.id = 3),
+  (orders.description = "Sandwich", orders.amount = 8, orders.id = 4),
+  (orders.description = "Cake", orders.amount = 6, orders.id = 5),
+  (orders.description = "Cookie", orders.amount = 2, orders.id = 6)
+}
 ```
