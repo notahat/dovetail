@@ -311,7 +311,7 @@ let test_create_table_end_to_end_sequence () =
   in
   check_contains "create status line" output "created table \"widgets\"";
   check_contains "widgets | type renders the relation type" output
-    "(id: int64, name: string, primary key (id))";
+    "(widgets.id: int64, widgets.name: string, primary key (id))";
   check_contains "drop status line" output "dropped table \"widgets\"";
   (* The substring [\nwidgets\n] is the listing-line shape: a table name
      on its own line in a [:list tables] block. It appears exactly once

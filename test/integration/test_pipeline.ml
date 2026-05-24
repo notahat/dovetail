@@ -363,8 +363,8 @@ let test_type_on_users_yields_relation_type () =
       in
       Alcotest.(check string)
         "users | type renders the fixture's relation type"
-        "(id: int64, name: string, email: string, active: bool, primary key \
-         (id))"
+        "(users.id: int64, users.name: string, users.email: string, \
+         users.active: bool, primary key (id))"
         rendered)
 
 let test_type_over_type_raises_at_lower () =

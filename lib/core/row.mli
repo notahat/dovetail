@@ -41,16 +41,17 @@ val format_field_name : field -> string
 val format_kind : Format.formatter -> kind -> unit
 (** [format_kind formatter kind] writes [kind] to [formatter] in the surface
     syntax for a row type: a parenthesised, comma-separated list of [name: type]
-    bindings, or [()] when [kind] is empty. Field qualifiers are dropped — the
-    surface row-type syntax has no qualifier form. Field kinds render via
-    {!Scalar.format_kind} (lowercase keywords). *)
+    bindings, or [()] when [kind] is empty. Field names render via
+    {!format_field_name}, so qualifiers appear as [qualifier.name] when present
+    and bare otherwise. Field kinds render via {!Scalar.format_kind} (lowercase
+    keywords). *)
 
 val format : Format.formatter -> t -> unit
 (** [format formatter row] writes [row] to [formatter] in the surface syntax for
     a row value: a parenthesised, comma-separated list of [name = value]
-    bindings, or [()] when the row is empty. Field qualifiers are dropped — the
-    surface row-value syntax has no qualifier form. Cell values render via
-    {!Scalar.format}. *)
+    bindings, or [()] when the row is empty. Field names render via
+    {!format_field_name}, so qualifiers appear as [qualifier.name] when present
+    and bare otherwise. Cell values render via {!Scalar.format}. *)
 
 val find_field : kind -> column_reference -> (int * field, string) result
 (** [find_field row_kind reference] resolves [reference] against [row_kind] and

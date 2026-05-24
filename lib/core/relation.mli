@@ -68,7 +68,7 @@ val format : Format.formatter -> _ t -> unit
     [relation (T) {}]; a relation with rows breaks across lines, with each row
     indented by two spaces on its own line, comma-separated, and a closing brace
     on the final line. Materialises the [value] sequence eagerly. Field
-    qualifiers in the row kind are dropped, matching {!format_kind} and
+    qualifiers in the row kind are preserved, matching {!format_kind} and
     {!Row.format}.
 
     No trailing newline is emitted after the closing brace, matching

@@ -15,7 +15,8 @@ let format_field_name (field : field) =
 
 let format_kind formatter (kind : kind) =
   let format_field formatter (field : field) =
-    Format.fprintf formatter "%s: %a" field.name Scalar.format_kind field.kind
+    Format.fprintf formatter "%s: %a" (format_field_name field)
+      Scalar.format_kind field.kind
   in
   let separator formatter () = Format.pp_print_string formatter ", " in
   Format.pp_print_string formatter "(";
@@ -25,7 +26,8 @@ let format_kind formatter (kind : kind) =
 let format formatter (row : t) =
   let pairs = List.combine row.kind (Array.to_list row.value) in
   let format_pair formatter ((field : field), value) =
-    Format.fprintf formatter "%s = %a" field.name Scalar.format value
+    Format.fprintf formatter "%s = %a" (format_field_name field) Scalar.format
+      value
   in
   let separator formatter () = Format.pp_print_string formatter ", " in
   Format.pp_print_string formatter "(";

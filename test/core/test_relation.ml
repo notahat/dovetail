@@ -289,10 +289,11 @@ let test_format_kind_with_composite_primary_key () =
     "(order_id: int64, line: int64, sku: string, primary key (order_id, line))"
     (format_kind_to_string kind)
 
-let test_format_kind_drops_field_qualifiers () =
+let test_format_kind_preserves_field_qualifiers () =
   Alcotest.(check string)
-    "qualifiers stripped from surface output"
-    "(id: int64, name: string, email: string, active: bool, primary key (id))"
+    "qualifiers preserved on the row-kind fields"
+    "(users.id: int64, users.name: string, users.email: string, users.active: \
+     bool, primary key (id))"
     (format_kind_to_string users_kind)
 
 (* Render via [Relation.format] into a string for comparison against the
@@ -309,8 +310,8 @@ let test_format_renders_empty_relation_inline () =
     { kind = users_kind; value = Seq.empty }
   in
   let expected =
-    "relation (id: int64, name: string, email: string, active: bool, primary \
-     key (id)) {}"
+    "relation (users.id: int64, users.name: string, users.email: string, \
+     users.active: bool, primary key (id)) {}"
   in
   Alcotest.(check string)
     "empty relation renders with inline braces" expected
@@ -323,12 +324,12 @@ let test_format_renders_multi_row_relation_one_row_per_line () =
   let expected =
     String.concat "\n"
       [
-        "relation (id: int64, name: string, email: string, active: bool, \
-         primary key (id)) {";
-        "  (id = 1, name = \"Alice\", email = \"alice@example.com\", active = \
-         true),";
-        "  (id = 10, name = \"Bob\", email = \"bob@example.com\", active = \
-         false)";
+        "relation (users.id: int64, users.name: string, users.email: string, \
+         users.active: bool, primary key (id)) {";
+        "  (users.id = 1, users.name = \"Alice\", users.email = \
+         \"alice@example.com\", users.active = true),";
+        "  (users.id = 10, users.name = \"Bob\", users.email = \
+         \"bob@example.com\", users.active = false)";
         "}";
       ]
   in
@@ -402,8 +403,8 @@ let () =
           Alcotest.test_case
             "with a composite primary key lists key columns in order" `Quick
             test_format_kind_with_composite_primary_key;
-          Alcotest.test_case "drops field qualifiers at the surface" `Quick
-            test_format_kind_drops_field_qualifiers;
+          Alcotest.test_case "preserves field qualifiers at the surface" `Quick
+            test_format_kind_preserves_field_qualifiers;
         ] );
       ( "format",
         [

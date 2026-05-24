@@ -132,7 +132,7 @@ let test_format_kind_multi_field_comma_separates () =
     "multi-field row" "(id: int64, name: string, active: bool)"
     (format_kind_to_string kind)
 
-let test_format_kind_drops_qualifiers () =
+let test_format_kind_preserves_qualifiers () =
   let kind : Row.kind =
     [
       { name = "id"; kind = Int64; qualifier = Some "users" };
@@ -140,7 +140,8 @@ let test_format_kind_drops_qualifiers () =
     ]
   in
   Alcotest.(check string)
-    "qualifiers are dropped at the surface" "(id: int64, name: string)"
+    "qualifiers are preserved at the surface"
+    "(users.id: int64, users.name: string)"
     (format_kind_to_string kind)
 
 (* Render via [Row.format] into a string for comparison with the expected
@@ -181,7 +182,7 @@ let test_format_multi_field_comma_separates () =
     "multi-field row" "(id = 1, name = \"Alice\", active = true)"
     (format_value_to_string row)
 
-let test_format_drops_qualifiers () =
+let test_format_preserves_qualifiers () =
   let row : Row.t =
     {
       kind =
@@ -193,7 +194,8 @@ let test_format_drops_qualifiers () =
     }
   in
   Alcotest.(check string)
-    "qualifiers are dropped at the surface" "(id = 1, name = \"Alice\")"
+    "qualifiers are preserved at the surface"
+    "(users.id = 1, users.name = \"Alice\")"
     (format_value_to_string row)
 
 let () =
@@ -245,8 +247,8 @@ let () =
             test_format_kind_single_field_renders_name_colon_type;
           Alcotest.test_case "multiple fields are comma-separated" `Quick
             test_format_kind_multi_field_comma_separates;
-          Alcotest.test_case "qualifiers are dropped at the surface" `Quick
-            test_format_kind_drops_qualifiers;
+          Alcotest.test_case "qualifiers are preserved at the surface" `Quick
+            test_format_kind_preserves_qualifiers;
         ] );
       ( "format",
         [
@@ -256,7 +258,7 @@ let () =
             test_format_single_field_renders_name_equals_value;
           Alcotest.test_case "multiple fields are comma-separated" `Quick
             test_format_multi_field_comma_separates;
-          Alcotest.test_case "qualifiers are dropped at the surface" `Quick
-            test_format_drops_qualifiers;
+          Alcotest.test_case "qualifiers are preserved at the surface" `Quick
+            test_format_preserves_qualifiers;
         ] );
     ]
