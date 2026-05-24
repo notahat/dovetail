@@ -1,4 +1,4 @@
-# 23 — Slice 23: Catalog rung
+# 24 — Slice 24: Catalog rung
 
 Lands the catalog rung from
 [`docs/type-system.md`](../type-system.md). Introduces `Core.Catalog`
@@ -6,7 +6,7 @@ Lands the catalog rung from
 and rendering for the catalog literal. Retires `:list tables` and
 deletes `lib/ddl/` entirely.
 
-Depends on [slice 22](22-slice-22-create-and-drop-table.md) — only
+Depends on [slice 23](23-slice-23-create-and-drop-table.md) — only
 `:list tables` remains in DDL after that slice; this one finishes
 the retirement.
 
@@ -83,7 +83,7 @@ catalog | tables        -> one-column relation (name: string), one
   cross-table `check (...)`). Same reasoning — syntax committed, no
   feature design yet.
 - Other `catalog | <op>` operators (`columns`, `refinements`, info-
-  schema-style introspection). Slice 23 lands only `type` and
+  schema-style introspection). Slice 24 lands only `type` and
   `tables`; future slices grow the family as needed.
 - `catalog | type | something` chained operations beyond what
   type-system.md commits. Today nothing in the grammar consumes a

@@ -1,12 +1,15 @@
-# 22 — Slice 22: `create table` and `drop table` as pipeline operators
+# 23 — Slice 23: `create table` and `drop table` as pipeline operators
 
 Lands the pipe-form for `create table` and `drop table` from
 [`docs/type-system.md`](../type-system.md). Retires the
 corresponding `:`-sigil DDL statements.
 
-Depends on [slice 21](21-slice-21-literal-syntax-flip.md) — the
-type-expression grammar and the new relation literal are needed for
-`create table`'s left side.
+Depends on [slice 21](21-slice-21-literal-syntax-flip.md) for the
+type-expression grammar and the new relation literal (`create
+table`'s left side), and on
+[slice 22](22-slice-22-qualifiers.md) for the no-silent-drop rule
+that `create table`'s input validation reuses (qualified field on
+the left → error pointing at `unqualify`).
 
 ## Goal
 
@@ -77,8 +80,8 @@ all work. `:create table` and `:drop table` are gone.
   matches what's stored; `create_table_seeded` writes a kind and
   then rows in the same transaction, consistent with how `:create
   table` + `insert into` work today.
-- Catalog rung (`catalog | tables`, etc.) — slice 23.
-- Composite primary keys aren't a slice 22 concern; the existing
+- Catalog rung (`catalog | tables`, etc.) — slice 24.
+- Composite primary keys aren't a slice 23 concern; the existing
   `Relation.kind` already supports multi-column PKs.
 
 ## Key design decisions made during planning
@@ -100,8 +103,8 @@ all work. `:create table` and `:drop table` are gone.
 
 ## Notes for follow-on slices
 
-- Slice 23 retires `:list tables` and removes the now-empty
-  `lib/ddl/` library wholesale. After slice 22, only `:list tables`
+- Slice 24 retires `:list tables` and removes the now-empty
+  `lib/ddl/` library wholesale. After slice 23, only `:list tables`
   remains in DDL.
 - The `create table` / `drop table` result-row shapes ship with this
   slice. If the project later decides on a uniform "operation

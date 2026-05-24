@@ -290,6 +290,71 @@ grammar, no `Ddl.Statement.t` AST, no `Ddl_executor`, no
 to catalog-mutating sinks the same way it dispatches to
 relation-mutating ones today.
 
+## Qualifiers
+
+`Row.field` carries an optional qualifier — a table alias that
+distinguishes `users.id` from `orders.id` inside a multi-relation
+query. Joins and cross-products produce them; stored catalog types
+never carry them. The canonical syntax extends the `name: type` and
+`name = value` forms with a `qualifier.name` head:
+
+```
+(users.id: int64, orders.user_id: int64)
+(users.id = 1, orders.user_id = 1)
+```
+
+The rule is that qualifiers round-trip exactly. A qualified field
+never silently loses its qualifier; an unqualified field never
+silently gains one. Display and input agree everywhere a row, row
+type, or relation type appears.
+
+### How operators handle qualifiers
+
+- **`filter`, `project`** preserve whatever qualifiers are on the
+  input. Expressions inside them accept bare field names when the
+  reference is unambiguous, and require a qualified name
+  (`users.id`) when two input fields share a name. The qualifier
+  exists to disambiguate; demanding it where there is nothing to
+  disambiguate would be noise.
+- **`join`, `cross`** produce qualified output. The surface RA
+  already attaches qualifiers internally; the canonical formatter
+  now prints them.
+- **`insert into <name>`** and **`create table <name>`** are the
+  boundary into stored shapes. Stored types have no qualifiers, so
+  both reject qualified input rather than silently stripping. A
+  qualified field reaching one of these sinks almost always means
+  the upstream pipeline picked up the wrong rows; failing loudly is
+  safer than guessing. Matching qualifiers (`(users.id = 1) | insert
+  into users`) are rejected on the same grounds — the no-silent-drop
+  rule does not have a "but it matched" escape hatch.
+
+To bridge a qualified pipeline into a stored shape on purpose, an
+explicit stripping stage sits between them:
+
+```
+users
+| join orders on users.id = orders.user_id
+| unqualify
+| insert into joined
+```
+
+`unqualify` is a pipe stage that drops every field's qualifier. It
+accepts either a relation or a row. It fails if stripping would
+collide two fields onto the same name — for instance, the output of
+`users | join orders …` contains both `users.id` and `orders.id`,
+and `unqualify` on that relation is an error. Resolving the
+collision is the caller's job: a `project` upstream that drops or
+renames one of them is the usual move.
+
+### Qualifiers in literals
+
+Row and relation literals may be written with qualified fields
+(`(users.id = 1, users.name = "alice")`, or a relation literal whose
+declared type is qualified). This is mostly useful for tests and for
+round-tripping pipeline output; it has no effect on storage. A
+qualified literal fed into `create table` or `insert into` follows
+the sink rules above.
+
 ## What this leaves open
 
 A handful of questions the syntax above does not commit on. They are
@@ -321,14 +386,6 @@ land them as they come up.
   is "bag" — duplicate rows are preserved as written — matching the
   rest of the system; an explicit set form is not needed for v1 but
   may want a marker later.
-- **Qualifiers on row fields.** `Row.field` carries an optional
-  qualifier (table alias) used inside multi-relation expressions. The
-  canonical form above drops qualifiers — only the field name and
-  type round-trip. Stored types in the catalog do not carry
-  qualifiers either; qualifiers are a query-construction concept,
-  not a stored-shape one. If a context emerges where round-tripping
-  *with* qualifiers matters, a `users.id: int64` form is the obvious
-  extension.
 
 ## What this note is not
 
