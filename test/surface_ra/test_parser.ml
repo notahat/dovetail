@@ -381,10 +381,32 @@ let test_ddl_drop_table_rejects_quoted_name () =
 let test_ddl_drop_table_rejects_trailing_garbage () =
   rejects ":drop table users xyz"
 
-(* The DDL keywords [drop] and [table] are not globally reserved either --
-   matches the [list] / [tables] cases below. *)
-let test_pipeline_keyword_drop_is_a_relation_name () =
-  parses "drop" (Ast.Relation_name "drop")
+(* A bare [drop] at pipeline-source position commits to the [drop table
+   <name>] leaf grammar; if [table] doesn't follow, the parse fails
+   rather than silently treating [drop] as a relation name. Mirrors the
+   [relation] case. The keyword [table] is still a relation name -- only
+   [drop] is reserved at source position. *)
+let test_pipeline_keyword_drop_alone_is_rejected () = rejects "drop"
+
+let test_pipeline_drop_table_parses_as_drop_table_leaf () =
+  parses "drop table users" (Ast.Drop_table { table_name = "users" })
+
+let test_pipeline_drop_table_tolerates_extra_whitespace () =
+  parses "drop   table\n  users" (Ast.Drop_table { table_name = "users" })
+
+let test_pipeline_drop_table_allows_downstream_pipeline_step () =
+  (* Drop_table is a leaf source: its result is a relation, so a
+     downstream pipeline step is grammatically legal even though the
+     query is pointless. *)
+  parses "drop table users | project dropped"
+    (Ast.Project
+       {
+         input = Ast.Drop_table { table_name = "users" };
+         columns = [ column_reference "dropped" ];
+       })
+
+let test_pipeline_drop_followed_by_non_table_keyword_is_rejected () =
+  rejects "drop notatable users"
 
 let test_pipeline_keyword_table_is_a_relation_name () =
   parses "table" (Ast.Relation_name "table")
@@ -1080,8 +1102,19 @@ let () =
             test_ddl_drop_table_rejects_quoted_name;
           Alcotest.test_case ":drop table with trailing garbage rejects" `Quick
             test_ddl_drop_table_rejects_trailing_garbage;
-          Alcotest.test_case "[drop] is a relation name in a pipeline" `Quick
-            test_pipeline_keyword_drop_is_a_relation_name;
+          Alcotest.test_case "bare [drop] in a pipeline is rejected" `Quick
+            test_pipeline_keyword_drop_alone_is_rejected;
+          Alcotest.test_case "[drop table <name>] parses as a Drop_table leaf"
+            `Quick test_pipeline_drop_table_parses_as_drop_table_leaf;
+          Alcotest.test_case
+            "[drop table] tolerates extra whitespace between tokens" `Quick
+            test_pipeline_drop_table_tolerates_extra_whitespace;
+          Alcotest.test_case
+            "[drop table <name> | <step>] parses with the step over the leaf"
+            `Quick test_pipeline_drop_table_allows_downstream_pipeline_step;
+          Alcotest.test_case
+            "[drop <non-table-keyword>] in a pipeline is rejected" `Quick
+            test_pipeline_drop_followed_by_non_table_keyword_is_rejected;
           Alcotest.test_case "[table] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_table_is_a_relation_name;
           Alcotest.test_case ":describe is no longer a recognised statement"

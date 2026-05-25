@@ -291,17 +291,28 @@ let relation_literal_body =
   <* whitespace <* char '}'
   >>| fun rows -> Ast.Relation_literal { kind; rows }
 
+(* The body of a [drop table <name>] leaf source: the caller has consumed
+   the [drop] keyword; this parser commits to whitespace, the [table]
+   keyword, more whitespace, and an identifier. A bare [drop] followed
+   by anything else is a parse error, matching how the [relation] case
+   commits to the literal grammar below -- a table called [drop] is a
+   parse error in source position. *)
+let drop_table_body =
+  whitespace *> keyword "table" *> whitespace *> identifier
+  >>| fun table_name -> Ast.Drop_table { table_name }
+
 (* A bare identifier at pipeline-source position: a [true] / [false] scalar
-   literal, the [relation] keyword introducing a relation literal, or a
-   relation name. The leading-letter character class is shared, so we parse
-   the identifier eagerly and dispatch on its spelling. The [relation] case
-   commits to the literal grammar: a table called [relation] is a parse
-   error in source position. *)
+   literal, the [relation] keyword introducing a relation literal, the
+   [drop] keyword introducing a [drop table <name>] leaf, or a relation
+   name. The leading-letter character class is shared, so we parse the
+   identifier eagerly and dispatch on its spelling. The [relation] and
+   [drop] cases commit to their respective sub-grammars. *)
 let identifier_relation_or_bool_literal =
   identifier >>= function
   | "true" -> return (Ast.Scalar_literal (Scalar.Bool true))
   | "false" -> return (Ast.Scalar_literal (Scalar.Bool false))
   | "relation" -> relation_literal_body
+  | "drop" -> drop_table_body
   | name -> return (Ast.Relation_name name)
 
 (* The leading position of a pipeline: a row literal, a bare scalar literal,
