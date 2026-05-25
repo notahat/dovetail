@@ -254,6 +254,16 @@ let test_create_table_seeded_requires_write_access () =
     "Create_table_seeded requires Write access" true
     (Logical.required_access plan = `Write)
 
+let test_catalog_source_requires_read_access () =
+  Alcotest.(check bool)
+    "Catalog_source requires Read access" true
+    (Logical.required_access Catalog_source = `Read)
+
+let test_catalog_source_renders_as_bare_keyword () =
+  Alcotest.(check string)
+    "CatalogSource on a single line" "CatalogSource\n"
+    (format_to_string Logical.Catalog_source)
+
 let test_drop_table_renders_with_table_name () =
   let plan : Logical.t = Drop_table { table_name = "users" } in
   Alcotest.(check string)
@@ -338,6 +348,8 @@ let () =
             test_create_table_empty_requires_write_access;
           Alcotest.test_case "Create_table_seeded requires Write access" `Quick
             test_create_table_seeded_requires_write_access;
+          Alcotest.test_case "Catalog_source requires Read access" `Quick
+            test_catalog_source_requires_read_access;
         ] );
       ( "format",
         [
@@ -370,5 +382,7 @@ let () =
           Alcotest.test_case
             "CreateTableSeeded renders header with indented source" `Quick
             test_create_table_seeded_renders_header_with_indented_source;
+          Alcotest.test_case "CatalogSource renders as the bare keyword" `Quick
+            test_catalog_source_renders_as_bare_keyword;
         ] );
     ]

@@ -25,6 +25,7 @@ type t =
   | Create_table_empty of { table_name : string; kind : Relation.kind }
   | Create_table_seeded of { table_name : string; source : t }
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
+  | Catalog_source
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
@@ -113,6 +114,7 @@ let rec format_at formatter indent plan =
   | Create_table_seeded { table_name; source } ->
       Format.fprintf formatter "%sCreateTableSeeded(%s)@\n" prefix table_name;
       format_at formatter (indent + 1) source
+  | Catalog_source -> Format.fprintf formatter "%sCatalogSource@\n" prefix
 
 let format formatter plan = format_at formatter 0 plan
 
@@ -206,3 +208,11 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
       failwith "Physical.kind_of: Row_literal does not produce a relation kind"
   | Drop_table _ -> drop_table_result_kind
   | Create_table_empty _ | Create_table_seeded _ -> create_table_result_kind
+  | Catalog_source ->
+      (* The catalog rung's static shape is a [Catalog.kind], not a
+         [Relation.kind] — the two faces are different types. The [Type_op]
+         evaluator short-circuits a [Catalog_source] input directly and never
+         delegates to [kind_of] for it, so this arm is unreachable from
+         the evaluator. The explicit failure surfaces any future caller that
+         asks for a relation kind it can't provide. *)
+      assert false

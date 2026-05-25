@@ -98,6 +98,14 @@ type t =
           pipeline's root only; the row's kind is derived eagerly from the
           values' scalar kinds and the references' qualifiers. Reports [`Read]
           from {!required_access}. *)
+  | Catalog_source
+      (** [Catalog_source] yields the database's catalog: every table's name
+          paired with a relation carrying its rows. A nullary leaf source.
+          {!Eval} reads the catalog under the active read transaction, opens a
+          per-table cursor lazily for each entry, and hands the assembled
+          {!Dovetail_core.Catalog.value} down the pipe as a
+          {!Dovetail_core.Term.Catalog_value}. Reports [`Read] from
+          {!required_access}. *)
 
 val required_access : t -> [ `Read | `Write ]
 (** [required_access plan] walks [plan] and returns the strongest transaction

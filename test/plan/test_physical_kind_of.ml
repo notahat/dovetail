@@ -322,6 +322,16 @@ let test_row_literal_raises_because_result_is_a_row () =
     (Failure "Physical.kind_of: Row_literal does not produce a relation kind")
     (fun () -> ignore (Physical.kind_of ~catalog:fixture_catalog plan))
 
+(* [Catalog_source]'s static shape is a [Catalog.kind], not a [Relation.kind].
+   The [Type_op] evaluator short-circuits a [Catalog_source] input directly,
+   so [kind_of] should be unreachable for this arm; calling it surfaces the
+   invariant as an [Assert_failure]. The exception's file / line / column
+   payload is not pinned -- only the exception constructor is. *)
+let test_catalog_source_invariant_violation_raises () =
+  match Physical.kind_of ~catalog:fixture_catalog Catalog_source with
+  | _ -> Alcotest.fail "expected Assert_failure but kind_of returned a kind"
+  | exception Assert_failure _ -> ()
+
 let () =
   Alcotest.run "physical_kind_of"
     [
@@ -374,5 +384,8 @@ let () =
           Alcotest.test_case
             "Create_table_seeded reports (created : string), not source kind"
             `Quick test_create_table_seeded_returns_created_kind_not_source_kind;
+          Alcotest.test_case
+            "Catalog_source raises because its result kind is a catalog kind"
+            `Quick test_catalog_source_invariant_violation_raises;
         ] );
     ]

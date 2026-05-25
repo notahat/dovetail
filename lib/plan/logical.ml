@@ -17,6 +17,7 @@ type t =
   | Create_table_empty of { table_name : string; kind : Relation.kind }
   | Create_table_seeded of { table_name : string; source : t }
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
+  | Catalog_source
 
 (* Walks a plan and reports the strongest transaction access any operator
    in it needs. Insert is the only write operator today; every other
@@ -39,6 +40,7 @@ let rec required_access = function
   | Create_table_empty _ -> `Write
   | Create_table_seeded { source; _ } ->
       access_max `Write (required_access source)
+  | Catalog_source -> `Read
 
 and access_max left right =
   match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
@@ -107,5 +109,6 @@ let rec format_at formatter indent plan =
   | Create_table_seeded { table_name; source } ->
       Format.fprintf formatter "%sCreateTableSeeded(%s)@\n" prefix table_name;
       format_at formatter (indent + 1) source
+  | Catalog_source -> Format.fprintf formatter "%sCatalogSource@\n" prefix
 
 let format formatter plan = format_at formatter 0 plan

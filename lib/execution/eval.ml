@@ -119,6 +119,11 @@ let rec eval environment transaction plan continue =
   | Create_table_seeded { table_name; source } ->
       evaluate_create_table_seeded environment transaction ~table_name ~source
         continue
+  | Catalog_source ->
+      (* The catalog evaluator lands in a follow-up step alongside the
+         integration test that exercises it end to end. *)
+      ignore continue;
+      failwith "Eval: catalog: the catalog evaluator is not yet wired through"
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified

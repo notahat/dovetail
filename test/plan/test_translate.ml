@@ -253,6 +253,12 @@ let test_drop_table_translates_through () =
     (Physical.Drop_table { table_name = "users" })
     physical
 
+let test_catalog_source_translates_through () =
+  let physical = Translate.translate ~catalog:noop_catalog Catalog_source in
+  Alcotest.(check physical_testable)
+    "Logical.Catalog_source -> Physical.Catalog_source" Physical.Catalog_source
+    physical
+
 let test_create_table_empty_translates_through () =
   let logical : Logical.t =
     Create_table_empty { table_name = "users"; kind = users_kind_no_qualifier }
@@ -525,6 +531,12 @@ let () =
             test_create_table_empty_translates_through;
           Alcotest.test_case "Logical.Create_table_seeded recurses into source"
             `Quick test_create_table_seeded_recurses_into_source;
+        ] );
+      ( "catalog source",
+        [
+          Alcotest.test_case
+            "translates Logical.Catalog_source through unchanged" `Quick
+            test_catalog_source_translates_through;
         ] );
       ( "nested loop join rewrite",
         [

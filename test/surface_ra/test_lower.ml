@@ -252,6 +252,11 @@ let test_unqualify_lowers_through () =
     (Unqualify { input = Scan { table = "users" } })
     logical
 
+let test_catalog_source_lowers_through () =
+  let logical = Lower.lower Ast.Catalog_source in
+  Alcotest.(check logical_testable)
+    "Ast.Catalog_source -> Logical.Catalog_source" Catalog_source logical
+
 let test_drop_table_lowers_through () =
   let ast = Ast.Drop_table { table_name = "users" } in
   let logical = Lower.lower ast in
@@ -655,6 +660,12 @@ let () =
         [
           Alcotest.test_case "lowers Ast.Unqualify to Logical.Unqualify" `Quick
             test_unqualify_lowers_through;
+        ] );
+      ( "catalog source",
+        [
+          Alcotest.test_case
+            "lowers Ast.Catalog_source to Logical.Catalog_source" `Quick
+            test_catalog_source_lowers_through;
         ] );
       ( "create / drop table",
         [

@@ -146,6 +146,14 @@ type t =
           is a row value, not a relation. The [Type_op] evaluator handles a
           [Row_literal] input specially, computing the corresponding {!Row.kind}
           directly. *)
+  | Catalog_source
+      (** [Catalog_source] yields the database's catalog as a value. {!Eval}
+          enumerates the catalog under the active read transaction and opens a
+          per-table cursor lazily for each entry. Sits at a plan's root only;
+          {!kind_of} is an invariant violation for this arm because the catalog
+          rung's static shape is a {!Dovetail_core.Catalog.kind} rather than a
+          {!Relation.kind}. The [Type_op] evaluator short-circuits a
+          [Catalog_source] input directly. *)
 
 val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
 (** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}
