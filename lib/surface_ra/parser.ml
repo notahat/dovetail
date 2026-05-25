@@ -2,7 +2,6 @@ open Angstrom
 module StringSet = Set.Make (String)
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
-module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
 
 type error = string
@@ -271,23 +270,7 @@ let row_literal = row_literal_body >>| fun fields -> Ast.Row_literal fields
 let relation_literal_body =
   whitespace *> type_expression_body >>= fun items ->
   let fields, refinements = partition_type_expression_items items in
-  let kind : Relation.kind =
-    {
-      row_kind =
-        List.map
-          (fun ({ qualifier; name; kind } : Ast.type_field) : Row.field ->
-            { name; kind; qualifier })
-          fields;
-      refinements =
-        List.map
-          (fun (Ast.Primary_key references) : Relation.refinement ->
-            Relation.Primary_key
-              (List.map
-                 (fun (reference : Ast.column_reference) -> reference.name)
-                 references))
-          refinements;
-    }
-  in
+  let relation_type : Ast.type_expression = { fields; refinements } in
   whitespace *> char '{' *> whitespace
   *> ( peek_char >>= function
        | Some '}' -> return []
@@ -298,7 +281,7 @@ let relation_literal_body =
            whitespace *> option false (char ',' *> return true) *> return ()
            >>| fun () -> first_row :: more_rows )
   <* whitespace <* char '}'
-  >>| fun rows -> Ast.Relation_literal { kind; rows }
+  >>| fun rows -> Ast.Relation_literal { relation_type; rows }
 
 (* The body of a [drop table <name>] leaf source: the caller has consumed
    the [drop] keyword; this parser commits to whitespace, the [table]

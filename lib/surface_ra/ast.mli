@@ -153,17 +153,18 @@ type t =
           recurses into [source]; the target kind is derived from [source]'s
           kind at eval time. Yields a one-row [(created : string)] relation. *)
   | Relation_literal of {
-      kind : Relation.kind;
+      relation_type : type_expression;
       rows : (column_reference * Scalar.value) list list;
     }
-      (** [Relation_literal { kind; rows }] is the surface form
+      (** [Relation_literal { relation_type; rows }] is the surface form
           [relation (id: int64, name: string) { (id = 1, name = "alice"), ... }]
           — a relation whose type is declared up front and whose rows are
           self-describing row literals. The empty form [relation (...) {}]
           parses with [rows = []]. Field names inside each row come straight
-          from the surface; {!Lower} checks each row against [kind] and reorders
-          the values to [kind]'s field order, then emits a
-          {!Plan.Logical.Relation_literal}. *)
+          from the surface; {!Lower} resolves [relation_type] via
+          {!Lower.lower_relation_type} to a {!Relation.kind}, checks each row
+          against it and reorders the values to the kind's field order, then
+          emits a {!Plan.Logical.Relation_literal}. *)
   | Catalog_source
       (** [Catalog_source] is the surface form of the bare [catalog] keyword at
           pipeline-source position. It yields the database's catalog as a

@@ -41,7 +41,7 @@ type t =
     }
   | Create_table_seeded of { table_name : string; source : t }
   | Relation_literal of {
-      kind : Relation.kind;
+      relation_type : type_expression;
       rows : (column_reference * Scalar.value) list list;
     }
   | Catalog_source

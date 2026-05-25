@@ -153,22 +153,23 @@ let test_join_lowers_to_restrict_over_cross_product () =
     logical
 
 let test_insert_mutation_lowers_through () =
-  let kind : Relation.kind =
+  let relation_type : Ast.type_expression =
     {
-      row_kind =
+      fields =
         [
-          { name = "id"; kind = Int64; qualifier = None };
-          { name = "user_id"; kind = Int64; qualifier = None };
-          { name = "description"; kind = String; qualifier = None };
-          { name = "amount"; kind = Int64; qualifier = None };
+          { qualifier = None; name = "id"; kind = Int64 };
+          { qualifier = None; name = "user_id"; kind = Int64 };
+          { qualifier = None; name = "description"; kind = String };
+          { qualifier = None; name = "amount"; kind = Int64 };
         ];
       refinements = [];
     }
   in
+  let kind = Lower.lower_relation_type relation_type in
   let source : Ast.t =
     Relation_literal
       {
-        kind;
+        relation_type;
         rows =
           [
             [
@@ -472,21 +473,23 @@ let test_row_literal_lowers_through () =
     (Row_literal { fields = logical_fields })
     logical
 
-let users_kind : Relation.kind =
+let users_type : Ast.type_expression =
   {
-    row_kind =
+    fields =
       [
-        { name = "id"; kind = Int64; qualifier = None };
-        { name = "name"; kind = String; qualifier = None };
+        { qualifier = None; name = "id"; kind = Int64 };
+        { qualifier = None; name = "name"; kind = String };
       ];
     refinements = [];
   }
+
+let users_kind : Relation.kind = Lower.lower_relation_type users_type
 
 let test_relation_literal_typed_lowers_to_relation_literal_typed () =
   let ast : Ast.t =
     Relation_literal
       {
-        kind = users_kind;
+        relation_type = users_type;
         rows =
           [
             [
@@ -519,7 +522,7 @@ let test_relation_literal_typed_reorders_row_fields_to_kind_order () =
   let ast : Ast.t =
     Relation_literal
       {
-        kind = users_kind;
+        relation_type = users_type;
         rows =
           [
             (* Fields appear in reverse order from the kind; Lower reorders
@@ -546,7 +549,7 @@ let test_relation_literal_typed_rejects_extra_field_in_row () =
   let ast : Ast.t =
     Relation_literal
       {
-        kind = users_kind;
+        relation_type = users_type;
         rows =
           [
             [
@@ -565,7 +568,7 @@ let test_relation_literal_typed_rejects_missing_field_in_row () =
   let ast : Ast.t =
     Relation_literal
       {
-        kind = users_kind;
+        relation_type = users_type;
         rows = [ [ (column_reference "id", Scalar.Int64 1L) ] ];
       }
   in
@@ -577,7 +580,7 @@ let test_relation_literal_typed_rejects_kind_mismatch () =
   let ast : Ast.t =
     Relation_literal
       {
-        kind = users_kind;
+        relation_type = users_type;
         rows =
           [
             [
@@ -593,7 +596,9 @@ let test_relation_literal_typed_rejects_kind_mismatch () =
     (fun () -> ignore (Lower.lower ast))
 
 let test_relation_literal_typed_empty_rows_lowers_to_empty_rows () =
-  let ast : Ast.t = Relation_literal { kind = users_kind; rows = [] } in
+  let ast : Ast.t =
+    Relation_literal { relation_type = users_type; rows = [] }
+  in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
     "empty rows preserves the kind and yields an empty row list"

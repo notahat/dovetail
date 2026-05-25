@@ -126,7 +126,8 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
           fields
       in
       Row_literal { fields }
-  | Relation_literal { kind; rows } ->
+  | Relation_literal { relation_type; rows } ->
+      let kind = lower_relation_type relation_type in
       let normalized_rows = List.map (validate_typed_row kind) rows in
       Relation_literal { kind; rows = normalized_rows }
   | Drop_table { table_name } -> Drop_table { table_name }

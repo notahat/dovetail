@@ -3,8 +3,6 @@
 open Dovetail_surface_ra
 open Test_helpers
 module Scalar = Dovetail_core.Scalar
-module Row = Dovetail_core.Row
-module Relation = Dovetail_core.Relation
 
 let ast_testable = Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast>")) ( = )
 
@@ -265,14 +263,14 @@ let parses_plan input expected_plan =
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
 let test_pipeline_ending_in_sink_parses_as_insert () =
-  let kind : Relation.kind =
+  let relation_type : Ast.type_expression =
     {
-      row_kind =
+      fields =
         [
-          { name = "id"; kind = Int64; qualifier = None };
-          { name = "user_id"; kind = Int64; qualifier = None };
-          { name = "description"; kind = String; qualifier = None };
-          { name = "amount"; kind = Int64; qualifier = None };
+          { qualifier = None; name = "id"; kind = Int64 };
+          { qualifier = None; name = "user_id"; kind = Int64 };
+          { qualifier = None; name = "description"; kind = String };
+          { qualifier = None; name = "amount"; kind = Int64 };
         ];
       refinements = [];
     }
@@ -286,7 +284,7 @@ let test_pipeline_ending_in_sink_parses_as_insert () =
          source =
            Ast.Relation_literal
              {
-               kind;
+               relation_type;
                rows =
                  [
                    [
@@ -332,12 +330,12 @@ let test_pipeline_rejects_two_sinks () =
    only the value-pipeline source is admitted by the sink itself. *)
 
 let test_pipeline_create_table_seeded_with_relation_literal_source_parses () =
-  let kind : Relation.kind =
+  let relation_type : Ast.type_expression =
     {
-      row_kind =
+      fields =
         [
-          { name = "id"; kind = Int64; qualifier = None };
-          { name = "name"; kind = String; qualifier = None };
+          { qualifier = None; name = "id"; kind = Int64 };
+          { qualifier = None; name = "name"; kind = String };
         ];
       refinements = [];
     }
@@ -351,7 +349,7 @@ let test_pipeline_create_table_seeded_with_relation_literal_source_parses () =
          source =
            Ast.Relation_literal
              {
-               kind;
+               relation_type;
                rows =
                  [
                    [
@@ -707,19 +705,20 @@ let test_row_literal_rejects_duplicate_qualified_field () =
 
 (* Typed relation literals: [relation (T) { rows }]. *)
 
-let id_int64_name_string_kind : Relation.kind =
+let id_int64_name_string_type : Ast.type_expression =
   {
-    row_kind =
+    fields =
       [
-        { name = "id"; kind = Int64; qualifier = None };
-        { name = "name"; kind = String; qualifier = None };
+        { qualifier = None; name = "id"; kind = Int64 };
+        { qualifier = None; name = "name"; kind = String };
       ];
     refinements = [];
   }
 
 let test_relation_literal_empty_parses () =
   parses "relation (id: int64, name: string) {}"
-    (Ast.Relation_literal { kind = id_int64_name_string_kind; rows = [] })
+    (Ast.Relation_literal
+       { relation_type = id_int64_name_string_type; rows = [] })
 
 let alice_row =
   [
@@ -736,34 +735,40 @@ let bob_row =
 let test_relation_literal_single_row_parses () =
   parses "relation (id: int64, name: string) { (id = 1, name = \"alice\") }"
     (Ast.Relation_literal
-       { kind = id_int64_name_string_kind; rows = [ alice_row ] })
+       { relation_type = id_int64_name_string_type; rows = [ alice_row ] })
 
 let test_relation_literal_multiple_rows_parses () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
      name = \"bob\") }"
     (Ast.Relation_literal
-       { kind = id_int64_name_string_kind; rows = [ alice_row; bob_row ] })
+       {
+         relation_type = id_int64_name_string_type;
+         rows = [ alice_row; bob_row ];
+       })
 
 let test_relation_literal_tolerates_trailing_comma () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
      name = \"bob\"), }"
     (Ast.Relation_literal
-       { kind = id_int64_name_string_kind; rows = [ alice_row; bob_row ] })
+       {
+         relation_type = id_int64_name_string_type;
+         rows = [ alice_row; bob_row ];
+       })
 
 let test_relation_literal_with_primary_key_refinement_parses () =
   parses "relation (id: int64, name: string, primary key (id)) {}"
     (Ast.Relation_literal
        {
-         kind =
+         relation_type =
            {
-             row_kind =
+             fields =
                [
-                 { name = "id"; kind = Int64; qualifier = None };
-                 { name = "name"; kind = String; qualifier = None };
+                 { qualifier = None; name = "id"; kind = Int64 };
+                 { qualifier = None; name = "name"; kind = String };
                ];
-             refinements = [ Primary_key [ "id" ] ];
+             refinements = [ Ast.Primary_key [ column_reference "id" ] ];
            };
          rows = [];
        })
@@ -772,9 +777,9 @@ let test_relation_literal_tolerates_extra_whitespace () =
   parses "  relation  (  id : int64  )  {  ( id = 1 )  ,  ( id = 2 )  }  "
     (Ast.Relation_literal
        {
-         kind =
+         relation_type =
            {
-             row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+             fields = [ { qualifier = None; name = "id"; kind = Int64 } ];
              refinements = [];
            };
          rows =
@@ -805,7 +810,7 @@ let test_relation_literal_followed_by_type_step () =
        {
          input =
            Ast.Relation_literal
-             { kind = id_int64_name_string_kind; rows = [ alice_row ] };
+             { relation_type = id_int64_name_string_type; rows = [ alice_row ] };
        })
 
 (* [list] is not a reserved keyword -- it parses as an ordinary
