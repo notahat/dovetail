@@ -209,6 +209,56 @@ let test_insert_returns_insert_count_kind () =
     "Insert reports a one-column (insert_count : int64) result" expected
     (Physical.kind_of ~catalog:fixture_catalog plan)
 
+let create_table_result_kind : Relation.kind =
+  {
+    row_kind = [ { name = "created"; kind = String; qualifier = None } ];
+    refinements = [];
+  }
+
+let drop_table_result_kind : Relation.kind =
+  {
+    row_kind = [ { name = "dropped"; kind = String; qualifier = None } ];
+    refinements = [];
+  }
+
+let test_drop_table_returns_dropped_kind () =
+  let plan : Physical.t = Drop_table { table_name = "users" } in
+  Alcotest.(check kind_testable)
+    "Drop_table reports a one-column (dropped : string) result"
+    drop_table_result_kind
+    (Physical.kind_of ~catalog:fixture_catalog plan)
+
+let test_create_table_empty_returns_created_kind () =
+  let plan : Physical.t =
+    Create_table_empty
+      {
+        table_name = "users";
+        kind =
+          {
+            row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+            refinements = [ Primary_key [ "id" ] ];
+          };
+      }
+  in
+  Alcotest.(check kind_testable)
+    "Create_table_empty reports a one-column (created : string) result"
+    create_table_result_kind
+    (Physical.kind_of ~catalog:fixture_catalog plan)
+
+let test_create_table_seeded_returns_created_kind_not_source_kind () =
+  (* The result kind is always the one-row (created : string) relation,
+     regardless of the source's shape. Exercises a non-trivial source
+     (FullScan over users) so a returned source kind would be visibly
+     wrong. *)
+  let plan : Physical.t =
+    Create_table_seeded
+      { table_name = "copy_of_users"; source = FullScan { table = "users" } }
+  in
+  Alcotest.(check kind_testable)
+    "Create_table_seeded ignores source kind and reports (created : string)"
+    create_table_result_kind
+    (Physical.kind_of ~catalog:fixture_catalog plan)
+
 let test_unqualify_strips_qualifiers_from_input_kind () =
   let plan : Physical.t = Unqualify { input = FullScan { table = "users" } } in
   let strip_qualifier (field : Dovetail_core.Row.field) =
@@ -315,5 +365,14 @@ let () =
           Alcotest.test_case
             "Unqualify raises on bare-name collision after stripping" `Quick
             test_unqualify_rejects_collision_on_bare_name;
+          Alcotest.test_case
+            "Drop_table reports a one-column (dropped : string) result" `Quick
+            test_drop_table_returns_dropped_kind;
+          Alcotest.test_case
+            "Create_table_empty reports a one-column (created : string) result"
+            `Quick test_create_table_empty_returns_created_kind;
+          Alcotest.test_case
+            "Create_table_seeded reports (created : string), not source kind"
+            `Quick test_create_table_seeded_returns_created_kind_not_source_kind;
         ] );
     ]

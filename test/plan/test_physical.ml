@@ -166,6 +166,37 @@ let test_unqualify_renders_header_with_indented_input () =
     "Unqualify prints a bare header with its input indented one level"
     "Unqualify\n  FullScan(users)\n" (format_to_string plan)
 
+let users_kind : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+      ];
+    refinements = [ Primary_key [ "id" ] ];
+  }
+
+let test_drop_table_renders_with_table_name () =
+  let plan : Physical.t = Drop_table { table_name = "users" } in
+  Alcotest.(check string)
+    "DropTable on a single line" "DropTable(users)\n" (format_to_string plan)
+
+let test_create_table_empty_renders_columns () =
+  let plan : Physical.t =
+    Create_table_empty { table_name = "users"; kind = users_kind }
+  in
+  Alcotest.(check string)
+    "CreateTableEmpty lists table name and column names"
+    "CreateTableEmpty(users, columns=id, name)\n" (format_to_string plan)
+
+let test_create_table_seeded_renders_header_with_indented_source () =
+  let plan : Physical.t =
+    Create_table_seeded { table_name = "users"; source = users_full_scan }
+  in
+  Alcotest.(check string)
+    "CreateTableSeeded prints header with its source indented one level"
+    "CreateTableSeeded(users)\n  FullScan(users)\n" (format_to_string plan)
+
 let test_nested_indentation_compounds () =
   (* A Filter wrapping a CrossProduct: confirms that each level of nesting
      adds two spaces, not just the immediate one. *)
@@ -218,5 +249,12 @@ let () =
             `Quick test_unqualify_renders_header_with_indented_input;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
+          Alcotest.test_case "DropTable renders with table name" `Quick
+            test_drop_table_renders_with_table_name;
+          Alcotest.test_case "CreateTableEmpty renders columns" `Quick
+            test_create_table_empty_renders_columns;
+          Alcotest.test_case
+            "CreateTableSeeded renders header with indented source" `Quick
+            test_create_table_seeded_renders_header_with_indented_source;
         ] );
     ]

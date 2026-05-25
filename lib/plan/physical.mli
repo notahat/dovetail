@@ -116,6 +116,25 @@ type t =
           [Failure] because the operator's result is a scalar value, not a
           relation. The [Type_op] evaluator handles a [Scalar_literal] input
           specially, computing the corresponding {!Scalar.kind} directly. *)
+  | Drop_table of { table_name : string }
+      (** [Drop_table { table_name }] removes [table_name] from the catalog and
+          deletes its storage subDB, all in the active write transaction.
+          {!kind_of} reports a one-row [(dropped : string)] result. *)
+  | Create_table_empty of { table_name : string; kind : Relation.kind }
+      (** [Create_table_empty { table_name; kind }] creates an empty table named
+          [table_name] with the declared [kind]: registers the kind in the
+          catalog and provisions its storage subDB, in the active write
+          transaction. {!kind_of} reports a one-row [(created : string)] result.
+      *)
+  | Create_table_seeded of { table_name : string; source : t }
+      (** [Create_table_seeded { table_name; source }] creates [table_name] from
+          [source]'s row kind and seeds it with [source]'s rows, all in the
+          active write transaction. The target kind is derived from [source]'s
+          kind at eval time (the evaluator calls {!kind_of} on [source], rejects
+          a qualified source, stamps each field with [Some table_name], and
+          requires a primary key). {!kind_of} on the node reports a one-row
+          [(created : string)] result -- the source kind is not the node's
+          result kind. *)
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
       (** [Row_literal { fields }] yields the literal row directly — no storage,
           no cursors. Each entry pairs a column reference (qualified

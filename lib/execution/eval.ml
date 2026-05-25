@@ -97,6 +97,10 @@ let rec eval environment transaction plan continue =
       evaluate_type_op environment transaction ~input continue
   | Scalar_literal value -> continue (Term.Scalar_value value)
   | Row_literal { fields } -> evaluate_row_literal fields continue
+  (* TODO(create-drop-table): evaluator arms land in the dedicated steps for
+     each operator. Unreachable until the parser emits these nodes. *)
+  | Drop_table _ | Create_table_empty _ | Create_table_seeded _ ->
+      failwith "Eval: create/drop table not yet implemented"
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified

@@ -21,6 +21,9 @@ type t =
   | Unqualify of { input : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
+  | Drop_table of { table_name : string }
+  | Create_table_empty of { table_name : string; kind : Relation.kind }
+  | Create_table_seeded of { table_name : string; source : t }
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
@@ -98,6 +101,18 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter "%sRowLiteral(%a)@\n" prefix
         (Format.pp_print_list ~pp_sep:separator format_field)
         fields
+  | Drop_table { table_name } ->
+      Format.fprintf formatter "%sDropTable(%s)@\n" prefix table_name
+  | Create_table_empty { table_name; kind } ->
+      let columns =
+        List.map (fun (field : Row.field) -> field.name) kind.row_kind
+      in
+      Format.fprintf formatter "%sCreateTableEmpty(%s, columns=%s)@\n" prefix
+        table_name
+        (String.concat ", " columns)
+  | Create_table_seeded { table_name; source } ->
+      Format.fprintf formatter "%sCreateTableSeeded(%s)@\n" prefix table_name;
+      format_at formatter (indent + 1) source
 
 let format formatter plan = format_at formatter 0 plan
 
@@ -108,6 +123,24 @@ let insert_result_kind : Relation.kind =
   {
     row_kind =
       [ { name = "insert_count"; kind = Scalar.Int64; qualifier = None } ];
+    refinements = [];
+  }
+
+(* The static result kind of [Create_table_empty] and
+   [Create_table_seeded]: a one-column [created : string] row carrying the
+   newly-created table's name. Mirrors the runtime value the evaluator
+   produces. *)
+let create_table_result_kind : Relation.kind =
+  {
+    row_kind = [ { name = "created"; kind = Scalar.String; qualifier = None } ];
+    refinements = [];
+  }
+
+(* The static result kind of [Drop_table]: a one-column [dropped : string]
+   row carrying the just-dropped table's name. *)
+let drop_table_result_kind : Relation.kind =
+  {
+    row_kind = [ { name = "dropped"; kind = Scalar.String; qualifier = None } ];
     refinements = [];
   }
 
@@ -171,3 +204,5 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
          evaluator today; the explicit failure surfaces any future caller
          that asks for a relation kind it can't provide. *)
       failwith "Physical.kind_of: Row_literal does not produce a relation kind"
+  | Drop_table _ -> drop_table_result_kind
+  | Create_table_empty _ | Create_table_seeded _ -> create_table_result_kind
