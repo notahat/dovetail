@@ -20,7 +20,7 @@ type t =
   | Insert of { table : string; source : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
-  | Row_literal of { fields : (string * Scalar.value) list }
+  | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
@@ -85,8 +85,10 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter "%sScalarLiteral(%a)@\n" prefix Scalar.format
         value
   | Row_literal { fields } ->
-      let format_field formatter (name, value) =
-        Format.fprintf formatter "%s=%a" name Scalar.format value
+      let format_field formatter (reference, value) =
+        Format.fprintf formatter "%s=%a"
+          (Row.format_column_reference reference)
+          Scalar.format value
       in
       let separator formatter () = Format.pp_print_string formatter ", " in
       Format.fprintf formatter "%sRowLiteral(%a)@\n" prefix

@@ -144,7 +144,13 @@ let test_scalar_literal_renders_value () =
 let test_row_literal_renders_fields () =
   let plan : Physical.t =
     Row_literal
-      { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] }
+      {
+        fields =
+          [
+            (column_reference "id", Scalar.Int64 1L);
+            (column_reference "name", Scalar.String "alice");
+          ];
+      }
   in
   Alcotest.(check string)
     "Row_literal lists fields comma-separated"

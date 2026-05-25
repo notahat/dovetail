@@ -6,8 +6,8 @@ module StringSet = Set.Make (String)
 
 let lower_type_fields (fields : Ast.type_field list) : Row.kind =
   List.map
-    (fun ({ name; kind } : Ast.type_field) : Row.field ->
-      { name; kind; qualifier = None })
+    (fun ({ qualifier; name; kind } : Ast.type_field) : Row.field ->
+      { name; kind; qualifier })
     fields
 
 let lower_row_type (type_expression : Ast.type_expression) : Row.kind =
@@ -25,16 +25,33 @@ let lower_relation_type (type_expression : Ast.type_expression) : Relation.kind
     refinements = type_expression.refinements;
   }
 
+(* Render a field's display name as the user wrote it: dotted
+   [qualifier.name] when qualified, bare [name] otherwise. Used in
+   {!validate_typed_row}'s diagnostics so errors quote the same spelling the
+   user typed (and the relation kind declares). *)
+let format_field_display_name (field : Row.field) : string =
+  Row.format_column_reference { qualifier = field.qualifier; name = field.name }
+
 (* Validate one self-describing row against a relation kind, returning the
-   row's values in the kind's field order. Raises [Failure] with a user-facing
-   message if the row's field names don't exactly match the kind's, or if any
-   value's kind doesn't match the declared field kind. *)
+   row's values in the kind's field order. Matches each row entry against
+   its kind field by qualified name -- a kind field [users.id] is bound by
+   a row entry [(users.id = ...)] and not by [(id = ...)]. Raises [Failure]
+   with a user-facing message if the row's qualified names don't exactly
+   match the kind's, or if any value's kind doesn't match the declared
+   field kind. *)
 let validate_typed_row (kind : Relation.kind)
-    (row : (string * Scalar.value) list) : Scalar.value list =
-  let row_field_names = StringSet.of_list (List.map fst row) in
+    (row : (Row.column_reference * Scalar.value) list) : Scalar.value list =
+  let row_field_names =
+    StringSet.of_list
+      (List.map
+         (fun (reference, _) -> Row.format_column_reference reference)
+         row)
+  in
   let kind_field_names =
     StringSet.of_list
-      (List.map (fun (field : Row.field) -> field.name) kind.row_kind)
+      (List.map
+         (fun (field : Row.field) -> format_field_display_name field)
+         kind.row_kind)
   in
   (if not (StringSet.equal row_field_names kind_field_names) then
      let missing = StringSet.diff kind_field_names row_field_names in
@@ -45,16 +62,26 @@ let validate_typed_row (kind : Relation.kind)
        else Printf.sprintf "unexpected field %S" (StringSet.choose extra)
      in
      failwith (Printf.sprintf "Lower: relation literal: %s" detail));
+  let lookup_value (field : Row.field) =
+    let target = format_field_display_name field in
+    let _, value =
+      List.find
+        (fun (reference, _) ->
+          String.equal (Row.format_column_reference reference) target)
+        row
+    in
+    value
+  in
   List.map
     (fun (field : Row.field) ->
-      let value = List.assoc field.name row in
+      let value = lookup_value field in
       let value_kind = Scalar.kind_of value in
       if value_kind <> field.kind then
         failwith
           (Format.asprintf
              "Lower: relation literal: field %S expected %a but got %a"
-             field.name Scalar.format_kind field.kind Scalar.format_kind
-             value_kind);
+             (format_field_display_name field)
+             Scalar.format_kind field.kind Scalar.format_kind value_kind);
       value)
     kind.row_kind
 

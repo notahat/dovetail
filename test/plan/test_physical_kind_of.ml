@@ -223,7 +223,8 @@ let test_scalar_literal_raises_because_result_is_a_scalar () =
 
 let test_row_literal_raises_because_result_is_a_row () =
   let plan : Physical.t =
-    Row_literal { fields = [ ("id", Dovetail_core.Scalar.Int64 1L) ] }
+    Row_literal
+      { fields = [ (column_reference "id", Dovetail_core.Scalar.Int64 1L) ] }
   in
   Alcotest.check_raises "Row_literal has no relation kind"
     (Failure "Physical.kind_of: Row_literal does not produce a relation kind")

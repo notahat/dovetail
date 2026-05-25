@@ -46,7 +46,12 @@ let rejects_relation_type input =
   | Error _ -> ()
 
 (* Build a [type_field] inline so tests read like the surface text. *)
-let field name (kind : Scalar.kind) : Ast.type_field = { name; kind }
+let field name (kind : Scalar.kind) : Ast.type_field =
+  { qualifier = None; name; kind }
+
+let qualified_field ~qualifier ~name (kind : Scalar.kind) : Ast.type_field =
+  { qualifier = Some qualifier; name; kind }
+
 let empty_type : Ast.type_expression = { fields = []; refinements = [] }
 
 let single_field_type : Ast.type_expression =
@@ -162,6 +167,43 @@ let test_field_name_key_rejected () =
   (* 'key' is reserved as half of the [primary key] clause. *)
   rejects_relation_type "(key: int64)"
 
+(* Qualified field names. The dotted [qualifier.name] form parses the
+   qualifier into the type field's [qualifier] slot. *)
+
+let test_row_type_parses_qualified_field () =
+  parses_row_type "(users.id: int64)"
+    {
+      fields = [ qualified_field ~qualifier:"users" ~name:"id" Int64 ];
+      refinements = [];
+    }
+
+let test_row_type_parses_mixed_qualified_and_unqualified () =
+  parses_row_type "(users.id: int64, name: string)"
+    {
+      fields =
+        [
+          qualified_field ~qualifier:"users" ~name:"id" Int64;
+          field "name" String;
+        ];
+      refinements = [];
+    }
+
+let test_relation_type_parses_qualified_field_with_refinement () =
+  parses_relation_type "(users.id: int64, users.name: string, primary key (id))"
+    {
+      fields =
+        [
+          qualified_field ~qualifier:"users" ~name:"id" Int64;
+          qualified_field ~qualifier:"users" ~name:"name" String;
+        ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+
+let test_row_type_rejects_qualified_field_with_reserved_name () =
+  (* The qualifier prefix doesn't bypass the reserved-word check on the
+     name half: a kind keyword in the name position is still ambiguous. *)
+  rejects_row_type "(users.int64: int64)"
+
 let () =
   Alcotest.run "type expression parser"
     [
@@ -193,6 +235,13 @@ let () =
             test_row_type_rejects_missing_closing_paren;
           Alcotest.test_case "rejects trailing garbage after the type" `Quick
             test_row_type_rejects_trailing_garbage;
+          Alcotest.test_case "parses a qualified field name" `Quick
+            test_row_type_parses_qualified_field;
+          Alcotest.test_case "parses a mix of qualified and unqualified fields"
+            `Quick test_row_type_parses_mixed_qualified_and_unqualified;
+          Alcotest.test_case
+            "rejects a qualified field whose name half is a reserved word"
+            `Quick test_row_type_rejects_qualified_field_with_reserved_name;
         ] );
       ( "relation type",
         [
@@ -213,6 +262,9 @@ let () =
             test_relation_type_rejects_primary_key_without_key_keyword;
           Alcotest.test_case "rejects an unknown lowercase kind keyword" `Quick
             test_relation_type_rejects_unknown_kind;
+          Alcotest.test_case
+            "parses qualified fields alongside a primary-key refinement" `Quick
+            test_relation_type_parses_qualified_field_with_refinement;
         ] );
       ( "reserved words",
         [

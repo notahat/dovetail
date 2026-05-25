@@ -116,13 +116,19 @@ and evaluate_type_op environment transaction ~input continue =
       let kind = Plan.Physical.kind_of ~catalog input in
       continue (Term.Relation_kind kind)
 
-(* Build a [Row.kind] from a row literal's [(name, value)] pairs by reading
-   each value's scalar kind. Field qualifiers have no surface form on a row
-   literal, so every field carries [qualifier = None]. *)
+(* Build a [Row.kind] from a row literal's [(reference, value)] pairs by
+   reading each value's scalar kind. The qualifier on each reference rides
+   through unchanged, so the bare form [(id = 1)] yields a field with
+   [qualifier = None] and the qualified form [(users.id = 1)] yields one
+   with [qualifier = Some "users"]. *)
 and row_kind_of_fields fields : Row.kind =
   List.map
-    (fun (name, value) : Row.field ->
-      { name; kind = Scalar.kind_of value; qualifier = None })
+    (fun ((reference : Row.column_reference), value) : Row.field ->
+      {
+        name = reference.name;
+        kind = Scalar.kind_of value;
+        qualifier = reference.qualifier;
+      })
     fields
 
 (* Materialise a [Relation_literal] as a [Relation.t] using the kind declared

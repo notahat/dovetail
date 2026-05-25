@@ -183,7 +183,9 @@ let test_scalar_literal_renders_value () =
     (format_to_string bool_plan)
 
 let test_row_literal_requires_read_access () =
-  let plan : Logical.t = Row_literal { fields = [ ("id", Scalar.Int64 1L) ] } in
+  let plan : Logical.t =
+    Row_literal { fields = [ (column_reference "id", Scalar.Int64 1L) ] }
+  in
   Alcotest.(check bool)
     "Row_literal requires Read access" true
     (Logical.required_access plan = `Read)
@@ -191,7 +193,13 @@ let test_row_literal_requires_read_access () =
 let test_row_literal_renders_fields () =
   let plan : Logical.t =
     Row_literal
-      { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] }
+      {
+        fields =
+          [
+            (column_reference "id", Scalar.Int64 1L);
+            (column_reference "name", Scalar.String "alice");
+          ];
+      }
   in
   Alcotest.(check string)
     "Row_literal lists fields comma-separated"

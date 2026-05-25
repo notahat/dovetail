@@ -172,10 +172,10 @@ let test_insert_mutation_lowers_through () =
         rows =
           [
             [
-              ("id", Scalar.Int64 9L);
-              ("user_id", Scalar.Int64 1L);
-              ("description", Scalar.String "Pretzel");
-              ("amount", Scalar.Int64 9L);
+              (column_reference "id", Scalar.Int64 9L);
+              (column_reference "user_id", Scalar.Int64 1L);
+              (column_reference "description", Scalar.String "Pretzel");
+              (column_reference "amount", Scalar.Int64 9L);
             ];
           ];
       }
@@ -260,7 +260,8 @@ let row_kind_testable : Row.kind Alcotest.testable =
 let relation_kind_testable : Relation.kind Alcotest.testable =
   Alcotest.testable Relation.format_kind ( = )
 
-let type_field name (kind : Scalar.kind) : Ast.type_field = { name; kind }
+let type_field name (kind : Scalar.kind) : Ast.type_field =
+  { qualifier = None; name; kind }
 
 let test_lower_row_type_empty_is_empty_kind () =
   let type_expression : Ast.type_expression =
@@ -379,14 +380,17 @@ let test_scalar_literal_lowers_through () =
     (Scalar_literal (Scalar.Int64 42L)) logical
 
 let test_row_literal_lowers_through () =
-  let ast : Ast.t =
-    Row_literal [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ]
+  let fields =
+    [
+      (column_reference "id", Scalar.Int64 1L);
+      (column_reference "name", Scalar.String "alice");
+    ]
   in
+  let ast : Ast.t = Row_literal fields in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
     "Ast.Row_literal -> Logical.Row_literal with same fields"
-    (Row_literal
-       { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] })
+    (Row_literal { fields })
     logical
 
 let users_kind : Relation.kind =
@@ -406,8 +410,14 @@ let test_relation_literal_typed_lowers_to_relation_literal_typed () =
         kind = users_kind;
         rows =
           [
-            [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
-            [ ("id", Scalar.Int64 2L); ("name", Scalar.String "bob") ];
+            [
+              (column_reference "id", Scalar.Int64 1L);
+              (column_reference "name", Scalar.String "alice");
+            ];
+            [
+              (column_reference "id", Scalar.Int64 2L);
+              (column_reference "name", Scalar.String "bob");
+            ];
           ];
       }
   in
@@ -436,7 +446,10 @@ let test_relation_literal_typed_reorders_row_fields_to_kind_order () =
             (* Fields appear in reverse order from the kind; Lower reorders
                them to match the kind so the logical-plan row aligns with
                [kind.row_kind]. *)
-            [ ("name", Scalar.String "alice"); ("id", Scalar.Int64 1L) ];
+            [
+              (column_reference "name", Scalar.String "alice");
+              (column_reference "id", Scalar.Int64 1L);
+            ];
           ];
       }
   in
@@ -458,9 +471,9 @@ let test_relation_literal_typed_rejects_extra_field_in_row () =
         rows =
           [
             [
-              ("id", Scalar.Int64 1L);
-              ("name", Scalar.String "alice");
-              ("extra", Scalar.Bool true);
+              (column_reference "id", Scalar.Int64 1L);
+              (column_reference "name", Scalar.String "alice");
+              (column_reference "extra", Scalar.Bool true);
             ];
           ];
       }
@@ -472,7 +485,10 @@ let test_relation_literal_typed_rejects_extra_field_in_row () =
 let test_relation_literal_typed_rejects_missing_field_in_row () =
   let ast : Ast.t =
     Relation_literal
-      { kind = users_kind; rows = [ [ ("id", Scalar.Int64 1L) ] ] }
+      {
+        kind = users_kind;
+        rows = [ [ (column_reference "id", Scalar.Int64 1L) ] ];
+      }
   in
   Alcotest.check_raises "row missing a declared field is rejected"
     (Failure "Lower: relation literal: missing field \"name\"") (fun () ->
@@ -484,7 +500,12 @@ let test_relation_literal_typed_rejects_kind_mismatch () =
       {
         kind = users_kind;
         rows =
-          [ [ ("id", Scalar.String "wrong"); ("name", Scalar.String "alice") ] ];
+          [
+            [
+              (column_reference "id", Scalar.String "wrong");
+              (column_reference "name", Scalar.String "alice");
+            ];
+          ];
       }
   in
   Alcotest.check_raises "row with a kind mismatch is rejected"

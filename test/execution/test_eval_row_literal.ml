@@ -43,7 +43,13 @@ let test_row_literal_evaluates_to_row_value () =
   with_environment_and_transaction @@ fun environment transaction ->
   let plan : Plan.Physical.t =
     Row_literal
-      { fields = [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] }
+      {
+        fields =
+          [
+            (column_reference "id", Scalar.Int64 1L);
+            (column_reference "name", Scalar.String "alice");
+          ];
+      }
   in
   let expected : Row.t =
     {
@@ -78,7 +84,10 @@ let test_type_op_over_row_literal_yields_row_kind () =
           Row_literal
             {
               fields =
-                [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+                [
+                  (column_reference "id", Scalar.Int64 1L);
+                  (column_reference "name", Scalar.String "alice");
+                ];
             };
       }
   in

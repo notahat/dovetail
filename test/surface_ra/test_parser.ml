@@ -304,10 +304,10 @@ let test_pipeline_ending_in_sink_parses_as_insert () =
                rows =
                  [
                    [
-                     ("id", Scalar.Int64 9L);
-                     ("user_id", Scalar.Int64 1L);
-                     ("description", Scalar.String "Pretzel");
-                     ("amount", Scalar.Int64 9L);
+                     (column_reference "id", Scalar.Int64 9L);
+                     (column_reference "user_id", Scalar.Int64 1L);
+                     (column_reference "description", Scalar.String "Pretzel");
+                     (column_reference "amount", Scalar.Int64 9L);
                    ];
                  ];
              };
@@ -590,26 +590,33 @@ let test_scalar_literal_followed_by_type_step () =
 let test_row_literal_empty_parses () = parses "()" (Ast.Row_literal [])
 
 let test_row_literal_single_field_parses () =
-  parses "(id = 1)" (Ast.Row_literal [ ("id", Scalar.Int64 1L) ])
+  parses "(id = 1)"
+    (Ast.Row_literal [ (column_reference "id", Scalar.Int64 1L) ])
 
 let test_row_literal_multiple_fields_parses () =
   parses "(id = 1, name = \"alice\", active = true)"
     (Ast.Row_literal
        [
-         ("id", Scalar.Int64 1L);
-         ("name", Scalar.String "alice");
-         ("active", Scalar.Bool true);
+         (column_reference "id", Scalar.Int64 1L);
+         (column_reference "name", Scalar.String "alice");
+         (column_reference "active", Scalar.Bool true);
        ])
 
 let test_row_literal_tolerates_trailing_comma () =
   parses "(id = 1, name = \"alice\",)"
     (Ast.Row_literal
-       [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ])
+       [
+         (column_reference "id", Scalar.Int64 1L);
+         (column_reference "name", Scalar.String "alice");
+       ])
 
 let test_row_literal_tolerates_extra_whitespace () =
   parses "(  id  =  1  ,  name  =  \"alice\"  )"
     (Ast.Row_literal
-       [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ])
+       [
+         (column_reference "id", Scalar.Int64 1L);
+         (column_reference "name", Scalar.String "alice");
+       ])
 
 let test_row_literal_rejects_duplicate_field () =
   rejects_with_message "(id = 1, id = 2)"
@@ -625,8 +632,49 @@ let test_row_literal_followed_by_type_step () =
        {
          input =
            Ast.Row_literal
-             [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
+             [
+               (column_reference "id", Scalar.Int64 1L);
+               (column_reference "name", Scalar.String "alice");
+             ];
        })
+
+(* Qualified row-literal fields. The dotted [qualifier.name] form parses
+   straight through into the field list; the qualifier survives onto the
+   column reference. *)
+
+let test_row_literal_parses_qualified_field () =
+  parses "(users.id = 1)"
+    (Ast.Row_literal
+       [
+         ( qualified_column_reference ~qualifier:"users" ~name:"id",
+           Scalar.Int64 1L );
+       ])
+
+let test_row_literal_parses_mixed_qualified_and_unqualified () =
+  parses "(users.id = 1, name = \"alice\")"
+    (Ast.Row_literal
+       [
+         ( qualified_column_reference ~qualifier:"users" ~name:"id",
+           Scalar.Int64 1L );
+         (column_reference "name", Scalar.String "alice");
+       ])
+
+let test_row_literal_allows_same_bare_name_under_different_qualifiers () =
+  (* The qualified names differ, so the dedup check accepts them. *)
+  parses "(users.id = 1, orders.id = 2)"
+    (Ast.Row_literal
+       [
+         ( qualified_column_reference ~qualifier:"users" ~name:"id",
+           Scalar.Int64 1L );
+         ( qualified_column_reference ~qualifier:"orders" ~name:"id",
+           Scalar.Int64 2L );
+       ])
+
+let test_row_literal_rejects_duplicate_qualified_field () =
+  (* The dotted name is fully qualified, so [users.id] repeated is a
+     duplicate. The error names the offending qualified spelling. *)
+  rejects_with_message "(users.id = 1, users.id = 2)"
+    ~mentions:[ "duplicate field"; "users.id" ]
 
 (* Typed relation literals: [relation (T) { rows }]. *)
 
@@ -644,41 +692,36 @@ let test_relation_literal_empty_parses () =
   parses "relation (id: int64, name: string) {}"
     (Ast.Relation_literal { kind = id_int64_name_string_kind; rows = [] })
 
+let alice_row =
+  [
+    (column_reference "id", Scalar.Int64 1L);
+    (column_reference "name", Scalar.String "alice");
+  ]
+
+let bob_row =
+  [
+    (column_reference "id", Scalar.Int64 2L);
+    (column_reference "name", Scalar.String "bob");
+  ]
+
 let test_relation_literal_single_row_parses () =
   parses "relation (id: int64, name: string) { (id = 1, name = \"alice\") }"
     (Ast.Relation_literal
-       {
-         kind = id_int64_name_string_kind;
-         rows = [ [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ] ];
-       })
+       { kind = id_int64_name_string_kind; rows = [ alice_row ] })
 
 let test_relation_literal_multiple_rows_parses () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
      name = \"bob\") }"
     (Ast.Relation_literal
-       {
-         kind = id_int64_name_string_kind;
-         rows =
-           [
-             [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
-             [ ("id", Scalar.Int64 2L); ("name", Scalar.String "bob") ];
-           ];
-       })
+       { kind = id_int64_name_string_kind; rows = [ alice_row; bob_row ] })
 
 let test_relation_literal_tolerates_trailing_comma () =
   parses
     "relation (id: int64, name: string) { (id = 1, name = \"alice\"), (id = 2, \
      name = \"bob\"), }"
     (Ast.Relation_literal
-       {
-         kind = id_int64_name_string_kind;
-         rows =
-           [
-             [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
-             [ ("id", Scalar.Int64 2L); ("name", Scalar.String "bob") ];
-           ];
-       })
+       { kind = id_int64_name_string_kind; rows = [ alice_row; bob_row ] })
 
 let test_relation_literal_with_primary_key_refinement_parses () =
   parses "relation (id: int64, name: string, primary key (id)) {}"
@@ -705,7 +748,11 @@ let test_relation_literal_tolerates_extra_whitespace () =
              row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
              refinements = [];
            };
-         rows = [ [ ("id", Scalar.Int64 1L) ]; [ ("id", Scalar.Int64 2L) ] ];
+         rows =
+           [
+             [ (column_reference "id", Scalar.Int64 1L) ];
+             [ (column_reference "id", Scalar.Int64 2L) ];
+           ];
        })
 
 let test_relation_literal_rejects_duplicate_field_in_row () =
@@ -730,13 +777,7 @@ let test_relation_literal_followed_by_type_step () =
        {
          input =
            Ast.Relation_literal
-             {
-               kind = id_int64_name_string_kind;
-               rows =
-                 [
-                   [ ("id", Scalar.Int64 1L); ("name", Scalar.String "alice") ];
-                 ];
-             };
+             { kind = id_int64_name_string_kind; rows = [ alice_row ] };
        })
 
 (* The DDL keywords are not globally reserved -- [list] and [tables] are
@@ -906,6 +947,15 @@ let () =
           Alcotest.test_case
             "row literal feeds a [| type] step at pipeline-source position"
             `Quick test_row_literal_followed_by_type_step;
+          Alcotest.test_case "parses a qualified field name" `Quick
+            test_row_literal_parses_qualified_field;
+          Alcotest.test_case "parses mixed qualified and unqualified fields"
+            `Quick test_row_literal_parses_mixed_qualified_and_unqualified;
+          Alcotest.test_case
+            "allows the same bare name under different qualifiers" `Quick
+            test_row_literal_allows_same_bare_name_under_different_qualifiers;
+          Alcotest.test_case "rejects two fields with the same qualified name"
+            `Quick test_row_literal_rejects_duplicate_qualified_field;
         ] );
       ( "relation literal",
         [

@@ -92,22 +92,43 @@ let literal_value =
   | Some character when is_letter character -> bool_literal
   | _ -> fail "expected a literal value (number, string, or bool)"
 
-(* One [name = value] binding inside a row literal. Returns the field name
-   alongside its scalar value; whitespace around the [=] is tolerated. *)
-let row_literal_field =
-  identifier >>= fun field_name ->
-  whitespace *> char '=' *> whitespace *> literal_value >>| fun value ->
-  (field_name, value)
+(* A column reference: either a bare identifier (unqualified) or two
+   identifiers separated by a dot with no whitespace around it (qualified).
+   The no-whitespace rule on the dot keeps the syntax disjoint from a future
+   floating-point literal grammar. Used both in expression positions and in
+   row-literal field positions. *)
+let column_reference =
+  identifier >>= fun first ->
+  peek_char >>= function
+  | Some '.' ->
+      char '.' *> identifier >>| fun second ->
+      ({ qualifier = Some first; name = second } : Row.column_reference)
+  | _ -> return ({ qualifier = None; name = first } : Row.column_reference)
 
-(* Raise a parse error if [fields] has two entries with the same name. The
-   error names the first duplicate so the user can find it. Mirrors the
-   relation-literal duplicate-column check. *)
+(* One [name = value] or [qualifier.name = value] binding inside a row
+   literal. Returns the column reference alongside its scalar value;
+   whitespace around the [=] is tolerated. *)
+let row_literal_field =
+  column_reference >>= fun reference ->
+  whitespace *> char '=' *> whitespace *> literal_value >>| fun value ->
+  (reference, value)
+
+(* Raise a parse error if [fields] has two entries with the same qualified
+   name -- the dotted [qualifier.name] form when present, the bare [name]
+   otherwise. Distinct qualifiers on the same bare name are allowed
+   ([users.id] and [orders.id] coexist), since their qualified names
+   differ. The error names the first duplicate's qualified spelling so the
+   user can find it. *)
 let check_for_duplicate_row_fields fields =
   let rec walk seen = function
     | [] -> return ()
-    | (field_name, _) :: _ when StringSet.mem field_name seen ->
-        fail (Printf.sprintf "duplicate field %S in row literal" field_name)
-    | (field_name, _) :: rest -> walk (StringSet.add field_name seen) rest
+    | (reference, _) :: _
+      when StringSet.mem (Row.format_column_reference reference) seen ->
+        fail
+          (Printf.sprintf "duplicate field %S in row literal"
+             (Row.format_column_reference reference))
+    | (reference, _) :: rest ->
+        walk (StringSet.add (Row.format_column_reference reference) seen) rest
   in
   walk StringSet.empty fields
 
@@ -137,25 +158,46 @@ let primary_key_columns =
   >>| fun () -> first_column :: more_columns
 
 (* A single item inside a type expression: either a field binding
-   ([name: kind]) or a [primary key (...)] refinement. The two are
-   disambiguated by the first identifier — [primary] introduces the refinement
-   clause; anything else is a field name. Reserved words are rejected at the
-   field-name position. *)
+   ([name: kind] or [qualifier.name: kind]) or a [primary key (...)]
+   refinement. The leading identifier and the lookahead character together
+   disambiguate the three shapes: a leading [primary] with no dot introduces
+   the refinement clause; an identifier followed by [.] is the qualifier of
+   a qualified field name; anything else is an unqualified field name.
+   Reserved words are rejected at the bare-name position; in the qualified
+   form the reserved-word check applies to the name half, since the
+   qualifier prefix already disambiguates from the kind keyword and the
+   refinement keyword. *)
 let type_expression_item =
   identifier >>= fun first_word ->
-  if first_word = "primary" then
-    whitespace *> keyword "key" *> whitespace *> char '(' *> whitespace
-    *> primary_key_columns
-    <* whitespace <* char ')'
-    >>| fun columns -> `Refinement (Relation.Primary_key columns)
-  else if StringSet.mem first_word type_expression_reserved_words then
-    fail
-      (Printf.sprintf "%S is reserved as a keyword inside a type expression"
-         first_word)
-  else
-    whitespace *> char ':' *> whitespace *> type_expression_kind_keyword
-    >>| fun field_kind ->
-    `Field ({ name = first_word; kind = field_kind } : Ast.type_field)
+  peek_char >>= function
+  | Some '.' ->
+      char '.' *> identifier >>= fun field_name ->
+      if StringSet.mem field_name type_expression_reserved_words then
+        fail
+          (Printf.sprintf "%S is reserved as a keyword inside a type expression"
+             field_name)
+      else
+        whitespace *> char ':' *> whitespace *> type_expression_kind_keyword
+        >>| fun field_kind ->
+        `Field
+          ({ qualifier = Some first_word; name = field_name; kind = field_kind }
+            : Ast.type_field)
+  | _ ->
+      if first_word = "primary" then
+        whitespace *> keyword "key" *> whitespace *> char '(' *> whitespace
+        *> primary_key_columns
+        <* whitespace <* char ')'
+        >>| fun columns -> `Refinement (Relation.Primary_key columns)
+      else if StringSet.mem first_word type_expression_reserved_words then
+        fail
+          (Printf.sprintf "%S is reserved as a keyword inside a type expression"
+             first_word)
+      else
+        whitespace *> char ':' *> whitespace *> type_expression_kind_keyword
+        >>| fun field_kind ->
+        `Field
+          ({ qualifier = None; name = first_word; kind = field_kind }
+            : Ast.type_field)
 
 (* A parenthesised type-expression body: zero or more comma-separated items
    with a permitted trailing comma, or the empty form [()]. Returns the items
@@ -231,8 +273,8 @@ let relation_literal_body =
     {
       row_kind =
         List.map
-          (fun ({ name; kind } : Ast.type_field) : Row.field ->
-            { name; kind; qualifier = None })
+          (fun ({ qualifier; name; kind } : Ast.type_field) : Row.field ->
+            { name; kind; qualifier })
           fields;
       refinements;
     }
@@ -297,18 +339,6 @@ let comparison_op =
       | Some '=' -> char '=' *> return Expression.GreaterEqual
       | _ -> return Expression.Greater)
   | _ -> fail "expected a comparison operator"
-
-(* A column reference: either a bare identifier (unqualified) or two
-   identifiers separated by a dot with no whitespace around it (qualified).
-   The no-whitespace rule on the dot keeps the syntax disjoint from a future
-   floating-point literal grammar. *)
-let column_reference =
-  identifier >>= fun first ->
-  peek_char >>= function
-  | Some '.' ->
-      char '.' *> identifier >>| fun second ->
-      ({ qualifier = Some first; name = second } : Row.column_reference)
-  | _ -> return ({ qualifier = None; name = first } : Row.column_reference)
 
 (* The expression grammar, built bottom-up inside [fix] so the atom can
    recurse into the full expression via parens. Top-level layering, from

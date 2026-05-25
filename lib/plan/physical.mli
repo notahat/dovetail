@@ -108,13 +108,17 @@ type t =
           [Failure] because the operator's result is a scalar value, not a
           relation. The [Type_op] evaluator handles a [Scalar_literal] input
           specially, computing the corresponding {!Scalar.kind} directly. *)
-  | Row_literal of { fields : (string * Scalar.value) list }
+  | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
       (** [Row_literal { fields }] yields the literal row directly — no storage,
-          no cursors. {!Eval} assembles a {!Row.t} from [fields] and hands it
-          down the pipe as a {!Term.Row_value}. Sits at a plan's root only;
-          {!kind_of} raises [Failure] because the operator's result is a row
-          value, not a relation. The [Type_op] evaluator handles a [Row_literal]
-          input specially, computing the corresponding {!Row.kind} directly. *)
+          no cursors. Each entry pairs a column reference (qualified
+          [qualifier.name] or bare [name]) with its value. {!Eval} assembles a
+          {!Row.t} from [fields] and hands it down the pipe as a
+          {!Term.Row_value}; the row's field kinds come from the values' scalar
+          kinds, and the qualifiers come from the references. Sits at a plan's
+          root only; {!kind_of} raises [Failure] because the operator's result
+          is a row value, not a relation. The [Type_op] evaluator handles a
+          [Row_literal] input specially, computing the corresponding {!Row.kind}
+          directly. *)
 
 val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
 (** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}
