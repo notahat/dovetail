@@ -37,13 +37,27 @@ let lookup_table_resources environment transaction table =
    exactly the [(value -> 'a) -> 'a] shape that [let*] binds. *)
 let ( let* ) action continue = action continue
 
+(* Build a [Relation.t] for [table_name] from its catalog entry and storage
+   subDB, opening a cursor for the duration of [continue]. The relation's
+   [value] seq pulls key-value pairs directly from the live cursor, so it
+   is valid only while [continue] runs. The multiplicity tag is left
+   polymorphic; callers commit to [`Bag] (the full-scan source) or [`Set]
+   (the catalog source) at the call site. *)
+let build_table_relation environment transaction ~table_name continue =
+  let kind, table_map =
+    lookup_table_resources environment transaction table_name
+  in
+  let* pairs = Storage.Engine.with_iter_seq table_map transaction in
+  let value = Seq.map (Storage.Row_codec.decode_row kind) pairs in
+  continue ({ kind; value } : _ Relation.t)
+
 (* Open the cursor for the duration of [continue] and hand it a relation
    whose rows are pulled lazily from the live cursor. *)
 let evaluate_full_scan environment transaction table continue =
-  let kind, table_map = lookup_table_resources environment transaction table in
-  let* pairs = Storage.Engine.with_iter_seq table_map transaction in
-  let value = Seq.map (Storage.Row_codec.decode_row kind) pairs in
-  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
+  let* relation =
+    build_table_relation environment transaction ~table_name:table
+  in
+  continue (Term.Relation_value (relation : [ `Bag ] Relation.t))
 
 (* Encode [key], probe the table's storage subDB with [Storage.Engine.get], and
    hand [continue] a relation whose [value] seq has either one element
