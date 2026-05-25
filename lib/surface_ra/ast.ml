@@ -27,6 +27,12 @@ type t =
   | Type of { input : t }
   | Scalar_literal of Scalar.value
   | Row_literal of (Row.column_reference * Scalar.value) list
+  | Drop_table of { table_name : string }
+  | Create_table_empty of {
+      table_name : string;
+      type_expression : type_expression;
+    }
+  | Create_table_seeded of { table_name : string; source : t }
   | Relation_literal of {
       kind : Relation.kind;
       rows : (Row.column_reference * Scalar.value) list list;

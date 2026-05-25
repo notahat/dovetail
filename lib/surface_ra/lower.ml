@@ -107,3 +107,9 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
   | Relation_literal { kind; rows } ->
       let normalized_rows = List.map (validate_typed_row kind) rows in
       Relation_literal { kind; rows = normalized_rows }
+  | Drop_table { table_name } -> Drop_table { table_name }
+  | Create_table_empty { table_name; type_expression } ->
+      Create_table_empty
+        { table_name; kind = lower_relation_type type_expression }
+  | Create_table_seeded { table_name; source } ->
+      Create_table_seeded { table_name; source = lower source }

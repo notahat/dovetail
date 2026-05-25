@@ -114,6 +114,26 @@ type t =
           in source order; the parser rejects duplicate qualified-name pairs.
           Evaluation hands the row down the pipe as a {!Term.Row_value}, and
           [| type] over a row literal yields the corresponding {!Row.kind}. *)
+  | Drop_table of { table_name : string }
+      (** [Drop_table { table_name }] is the surface form [drop table <name>]. A
+          leaf source -- nothing sits at pipeline-source position to its left.
+          Yields a one-row [(dropped : string)] relation reporting the dropped
+          table's name. *)
+  | Create_table_empty of {
+      table_name : string;
+      type_expression : type_expression;
+    }
+      (** [Create_table_empty { table_name; type_expression }] is the surface
+          form [<type-expression> | create table <name>] -- creates an empty
+          table whose declared kind is the carried [type_expression]. {!Lower}
+          calls {!lower_relation_type} to resolve the type expression to a
+          {!Relation.kind}. Yields a one-row [(created : string)] relation. *)
+  | Create_table_seeded of { table_name : string; source : t }
+      (** [Create_table_seeded { table_name; source }] is the surface form
+          [<value-pipeline> | create table <name>] -- creates [table_name] from
+          [source]'s row kind and seeds it with [source]'s rows. {!Lower}
+          recurses into [source]; the target kind is derived from [source]'s
+          kind at eval time. Yields a one-row [(created : string)] relation. *)
   | Relation_literal of {
       kind : Relation.kind;
       rows : (Row.column_reference * Scalar.value) list list;

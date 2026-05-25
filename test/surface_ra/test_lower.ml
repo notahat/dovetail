@@ -252,6 +252,55 @@ let test_unqualify_lowers_through () =
     (Unqualify { input = Scan { table = "users" } })
     logical
 
+let test_drop_table_lowers_through () =
+  let ast = Ast.Drop_table { table_name = "users" } in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Drop_table -> Logical.Drop_table with the same name"
+    (Drop_table { table_name = "users" })
+    logical
+
+let test_create_table_empty_lowers_type_expression_to_relation_kind () =
+  let type_expression : Ast.type_expression =
+    {
+      fields =
+        [
+          { qualifier = None; name = "id"; kind = Int64 };
+          { qualifier = None; name = "name"; kind = String };
+        ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  let ast = Ast.Create_table_empty { table_name = "users"; type_expression } in
+  let logical = Lower.lower ast in
+  let expected_kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  Alcotest.(check logical_testable)
+    "Ast.Create_table_empty -> Logical.Create_table_empty with kind resolved \
+     via lower_relation_type"
+    (Create_table_empty { table_name = "users"; kind = expected_kind })
+    logical
+
+let test_create_table_seeded_recurses_into_source () =
+  let ast =
+    Ast.Create_table_seeded
+      { table_name = "users"; source = Ast.Relation_name "other" }
+  in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Create_table_seeded -> Logical.Create_table_seeded with source lowered"
+    (Create_table_seeded
+       { table_name = "users"; source = Scan { table = "other" } })
+    logical
+
 let test_type_over_type_is_rejected () =
   let ast =
     Ast.Type { input = Ast.Type { input = Ast.Relation_name "users" } }
@@ -606,6 +655,19 @@ let () =
         [
           Alcotest.test_case "lowers Ast.Unqualify to Logical.Unqualify" `Quick
             test_unqualify_lowers_through;
+        ] );
+      ( "create / drop table",
+        [
+          Alcotest.test_case "lowers Ast.Drop_table to Logical.Drop_table"
+            `Quick test_drop_table_lowers_through;
+          Alcotest.test_case
+            "lowers Ast.Create_table_empty, resolving its type expression to a \
+             relation kind"
+            `Quick
+            test_create_table_empty_lowers_type_expression_to_relation_kind;
+          Alcotest.test_case
+            "lowers Ast.Create_table_seeded, recursing into its source" `Quick
+            test_create_table_seeded_recurses_into_source;
         ] );
       ( "insert mutation",
         [
