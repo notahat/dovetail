@@ -39,6 +39,10 @@ type error =
       expression : Expression.t;
       actual_kind : Scalar.kind;
     }
+  | Projection_duplicate_column of {
+      operator : string;
+      column_reference : Row.column_reference;
+    }
   | Ordering_operator_on_unordered_kind of {
       operator : string;
       comparison_op : Expression.comparison_op;
@@ -137,6 +141,9 @@ let render = function
   | Predicate_not_boolean { operator; expression = _; actual_kind } ->
       Printf.sprintf "%s: predicate position requires Bool, got %s" operator
         (Scalar.kind_to_string actual_kind)
+  | Projection_duplicate_column { operator; column_reference } ->
+      Printf.sprintf "%s: duplicate column %S" operator
+        (Row.format_column_reference column_reference)
   | Ordering_operator_on_unordered_kind { operator; comparison_op; kind } ->
       Printf.sprintf "%s: ordering operator %s is not defined for %s" operator
         (render_comparison_op comparison_op)
@@ -378,6 +385,26 @@ let check_predicate_kind ~operator ~row_kind expression : error list =
   | Some actual_kind ->
       [ Predicate_not_boolean { operator; expression; actual_kind } ]
 
+(* Walk [references] left-to-right, emitting one [Projection_duplicate_column]
+   for every occurrence beyond the first of a reference whose formatted
+   spelling has already been seen. The formatted spelling collapses bare
+   and qualified forms together so ["users.id"] and ["users.id"] count as
+   duplicates regardless of which spelling style appeared first. *)
+let check_duplicate_columns ~operator references : error list =
+  let rec walk seen errors = function
+    | [] -> List.rev errors
+    | reference :: rest ->
+        let key = Row.format_column_reference reference in
+        if List.mem key seen then
+          walk seen
+            (Projection_duplicate_column
+               { operator; column_reference = reference }
+            :: errors)
+            rest
+        else walk (key :: seen) errors rest
+  in
+  walk [] [] references
+
 (* For each column reference [references] holds, emit an [Unresolved_column]
    error when it does not resolve to exactly one field of [row_kind].
    [operator] becomes the error's user-facing prefix. Used for the bare
@@ -416,7 +443,10 @@ let rec collect_errors ~catalog (plan : Logical.t) : error list =
         check_column_references ~operator:"Project" ~row_kind:input_row_kind
           columns
       in
-      input_errors @ column_errors
+      let duplicate_errors =
+        check_duplicate_columns ~operator:"Project" columns
+      in
+      input_errors @ column_errors @ duplicate_errors
   | Restrict { input; predicate } ->
       let input_errors = collect_errors ~catalog input in
       let input_row_kind = (kind_of ~catalog input).row_kind in

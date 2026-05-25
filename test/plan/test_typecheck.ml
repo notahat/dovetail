@@ -587,6 +587,44 @@ let test_project_emits_one_error_per_unresolved_column () =
       Alcotest.(check error_list_testable)
         "two structured errors" expected errors
 
+let test_project_with_duplicate_column_reports_structured_error () =
+  let plan : Logical.t =
+    Project
+      {
+        input = two_column_literal;
+        columns =
+          [
+            { qualifier = None; name = "id" }; { qualifier = None; name = "id" };
+          ];
+      }
+  in
+  let expected : Typecheck.error list =
+    [
+      Projection_duplicate_column
+        {
+          operator = "Project";
+          column_reference = { qualifier = None; name = "id" };
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Projection_duplicate_column error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured duplicate" expected errors
+
+let test_projection_duplicate_renders_with_project_prefix () =
+  let error : Typecheck.error =
+    Projection_duplicate_column
+      {
+        operator = "Project";
+        column_reference = { qualifier = None; name = "id" };
+      }
+  in
+  Alcotest.(check string)
+    "rendered duplicate" "Project: duplicate column \"id\""
+    (Typecheck.render error)
+
 let test_project_unknown_column_renders_with_project_prefix () =
   let error : Typecheck.error =
     Unresolved_column
@@ -662,6 +700,10 @@ let () =
             `Quick test_project_emits_one_error_per_unresolved_column;
           Alcotest.test_case "unknown column renders with Project prefix" `Quick
             test_project_unknown_column_renders_with_project_prefix;
+          Alcotest.test_case "duplicate column produces a structured error"
+            `Quick test_project_with_duplicate_column_reports_structured_error;
+          Alcotest.test_case "duplicate column renders with Project prefix"
+            `Quick test_projection_duplicate_renders_with_project_prefix;
         ] );
       ( "restrict compare kind validation",
         [

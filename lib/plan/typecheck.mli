@@ -91,6 +91,16 @@ type error =
           renderer's prefix; [expression] is the whole offending predicate (kept
           for LSP detail even though the renderer does not name it, matching the
           legacy resolve-time message). *)
+  | Projection_duplicate_column of {
+      operator : string;
+      column_reference : Row.column_reference;
+    }
+      (** A [Project]'s column list names the same column twice. [operator]
+          names the user-facing operator (today: always ["Project"]) and becomes
+          the renderer's prefix; [column_reference] carries the duplicated
+          reference for the renderer to echo back. Emitted once per duplicate
+          occurrence beyond the first, so a column listed three times produces
+          two errors. *)
   | Ordering_operator_on_unordered_kind of {
       operator : string;
       comparison_op : Expression.comparison_op;
