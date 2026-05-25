@@ -369,12 +369,15 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
     (Term.Relation_value
        ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
 
-(* Reject any source row whose fields carry qualifiers. The sink stores rows
-   under bare names, so a qualified source -- typically the output of a join --
-   is ambiguous: we won't silently drop the qualifier. The error names every
+(* Reject any source row whose fields carry qualifiers. Row-writing sinks
+   (insert into, create table from a value pipeline) store rows under bare
+   names, so a qualified source -- typically the output of a join -- is
+   ambiguous: we won't silently drop the qualifier. The error names every
    offending field and points at the [unqualify] operator as the explicit
-   strip. *)
-and reject_qualified_source ~target_table ~source_row_kind =
+   strip. [target_table] is quoted into the prefix so the error matches the
+   surface operation the user wrote. *)
+and reject_qualified_source_for_target ~operation ~target_table ~source_row_kind
+    =
   let qualified_fields =
     List.filter
       (fun (field : Row.field) -> field.qualifier <> None)
@@ -391,16 +394,16 @@ and reject_qualified_source ~target_table ~source_row_kind =
       in
       failwith
         (Printf.sprintf
-           "Eval: insert into %S: source has qualified field(s) %s; pipe \
-            through unqualify to drop qualifiers"
-           target_table formatted_names)
+           "Eval: %s %S: source has qualified field(s) %s; pipe through \
+            unqualify to drop qualifiers"
+           operation target_table formatted_names)
 
 (* For each target field, find the position in [source_row_kind] that supplies
    its value. Raises [Failure] if a target field has no matching source
    column. Source columns absent from the target are tolerated here;
    Translate-level validation rejects them upstream. *)
-and build_source_position_map ~target_table ~source_row_kind
-    ~(target_kind : Relation.kind) =
+and build_source_to_target_position_map ~operation ~target_table
+    ~source_row_kind ~(target_kind : Relation.kind) =
   List.map
     (fun (target_field : Row.field) ->
       match
@@ -411,9 +414,9 @@ and build_source_position_map ~target_table ~source_row_kind
       | Error _ ->
           failwith
             (Printf.sprintf
-               "Eval: insert into %S: source is missing column %S required by \
-                target kind"
-               target_table target_field.name))
+               "Eval: %s %S: source is missing column %S required by target \
+                kind"
+               operation target_table target_field.name))
     target_kind.row_kind
 
 (* Reorder [source_row] into a row matching [target_kind]'s field order, by
@@ -445,8 +448,8 @@ and primary_key_value_text (target_kind : Relation.kind) target_row =
 
 (* Encode one source row in target form, fail on PK collision, else write
    it. *)
-and insert_one_row ~target_kind ~target_map ~target_table ~write_transaction
-    ~position_map source_row =
+and write_one_row ~operation ~target_kind ~target_map ~target_table
+    ~write_transaction ~position_map source_row =
   let target_row = project_to_target_order ~position_map source_row in
   let key_bytes, value_bytes =
     Storage.Row_codec.encode_row target_kind target_row
@@ -455,12 +458,37 @@ and insert_one_row ~target_kind ~target_map ~target_table ~write_transaction
   | None -> ()
   | Some _ ->
       failwith
-        (Printf.sprintf
-           "Eval: insert into %S: row with primary key %s already exists"
-           target_table
+        (Printf.sprintf "Eval: %s %S: row with primary key %s already exists"
+           operation target_table
            (primary_key_value_text target_kind target_row)));
   Storage.Engine.put target_map write_transaction ~key:key_bytes
     ~value:value_bytes
+
+(* Stream [source_relation]'s rows into [target_table]. Runs the
+   qualifier-rejection check on the source, builds the source-to-target
+   position map once, then iterates source rows through [write_one_row].
+   Returns the number of rows written. [operation] (e.g. "insert into",
+   "create table") is quoted into all user-facing errors so they line up
+   with the surface operation the user wrote. *)
+and write_source_rows_into_table ~operation ~target_kind ~target_map
+    ~target_table ~write_transaction ~(source_relation : _ Relation.t) =
+  reject_qualified_source_for_target ~operation ~target_table
+    ~source_row_kind:source_relation.kind.row_kind;
+  let position_map =
+    build_source_to_target_position_map ~operation ~target_table
+      ~source_row_kind:source_relation.kind.row_kind ~target_kind
+  in
+  (* The row-write is the point of the iteration and the count is
+     incidental; [Seq.iter] + [ref] expresses that more honestly than
+     folding the count through a [Seq.fold_left] accumulator. *)
+  let written_rows = ref 0 in
+  Seq.iter
+    (fun source_row ->
+      write_one_row ~operation ~target_kind ~target_map ~target_table
+        ~write_transaction ~position_map source_row;
+      incr written_rows)
+    source_relation.value;
+  !written_rows
 
 (* The static row shape an insert reports: a one-column [insert_count : int64]
    row. The kind has no refinements -- the relation describes an evaluation
@@ -497,21 +525,9 @@ and evaluate_insert environment transaction ~target_table ~source continue =
   let target_kind, target_map =
     lookup_table_resources environment write_transaction target_table
   in
-  (* The row-write is the point of the iteration and the count is
-     incidental; [Seq.iter] + [ref] expresses that more honestly than
-     folding the count through a [Seq.fold_left] accumulator. *)
-  let affected_rows = ref 0 in
   eval_input environment transaction source (fun source_relation ->
-      reject_qualified_source ~target_table
-        ~source_row_kind:source_relation.kind.row_kind;
-      let position_map =
-        build_source_position_map ~target_table
-          ~source_row_kind:source_relation.kind.row_kind ~target_kind
+      let affected_rows =
+        write_source_rows_into_table ~operation:"insert into" ~target_kind
+          ~target_map ~target_table ~write_transaction ~source_relation
       in
-      Seq.iter
-        (fun source_row ->
-          insert_one_row ~target_kind ~target_map ~target_table
-            ~write_transaction ~position_map source_row;
-          incr affected_rows)
-        source_relation.value;
-      continue (Term.Relation_value (insert_result_relation !affected_rows)))
+      continue (Term.Relation_value (insert_result_relation affected_rows)))
