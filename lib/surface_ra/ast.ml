@@ -16,9 +16,11 @@ type type_field = {
   kind : Scalar.kind;
 }
 
+type refinement = Primary_key of column_reference list
+
 type type_expression = {
   fields : type_field list;
-  refinements : Relation.refinement list;
+  refinements : refinement list;
 }
 
 type t =

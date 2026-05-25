@@ -183,7 +183,13 @@ let type_expression_item =
         whitespace *> keyword "key" *> whitespace *> char '(' *> whitespace
         *> primary_key_columns
         <* whitespace <* char ')'
-        >>| fun columns -> `Refinement (Relation.Primary_key columns)
+        >>| fun columns ->
+        let references =
+          List.map
+            (fun name : Ast.column_reference -> { qualifier = None; name })
+            columns
+        in
+        `Refinement (Ast.Primary_key references)
       else if StringSet.mem first_word type_expression_reserved_words then
         fail
           (Printf.sprintf "%S is reserved as a keyword inside a type expression"
@@ -272,7 +278,14 @@ let relation_literal_body =
           (fun ({ qualifier; name; kind } : Ast.type_field) : Row.field ->
             { name; kind; qualifier })
           fields;
-      refinements;
+      refinements =
+        List.map
+          (fun (Ast.Primary_key references) : Relation.refinement ->
+            Relation.Primary_key
+              (List.map
+                 (fun (reference : Ast.column_reference) -> reference.name)
+                 references))
+          refinements;
     }
   in
   whitespace *> char '{' *> whitespace

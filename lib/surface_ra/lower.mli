@@ -22,11 +22,18 @@ val lower_row_type : Ast.type_expression -> Row.kind
     guarantees this for parsed input. Not yet called from anywhere; wired in
     once the lowering pipeline grows a row-type path. *)
 
+val lower_refinement : Ast.refinement -> Relation.refinement
+(** [lower_refinement refinement] is the AST-to-logical translation for a
+    refinement clause. For [Ast.Primary_key references] it discards the
+    qualifier slot from each reference -- the surface grammar admits only bare
+    identifiers inside a [primary key (...)] clause, so qualified references are
+    an upstream-invariant violation. *)
+
 val lower_relation_type : Ast.type_expression -> Relation.kind
 (** [lower_relation_type type_expression] turns a parsed relation-type
     expression into a {!Relation.kind}. The fields become the [row_kind] (each
-    with [qualifier = None]); [type_expression.refinements] flow through to the
-    kind's [refinements] unchanged. *)
+    with [qualifier = None]); each {!Ast.refinement} is translated via
+    {!lower_refinement}. *)
 
 val lower : Ast.t -> Plan.Logical.t
 (** [lower ast] rewrites [ast] into an equivalent logical plan.

@@ -280,7 +280,7 @@ let test_create_table_empty_lowers_type_expression_to_relation_kind () =
           { qualifier = None; name = "id"; kind = Int64 };
           { qualifier = None; name = "name"; kind = String };
         ];
-      refinements = [ Primary_key [ "id" ] ];
+      refinements = [ Ast.Primary_key [ column_reference "id" ] ];
     }
   in
   let ast = Ast.Create_table_empty { table_name = "users"; type_expression } in
@@ -397,7 +397,7 @@ let test_lower_relation_type_with_single_column_primary_key () =
   let type_expression : Ast.type_expression =
     {
       fields = [ type_field "id" Int64; type_field "name" String ];
-      refinements = [ Primary_key [ "id" ] ];
+      refinements = [ Ast.Primary_key [ column_reference "id" ] ];
     }
   in
   let expected : Relation.kind =
@@ -423,7 +423,11 @@ let test_lower_relation_type_with_compound_primary_key () =
           type_field "order_id" Int64;
           type_field "qty" Int64;
         ];
-      refinements = [ Primary_key [ "user_id"; "order_id" ] ];
+      refinements =
+        [
+          Ast.Primary_key
+            [ column_reference "user_id"; column_reference "order_id" ];
+        ];
     }
   in
   let expected : Relation.kind =

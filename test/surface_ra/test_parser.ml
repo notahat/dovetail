@@ -438,7 +438,7 @@ let test_pipeline_create_table_empty_with_primary_key_parses () =
                  { qualifier = None; name = "id"; kind = Int64 };
                  { qualifier = None; name = "name"; kind = String };
                ];
-             refinements = [ Relation.Primary_key [ "id" ] ];
+             refinements = [ Ast.Primary_key [ column_reference "id" ] ];
            };
        })
 

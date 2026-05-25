@@ -4,7 +4,6 @@
 
 open Dovetail_surface_ra
 module Scalar = Dovetail_core.Scalar
-module Relation = Dovetail_core.Relation
 
 (* Comparing [type_expression] structurally is enough; the testable's pretty-
    printer prints a fixed tag because Alcotest only displays it on failure. *)
@@ -51,6 +50,15 @@ let field name (kind : Scalar.kind) : Ast.type_field =
 
 let qualified_field ~qualifier ~name (kind : Scalar.kind) : Ast.type_field =
   { qualifier = Some qualifier; name; kind }
+
+(* Build an AST-side [Primary_key] refinement from bare column names — the
+   only spelling the surface grammar admits inside a [primary key (...)]
+   clause. *)
+let primary_key names : Ast.refinement =
+  Primary_key
+    (List.map
+       (fun name : Ast.column_reference -> { qualifier = None; name })
+       names)
 
 let empty_type : Ast.type_expression = { fields = []; refinements = [] }
 
@@ -107,14 +115,14 @@ let test_row_type_rejects_trailing_garbage () =
 let single_pk_type : Ast.type_expression =
   {
     fields = [ field "id" Int64; field "name" String ];
-    refinements = [ Relation.Primary_key [ "id" ] ];
+    refinements = [ primary_key [ "id" ] ];
   }
 
 let compound_pk_type : Ast.type_expression =
   {
     fields =
       [ field "user_id" Int64; field "order_id" Int64; field "qty" Int64 ];
-    refinements = [ Relation.Primary_key [ "user_id"; "order_id" ] ];
+    refinements = [ primary_key [ "user_id"; "order_id" ] ];
   }
 
 let test_relation_type_parses_empty () = parses_relation_type "()" empty_type
@@ -135,7 +143,7 @@ let test_relation_type_parses_compound_primary_key () =
 
 let test_relation_type_tolerates_whitespace_inside_primary_key () =
   parses_relation_type "(id: int64, primary  key  (  id  ))"
-    { fields = [ field "id" Int64 ]; refinements = [ Primary_key [ "id" ] ] }
+    { fields = [ field "id" Int64 ]; refinements = [ primary_key [ "id" ] ] }
 
 let test_relation_type_rejects_empty_primary_key_column_list () =
   rejects_relation_type "(id: int64, primary key ())"
@@ -196,7 +204,7 @@ let test_relation_type_parses_qualified_field_with_refinement () =
           qualified_field ~qualifier:"users" ~name:"id" Int64;
           qualified_field ~qualifier:"users" ~name:"name" String;
         ];
-      refinements = [ Primary_key [ "id" ] ];
+      refinements = [ primary_key [ "id" ] ];
     }
 
 let test_row_type_rejects_qualified_field_with_reserved_name () =

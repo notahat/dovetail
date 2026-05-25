@@ -22,11 +22,23 @@ let lower_row_type (type_expression : Ast.type_expression) : Row.kind =
          type_expression reaching this helper has an empty refinements list. *)
       assert false
 
+let lower_refinement (refinement : Ast.refinement) : Relation.refinement =
+  match refinement with
+  | Primary_key references ->
+      let column_name (reference : Ast.column_reference) =
+        match reference.qualifier with
+        | None -> reference.name
+        (* Parser admits only bare identifiers inside a primary-key
+           clause, so a qualified reference here is an upstream bug. *)
+        | Some _ -> assert false
+      in
+      Relation.Primary_key (List.map column_name references)
+
 let lower_relation_type (type_expression : Ast.type_expression) : Relation.kind
     =
   {
     row_kind = lower_type_fields type_expression.fields;
-    refinements = type_expression.refinements;
+    refinements = List.map lower_refinement type_expression.refinements;
   }
 
 (* Render a field's display name as the user wrote it: dotted

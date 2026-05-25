@@ -38,9 +38,20 @@ type type_field = {
     {!qualifier} records the dotted prefix when present and is [None] otherwise.
 *)
 
+type refinement =
+  | Primary_key of column_reference list
+      (** A constraint clause attached to a relation type. Today only
+          [Primary_key columns] exists; it carries the AST-side
+          {!column_reference} so refinements share the column vocabulary used
+          everywhere else in the AST. {!Lower.lower_refinement} translates each
+          refinement to its {!Relation.refinement} counterpart at the
+          AST-to-logical boundary. The surface grammar emits only unqualified
+          columns inside a [primary key (...)] clause; the qualifier slot is
+          present for uniformity but is always [None] in parsed input. *)
+
 type type_expression = {
   fields : type_field list;
-  refinements : Relation.refinement list;
+  refinements : refinement list;
 }
 (** A parenthesised type expression as written at the surface. Two surface forms
     map onto this one node:
