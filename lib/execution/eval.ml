@@ -648,10 +648,11 @@ and evaluate_create_table_empty environment transaction ~table_name ~kind
   let write_transaction : [ `Read | `Write ] Storage.Engine.transaction =
     Obj.magic transaction
   in
-  validate_target_kind ~table_name kind;
+  let target_kind = stamp_qualifier_on_kind ~qualifier:table_name kind in
+  validate_target_kind ~table_name target_kind;
   reject_existing_table environment write_transaction ~table_name;
   let _target_map =
-    provision_table environment write_transaction ~table_name ~kind
+    provision_table environment write_transaction ~table_name ~kind:target_kind
   in
   continue
     (Term.Relation_value (mutation_result_relation ~verb:"created" table_name))

@@ -17,9 +17,10 @@ module Storage = Dovetail_storage
 
 (* A well-formed [Relation.kind] mirroring the kind a successful
    [<type-expr> | create table widgets] would carry: two fields with a
-   single-column primary key, no qualifier (the surface type-expression
-   has none, and the evaluator stamps qualifiers only on derived kinds
-   for the seeded form -- empty creates trust the carried kind verbatim). *)
+   single-column primary key, no qualifier as written by the user. The
+   evaluator stamps [Some table_name] onto every field before writing
+   the catalog entry, so the catalog kind read back here has the
+   qualifier set even though the input carried [None]. *)
 let widgets_kind : Relation.kind =
   {
     row_kind =
