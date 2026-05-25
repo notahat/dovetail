@@ -308,6 +308,119 @@ let test_restrict_with_ambiguous_bare_reference_reports_structured_error () =
       Alcotest.(check error_list_testable)
         "structured ambiguous" expected errors
 
+let test_restrict_with_compare_kind_mismatch_reports_structured_error () =
+  let predicate : Expression.t =
+    Compare
+      {
+        left = Column { qualifier = None; name = "description" };
+        op = Equal;
+        right = Literal (Scalar.Int64 1L);
+      }
+  in
+  let plan : Logical.t = Restrict { input = two_column_literal; predicate } in
+  let expected : Typecheck.error list =
+    [
+      Compare_kind_mismatch
+        {
+          operator = "Restrict";
+          left = Column { qualifier = None; name = "description" };
+          left_kind = String;
+          right = Literal (Scalar.Int64 1L);
+          right_kind = Int64;
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Compare_kind_mismatch error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured kind mismatch" expected errors
+
+let test_compare_kind_mismatch_renders_with_operator_prefix () =
+  let error : Typecheck.error =
+    Compare_kind_mismatch
+      {
+        operator = "Restrict";
+        left = Column { qualifier = None; name = "description" };
+        left_kind = String;
+        right = Literal (Scalar.Int64 1L);
+        right_kind = Int64;
+      }
+  in
+  Alcotest.(check string)
+    "rendered compare mismatch"
+    "Restrict: type mismatch: column \"description\" is String, literal Int64 \
+     is Int64"
+    (Typecheck.render error)
+
+let test_restrict_with_ordering_on_bool_reports_structured_error () =
+  (* Two-column literal with a Bool column so the ordering check fires
+     without a kind-mismatch error masking it. *)
+  let input : Logical.t =
+    Relation_literal
+      {
+        kind =
+          {
+            row_kind =
+              [
+                { name = "active"; kind = Bool; qualifier = None };
+                { name = "also_active"; kind = Bool; qualifier = None };
+              ];
+            refinements = [];
+          };
+        rows = [];
+      }
+  in
+  let predicate : Expression.t =
+    Compare
+      {
+        left = Column { qualifier = None; name = "active" };
+        op = Greater;
+        right = Column { qualifier = None; name = "also_active" };
+      }
+  in
+  let plan : Logical.t = Restrict { input; predicate } in
+  let expected : Typecheck.error list =
+    [
+      Ordering_operator_on_unordered_kind
+        { operator = "Restrict"; comparison_op = Greater; kind = Bool };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ ->
+      Alcotest.fail "expected an Ordering_operator_on_unordered_kind error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured ordering error" expected errors
+
+let test_ordering_on_bool_renders_with_operator_prefix () =
+  let error : Typecheck.error =
+    Ordering_operator_on_unordered_kind
+      { operator = "Restrict"; comparison_op = Greater; kind = Bool }
+  in
+  Alcotest.(check string)
+    "rendered ordering error"
+    "Restrict: ordering operator > is not defined for Bool"
+    (Typecheck.render error)
+
+let test_restrict_skips_ordering_check_when_kinds_disagree () =
+  (* When the two sides of a Compare have different kinds, the
+     mismatch error is enough; we don't also emit an ordering error. *)
+  let predicate : Expression.t =
+    Compare
+      {
+        left = Column { qualifier = None; name = "description" };
+        op = Greater;
+        right = Literal (Scalar.Int64 1L);
+      }
+  in
+  let plan : Logical.t = Restrict { input = two_column_literal; predicate } in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected one Compare_kind_mismatch error"
+  | Error errors ->
+      let count = List.length errors in
+      Alcotest.(check int) "exactly one error" 1 count
+
 let test_project_with_unresolved_column_reports_structured_error () =
   let plan : Logical.t =
     Project
@@ -442,6 +555,19 @@ let () =
             `Quick test_project_emits_one_error_per_unresolved_column;
           Alcotest.test_case "unknown column renders with Project prefix" `Quick
             test_project_unknown_column_renders_with_project_prefix;
+        ] );
+      ( "restrict compare kind validation",
+        [
+          Alcotest.test_case "kind mismatch produces a structured error" `Quick
+            test_restrict_with_compare_kind_mismatch_reports_structured_error;
+          Alcotest.test_case "kind mismatch renders with operator prefix" `Quick
+            test_compare_kind_mismatch_renders_with_operator_prefix;
+          Alcotest.test_case "ordering on Bool produces a structured error"
+            `Quick test_restrict_with_ordering_on_bool_reports_structured_error;
+          Alcotest.test_case "ordering error renders with operator prefix"
+            `Quick test_ordering_on_bool_renders_with_operator_prefix;
+          Alcotest.test_case "kind mismatch alone suppresses the ordering check"
+            `Quick test_restrict_skips_ordering_check_when_kinds_disagree;
         ] );
       ( "insert kind mismatch",
         [

@@ -21,6 +21,55 @@ type error =
       available_row_kind : Row.kind;
       operator : string;
     }
+  | Compare_kind_mismatch of {
+      operator : string;
+      left : Expression.t;
+      left_kind : Scalar.kind;
+      right : Expression.t;
+      right_kind : Scalar.kind;
+    }
+  | Ordering_operator_on_unordered_kind of {
+      operator : string;
+      comparison_op : Expression.comparison_op;
+      kind : Scalar.kind;
+    }
+
+(* Source-flavoured description of an expression node, used inside the
+   renderer for [Compare_kind_mismatch]. Mirrors the wording the legacy
+   [Expression.resolve]-time message used, so users see the same phrasing
+   ("column %S", "literal %s") regardless of which layer reported the
+   error. Compound arms fall back to a generic label -- today's grammar
+   doesn't nest [Compare]/[And]/[Or]/[Not] under a [Compare]'s operand
+   position, so they are not exercised in practice. *)
+let describe_expression : Expression.t -> string = function
+  | Column reference ->
+      Printf.sprintf "column %S" (Row.format_column_reference reference)
+  | Literal value ->
+      Printf.sprintf "literal %s" (Scalar.kind_to_string (Scalar.kind_of value))
+  | Compare _ -> "comparison expression"
+  | And _ -> "and expression"
+  | Or _ -> "or expression"
+  | Not _ -> "not expression"
+
+(* Render a comparison operator the way it appears in source. *)
+let render_comparison_op : Expression.comparison_op -> string = function
+  | Equal -> "="
+  | NotEqual -> "<>"
+  | Less -> "<"
+  | LessEqual -> "<="
+  | Greater -> ">"
+  | GreaterEqual -> ">="
+
+(* Ordering operators have a meaningful comparison only on kinds with a
+   natural order. Mirrors [Expression]'s internal definition; duplicated
+   here so [Typecheck] does not depend on private [Expression] helpers. *)
+let is_ordering_op : Expression.comparison_op -> bool = function
+  | Less | LessEqual | Greater | GreaterEqual -> true
+  | Equal | NotEqual -> false
+
+let is_ordered_kind : Scalar.kind -> bool = function
+  | Int64 | String -> true
+  | Bool -> false
 
 (* Symmetric difference of [expected] and [actual] as two lists: the names
    in [expected] but not in [actual] and the names in [actual] but not in
@@ -59,6 +108,16 @@ let render = function
         | Ok _ -> assert false
       in
       Printf.sprintf "%s: %s" operator detail
+  | Compare_kind_mismatch { operator; left; left_kind; right; right_kind } ->
+      Printf.sprintf "%s: type mismatch: %s is %s, %s is %s" operator
+        (describe_expression left)
+        (Scalar.kind_to_string left_kind)
+        (describe_expression right)
+        (Scalar.kind_to_string right_kind)
+  | Ordering_operator_on_unordered_kind { operator; comparison_op; kind } ->
+      Printf.sprintf "%s: ordering operator %s is not defined for %s" operator
+        (render_comparison_op comparison_op)
+        (Scalar.kind_to_string kind)
 
 (* Check that [literal_kind]'s field names are a permutation of
    [target_kind]'s. Emits a single [Insert_column_mismatch] carrying both
@@ -202,23 +261,71 @@ let rec kind_of ~(catalog : Catalog.kind) (plan : Logical.t) : Relation.kind =
          operator demands a relation. *)
       assert false
 
-(* Every [Column] reference inside [expression], in left-to-right source
-   order. Literals and compound nodes contribute nothing of their own; the
-   walk just descends into them. *)
-let rec expression_column_references (expression : Expression.t) :
-    Row.column_reference list =
+(* Static scalar kind of [expression] under [row_kind], or [None] when the
+   kind cannot be determined cleanly (currently: an unresolved [Column]
+   reference). [Compare] / [And] / [Or] / [Not] structurally return [Bool]
+   regardless of whether their own validation passes, so kind-derivation
+   for those nodes never cascades a [None] upward. *)
+let expression_kind ~row_kind (expression : Expression.t) : Scalar.kind option =
+  match expression with
+  | Literal value -> Some (Scalar.kind_of value)
+  | Column reference -> (
+      match Row.find_field row_kind reference with
+      | Ok (_position, field) -> Some field.kind
+      | Error _ -> None)
+  | Compare _ | And _ | Or _ | Not _ -> Some Scalar.Bool
+
+(* Errors specific to a single [Compare] node: kind agreement between the
+   two operand sub-expressions, then ordering-operator compatibility
+   against the agreed kind. Skips the ordering check when the mismatch
+   error has already fired, mirroring the legacy [Expression.resolve]
+   ordering and avoiding noise atop noise. *)
+let check_compare ~operator ~row_kind ~left ~op ~right : error list =
+  match (expression_kind ~row_kind left, expression_kind ~row_kind right) with
+  | Some left_kind, Some right_kind when left_kind <> right_kind ->
+      [ Compare_kind_mismatch { operator; left; left_kind; right; right_kind } ]
+  | Some shared_kind, Some _
+    when is_ordering_op op && not (is_ordered_kind shared_kind) ->
+      [
+        Ordering_operator_on_unordered_kind
+          { operator; comparison_op = op; kind = shared_kind };
+      ]
+  | _ -> []
+
+(* Walk [expression] once, accumulating every typecheck error it carries.
+   Covers unresolved column references at every [Column] node plus
+   per-[Compare] kind and ordering checks. [operator] becomes the
+   user-facing prefix on every error emitted by this walk. *)
+let rec check_expression ~operator ~row_kind (expression : Expression.t) :
+    error list =
   match expression with
   | Literal _ -> []
-  | Column reference -> [ reference ]
-  | Compare { left; right; _ } ->
-      expression_column_references left @ expression_column_references right
+  | Column reference -> (
+      match Row.find_field row_kind reference with
+      | Ok _ -> []
+      | Error _ ->
+          [
+            Unresolved_column
+              {
+                column_reference = reference;
+                available_row_kind = row_kind;
+                operator;
+              };
+          ])
+  | Compare { left; op; right } ->
+      let left_errors = check_expression ~operator ~row_kind left in
+      let right_errors = check_expression ~operator ~row_kind right in
+      let compare_errors = check_compare ~operator ~row_kind ~left ~op ~right in
+      left_errors @ right_errors @ compare_errors
   | And (left, right) | Or (left, right) ->
-      expression_column_references left @ expression_column_references right
-  | Not operand -> expression_column_references operand
+      check_expression ~operator ~row_kind left
+      @ check_expression ~operator ~row_kind right
+  | Not operand -> check_expression ~operator ~row_kind operand
 
 (* For each column reference [references] holds, emit an [Unresolved_column]
    error when it does not resolve to exactly one field of [row_kind].
-   [operator] becomes the error's user-facing prefix. *)
+   [operator] becomes the error's user-facing prefix. Used for the bare
+   column-reference lists projections carry. *)
 let check_column_references ~operator ~row_kind references : error list =
   List.filter_map
     (fun reference ->
@@ -258,8 +365,7 @@ let rec collect_errors ~catalog (plan : Logical.t) : error list =
       let input_errors = collect_errors ~catalog input in
       let input_row_kind = (kind_of ~catalog input).row_kind in
       let predicate_errors =
-        check_column_references ~operator:"Restrict" ~row_kind:input_row_kind
-          (expression_column_references predicate)
+        check_expression ~operator:"Restrict" ~row_kind:input_row_kind predicate
       in
       input_errors @ predicate_errors
   | CrossProduct { left; right } ->

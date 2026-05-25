@@ -12,6 +12,7 @@
     the success arm widens to that type then. *)
 
 module Catalog = Dovetail_core.Catalog
+module Expression = Dovetail_core.Expression
 module Row = Dovetail_core.Row
 module Scalar = Dovetail_core.Scalar
 
@@ -52,6 +53,30 @@ type error =
           the user-facing operator the reference appears in (for example
           ["Restrict"], ["Project"]); the renderer uses it as the error prefix.
       *)
+  | Compare_kind_mismatch of {
+      operator : string;
+      left : Expression.t;
+      left_kind : Scalar.kind;
+      right : Expression.t;
+      right_kind : Scalar.kind;
+    }
+      (** The two operands of a [Compare] inside an expression disagree on
+          scalar kind. [operator] names the user-facing operator the expression
+          appears in (for example ["Restrict"]); [left] / [right] are the
+          operand sub-expressions, included so the renderer can describe them in
+          the same source-flavoured wording the legacy resolve-time message
+          uses. *)
+  | Ordering_operator_on_unordered_kind of {
+      operator : string;
+      comparison_op : Expression.comparison_op;
+      kind : Scalar.kind;
+    }
+      (** A comparison expression uses an ordering operator ([<], [<=], [>],
+          [>=]) on a kind without a meaningful order. Today the only unordered
+          scalar kind is [Bool]; [kind] carries the operands' shared kind so the
+          renderer can name it. Emitted only when the operands' kinds already
+          agree, so [Compare_kind_mismatch] never overlaps with this error on
+          the same node. *)
 
 val render : error -> string
 (** [render error] formats [error] for a human reader, with an operator-named
