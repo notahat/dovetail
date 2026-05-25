@@ -99,11 +99,13 @@ let rec eval environment transaction plan continue =
   | Row_literal { fields } -> evaluate_row_literal fields continue
   | Drop_table { table_name } ->
       evaluate_drop_table environment transaction ~table_name continue
-  (* TODO(create-drop-table): create_table arms land in the dedicated
-     steps for each operator. Unreachable until the parser emits these
-     nodes. *)
-  | Create_table_empty _ | Create_table_seeded _ ->
-      failwith "Eval: create table not yet implemented"
+  | Create_table_empty { table_name; kind } ->
+      evaluate_create_table_empty environment transaction ~table_name ~kind
+        continue
+  (* TODO(create-drop-table): the seeded form lands in its own step.
+     Unreachable until the parser emits this node. *)
+  | Create_table_seeded _ ->
+      failwith "Eval: create table seeded not yet implemented"
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified
@@ -554,6 +556,76 @@ and mutation_result_relation ~verb table_name : [ `Bag ] Relation.t =
     kind = mutation_result_kind ~verb;
     value = Seq.return [| Scalar.String table_name |];
   }
+
+(* The first element that appears more than once in [items], in order of
+   second appearance. Returns [None] when every element is unique. Used
+   by the create-table validator to point at the column or PK column
+   that broke the uniqueness rule. *)
+and first_duplicate items =
+  let rec walk seen = function
+    | [] -> None
+    | item :: rest ->
+        if List.mem item seen then Some item else walk (item :: seen) rest
+  in
+  walk [] items
+
+(* Run the five structural checks on a target [kind] proposed for
+   [table_name]: non-empty fields; no duplicate field names; non-empty
+   primary key; PK columns drawn from the field list; no duplicate PK
+   columns. Raises [Failure] with an [Eval: create table %S: ...] prefix
+   on the first failing rule. Reused by both create_table evaluators
+   (the empty form's carried kind, and the seeded form's derived kind). *)
+and validate_target_kind ~table_name (kind : Relation.kind) =
+  let fail detail =
+    failwith (Printf.sprintf "Eval: create table %S: %s" table_name detail)
+  in
+  let field_names =
+    List.map (fun (field : Row.field) -> field.name) kind.row_kind
+  in
+  if field_names = [] then fail "column list is empty";
+  (match first_duplicate field_names with
+  | Some name -> fail (Printf.sprintf "column %S appears twice" name)
+  | None -> ());
+  let primary_key = Relation.primary_key_names kind in
+  if primary_key = [] then fail "primary key is empty";
+  (match
+     List.find_opt (fun name -> not (List.mem name field_names)) primary_key
+   with
+  | Some name ->
+      fail (Printf.sprintf "primary key column %S not in column list" name)
+  | None -> ());
+  match first_duplicate primary_key with
+  | Some name ->
+      fail (Printf.sprintf "primary key column %S appears twice" name)
+  | None -> ()
+
+(* Create [table_name] from a pre-resolved [kind]. Runs the structural
+   checks first, then the catalog "table already exists" check, all
+   before any storage mutation: a validation failure leaves the catalog
+   and storage untouched. On success, provisions the storage subDB
+   before the catalog entry; if anything raises in between, the
+   transaction aborts and rolls both halves back.
+
+   [transaction] is widened to a write transaction via [Obj.magic]; same
+   upstream invariant as {!evaluate_drop_table}. *)
+and evaluate_create_table_empty environment transaction ~table_name ~kind
+    continue =
+  let write_transaction : [ `Read | `Write ] Storage.Engine.transaction =
+    Obj.magic transaction
+  in
+  validate_target_kind ~table_name kind;
+  (match Storage.Catalog.get environment write_transaction ~table_name with
+  | None -> ()
+  | Some _ ->
+      failwith
+        (Printf.sprintf "Eval: create table %S: table already exists" table_name));
+  let _map =
+    Storage.Engine.create_map environment write_transaction
+      ~name:(Storage.Catalog.table_subdb_name table_name)
+  in
+  Storage.Catalog.put environment write_transaction ~table_name kind;
+  continue
+    (Term.Relation_value (mutation_result_relation ~verb:"created" table_name))
 
 (* Drop [table_name] from the catalog and storage. Mirrors
    {!Ddl_executor.drop_table}'s ordering: rejects an unknown table first,
