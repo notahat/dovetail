@@ -160,19 +160,31 @@ let row_list_testable : Row.value list Alcotest.testable =
 let physical_testable : Plan.Physical.t Alcotest.testable =
   Alcotest.testable Plan.Physical.format ( = )
 
-(** Build a bare (unqualified) [Row.column_reference]. *)
-let column_reference name : Row.column_reference = { qualifier = None; name }
+(** Build a bare (unqualified) [Surface_ra.Ast.column_reference]. *)
+let column_reference name : Surface_ra.Ast.column_reference =
+  { qualifier = None; name }
+
+(** Build a qualified [Surface_ra.Ast.column_reference]. *)
+let qualified_column_reference ~qualifier ~name :
+    Surface_ra.Ast.column_reference =
+  { qualifier = Some qualifier; name }
+
+(** Build a bare (unqualified) [Row.column_reference]. Used in test sites that
+    construct values at the logical / physical layers, where the column
+    reference is still {!Row.column_reference}. *)
+let row_column_reference name : Row.column_reference =
+  { qualifier = None; name }
 
 (** Build a qualified [Row.column_reference]. *)
-let qualified_column_reference ~qualifier ~name : Row.column_reference =
+let qualified_row_column_reference ~qualifier ~name : Row.column_reference =
   { qualifier = Some qualifier; name }
 
 (** An [Expression.t] referring to a bare (unqualified) column. *)
-let expression_column name : Expression.t = Column (column_reference name)
+let expression_column name : Expression.t = Column (row_column_reference name)
 
 (** An [Expression.t] referring to a qualified column. *)
 let expression_qualified_column ~qualifier ~name : Expression.t =
-  Column (qualified_column_reference ~qualifier ~name)
+  Column (qualified_row_column_reference ~qualifier ~name)
 
 (** An [Expression.t] wrapping a literal value. *)
 let expression_literal value : Expression.t = Literal value

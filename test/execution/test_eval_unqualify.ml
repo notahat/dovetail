@@ -78,8 +78,10 @@ let test_unqualify_rejects_collision_on_bare_name () =
                       };
                   columns =
                     [
-                      qualified_column_reference ~qualifier:"users" ~name:"id";
-                      qualified_column_reference ~qualifier:"orders" ~name:"id";
+                      qualified_row_column_reference ~qualifier:"users"
+                        ~name:"id";
+                      qualified_row_column_reference ~qualifier:"orders"
+                        ~name:"id";
                     ];
                 };
           }
@@ -100,9 +102,10 @@ let test_unqualify_strips_qualifiers_from_row () =
             {
               fields =
                 [
-                  ( qualified_column_reference ~qualifier:"users" ~name:"id",
+                  ( qualified_row_column_reference ~qualifier:"users" ~name:"id",
                     Scalar.Int64 1L );
-                  ( qualified_column_reference ~qualifier:"users" ~name:"name",
+                  ( qualified_row_column_reference ~qualifier:"users"
+                      ~name:"name",
                     Scalar.String "alice" );
                 ];
             };

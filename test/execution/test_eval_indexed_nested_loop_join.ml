@@ -41,9 +41,10 @@ let expected_order_then_user_rows : Row.value list =
   [ pair 0 0; pair 1 0; pair 2 1; pair 3 2; pair 4 2; pair 5 4 ]
 
 let orders_user_id_column =
-  qualified_column_reference ~qualifier:"orders" ~name:"user_id"
+  qualified_row_column_reference ~qualifier:"orders" ~name:"user_id"
 
-let orders_id_column = qualified_column_reference ~qualifier:"orders" ~name:"id"
+let orders_id_column =
+  qualified_row_column_reference ~qualifier:"orders" ~name:"id"
 
 let canonical_indexed_join_plan inner_position : Plan.Physical.t =
   IndexedNestedLoopJoin
@@ -137,7 +138,7 @@ let test_indexed_join_raises_when_outer_key_column_is_not_int64 () =
         outer = FullScan { table = "orders" };
         inner_table = "users";
         outer_key_column =
-          qualified_column_reference ~qualifier:"orders" ~name:"description";
+          qualified_row_column_reference ~qualifier:"orders" ~name:"description";
         inner_position = `Left;
       }
   in

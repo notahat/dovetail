@@ -310,7 +310,7 @@ let test_indexed_nested_loop_join_renders_matched_pairs () =
         outer = Plan.Physical.FullScan { table = "orders" };
         inner_table = "users";
         outer_key_column =
-          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+          qualified_row_column_reference ~qualifier:"orders" ~name:"user_id";
         inner_position = `Left;
       }
   in

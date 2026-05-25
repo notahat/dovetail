@@ -48,8 +48,8 @@ let test_row_literal_evaluates_to_row_value () =
       {
         fields =
           [
-            (column_reference "id", Scalar.Int64 1L);
-            (column_reference "name", Scalar.String "alice");
+            (row_column_reference "id", Scalar.Int64 1L);
+            (row_column_reference "name", Scalar.String "alice");
           ];
       }
   in
@@ -87,8 +87,8 @@ let test_type_op_over_row_literal_yields_row_kind () =
             {
               fields =
                 [
-                  (column_reference "id", Scalar.Int64 1L);
-                  (column_reference "name", Scalar.String "alice");
+                  (row_column_reference "id", Scalar.Int64 1L);
+                  (row_column_reference "name", Scalar.String "alice");
                 ];
             };
       }

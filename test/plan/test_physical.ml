@@ -47,7 +47,7 @@ let test_project_renders_columns_in_order () =
     Project
       {
         input = users_full_scan;
-        columns = [ column_reference "name"; column_reference "email" ];
+        columns = [ row_column_reference "name"; row_column_reference "email" ];
       }
   in
   Alcotest.(check string)
@@ -92,7 +92,7 @@ let test_indexed_nested_loop_join_renders_with_inner_position_left () =
         outer = orders_full_scan;
         inner_table = "users";
         outer_key_column =
-          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+          qualified_row_column_reference ~qualifier:"orders" ~name:"user_id";
         inner_position = `Left;
       }
   in
@@ -110,7 +110,7 @@ let test_indexed_nested_loop_join_renders_with_inner_position_right () =
         outer = orders_full_scan;
         inner_table = "users";
         outer_key_column =
-          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+          qualified_row_column_reference ~qualifier:"orders" ~name:"user_id";
         inner_position = `Right;
       }
   in
@@ -147,8 +147,8 @@ let test_row_literal_renders_fields () =
       {
         fields =
           [
-            (column_reference "id", Scalar.Int64 1L);
-            (column_reference "name", Scalar.String "alice");
+            (row_column_reference "id", Scalar.Int64 1L);
+            (row_column_reference "name", Scalar.String "alice");
           ];
       }
   in

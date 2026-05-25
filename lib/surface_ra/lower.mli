@@ -9,6 +9,11 @@ module Plan = Dovetail_plan
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
+val lower_column_reference : Ast.column_reference -> Row.column_reference
+(** [lower_column_reference reference] is the AST-to-logical translation for a
+    column reference: structurally identity today, with the helper existing for
+    the layering rather than the work. *)
+
 val lower_row_type : Ast.type_expression -> Row.kind
 (** [lower_row_type type_expression] turns a parsed row-type expression into a
     {!Row.kind}. Each {!Ast.type_field} becomes a {!Row.field} with

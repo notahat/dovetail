@@ -37,7 +37,7 @@ let id_equals_three =
     ~right:(expression_literal (Scalar.Int64 3L))
 
 let name_then_email : Projection.t =
-  [ column_reference "name"; column_reference "email" ]
+  [ row_column_reference "name"; row_column_reference "email" ]
 
 let test_restrict_translates_to_filter () =
   let logical =
@@ -215,8 +215,8 @@ let test_scalar_literal_translates_through () =
 let test_row_literal_translates_through () =
   let fields =
     [
-      (column_reference "id", Scalar.Int64 1L);
-      (column_reference "name", Scalar.String "alice");
+      (row_column_reference "id", Scalar.Int64 1L);
+      (row_column_reference "name", Scalar.String "alice");
     ]
   in
   let logical : Logical.t = Row_literal { fields } in

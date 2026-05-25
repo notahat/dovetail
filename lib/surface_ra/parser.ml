@@ -101,8 +101,8 @@ let column_reference =
   peek_char >>= function
   | Some '.' ->
       char '.' *> identifier >>| fun second ->
-      ({ qualifier = Some first; name = second } : Row.column_reference)
-  | _ -> return ({ qualifier = None; name = first } : Row.column_reference)
+      ({ qualifier = Some first; name = second } : Ast.column_reference)
+  | _ -> return ({ qualifier = None; name = first } : Ast.column_reference)
 
 (* One [name = value] or [qualifier.name = value] binding inside a row
    literal. Returns the column reference alongside its scalar value;
@@ -122,12 +122,12 @@ let check_for_duplicate_row_fields fields =
   let rec walk seen = function
     | [] -> return ()
     | (reference, _) :: _
-      when StringSet.mem (Row.format_column_reference reference) seen ->
+      when StringSet.mem (Ast.format_column_reference reference) seen ->
         fail
           (Printf.sprintf "duplicate field %S in row literal"
-             (Row.format_column_reference reference))
+             (Ast.format_column_reference reference))
     | (reference, _) :: rest ->
-        walk (StringSet.add (Row.format_column_reference reference) seen) rest
+        walk (StringSet.add (Ast.format_column_reference reference) seen) rest
   in
   walk StringSet.empty fields
 
@@ -384,8 +384,10 @@ let expression =
         | Some character when is_letter character ->
             bool_literal
             >>| (fun literal_value -> Expression.Literal literal_value)
-            <|> ( column_reference >>| fun reference ->
-                  Expression.Column reference )
+            <|> ( column_reference >>| fun (reference : Ast.column_reference) ->
+                  Expression.Column
+                    ({ qualifier = reference.qualifier; name = reference.name }
+                      : Row.column_reference) )
         | Some '(' ->
             char '(' *> whitespace *> expression <* whitespace <* char ')'
         | _ -> fail "expected a column reference, literal, or '('"
@@ -452,7 +454,13 @@ let restrict_step =
 let project_step =
   keyword "project" *> whitespace *> project_columns
   >>| fun parsed_columns input ->
-  Ast.Project { input; columns = parsed_columns }
+  let columns =
+    List.map
+      (fun (reference : Ast.column_reference) : Row.column_reference ->
+        { qualifier = reference.qualifier; name = reference.name })
+      parsed_columns
+  in
+  Ast.Project { input; columns }
 
 (* A cross-product pipeline step: [| cross <relation>]. The right-hand side
    is a relation reference (a base table for now); nesting and

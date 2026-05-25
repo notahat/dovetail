@@ -4,6 +4,12 @@ module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
 module Plan = Dovetail_plan
 
+type column_reference = { qualifier : string option; name : string }
+
+let format_column_reference = function
+  | { qualifier = Some qualifier; name } -> qualifier ^ "." ^ name
+  | { qualifier = None; name } -> name
+
 type type_field = {
   qualifier : string option;
   name : string;
@@ -25,7 +31,7 @@ type t =
   | Unqualify of { input : t }
   | Type of { input : t }
   | Scalar_literal of Scalar.value
-  | Row_literal of (Row.column_reference * Scalar.value) list
+  | Row_literal of (column_reference * Scalar.value) list
   | Drop_table of { table_name : string }
   | Create_table_empty of {
       table_name : string;
@@ -34,7 +40,7 @@ type t =
   | Create_table_seeded of { table_name : string; source : t }
   | Relation_literal of {
       kind : Relation.kind;
-      rows : (Row.column_reference * Scalar.value) list list;
+      rows : (column_reference * Scalar.value) list list;
     }
   | Catalog_source
   | Tables of { input : t }

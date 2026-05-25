@@ -106,14 +106,14 @@ let users_relation = Ast.Relation_name "users"
 let test_pipeline_parses_single_column_project () =
   parses "users | project name"
     (Ast.Project
-       { input = users_relation; columns = [ column_reference "name" ] })
+       { input = users_relation; columns = [ row_column_reference "name" ] })
 
 let test_pipeline_parses_multi_column_project () =
   parses "users | project name, email"
     (Ast.Project
        {
          input = users_relation;
-         columns = [ column_reference "name"; column_reference "email" ];
+         columns = [ row_column_reference "name"; row_column_reference "email" ];
        })
 
 let test_pipeline_parses_project_without_spaces_around_comma () =
@@ -121,7 +121,7 @@ let test_pipeline_parses_project_without_spaces_around_comma () =
     (Ast.Project
        {
          input = users_relation;
-         columns = [ column_reference "name"; column_reference "email" ];
+         columns = [ row_column_reference "name"; row_column_reference "email" ];
        })
 
 let test_pipeline_parses_project_with_space_before_comma () =
@@ -129,7 +129,7 @@ let test_pipeline_parses_project_with_space_before_comma () =
     (Ast.Project
        {
          input = users_relation;
-         columns = [ column_reference "name"; column_reference "email" ];
+         columns = [ row_column_reference "name"; row_column_reference "email" ];
        })
 
 let test_pipeline_parses_project_reordering_columns () =
@@ -137,7 +137,7 @@ let test_pipeline_parses_project_reordering_columns () =
     (Ast.Project
        {
          input = users_relation;
-         columns = [ column_reference "email"; column_reference "id" ];
+         columns = [ row_column_reference "email"; row_column_reference "id" ];
        })
 
 let test_pipeline_parses_chained_project () =
@@ -146,8 +146,11 @@ let test_pipeline_parses_chained_project () =
        {
          input =
            Ast.Project
-             { input = users_relation; columns = [ column_reference "name" ] };
-         columns = [ column_reference "email" ];
+             {
+               input = users_relation;
+               columns = [ row_column_reference "name" ];
+             };
+         columns = [ row_column_reference "email" ];
        })
 
 let test_pipeline_parses_restrict_then_project () =
@@ -156,7 +159,7 @@ let test_pipeline_parses_restrict_then_project () =
        {
          input =
            Ast.Restrict { input = users_relation; predicate = id_equals_three };
-         columns = [ column_reference "name"; column_reference "email" ];
+         columns = [ row_column_reference "name"; row_column_reference "email" ];
        })
 
 let test_pipeline_parses_project_with_qualified_columns () =
@@ -166,8 +169,8 @@ let test_pipeline_parses_project_with_qualified_columns () =
          input = users_relation;
          columns =
            [
-             qualified_column_reference ~qualifier:"users" ~name:"name";
-             qualified_column_reference ~qualifier:"users" ~name:"email";
+             qualified_row_column_reference ~qualifier:"users" ~name:"name";
+             qualified_row_column_reference ~qualifier:"users" ~name:"email";
            ];
        })
 
@@ -373,7 +376,7 @@ let test_pipeline_create_table_seeded_with_upstream_steps_parses () =
            Ast.Project
              {
                input = Ast.Relation_name "users";
-               columns = [ column_reference "id" ];
+               columns = [ row_column_reference "id" ];
              };
        })
 
@@ -502,7 +505,7 @@ let test_pipeline_drop_table_allows_downstream_pipeline_step () =
     (Ast.Project
        {
          input = Ast.Drop_table { table_name = "users" };
-         columns = [ column_reference "dropped" ];
+         columns = [ row_column_reference "dropped" ];
        })
 
 let test_pipeline_drop_followed_by_non_table_keyword_is_rejected () =

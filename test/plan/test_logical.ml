@@ -108,7 +108,7 @@ let test_project_renders_columns_in_order () =
     Project
       {
         input = users_scan;
-        columns = [ column_reference "name"; column_reference "email" ];
+        columns = [ row_column_reference "name"; row_column_reference "email" ];
       }
   in
   Alcotest.(check string)
@@ -184,7 +184,7 @@ let test_scalar_literal_renders_value () =
 
 let test_row_literal_requires_read_access () =
   let plan : Logical.t =
-    Row_literal { fields = [ (column_reference "id", Scalar.Int64 1L) ] }
+    Row_literal { fields = [ (row_column_reference "id", Scalar.Int64 1L) ] }
   in
   Alcotest.(check bool)
     "Row_literal requires Read access" true
@@ -196,8 +196,8 @@ let test_row_literal_renders_fields () =
       {
         fields =
           [
-            (column_reference "id", Scalar.Int64 1L);
-            (column_reference "name", Scalar.String "alice");
+            (row_column_reference "id", Scalar.Int64 1L);
+            (row_column_reference "name", Scalar.String "alice");
           ];
       }
   in

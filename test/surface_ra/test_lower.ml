@@ -71,7 +71,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
                rows)))
 
 let name_then_email : Plan.Projection.t =
-  [ column_reference "name"; column_reference "email" ]
+  [ row_column_reference "name"; row_column_reference "email" ]
 
 let test_project_lowers_to_logical_project () =
   let ast =
@@ -449,17 +449,23 @@ let test_scalar_literal_lowers_through () =
     (Scalar_literal (Scalar.Int64 42L)) logical
 
 let test_row_literal_lowers_through () =
-  let fields =
+  let ast_fields =
     [
       (column_reference "id", Scalar.Int64 1L);
       (column_reference "name", Scalar.String "alice");
     ]
   in
-  let ast : Ast.t = Row_literal fields in
+  let logical_fields =
+    [
+      (row_column_reference "id", Scalar.Int64 1L);
+      (row_column_reference "name", Scalar.String "alice");
+    ]
+  in
+  let ast : Ast.t = Row_literal ast_fields in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
     "Ast.Row_literal -> Logical.Row_literal with same fields"
-    (Row_literal { fields })
+    (Row_literal { fields = logical_fields })
     logical
 
 let users_kind : Relation.kind =

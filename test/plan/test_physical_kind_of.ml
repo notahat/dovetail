@@ -72,7 +72,7 @@ let test_project_narrows_to_named_columns () =
     Project
       {
         input = FullScan { table = "users" };
-        columns = [ column_reference "name"; column_reference "active" ];
+        columns = [ row_column_reference "name"; row_column_reference "active" ];
       }
   in
   let expected : Relation.kind =
@@ -127,7 +127,7 @@ let test_indexed_nested_loop_join_left_puts_inner_first () =
         outer = FullScan { table = "orders" };
         inner_table = "users";
         outer_key_column =
-          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+          qualified_row_column_reference ~qualifier:"orders" ~name:"user_id";
         inner_position = `Left;
       }
   in
@@ -145,7 +145,7 @@ let test_indexed_nested_loop_join_right_puts_outer_first () =
         outer = FullScan { table = "orders" };
         inner_table = "users";
         outer_key_column =
-          qualified_column_reference ~qualifier:"orders" ~name:"user_id";
+          qualified_row_column_reference ~qualifier:"orders" ~name:"user_id";
         inner_position = `Right;
       }
   in
@@ -289,8 +289,8 @@ let test_unqualify_rejects_collision_on_bare_name () =
                   };
               columns =
                 [
-                  qualified_column_reference ~qualifier:"users" ~name:"id";
-                  qualified_column_reference ~qualifier:"orders" ~name:"id";
+                  qualified_row_column_reference ~qualifier:"users" ~name:"id";
+                  qualified_row_column_reference ~qualifier:"orders" ~name:"id";
                 ];
             };
       }
@@ -316,7 +316,9 @@ let test_scalar_literal_raises_because_result_is_a_scalar () =
 let test_row_literal_raises_because_result_is_a_row () =
   let plan : Physical.t =
     Row_literal
-      { fields = [ (column_reference "id", Dovetail_core.Scalar.Int64 1L) ] }
+      {
+        fields = [ (row_column_reference "id", Dovetail_core.Scalar.Int64 1L) ];
+      }
   in
   Alcotest.check_raises "Row_literal has no relation kind"
     (Failure "Physical.kind_of: Row_literal does not produce a relation kind")

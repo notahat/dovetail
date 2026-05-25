@@ -78,12 +78,14 @@ let users_and_admins_catalog table_name =
   | "admins" -> Some admins_kind
   | _ -> None
 
-let users_id_column = qualified_column_reference ~qualifier:"users" ~name:"id"
+let users_id_column =
+  qualified_row_column_reference ~qualifier:"users" ~name:"id"
 
 let orders_user_id_column =
-  qualified_column_reference ~qualifier:"orders" ~name:"user_id"
+  qualified_row_column_reference ~qualifier:"orders" ~name:"user_id"
 
-let admins_id_column = qualified_column_reference ~qualifier:"admins" ~name:"id"
+let admins_id_column =
+  qualified_row_column_reference ~qualifier:"admins" ~name:"id"
 
 let users_id_equals_orders_user_id =
   expression_compare ~left:(Column users_id_column) ~op:Equal
@@ -105,7 +107,8 @@ let test_canonical_users_id_equals_orders_user_id_folds () =
      the CrossProduct, so inner_position = Left -- output columns are
      users.* then orders.* . *)
   let physical =
-    Translate.translate ~catalog:users_and_orders_catalog users_join_orders_on_pk_equality
+    Translate.translate ~catalog:users_and_orders_catalog
+      users_join_orders_on_pk_equality
   in
   Alcotest.(check physical_testable)
     "Restrict(CrossProduct, users.id = orders.user_id) -> \
@@ -234,7 +237,7 @@ let test_inner_candidate_wrapped_in_project_falls_back () =
                 Project
                   {
                     input = Scan { table = "users" };
-                    columns = [ column_reference "id" ];
+                    columns = [ row_column_reference "id" ];
                   };
               right = Scan { table = "orders" };
             };
@@ -252,7 +255,7 @@ let test_inner_candidate_wrapped_in_project_falls_back () =
            Physical.Project
              {
                input = Physical.FullScan { table = "users" };
-               columns = [ column_reference "id" ];
+               columns = [ row_column_reference "id" ];
              };
          right = Physical.FullScan { table = "orders" };
          predicate = users_id_equals_orders_user_id;
@@ -404,7 +407,8 @@ let test_multiple_pk_eqs_pick_the_first_conjunct () =
                outer = Physical.FullScan { table = "admins" };
                inner_table = "users";
                outer_key_column =
-                 qualified_column_reference ~qualifier:"admins" ~name:"level";
+                 qualified_row_column_reference ~qualifier:"admins"
+                   ~name:"level";
                inner_position = `Left;
              };
          predicate = users_active_equals_admins_id;

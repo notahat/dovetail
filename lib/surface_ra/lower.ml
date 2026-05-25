@@ -4,6 +4,10 @@ module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module StringSet = Set.Make (String)
 
+let lower_column_reference (reference : Ast.column_reference) :
+    Row.column_reference =
+  { qualifier = reference.qualifier; name = reference.name }
+
 let lower_type_fields (fields : Ast.type_field list) : Row.kind =
   List.map
     (fun ({ qualifier; name; kind } : Ast.type_field) : Row.field ->
@@ -40,11 +44,11 @@ let format_field_display_name (field : Row.field) : string =
    match the kind's, or if any value's kind doesn't match the declared
    field kind. *)
 let validate_typed_row (kind : Relation.kind)
-    (row : (Row.column_reference * Scalar.value) list) : Scalar.value list =
+    (row : (Ast.column_reference * Scalar.value) list) : Scalar.value list =
   let row_field_names =
     StringSet.of_list
       (List.map
-         (fun (reference, _) -> Row.format_column_reference reference)
+         (fun (reference, _) -> Ast.format_column_reference reference)
          row)
   in
   let kind_field_names =
@@ -67,7 +71,7 @@ let validate_typed_row (kind : Relation.kind)
     let _, value =
       List.find
         (fun (reference, _) ->
-          String.equal (Row.format_column_reference reference) target)
+          String.equal (Ast.format_column_reference reference) target)
         row
     in
     value
@@ -103,7 +107,13 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
   | Type { input = Type _ } -> failwith "type: input is already a type"
   | Type { input } -> Type_op { input = lower input }
   | Scalar_literal value -> Scalar_literal value
-  | Row_literal fields -> Row_literal { fields }
+  | Row_literal fields ->
+      let fields =
+        List.map
+          (fun (reference, value) -> (lower_column_reference reference, value))
+          fields
+      in
+      Row_literal { fields }
   | Relation_literal { kind; rows } ->
       let normalized_rows = List.map (validate_typed_row kind) rows in
       Relation_literal { kind; rows = normalized_rows }

@@ -14,6 +14,19 @@ module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
 module Plan = Dovetail_plan
 
+type column_reference = { qualifier : string option; name : string }
+(** A reference to a column by name, with an optional dotted qualifier. The
+    surface syntax is the bare identifier [name] when unqualified, and the
+    [qualifier.name] form when qualified. The AST owns this type so the surface
+    form is independent of the resolved semantic form;
+    {!Lower.lower_column_reference} translates it to {!Row.column_reference} at
+    the AST-to-logical boundary. *)
+
+val format_column_reference : column_reference -> string
+(** Render a [column_reference] in its source form: dotted [qualifier.name] when
+    qualified, bare [name] otherwise. Mirrors {!Row.format_column_reference} on
+    the AST side. *)
+
 type type_field = {
   qualifier : string option;
   name : string;
@@ -99,7 +112,7 @@ type t =
           the value itself; evaluation hands the value down the pipe as a
           {!Term.Scalar_value}, and [| type] over a scalar literal yields the
           corresponding {!Scalar.kind}. *)
-  | Row_literal of (Row.column_reference * Scalar.value) list
+  | Row_literal of (column_reference * Scalar.value) list
       (** [Row_literal fields] is the surface form of a bare row at the head of
           a pipeline: [(id = 1, name = "alice")] parses as a list of two fields
           whose column references are unqualified. A qualified spelling such as
@@ -130,7 +143,7 @@ type t =
           kind at eval time. Yields a one-row [(created : string)] relation. *)
   | Relation_literal of {
       kind : Relation.kind;
-      rows : (Row.column_reference * Scalar.value) list list;
+      rows : (column_reference * Scalar.value) list list;
     }
       (** [Relation_literal { kind; rows }] is the surface form
           [relation (id: int64, name: string) { (id = 1, name = "alice"), ... }]
