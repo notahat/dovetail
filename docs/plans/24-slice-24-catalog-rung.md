@@ -120,6 +120,172 @@ catalog | tables        -> one-column relation (name: string), one
   final deletion lands here as a clean diff at the end of the
   type-system work.
 
+- **`Catalog.value` is not `'tag`-parameterised.** The plan's
+  `'tag value = { relations : (string * 'tag Relation.t) list }`
+  was simplified to a hardcoded `[`Set] Relation.t` per entry:
+  every base table in storage is a set today, and uniformly
+  tagging a container by a multiplicity it does not itself carry
+  is sugar without substance. When a bag-table mode lands, the
+  catalog grows a per-entry discriminator at the same time. As a
+  consequence, `Term.Catalog_value` carries `Catalog.value`
+  directly with no `'tag` parameter.
+
+- **`tables` is the language's first `[`Set]`-tagged leaf.** Every
+  existing source emits `[`Bag] Relation.t`. The `tables` operator
+  emits a set (table names are unique by storage construction)
+  with no primary-key refinement (kept deliberately minimal).
+  The step that lands it watches for any latent assumption in the
+  pipeline that a leaf is always a bag.
+
+- **`type` at the catalog rung does not fall out of existing
+  machinery.** The plan's "exercises the existing `Type_op`
+  machinery" framing is misleading. `Physical.kind_of` returns
+  `Relation.kind`, but the catalog rung's kind is
+  `Catalog.kind` — a different type. `evaluate_type_op` already
+  short-circuits the `Scalar_literal` and `Row_literal` cases
+  for the same reason; the catalog case joins that club rather
+  than going through `kind_of`. A TODO marker in the new arm
+  flags the non-uniform `kind_of` family for a future refactor;
+  this slice does not unify it.
+
+- **`Relation.format` is reworked into Format boxes as a prep
+  step.** Today it hand-rolls indentation with raw `\n  ` strings,
+  so a relation rendered inside a catalog ends up with its rows
+  at column 2 instead of column 4. The prep rewrite uses
+  `vbox 2` + `@,` cuts so nesting auto-indents. No behaviour
+  change at depth 0 (modulo trivial whitespace tweaks if Format
+  produces slightly different output for the existing fixtures).
+
+## Detailed plan
+
+Ten steps. Each is one commit, ends with the watcher green,
+leaves the project in a working state. TDD where the global rules
+call for it (steps 2–4, 6–9 are behaviour changes — failing test
+first; steps 1 and 5 are refactors that rely on existing tests
+staying green; step 10 is a deletion with tests updated in the
+same commit).
+
+1. **Prep — `Relation.format` with Format boxes** (refactor, no
+   behaviour change). Rewrite `format` in `lib/core/relation.ml`
+   to use `Format.fprintf`'s `@[<v 2>…@]` and `@,` cuts so the
+   rows-block auto-indents when the formatter is nested. Existing
+   single-relation rendering at depth 0 is unchanged; existing
+   tests stay green. If Format's output for the empty or
+   single-row cases drifts at depth 0, fixture tweaks land in
+   this commit.
+
+2. **`Core.Catalog` types + `Term.t` arms.** New module
+   `lib/core/catalog.ml{,i}` defining
+   `kind = { relation_kinds : (string * Relation.kind) list }`
+   and `value = { relations : (string * [`Set] Relation.t) list }`.
+   Both ordered byte-sorted by table name (matching
+   `Storage.Catalog.list_table_names`'s cursor order). `Term.t`
+   gains `Catalog_value of Catalog.value` and `Catalog_kind of
+   Catalog.kind`; neither constrains the existing `'tag`
+   parameter. Unit tests construct hand-built values and kinds.
+
+3. **`Catalog.format` (value + kind) + `Term.format` dispatch.**
+   `format_kind` renders as
+   `catalog { users: (id: int64, name: string), … }` (single-line
+   if short, the inner kinds use `Relation.format_kind`). `format`
+   for the value renders as
+   `catalog { users = relation (…) { … }, … }` with each
+   relation expanded via `Relation.format`; the step-1 prep
+   makes the nesting auto-indent. Empty cases render as
+   `catalog {}` for both value and kind. `Term.format` grows
+   matching arms. Unit tests cover non-empty, empty, and nested
+   (multi-table-with-rows) cases.
+
+4. **Parser — `catalog` keyword.** Reserve `catalog` as a keyword
+   in the parser (a quick `rg` over `test/` first to confirm no
+   existing fixture uses it as a table name). Add
+   `Ast.Catalog_source` (nullary). Add the parser branch so a
+   bare `catalog` at source position produces the new AST node.
+   Parser unit tests in `test/surface_ra/test_parser.ml`. No
+   integration test for this step; step 6 backfills coverage.
+
+5. **Eval prep refactor — extract per-table relation
+   construction** (refactor, no behaviour change). Lift the body
+   of `evaluate_full_scan` that builds a per-table `Relation.t`
+   from an open transaction into a module-level helper
+   (something like
+   `build_table_relation ~environment ~transaction ~table_name`,
+   returning a `[`Set] Relation.t` whose `value` seq opens the
+   cursor lazily). `evaluate_full_scan` rewritten in terms of
+   the helper; existing scan tests stay green.
+
+6. **Vertical — `catalog` end-to-end.** Add
+   `Logical.Catalog_source` (and the `required_access` arm
+   returning `` `Read ``), `Lower` arm for `Ast.Catalog_source`,
+   `Physical.Catalog_source` (and `kind_of` arm returning a
+   placeholder `Relation.kind` is wrong — instead, `kind_of`
+   must remain undefined for this arm; the step-7 short-circuit
+   in `evaluate_type_op` is what handles `catalog | type`, so
+   `kind_of` over a bare `Catalog_source` should `assert false`
+   with an invariant comment), `Translate` arm, and
+   `Eval.evaluate_catalog_source`. The evaluator calls
+   `Storage.Catalog.list_table_names`, then for each name calls
+   `Storage.Catalog.get` to recover the kind and the step-5
+   helper to build the per-table relation (lazy cursor opening,
+   scoped to the same read transaction), assembles a
+   `Catalog.value`, and hands `Term.Catalog_value` to the
+   continuation. Per-layer unit tests at each rung. Integration
+   test in `test/integration/`: seed a multi-table catalog,
+   evaluate bare `catalog`, assert the rendered literal matches
+   a fixed expected string (covers the parser-to-AST hop step 4
+   left untested).
+
+7. **`type` at the catalog rung.** Add a `Catalog_source` arm to
+   `evaluate_type_op` in `lib/execution/eval.ml`, mirroring the
+   existing `Scalar_literal` / `Row_literal` short-circuits: emit
+   `Term.Catalog_kind` built from the catalog's relation kinds
+   without opening any row cursors. Add a TODO comment naming
+   the limitation (the `kind_of` family is non-uniform across
+   rungs; a future refactor unifies it). Integration tests:
+   `catalog | type` renders the kind literal; `catalog | tables
+   | type` renders the one-column relation kind (falls out of
+   the default `kind_of` branch for free — confirming this in a
+   test is the point).
+
+8. **`tables` operator end-to-end.** Add `Ast.Tables of { input
+   : t }`, the parser branch, `Logical.Tables` (with
+   `required_access` recursing into input), `Lower` arm,
+   `Physical.Tables`, `Translate` arm, and
+   `Eval.evaluate_tables`. The evaluator pattern-matches the
+   incoming term: on `Term.Catalog_value`, walks the strict
+   `relations` list and emits a `Relation_value` carrying a
+   `[`Set] Relation.t` with kind `(name: string)` (bare name, no
+   qualifier, no refinements) and a `Seq.t` of one row per table
+   name; on any other arm, `failwith "Eval: tables: expected
+   catalog value, got <description>"`. Per-layer unit tests.
+   Integration test: `catalog | tables` returns the expected
+   rows for a seeded catalog; `42 | tables` raises the
+   user-facing error.
+
+9. **Retire `:list tables`.** Drop the parser rule, the
+   `Ddl.Statement.List_tables` constructor, the executor case in
+   `lib/execution/ddl_executor.ml`, the format-printer case in
+   `lib/ddl/format.ml`, and all related tests. The library still
+   compiles (empty after this step); the REPL still dispatches on
+   the `Ddl` arm but no `Ddl.Statement.t` constructor remains, so
+   the dispatch is unreachable. Tests updated in the same commit.
+
+10. **Delete `lib/ddl/`.** Remove the `lib/ddl/` directory and
+    its dune library entirely. Remove `module Ddl = Dovetail_ddl`
+    aliases from every file that opens them (per the project's
+    cross-library alias convention — `lib/surface_ra/`,
+    `lib/execution/`, `lib/frontend/`, and matching test files).
+    Drop the `Ast.program.Ddl` arm; the wrapper becomes a single
+    `Pipeline of t` alternative, so the REPL stops dispatching
+    on it (the wrapper itself can also be retired if nothing
+    else needs the distinction — a `Pipeline of t` alternative
+    around a `t` is just `t`). Amend `docs/type-system.md` per
+    the slice-17 reversal noted in scope (catalog values are no
+    longer "deliberately absent"). If this step exceeds ~5 files
+    / ~200 lines after the alias and `Pipeline` cleanups, split
+    into 10a (`lib/ddl/` deletion + alias removals) and 10b
+    (`Ast.program` collapse + REPL cleanup + doc amendment).
+
 ## Notes for follow-on slices
 
 - An FK slice (whenever it lands) adds:
