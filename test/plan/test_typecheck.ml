@@ -128,6 +128,49 @@ let test_insert_into_unknown_table_reports_no_typecheck_error () =
   | Error errors ->
       Alcotest.failf "expected Ok; got %d error(s)" (List.length errors)
 
+let test_insert_with_kind_mismatch_reports_structured_error () =
+  let plan =
+    insert_literal ~table:"orders"
+      ~pairs:
+        [
+          ("id", Scalar.Int64 9L);
+          ("description", Scalar.String "Pretzel");
+          (* amount expects Int64; supply a String. *)
+          ("amount", Scalar.String "nine");
+        ]
+  in
+  let expected : Typecheck.error list =
+    [
+      Insert_kind_mismatch
+        {
+          table_name = "orders";
+          column = "amount";
+          expected = Int64;
+          actual = String;
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:orders_catalog plan with
+  | Ok _ -> Alcotest.fail "expected an Insert_kind_mismatch error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured kind mismatch" expected errors
+
+let test_insert_kind_mismatch_renders_with_insert_prefix () =
+  let error : Typecheck.error =
+    Insert_kind_mismatch
+      {
+        table_name = "orders";
+        column = "amount";
+        expected = Int64;
+        actual = String;
+      }
+  in
+  Alcotest.(check string)
+    "rendered kind-mismatch error"
+    "Insert: into \"orders\": column \"amount\" expects Int64, got String"
+    (Typecheck.render error)
+
 let () =
   Alcotest.run "typecheck"
     [
@@ -148,5 +191,12 @@ let () =
             test_insert_with_both_missing_and_unknown_renders_both_halves;
           Alcotest.test_case "unknown target table is not a typecheck error yet"
             `Quick test_insert_into_unknown_table_reports_no_typecheck_error;
+        ] );
+      ( "insert kind mismatch",
+        [
+          Alcotest.test_case "mismatched value kind produces a structured error"
+            `Quick test_insert_with_kind_mismatch_reports_structured_error;
+          Alcotest.test_case "kind mismatch renders with Insert prefix" `Quick
+            test_insert_kind_mismatch_renders_with_insert_prefix;
         ] );
     ]

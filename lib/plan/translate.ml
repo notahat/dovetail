@@ -1,4 +1,3 @@
-module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
@@ -276,46 +275,6 @@ let rewrite_indexed_nested_loop_join ~translate_outer ~catalog ~left ~right
       | Some residual ->
           Some (Physical.Filter { input = join; predicate = residual }))
 
-(* Check that each field in [literal_kind] has the same scalar kind as the
-   target column with the same name. Raises [Failure] naming the column and
-   both kinds.
-
-   Precondition: [Typecheck] has already verified that [literal_kind]'s
-   column names are a permutation of [target_kind]'s, so every name in
-   [literal_kind] resolves in [target_kind.row_kind]. *)
-let check_value_kinds ~target_table ~(target_kind : Relation.kind)
-    ~(literal_kind : Relation.kind) =
-  List.iter
-    (fun (literal_field : Row.field) ->
-      let target_field =
-        List.find
-          (fun (field : Row.field) -> field.name = literal_field.name)
-          target_kind.row_kind
-      in
-      if literal_field.kind <> target_field.kind then
-        failwith
-          (Printf.sprintf
-             "Translate: insert into %S: column %S expects %s, got %s"
-             target_table literal_field.name
-             (Scalar.kind_to_string target_field.kind)
-             (Scalar.kind_to_string literal_field.kind)))
-    literal_kind.row_kind
-
-(* Run the remaining literal/target checks (per-column kinds). The
-   column-set permutation check now lives in [Typecheck]. *)
-let validate_literal_against_target ~target_table ~target_kind ~literal_kind =
-  check_value_kinds ~target_table ~target_kind ~literal_kind
-
-(* Run validation when the insert source is a [Relation_literal]; pass through
-   silently for any other source. Non-literal sources aren't a tested path
-   yet, but the sink stays source-agnostic by design -- the sink itself
-   enforces column coverage at eval time. *)
-let validate_mutation_source ~target_table ~target_kind (source : Logical.t) =
-  match source with
-  | Relation_literal { kind = literal_kind; _ } ->
-      validate_literal_against_target ~target_table ~target_kind ~literal_kind
-  | _ -> ()
-
 let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   match plan with
   | Scan { table } -> FullScan { table }
@@ -371,19 +330,14 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   | Catalog_source -> Catalog_source
   | Tables { input } -> Tables { input = translate_relation ~catalog input }
 
-(* Look up [target_table]'s kind in the catalog and validate the literal
-   source's columns and value kinds against it. Returns the translated
-   physical [Insert]. Raises [Failure] if the catalog has no kind for the
-   table or any validation check fails. *)
+(* Confirm the target table exists in the catalog and translate the source.
+   Literal column-set and per-column kind agreement live in [Typecheck];
+   what stays here is the catalog lookup that proves the table is real. *)
 and translate_insert ~catalog ~table ~source : Physical.t =
-  let target_kind =
-    match catalog table with
-    | Some kind -> kind
-    | None ->
-        failwith
-          (Printf.sprintf "Translate: insert into %S: unknown table" table)
-  in
-  validate_mutation_source ~target_table:table ~target_kind source;
+  (match catalog table with
+  | Some _ -> ()
+  | None ->
+      failwith (Printf.sprintf "Translate: insert into %S: unknown table" table));
   Insert { table; source = translate_relation ~catalog source }
 
 let translate = translate_relation

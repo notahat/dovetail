@@ -12,6 +12,7 @@
     the success arm widens to that type then. *)
 
 module Catalog = Dovetail_core.Catalog
+module Scalar = Dovetail_core.Scalar
 
 (** The variant of user-facing typecheck errors. Each constructor carries the
     structured detail an LSP needs; {!render} produces the user-facing string.
@@ -26,6 +27,17 @@ type error =
           table. [missing] names the target's columns absent from the source, in
           target row-order; [extra] names the source's columns absent from the
           target, in source row-order. At least one of the two is non-empty. *)
+  | Insert_kind_mismatch of {
+      table_name : string;
+      column : string;
+      expected : Scalar.kind;
+      actual : Scalar.kind;
+    }
+      (** A column of an [Insert]'s source has a scalar kind different from the
+          target column with the same name. One error per mismatching column;
+          emitted in source row-order. Only fires once [Insert_column_mismatch]
+          has not, so [column] is guaranteed to name a column present in both
+          source and target. *)
 
 val render : error -> string
 (** [render error] formats [error] for a human reader, with an operator-named

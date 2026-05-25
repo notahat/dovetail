@@ -425,27 +425,10 @@ let test_mutation_against_unknown_table_raises () =
     (Failure "Translate: insert into \"widgets\": unknown table") (fun () ->
       ignore (Translate.translate ~catalog:orders_catalog plan))
 
-(* Column-set agreement is no longer Translate's responsibility -- those
-   cases now live in [test/plan/test_typecheck.ml]. Translate trusts that
-   [Typecheck] has validated the column names before it runs. *)
-
-let test_mutation_with_kind_mismatch_raises () =
-  let plan =
-    insert_plan ~table:"orders"
-      ~pairs:
-        [
-          ("id", Scalar.Int64 9L);
-          ("user_id", Scalar.Int64 1L);
-          ("description", Scalar.String "Pretzel");
-          (* amount expects Int64; supply a String. *)
-          ("amount", Scalar.String "nine");
-        ]
-  in
-  Alcotest.check_raises "kind mismatch"
-    (Failure
-       "Translate: insert into \"orders\": column \"amount\" expects Int64, \
-        got String") (fun () ->
-      ignore (Translate.translate ~catalog:orders_catalog plan))
+(* Insert-literal column-set agreement and per-column kind agreement are no
+   longer Translate's responsibility -- those cases now live in
+   [test/plan/test_typecheck.ml]. Translate trusts that [Typecheck] has
+   validated the literal source before it runs. *)
 
 let () =
   Alcotest.run "translate"
@@ -544,9 +527,5 @@ let () =
             test_mutation_in_permuted_order_translates_through;
           Alcotest.test_case "Insert into an unknown table raises" `Quick
             test_mutation_against_unknown_table_raises;
-          Alcotest.test_case
-            "Insert whose value kind disagrees with the target column names \
-             both kinds in the error"
-            `Quick test_mutation_with_kind_mismatch_raises;
         ] );
     ]

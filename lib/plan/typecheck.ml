@@ -1,12 +1,19 @@
 module Catalog = Dovetail_core.Catalog
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
+module Scalar = Dovetail_core.Scalar
 
 type error =
   | Insert_column_mismatch of {
       table_name : string;
       missing : string list;
       extra : string list;
+    }
+  | Insert_kind_mismatch of {
+      table_name : string;
+      column : string;
+      expected : Scalar.kind;
+      actual : Scalar.kind;
     }
 
 (* Symmetric difference of [expected] and [actual] as two lists: the names
@@ -32,6 +39,11 @@ let render = function
       in
       Printf.sprintf "Insert: into %S: %s" table_name
         (String.concat "; " halves)
+  | Insert_kind_mismatch { table_name; column; expected; actual } ->
+      Printf.sprintf "Insert: into %S: column %S expects %s, got %s" table_name
+        column
+        (Scalar.kind_to_string expected)
+        (Scalar.kind_to_string actual)
 
 (* Check that [literal_kind]'s field names are a permutation of
    [target_kind]'s. Emits a single [Insert_column_mismatch] carrying both
@@ -52,15 +64,49 @@ let check_insert_columns ~table_name ~(target_kind : Relation.kind)
   if missing = [] && extra = [] then []
   else [ Insert_column_mismatch { table_name; missing; extra } ]
 
-(* Errors specific to an [Insert] node: today, the literal source's column
-   set against the target's. Unknown target tables pass through silently --
-   [Translate] still raises for those. Non-literal sources have no
-   compile-time kind to check against here. *)
+(* Check that each field in [literal_kind] has the same scalar kind as the
+   target column with the same name. Emits one [Insert_kind_mismatch] per
+   mismatching column, in source row-order.
+
+   Precondition: column names have already agreed via
+   [check_insert_columns], so every literal field has a matching target
+   field. *)
+let check_insert_value_kinds ~table_name ~(target_kind : Relation.kind)
+    ~(literal_kind : Relation.kind) : error list =
+  List.filter_map
+    (fun (literal_field : Row.field) ->
+      let target_field =
+        List.find
+          (fun (field : Row.field) -> field.name = literal_field.name)
+          target_kind.row_kind
+      in
+      if literal_field.kind = target_field.kind then None
+      else
+        Some
+          (Insert_kind_mismatch
+             {
+               table_name;
+               column = literal_field.name;
+               expected = target_field.kind;
+               actual = literal_field.kind;
+             }))
+    literal_kind.row_kind
+
+(* Errors specific to an [Insert] node: the literal source's column set
+   against the target's, then per-column kind agreement. The kind check is
+   skipped when the column-set check has already failed -- comparing
+   value kinds against mismatched names produces noise. Unknown target
+   tables pass through silently -- [Translate] still raises for those.
+   Non-literal sources have no compile-time kind to check against here. *)
 let check_insert ~(catalog : Catalog.kind) ~table ~(source : Logical.t) :
     error list =
   match (List.assoc_opt table catalog.relation_kinds, source) with
   | Some target_kind, Relation_literal { kind = literal_kind; _ } ->
-      check_insert_columns ~table_name:table ~target_kind ~literal_kind
+      let column_errors =
+        check_insert_columns ~table_name:table ~target_kind ~literal_kind
+      in
+      if column_errors <> [] then column_errors
+      else check_insert_value_kinds ~table_name:table ~target_kind ~literal_kind
   | _ -> []
 
 (* Post-order walk: gather errors from each subtree, then add any errors
