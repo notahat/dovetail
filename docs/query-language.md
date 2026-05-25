@@ -21,8 +21,8 @@ The guide is in several parts:
   -- the sublanguages used inside `restrict`, `project`, and the
   `on` clause of `join`.
 - [Data definition reference](query-language-data-definition.md) --
-  the `:`-prefixed catalog statement (today just `:list tables`) and
-  the `type` pipeline operator that inspects a relation's type.
+  redirect page; data definition lives entirely in the pipeline grammar
+  now (`create table`, `drop table`, `catalog | tables`, `| type`).
 
 ## Running the REPL
 

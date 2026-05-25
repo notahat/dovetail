@@ -194,61 +194,34 @@ let test_unqualify_unblocks_join_to_insert_chain () =
   check_contains "insert succeeds and reports six affected rows" output
     "insert_count = 6"
 
-(* [:list tables] runs through Parser → REPL DDL
-   dispatch → Ddl_executor.execute_read → Catalog.list_table_names and
-   prints each table name on its own line. The fixture seeds [users] and
-   [orders]; cursor (byte-sorted) order puts [orders] first. *)
-let test_list_tables_prints_fixture_tables_in_byte_sorted_order () =
-  let output = run_with_input [ ":list tables" ] in
-  check_contains ":list tables output" output "orders";
-  check_contains ":list tables output" output "users";
-  let orders_position =
-    let rec search position =
-      if position >= String.length output - 6 then String.length output
-      else if String.sub output position 6 = "orders" then position
-      else search (position + 1)
-    in
-    search 0
-  in
-  let users_position =
-    let rec search position =
-      if position >= String.length output - 5 then String.length output
-      else if String.sub output position 5 = "users" then position
-      else search (position + 1)
-    in
-    search 0
-  in
-  Alcotest.(check bool)
-    "orders precedes users (byte-sorted)" true
-    (orders_position < users_position)
-
 (* End-to-end: the pipe-source leaf [drop table <name>] parses,
    classifies as a write, removes the catalog entry and storage subDB
    inside a write transaction, and yields a one-row
-   [(dropped = "<name>")] relation. The follow-up [:list tables]
+   [(dropped = "<name>")] relation. The follow-up [catalog | tables]
    confirms the table is gone while its sibling remains. *)
 let test_drop_table_removes_table_and_reports_status () =
-  let output = run_with_input [ "drop table users"; ":list tables" ] in
+  let output = run_with_input [ "drop table users"; "catalog | tables" ] in
   check_contains "drop result row" output "dropped = \"users\"";
-  check_contains "orders still listed after drop" output "orders";
+  check_contains "orders still listed after drop" output "name = \"orders\"";
   Alcotest.(check bool)
     "users not listed after drop" false
-    (* Match a whole-token "users" on its own line so substrings like
-       [alice@example.com] in earlier output can't satisfy the check.
-       The post-drop list output is the only place a bare [users] would
-       appear after the drop, so its absence here is the assertion. *)
-    (contains_substring output "\nusers\n")
+    (* The post-drop [catalog | tables] output is the only place a bare
+       [name = "users"] row would appear after the drop, so its absence
+       here is the assertion. *)
+    (contains_substring output "name = \"users\"")
 
 (* The "no such table" error path: dropping an unseeded table raises in
    [Eval], the REPL catches it via its generic error guard, prints the
    failure with the [Eval: drop table ...: no such table] prefix, and
    continues so the follow-up query still executes. *)
 let test_drop_nonexistent_table_reports_error_and_continues () =
-  let output = run_with_input [ "drop table nonexistent"; ":list tables" ] in
+  let output =
+    run_with_input [ "drop table nonexistent"; "catalog | tables" ]
+  in
   check_contains "no-such-table error" output
     "Eval: drop table \"nonexistent\": no such table";
-  check_contains "loop continues after drop error" output "users";
-  check_contains "loop continues after drop error" output "orders"
+  check_contains "loop continues after drop error" output "name = \"users\"";
+  check_contains "loop continues after drop error" output "name = \"orders\""
 
 let test_relation_literal_alone_prints_one_row () =
   let output =
@@ -320,9 +293,6 @@ let () =
           Alcotest.test_case
             "join | project | unqualify | insert into chain writes the rows"
             `Quick test_unqualify_unblocks_join_to_insert_chain;
-          Alcotest.test_case
-            ":list tables prints fixture tables in byte-sorted order" `Quick
-            test_list_tables_prints_fixture_tables_in_byte_sorted_order;
           Alcotest.test_case
             "[drop table <name>] removes the table and yields a result row"
             `Quick test_drop_table_removes_table_and_reports_status;

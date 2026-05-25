@@ -4,7 +4,6 @@ module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 module Expression = Dovetail_core.Expression
-module Ddl = Dovetail_ddl
 
 type error = string
 
@@ -589,27 +588,14 @@ let pipeline_parser =
   in
   create_table_empty_form <|> value_pipeline
 
-(* The DDL body grammar: the productions admitted after the [:]
-   sigil has been consumed. Today's only DDL form is [:list tables]. *)
-let ddl_list_tables =
-  keyword "list" *> whitespace *> keyword "tables"
-  *> return Ddl.Statement.List_tables
-
-let ddl_body = ddl_list_tables
-
-(* The top-level grammar: optional leading whitespace, then dispatch on the
-   first non-whitespace character. A leading [:] introduces a DDL statement
-   (the sigil is recognised only here, so a [:] inside a pipeline or
-   expression is a parse error). Anything else is parsed as a relational
-   pipeline. [end_of_input] at the tail enforces full consumption for both
-   universes, so trailing garbage after either kind of input is rejected. *)
+(* The top-level grammar: optional leading whitespace, then a relational
+   pipeline. The DDL universe is empty; the leading [:] sigil that used
+   to introduce a DDL statement is no longer recognised, so [:list
+   tables] and friends are now plain parse errors. [end_of_input] at
+   the tail enforces full consumption, so trailing garbage is rejected. *)
 let program_parser =
-  whitespace
-  *> ( peek_char >>= function
-       | Some ':' ->
-           char ':' *> whitespace *> ddl_body >>| fun statement ->
-           Ast.Ddl statement
-       | _ -> pipeline_parser >>| fun plan -> Ast.Pipeline plan )
+  whitespace *> pipeline_parser
+  >>| (fun plan -> Ast.Pipeline plan)
   <* whitespace <* end_of_input
 
 let parse input = parse_string ~consume:All program_parser input

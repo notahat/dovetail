@@ -1,6 +1,5 @@
 module Relation = Dovetail_core.Relation
 module Term = Dovetail_core.Term
-module Ddl = Dovetail_ddl
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
@@ -58,28 +57,10 @@ let evaluate_and_print environment ~output ~show_logical ~show_physical
               ~show_physical logical_plan)
   with Failure message -> Format.fprintf output "error: %s@." message
 
-(* Render the result of a read-only DDL statement to [output]. [Listed] is
-   one table name per line, in cursor order; an empty catalog produces no
-   output (the prompt that follows the call sits immediately after). *)
-let print_ddl_read_result ~output = function
-  | Ddl.Statement.Listed names ->
-      List.iter (fun name -> Format.fprintf output "%s@." name) names
-
-(* Execute a DDL statement against [environment] and write the rendered
-   result to [output]. Today's only DDL statement is [:list tables], which
-   runs inside a read transaction; [Failure] raised inside [execute_read]
-   lands in the [error: ...] line through the shared guard. *)
-let execute_and_print_ddl environment ~output statement =
-  try
-    Storage.Engine.with_read_transaction environment (fun transaction ->
-        print_ddl_read_result ~output
-          (Execution.Ddl_executor.execute_read environment transaction statement))
-  with Failure message -> Format.fprintf output "error: %s@." message
-
-(* Process one input line: parse, dispatch on the program universe (a
-   relational pipeline goes through Lower / Translate / Eval; a DDL
-   statement goes straight to [Ddl_executor.execute_*]), print. Parse and
-   eval errors land in [output]; nothing is raised. *)
+(* Process one input line: parse, lower, evaluate, print. Parse and eval
+   errors land in [output]; nothing is raised. The [Ddl] arm is reachable
+   only in principle -- [Ddl.Statement.t] has no constructors -- so the
+   refutation pattern handles it. *)
 let process_line environment ~output ~show_logical ~show_physical line =
   match Surface_ra.Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message
@@ -87,8 +68,7 @@ let process_line environment ~output ~show_logical ~show_physical line =
       let logical_plan = Surface_ra.Lower.lower plan in
       evaluate_and_print environment ~output ~show_logical ~show_physical
         logical_plan
-  | Ok (Surface_ra.Ast.Ddl statement) ->
-      execute_and_print_ddl environment ~output statement
+  | Ok (Surface_ra.Ast.Ddl _) -> .
 
 let run ?(show_logical = false) ?(show_physical = false) environment ~read_line
     ~output =

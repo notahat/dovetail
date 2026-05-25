@@ -226,9 +226,7 @@ let with_query_result query check_rows =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -250,9 +248,7 @@ let with_query_kind query check_kind =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -279,9 +275,7 @@ let with_query_scalar_value query check_value =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -307,9 +301,7 @@ let with_query_scalar_kind query check_kind =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -335,9 +327,7 @@ let with_query_row_value query check_row =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -363,9 +353,7 @@ let with_query_row_kind query check_kind =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -389,9 +377,7 @@ let with_query_failure ~label ~expected query =
       let ast =
         match Surface_ra.Parser.parse query with
         | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) ->
-            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
-              query
+        | Ok (Surface_ra.Ast.Ddl _) -> .
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in

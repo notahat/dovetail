@@ -86,7 +86,7 @@ let test_create_table_empty_form_creates_and_reports () =
   with_temp_dir @@ fun environment_path ->
   let stdin_text =
     "(id: int64, name: string, primary key (id)) | create table widgets\n\
-     :list tables\n"
+     catalog | tables\n"
   in
   let stdout_text = run_binary ~environment_path ~stdin_text in
   expect_stdout_contains stdout_text [ "widgets"; "created" ]
@@ -103,7 +103,7 @@ let test_create_table_seeded_form_creates_and_seeds () =
 
 let test_drop_table_leaf_drops_and_reports () =
   with_temp_dir @@ fun environment_path ->
-  let stdin_text = "drop table orders\n:list tables\n" in
+  let stdin_text = "drop table orders\ncatalog | tables\n" in
   let stdout_text = run_binary ~environment_path ~stdin_text in
   expect_stdout_contains stdout_text [ "orders"; "dropped" ]
 

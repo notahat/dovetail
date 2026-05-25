@@ -2,7 +2,6 @@
 
 open Dovetail_surface_ra
 open Test_helpers
-module Ddl = Dovetail_ddl
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
@@ -12,8 +11,7 @@ let ast_program_testable =
 
 (* Wraps the expected [Ast.t] in [Ast.Pipeline] before comparing against the
    parser's [Ast.program] output. The sink-production tests below build an
-   [Ast.Insert] inside the pipeline using {!parses_plan}; the DDL tests use
-   [parses_program] to assert against an [Ast.Ddl] directly. *)
+   [Ast.Insert] inside the pipeline using {!parses_plan}. *)
 let parses input expected_inner_ast =
   match Parser.parse input with
   | Ok actual_program ->
@@ -265,19 +263,6 @@ let parses_plan input expected_plan =
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
-(* Bare program assertion: compare against an arbitrary [Ast.program]
-   without the [Pipeline] wrapping that {!parses} and {!parses_plan}
-   provide. The DDL tests below use this to assert against [Ast.Ddl]
-   constructors directly. *)
-let parses_program input expected_program =
-  match Parser.parse input with
-  | Ok actual_program ->
-      Alcotest.(check ast_program_testable)
-        (Printf.sprintf "%S parses to program" input)
-        expected_program actual_program
-  | Error message ->
-      Alcotest.failf "expected %S to parse but got error: %s" input message
-
 let test_pipeline_ending_in_sink_parses_as_insert () =
   let kind : Relation.kind =
     {
@@ -498,25 +483,13 @@ let test_pipeline_parens_with_colon_and_equals_mixed_is_rejected () =
      and the parse is rejected. *)
   rejects "(name = \"x\", id: int64) | create table users"
 
-(* The DDL sigil. A leading [:] (after any optional whitespace) marks a
-   DDL statement. The sigil is recognised only at the top of input -- a
-   [:] inside a pipeline is a parse error rather than an embedded DDL
-   statement. *)
+(* The retired DDL sigil. A leading [:] used to introduce a
+   data-definition statement; every form has since been retired in
+   favour of pipe-form operators. The sigil is no longer recognised
+   anywhere -- a leading [:list tables] is now a parse error just like
+   any other unknown input. *)
 
-let test_ddl_list_tables_parses () =
-  parses_program ":list tables" (Ast.Ddl Ddl.Statement.List_tables)
-
-let test_ddl_list_tables_tolerates_leading_whitespace () =
-  parses_program "   :list tables" (Ast.Ddl Ddl.Statement.List_tables)
-
-let test_ddl_list_tables_tolerates_whitespace_after_sigil () =
-  parses_program ":   list tables" (Ast.Ddl Ddl.Statement.List_tables)
-
-let test_ddl_list_tables_tolerates_extra_whitespace_between_keywords () =
-  parses_program ":list    tables" (Ast.Ddl Ddl.Statement.List_tables)
-
-let test_ddl_list_tables_tolerates_trailing_whitespace () =
-  parses_program ":list tables    " (Ast.Ddl Ddl.Statement.List_tables)
+let test_ddl_list_tables_is_no_longer_recognised () = rejects ":list tables"
 
 (* The [:drop table] DDL form has been retired in favour of the
    [drop table <name>] pipe-source leaf. The sigil form is now
@@ -1149,17 +1122,8 @@ let () =
         ] );
       ( "ddl syntax",
         [
-          Alcotest.test_case ":list tables parses to Ddl List_tables" `Quick
-            test_ddl_list_tables_parses;
-          Alcotest.test_case "tolerates whitespace before the sigil" `Quick
-            test_ddl_list_tables_tolerates_leading_whitespace;
-          Alcotest.test_case "tolerates whitespace after the sigil" `Quick
-            test_ddl_list_tables_tolerates_whitespace_after_sigil;
-          Alcotest.test_case "tolerates extra whitespace between keywords"
-            `Quick
-            test_ddl_list_tables_tolerates_extra_whitespace_between_keywords;
-          Alcotest.test_case "tolerates trailing whitespace" `Quick
-            test_ddl_list_tables_tolerates_trailing_whitespace;
+          Alcotest.test_case ":list tables is no longer recognised" `Quick
+            test_ddl_list_tables_is_no_longer_recognised;
           Alcotest.test_case "rejects a bare sigil" `Quick
             test_ddl_rejects_bare_sigil;
           Alcotest.test_case "rejects an unknown body" `Quick

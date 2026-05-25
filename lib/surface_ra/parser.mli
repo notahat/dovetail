@@ -1,14 +1,12 @@
 (** Parser for the relational-algebra query language.
 
-    Built on [angstrom]. A top-level input is one of two universes, decided by
-    the first non-whitespace character: a leading [:] introduces a DDL statement
-    (today just [:list tables]); anything else is a relational pipeline -- a
-    base relation reference followed by zero or more pipe-separated steps:
+    Built on [angstrom]. A top-level input is a relational pipeline -- a base
+    relation reference followed by zero or more pipe-separated steps:
     [restrict <predicate>], [project <columns>], [cross <relation>],
     [join <relation> on <predicate>], [type], and optionally a terminal sink
     ([insert into <table>]). Whitespace surrounding tokens is tolerated;
-    anything else (extra tokens, malformed identifiers, empty input, a [:]
-    mid-pipeline) is rejected.
+    anything else (extra tokens, malformed identifiers, empty input, a leading
+    [:] sigil from the retired DDL grammar) is rejected.
 
     The error type is currently a string passed straight from angstrom. When
     user-visible errors gain location information or structured cases this
@@ -23,15 +21,14 @@ type error = string
 
 val parse : string -> (Ast.program, error) result
 (** [parse input] parses [input] as a complete top-level program. The result is
-    an {!Ast.program}: either an {!Ast.Pipeline} carrying an {!Ast.t} (a
-    relational pipeline; [Ast.Insert] sits inside [t] as a regular operator) or
-    an {!Ast.Ddl} carrying a {!Statement.t} (a data-definition statement
-    introduced by the leading [:] sigil).
+    always an {!Ast.Pipeline} carrying an {!Ast.t} ([Ast.Insert] sits inside [t]
+    as a regular operator); the {!Ast.Ddl} arm is uninhabited.
 
     The pipeline grammar enforces structurally that a sink terminates a pipeline
-    -- a query operator after [| insert into ...] is a parse error. The [:]
-    sigil is recognised only at the very top of the input, so a [:] inside a
-    pipeline or expression is a parse error rather than a DDL statement.
+    -- a query operator after [| insert into ...] is a parse error. A leading
+    [:] is no longer recognised: every DDL statement has been retired in favour
+    of pipe-form operators, so [:list tables] and friends are now plain parse
+    errors.
 
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)

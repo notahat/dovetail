@@ -3,8 +3,7 @@
   test_pipeline
   test_dovetail
   test_documentation
-  test_doctest
-  test_ddl_roundtrip)
+  test_doctest)
  (libraries
   alcotest
   dovetail.core
