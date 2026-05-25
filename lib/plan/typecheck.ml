@@ -241,12 +241,19 @@ let rec collect_errors ~catalog (plan : Logical.t) : error list =
   | Scan _ | Relation_literal _ | Scalar_literal _ | Row_literal _
   | Drop_table _ | Create_table_empty _ | Catalog_source ->
       []
-  | Project { input; _ }
   | Unqualify { input }
   | Type_op { input }
   | Tables { input }
   | Create_table_seeded { source = input; _ } ->
       collect_errors ~catalog input
+  | Project { input; columns } ->
+      let input_errors = collect_errors ~catalog input in
+      let input_row_kind = (kind_of ~catalog input).row_kind in
+      let column_errors =
+        check_column_references ~operator:"Project" ~row_kind:input_row_kind
+          columns
+      in
+      input_errors @ column_errors
   | Restrict { input; predicate } ->
       let input_errors = collect_errors ~catalog input in
       let input_row_kind = (kind_of ~catalog input).row_kind in

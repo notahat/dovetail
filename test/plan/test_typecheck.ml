@@ -308,6 +308,78 @@ let test_restrict_with_ambiguous_bare_reference_reports_structured_error () =
       Alcotest.(check error_list_testable)
         "structured ambiguous" expected errors
 
+let test_project_with_unresolved_column_reports_structured_error () =
+  let plan : Logical.t =
+    Project
+      {
+        input = two_column_literal;
+        columns = [ { qualifier = None; name = "missing" } ];
+      }
+  in
+  let expected : Typecheck.error list =
+    [
+      Unresolved_column
+        {
+          column_reference = { qualifier = None; name = "missing" };
+          available_row_kind = two_column_row_kind;
+          operator = "Project";
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected an Unresolved_column error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured unresolved project" expected errors
+
+let test_project_emits_one_error_per_unresolved_column () =
+  let plan : Logical.t =
+    Project
+      {
+        input = two_column_literal;
+        columns =
+          [
+            { qualifier = None; name = "id" };
+            { qualifier = None; name = "missing_one" };
+            { qualifier = None; name = "missing_two" };
+          ];
+      }
+  in
+  let expected : Typecheck.error list =
+    [
+      Unresolved_column
+        {
+          column_reference = { qualifier = None; name = "missing_one" };
+          available_row_kind = two_column_row_kind;
+          operator = "Project";
+        };
+      Unresolved_column
+        {
+          column_reference = { qualifier = None; name = "missing_two" };
+          available_row_kind = two_column_row_kind;
+          operator = "Project";
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected two Unresolved_column errors"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "two structured errors" expected errors
+
+let test_project_unknown_column_renders_with_project_prefix () =
+  let error : Typecheck.error =
+    Unresolved_column
+      {
+        column_reference = { qualifier = None; name = "missing" };
+        available_row_kind = two_column_row_kind;
+        operator = "Project";
+      }
+  in
+  Alcotest.(check string)
+    "rendered project unknown" "Project: unknown column \"missing\""
+    (Typecheck.render error)
+
 let test_restrict_ambiguous_bare_renders_with_match_list () =
   let error : Typecheck.error =
     Unresolved_column
@@ -361,6 +433,15 @@ let () =
             test_restrict_with_ambiguous_bare_reference_reports_structured_error;
           Alcotest.test_case "ambiguous bare reference renders with match list"
             `Quick test_restrict_ambiguous_bare_renders_with_match_list;
+        ] );
+      ( "project unresolved column",
+        [
+          Alcotest.test_case "unknown column produces a structured error" `Quick
+            test_project_with_unresolved_column_reports_structured_error;
+          Alcotest.test_case "every unresolved column produces its own error"
+            `Quick test_project_emits_one_error_per_unresolved_column;
+          Alcotest.test_case "unknown column renders with Project prefix" `Quick
+            test_project_unknown_column_renders_with_project_prefix;
         ] );
       ( "insert kind mismatch",
         [
