@@ -114,3 +114,4 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
   | Create_table_seeded { table_name; source } ->
       Create_table_seeded { table_name; source = lower source }
   | Catalog_source -> Catalog_source
+  | Tables { input } -> Tables { input = lower input }

@@ -407,6 +407,7 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
       Create_table_seeded
         { table_name; source = translate_relation ~catalog source }
   | Catalog_source -> Catalog_source
+  | Tables { input } -> Tables { input = translate_relation ~catalog input }
 
 (* Look up [target_table]'s kind in the catalog and validate the literal
    source's columns and value kinds against it. Returns the translated

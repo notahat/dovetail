@@ -38,5 +38,6 @@ type t =
       rows : (Row.column_reference * Scalar.value) list list;
     }
   | Catalog_source
+  | Tables of { input : t }
 
 type program = Pipeline of t | Ddl of Ddl.Statement.t

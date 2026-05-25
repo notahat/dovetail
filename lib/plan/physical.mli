@@ -154,6 +154,14 @@ type t =
           rung's static shape is a {!Dovetail_core.Catalog.kind} rather than a
           {!Relation.kind}. The [Type_op] evaluator short-circuits a
           [Catalog_source] input directly. *)
+  | Tables of { input : t }
+      (** [Tables { input }] yields a one-column [(name: string)] relation
+          listing every table in the catalog [input] produces. {!Eval}
+          pattern-matches [input]'s term: a [Catalog_value] streams one row per
+          table in cursor order; anything else raises a user-facing [Failure].
+          {!kind_of} reports the static result kind unconditionally, so
+          [tables | type] falls out of the default dispatch in
+          [evaluate_type_op]. *)
 
 val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
 (** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}

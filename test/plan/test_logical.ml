@@ -259,10 +259,22 @@ let test_catalog_source_requires_read_access () =
     "Catalog_source requires Read access" true
     (Logical.required_access Catalog_source = `Read)
 
+let test_tables_required_access_passes_through () =
+  let plan : Logical.t = Tables { input = Catalog_source } in
+  Alcotest.(check bool)
+    "Tables over a read-only input is read-only" true
+    (Logical.required_access plan = `Read)
+
 let test_catalog_source_renders_as_bare_keyword () =
   Alcotest.(check string)
     "CatalogSource on a single line" "CatalogSource\n"
     (format_to_string Logical.Catalog_source)
+
+let test_tables_renders_header_with_indented_input () =
+  let plan : Logical.t = Tables { input = Catalog_source } in
+  Alcotest.(check string)
+    "Tables prints header with the input indented one level"
+    "Tables\n  CatalogSource\n" (format_to_string plan)
 
 let test_drop_table_renders_with_table_name () =
   let plan : Logical.t = Drop_table { table_name = "users" } in
@@ -350,6 +362,8 @@ let () =
             test_create_table_seeded_requires_write_access;
           Alcotest.test_case "Catalog_source requires Read access" `Quick
             test_catalog_source_requires_read_access;
+          Alcotest.test_case "Tables required_access passes through input"
+            `Quick test_tables_required_access_passes_through;
         ] );
       ( "format",
         [
@@ -384,5 +398,7 @@ let () =
             test_create_table_seeded_renders_header_with_indented_source;
           Alcotest.test_case "CatalogSource renders as the bare keyword" `Quick
             test_catalog_source_renders_as_bare_keyword;
+          Alcotest.test_case "Tables renders header with indented input" `Quick
+            test_tables_renders_header_with_indented_input;
         ] );
     ]

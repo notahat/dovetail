@@ -592,6 +592,13 @@ let test_pipeline_catalog_allows_downstream_pipeline_step () =
      witness; semantic checks land in later steps. *)
   parses "catalog | type" (Ast.Type { input = Ast.Catalog_source })
 
+let test_pipeline_tables_step_wraps_upstream () =
+  parses "catalog | tables" (Ast.Tables { input = Ast.Catalog_source })
+
+let test_pipeline_tables_then_type_composes () =
+  parses "catalog | tables | type"
+    (Ast.Type { input = Ast.Tables { input = Ast.Catalog_source } })
+
 let test_pipeline_parses_type_step () =
   parses "users | type" (Ast.Type { input = Ast.Relation_name "users" })
 
@@ -1197,5 +1204,9 @@ let () =
           Alcotest.test_case
             "[catalog | <step>] parses with the step over the leaf" `Quick
             test_pipeline_catalog_allows_downstream_pipeline_step;
+          Alcotest.test_case "[| tables] wraps the upstream pipeline in Tables"
+            `Quick test_pipeline_tables_step_wraps_upstream;
+          Alcotest.test_case "[catalog | tables | type] composes left-to-right"
+            `Quick test_pipeline_tables_then_type_composes;
         ] );
     ]

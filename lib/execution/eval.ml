@@ -143,6 +143,12 @@ let rec eval environment transaction plan continue =
       evaluate_create_table_seeded environment transaction ~table_name ~source
         continue
   | Catalog_source -> evaluate_catalog_source environment transaction continue
+  | Tables { input } ->
+      ignore input;
+      ignore continue;
+      (* The tables evaluator lands in a follow-up step alongside the
+         integration tests that exercise it end to end. *)
+      failwith "Eval: tables: the tables evaluator is not yet wired through"
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified

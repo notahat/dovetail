@@ -153,6 +153,11 @@ type t =
           its rows. {!Lower} emits a logical [Catalog_source] node; the
           evaluator opens a per-table cursor lazily for each entry, scoped to
           the read transaction. *)
+  | Tables of { input : t }
+      (** [Tables { input }] is the surface form [input | tables]. Takes a
+          catalog value on the left and yields a one-column [(name: string)]
+          relation, one row per table in [input], in the catalog's cursor order.
+          A user-facing error fires at eval time if [input] is not a catalog. *)
 
 type program =
   | Pipeline of t

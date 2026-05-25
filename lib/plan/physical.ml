@@ -26,6 +26,7 @@ type t =
   | Create_table_seeded of { table_name : string; source : t }
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
   | Catalog_source
+  | Tables of { input : t }
 
 (* Pretty-print [plan] starting at [indent] levels of two-space indentation.
    Each operator emits one header line ([Op] or [Op(arg)]) and recurses into
@@ -115,6 +116,9 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter "%sCreateTableSeeded(%s)@\n" prefix table_name;
       format_at formatter (indent + 1) source
   | Catalog_source -> Format.fprintf formatter "%sCatalogSource@\n" prefix
+  | Tables { input } ->
+      Format.fprintf formatter "%sTables@\n" prefix;
+      format_at formatter (indent + 1) input
 
 let format formatter plan = format_at formatter 0 plan
 
@@ -143,6 +147,16 @@ let create_table_result_kind : Relation.kind =
 let drop_table_result_kind : Relation.kind =
   {
     row_kind = [ { name = "dropped"; kind = Scalar.String; qualifier = None } ];
+    refinements = [];
+  }
+
+(* The static result kind of [Tables]: a one-column [name : string] row, one
+   per table in the input catalog. Kept deliberately minimal -- no qualifier
+   and no primary-key refinement -- so the relation composes cleanly with
+   downstream operators. *)
+let tables_result_kind : Relation.kind =
+  {
+    row_kind = [ { name = "name"; kind = Scalar.String; qualifier = None } ];
     refinements = [];
   }
 
@@ -216,3 +230,4 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
          the evaluator. The explicit failure surfaces any future caller that
          asks for a relation kind it can't provide. *)
       assert false
+  | Tables _ -> tables_result_kind

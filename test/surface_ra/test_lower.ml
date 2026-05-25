@@ -257,6 +257,13 @@ let test_catalog_source_lowers_through () =
   Alcotest.(check logical_testable)
     "Ast.Catalog_source -> Logical.Catalog_source" Catalog_source logical
 
+let test_tables_lowers_through () =
+  let logical = Lower.lower (Ast.Tables { input = Ast.Catalog_source }) in
+  Alcotest.(check logical_testable)
+    "Ast.Tables -> Logical.Tables with the lowered input"
+    (Tables { input = Catalog_source })
+    logical
+
 let test_drop_table_lowers_through () =
   let ast = Ast.Drop_table { table_name = "users" } in
   let logical = Lower.lower ast in
@@ -666,6 +673,9 @@ let () =
           Alcotest.test_case
             "lowers Ast.Catalog_source to Logical.Catalog_source" `Quick
             test_catalog_source_lowers_through;
+          Alcotest.test_case
+            "lowers Ast.Tables to Logical.Tables, recursing into input" `Quick
+            test_tables_lowers_through;
         ] );
       ( "create / drop table",
         [

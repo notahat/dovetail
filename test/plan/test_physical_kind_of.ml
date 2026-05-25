@@ -332,6 +332,19 @@ let test_catalog_source_invariant_violation_raises () =
   | _ -> Alcotest.fail "expected Assert_failure but kind_of returned a kind"
   | exception Assert_failure _ -> ()
 
+let test_tables_returns_one_column_name_kind () =
+  let plan : Physical.t = Tables { input = Catalog_source } in
+  let expected : Relation.kind =
+    {
+      row_kind = [ { name = "name"; kind = String; qualifier = None } ];
+      refinements = [];
+    }
+  in
+  Alcotest.(check kind_testable)
+    "Tables reports a one-column (name: string) result kind regardless of input"
+    expected
+    (Physical.kind_of ~catalog:fixture_catalog plan)
+
 let () =
   Alcotest.run "physical_kind_of"
     [
@@ -387,5 +400,8 @@ let () =
           Alcotest.test_case
             "Catalog_source raises because its result kind is a catalog kind"
             `Quick test_catalog_source_invariant_violation_raises;
+          Alcotest.test_case
+            "Tables reports a one-column (name: string) result kind" `Quick
+            test_tables_returns_one_column_name_kind;
         ] );
     ]

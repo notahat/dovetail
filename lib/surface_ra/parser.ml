@@ -493,13 +493,18 @@ let type_step = keyword "type" >>| fun () input -> Ast.Type { input }
 let unqualify_step =
   keyword "unqualify" >>| fun () input -> Ast.Unqualify { input }
 
+(* A tables pipeline step: [| tables]. Unary with no arguments. The kind
+   check (input must be a catalog value) lives in Eval; the parser just
+   wraps the upstream into the AST node. *)
+let tables_step = keyword "tables" >>| fun () input -> Ast.Tables { input }
+
 (* A single pipeline step. Each branch wraps its [Ast.t] argument with
    the step's effect, so the caller can fold a list of steps
    left-to-right over the base. *)
 let pipeline_step =
   whitespace *> char '|' *> whitespace
   *> (restrict_step <|> project_step <|> cross_step <|> join_step <|> type_step
-    <|> unqualify_step)
+    <|> unqualify_step <|> tables_step)
 
 (* A query pipeline: a relation reference followed by zero or more
    query-operator steps, folded left-associatively. The result is an

@@ -106,6 +106,12 @@ type t =
           {!Dovetail_core.Catalog.value} down the pipe as a
           {!Dovetail_core.Term.Catalog_value}. Reports [`Read] from
           {!required_access}. *)
+  | Tables of { input : t }
+      (** [Tables { input }] takes a catalog value on the left and yields a
+          one-column [(name: string)] relation -- one row per table in [input],
+          in catalog cursor order. {!required_access} passes through to
+          [input]'s access; a [Catalog_source] input keeps the plan read-only.
+          {!Eval} raises a user-facing [Failure] if [input] is not a catalog. *)
 
 val required_access : t -> [ `Read | `Write ]
 (** [required_access plan] walks [plan] and returns the strongest transaction
