@@ -14,8 +14,6 @@
     already speak in terms of [Parser.error] rather than coupling to [string].
 *)
 
-module Expression = Dovetail_core.Expression
-
 type error = string
 (** Placeholder for parser errors. The string is whatever angstrom produced. *)
 
@@ -50,7 +48,7 @@ val parse_relation_type : string -> (Ast.type_expression, error) result
     entire input. Not yet wired into the pipeline grammar; exposed for direct
     testing while the new literal syntax is being assembled. *)
 
-val parse_expression : string -> (Expression.t, error) result
+val parse_expression : string -> (Ast.expression, error) result
 (** [parse_expression input] parses [input] as a single expression in the
     sublanguage shared by [restrict] and [join ... on]. The grammar, from
     loosest to tightest binding:
@@ -72,7 +70,8 @@ val parse_expression : string -> (Expression.t, error) result
 
     A standalone atom is a valid expression at the parser level; whether it
     resolves to a [Bool] (and so is acceptable in a predicate position) is a
-    resolve-time concern handled by {!Expression.resolve}.
+    resolve-time concern handled at the logical layer after
+    {!Lower.lower_expression}.
 
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)

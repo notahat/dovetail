@@ -62,14 +62,16 @@ let test_rejects_two_identifiers () =
   rejects "users orders"
 
 let id_equals_three =
-  expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Scalar.Int64 3L))
+  ast_expression_compare
+    ~left:(ast_expression_column "id")
+    ~op:Equal
+    ~right:(ast_expression_literal (Scalar.Int64 3L))
 
 let active_equals_true =
-  expression_compare
-    ~left:(expression_column "active")
+  ast_expression_compare
+    ~left:(ast_expression_column "active")
     ~op:Equal
-    ~right:(expression_literal (Scalar.Bool true))
+    ~right:(ast_expression_literal (Scalar.Bool true))
 
 let test_pipeline_parses_single_restrict () =
   parses "users | restrict id = 3"
@@ -211,10 +213,10 @@ let test_pipeline_keyword_prefix_is_a_relation_name () =
        { left = users_relation; right = Ast.Relation_name "crossroads" })
 
 let users_id_equals_orders_user_id =
-  expression_compare
-    ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
+  ast_expression_compare
+    ~left:(ast_expression_qualified_column ~qualifier:"users" ~name:"id")
     ~op:Equal
-    ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id")
+    ~right:(ast_expression_qualified_column ~qualifier:"orders" ~name:"user_id")
 
 let test_pipeline_parses_join_on_predicate () =
   parses "users | join orders on users.id = orders.user_id"
@@ -567,14 +569,12 @@ let test_pipeline_parses_unqualify_after_join () =
                left = Ast.Relation_name "users";
                right = Ast.Relation_name "orders";
                predicate =
-                 Expression.Compare
+                 Ast.Compare
                    {
-                     left =
-                       Expression.Column
-                         { qualifier = Some "users"; name = "id" };
-                     op = Expression.Equal;
+                     left = Ast.Column { qualifier = Some "users"; name = "id" };
+                     op = Ast.Equal;
                      right =
-                       Expression.Column
+                       Ast.Column
                          { qualifier = Some "orders"; name = "user_id" };
                    };
              };

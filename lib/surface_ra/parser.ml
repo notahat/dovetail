@@ -1,8 +1,6 @@
 open Angstrom
 module StringSet = Set.Make (String)
 module Scalar = Dovetail_core.Scalar
-module Row = Dovetail_core.Row
-module Expression = Dovetail_core.Expression
 
 type error = string
 
@@ -333,16 +331,16 @@ let relation_expr =
    [<|>] backtracking behaviour. *)
 let comparison_op =
   peek_char >>= function
-  | Some '=' -> char '=' *> return Expression.Equal
+  | Some '=' -> char '=' *> return Ast.Equal
   | Some '<' -> (
       char '<' *> peek_char >>= function
-      | Some '>' -> char '>' *> return Expression.NotEqual
-      | Some '=' -> char '=' *> return Expression.LessEqual
-      | _ -> return Expression.Less)
+      | Some '>' -> char '>' *> return Ast.NotEqual
+      | Some '=' -> char '=' *> return Ast.LessEqual
+      | _ -> return Ast.Less)
   | Some '>' -> (
       char '>' *> peek_char >>= function
-      | Some '=' -> char '=' *> return Expression.GreaterEqual
-      | _ -> return Expression.Greater)
+      | Some '=' -> char '=' *> return Ast.GreaterEqual
+      | _ -> return Ast.Greater)
   | _ -> fail "expected a comparison operator"
 
 (* The expression grammar, built bottom-up inside [fix] so the atom can
@@ -369,21 +367,15 @@ let expression =
       let term =
         peek_char >>= function
         | Some '"' ->
-            string_literal >>| fun literal_value ->
-            Expression.Literal literal_value
+            string_literal >>| fun literal_value -> Ast.Literal literal_value
         | Some '-' ->
-            int64_literal >>| fun literal_value ->
-            Expression.Literal literal_value
+            int64_literal >>| fun literal_value -> Ast.Literal literal_value
         | Some character when is_digit character ->
-            int64_literal >>| fun literal_value ->
-            Expression.Literal literal_value
+            int64_literal >>| fun literal_value -> Ast.Literal literal_value
         | Some character when is_letter character ->
             bool_literal
-            >>| (fun literal_value -> Expression.Literal literal_value)
-            <|> ( column_reference >>| fun (reference : Ast.column_reference) ->
-                  Expression.Column
-                    ({ qualifier = reference.qualifier; name = reference.name }
-                      : Row.column_reference) )
+            >>| (fun literal_value -> Ast.Literal literal_value)
+            <|> (column_reference >>| fun reference -> Ast.Column reference)
         | Some '(' ->
             char '(' *> whitespace *> expression <* whitespace <* char ')'
         | _ -> fail "expected a column reference, literal, or '('"
@@ -395,8 +387,7 @@ let expression =
         term >>= fun left ->
         let with_comparison =
           whitespace *> comparison_op >>= fun op ->
-          whitespace *> term >>| fun right ->
-          Expression.Compare { left; op; right }
+          whitespace *> term >>| fun right -> Ast.Compare { left; op; right }
         in
         with_comparison <|> return left
       in
@@ -408,7 +399,7 @@ let expression =
       let not_expression =
         fix (fun not_expression ->
             keyword "not" *> whitespace *> not_expression
-            >>| (fun operand -> Expression.Not operand)
+            >>| (fun operand -> Ast.Not operand)
             <|> comparison_expression)
       in
       (* An [and]-chain: one or more [not]-expressions joined by the [and]
@@ -418,7 +409,7 @@ let expression =
         many (whitespace *> keyword "and" *> whitespace *> not_expression)
         >>| fun rest ->
         List.fold_left
-          (fun accumulator next -> Expression.And (accumulator, next))
+          (fun accumulator next -> Ast.And (accumulator, next))
           first rest
       in
       (* The top of the predicate grammar: one or more [and]-chains joined
@@ -427,7 +418,7 @@ let expression =
       many (whitespace *> keyword "or" *> whitespace *> and_expression)
       >>| fun rest ->
       List.fold_left
-        (fun accumulator next -> Expression.Or (accumulator, next))
+        (fun accumulator next -> Ast.Or (accumulator, next))
         first rest)
 
 (* The projection grammar: one column reference followed by zero or

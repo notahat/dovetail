@@ -2,6 +2,7 @@ module Plan = Dovetail_plan
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
+module Expression = Dovetail_core.Expression
 module StringSet = Set.Make (String)
 
 let lower_column_reference (reference : Ast.column_reference) :
@@ -36,6 +37,30 @@ let lower_refinement (refinement : Ast.refinement) : Relation.refinement =
 
 let lower_projection (projection : Ast.projection) : Plan.Projection.t =
   List.map lower_column_reference projection
+
+let lower_comparison_op (op : Ast.comparison_op) : Expression.comparison_op =
+  match op with
+  | Equal -> Equal
+  | NotEqual -> NotEqual
+  | Less -> Less
+  | LessEqual -> LessEqual
+  | Greater -> Greater
+  | GreaterEqual -> GreaterEqual
+
+let rec lower_expression (expression : Ast.expression) : Expression.t =
+  match expression with
+  | Literal value -> Literal value
+  | Column reference -> Column (lower_column_reference reference)
+  | Compare { left; op; right } ->
+      Compare
+        {
+          left = lower_expression left;
+          op = lower_comparison_op op;
+          right = lower_expression right;
+        }
+  | And (left, right) -> And (lower_expression left, lower_expression right)
+  | Or (left, right) -> Or (lower_expression left, lower_expression right)
+  | Not operand -> Not (lower_expression operand)
 
 let lower_relation_type (type_expression : Ast.type_expression) : Relation.kind
     =
@@ -107,7 +132,8 @@ let validate_typed_row (kind : Relation.kind)
 let rec lower (ast : Ast.t) : Plan.Logical.t =
   match ast with
   | Relation_name name -> Scan { table = name }
-  | Restrict { input; predicate } -> Restrict { input = lower input; predicate }
+  | Restrict { input; predicate } ->
+      Restrict { input = lower input; predicate = lower_expression predicate }
   | Project { input; columns } ->
       Project { input = lower input; columns = lower_projection columns }
   | CrossProduct { left; right } ->
@@ -116,7 +142,7 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
       Restrict
         {
           input = CrossProduct { left = lower left; right = lower right };
-          predicate;
+          predicate = lower_expression predicate;
         }
   | Insert { table; source } -> Insert { table; source = lower source }
   | Unqualify { input } -> Unqualify { input = lower input }

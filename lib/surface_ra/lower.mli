@@ -8,6 +8,7 @@
 module Plan = Dovetail_plan
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
+module Expression = Dovetail_core.Expression
 
 val lower_column_reference : Ast.column_reference -> Row.column_reference
 (** [lower_column_reference reference] is the AST-to-logical translation for a
@@ -28,6 +29,20 @@ val lower_refinement : Ast.refinement -> Relation.refinement
     qualifier slot from each reference -- the surface grammar admits only bare
     identifiers inside a [primary key (...)] clause, so qualified references are
     an upstream-invariant violation. *)
+
+val lower_comparison_op : Ast.comparison_op -> Expression.comparison_op
+(** [lower_comparison_op op] translates an AST-side comparison operator to its
+    {!Expression.comparison_op} counterpart. Structurally identity — both sides
+    share the same six constructors — with the helper existing for the layering.
+*)
+
+val lower_expression : Ast.expression -> Expression.t
+(** [lower_expression expression] translates an AST-side expression into its
+    {!Expression.t} counterpart. Pattern-matches each constructor and rebuilds
+    the equivalent {!Expression.t}, recursing into sub-expressions and routing
+    {!Column} references through {!lower_column_reference} and {!Compare} ops
+    through {!lower_comparison_op}. Behaviour-preserving: the resulting
+    {!Expression.t} resolves to the same value the AST-side form denotes. *)
 
 val lower_projection : Ast.projection -> Plan.Projection.t
 (** [lower_projection projection] translates an AST-side projection into its

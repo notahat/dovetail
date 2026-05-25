@@ -4,7 +4,7 @@
     between the printer and the parser as a first-class property of every rung
     of the value/type ladder. This file pins the property at the scalar rung:
     for each [Scalar.value] [s] in a hand-rolled corpus, parsing the output of
-    [Scalar.format s] yields an [Expression.Literal s] back.
+    [Scalar.format s] yields an [Ast.Literal s] back.
 
     The parser surface for a bare scalar today is [Parser.parse_expression] -- a
     literal is a valid standalone atom in the expression sublanguage. When the
@@ -22,7 +22,6 @@
 
 open Dovetail_surface_ra
 module Scalar = Dovetail_core.Scalar
-module Expression = Dovetail_core.Expression
 
 (* Polymorphic equality is safe for [Scalar.value] -- it is a plain
    algebraic data type. The printer in the testable mirrors [Scalar.format]
@@ -35,13 +34,13 @@ let scalar_testable =
     ( = )
 
 (* Format a scalar, parse the result as a standalone expression, and assert
-   the parser produced an [Expression.Literal] wrapping the same scalar
-   value. A parse error, or a non-[Literal] expression, is a failed round
-   trip and surfaces the formatted text so the offending shape is visible. *)
+   the parser produced an [Ast.Literal] wrapping the same scalar value. A
+   parse error, or a non-[Literal] expression, is a failed round trip and
+   surfaces the formatted text so the offending shape is visible. *)
 let check_round_trip (value : Scalar.value) =
   let formatted = Scalar.to_string value in
   match Parser.parse_expression formatted with
-  | Ok (Expression.Literal parsed_value) ->
+  | Ok (Ast.Literal parsed_value) ->
       Alcotest.check scalar_testable
         (Printf.sprintf "round-trip preserves the scalar value (formatted: %S)"
            formatted)
@@ -53,12 +52,12 @@ let check_round_trip (value : Scalar.value) =
          parsed kind: %s"
         formatted
         (match other_expression with
-        | Expression.Literal _ -> "Literal"
-        | Expression.Column _ -> "Column"
-        | Expression.Compare _ -> "Compare"
-        | Expression.And _ -> "And"
-        | Expression.Or _ -> "Or"
-        | Expression.Not _ -> "Not")
+        | Ast.Literal _ -> "Literal"
+        | Ast.Column _ -> "Column"
+        | Ast.Compare _ -> "Compare"
+        | Ast.And _ -> "And"
+        | Ast.Or _ -> "Or"
+        | Ast.Not _ -> "Not")
   | Error message ->
       Alcotest.failf
         "round-trip failed to parse the formatted text\n\

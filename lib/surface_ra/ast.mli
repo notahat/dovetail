@@ -8,23 +8,20 @@
     Every top-level input is a relational pipeline: an {!t} whose operators each
     produce a relation, including write operators like {!Insert}. *)
 
+(* [Scalar] is the only module from outside [surface_ra] that the AST
+   references. Scalar kinds and values are primitive tags and payloads carried
+   verbatim from the surface; every other semantic type lives on the far side
+   of {!Lower} and the AST has no business naming them here. *)
 module Scalar = Dovetail_core.Scalar
-module Expression = Dovetail_core.Expression
-module Relation = Dovetail_core.Relation
-module Row = Dovetail_core.Row
 
 type column_reference = { qualifier : string option; name : string }
 (** A reference to a column by name, with an optional dotted qualifier. The
     surface syntax is the bare identifier [name] when unqualified, and the
-    [qualifier.name] form when qualified. The AST owns this type so the surface
-    form is independent of the resolved semantic form;
-    {!Lower.lower_column_reference} translates it to {!Row.column_reference} at
-    the AST-to-logical boundary. *)
+    [qualifier.name] form when qualified. *)
 
 val format_column_reference : column_reference -> string
 (** Render a [column_reference] in its source form: dotted [qualifier.name] when
-    qualified, bare [name] otherwise. Mirrors {!Row.format_column_reference} on
-    the AST side. *)
+    qualified, bare [name] otherwise. *)
 
 type type_field = {
   qualifier : string option;
@@ -42,9 +39,7 @@ type refinement =
       (** A constraint clause attached to a relation type. Today only
           [Primary_key columns] exists; it carries the AST-side
           {!column_reference} so refinements share the column vocabulary used
-          everywhere else in the AST. {!Lower.lower_refinement} translates each
-          refinement to its {!Relation.refinement} counterpart at the
-          AST-to-logical boundary. The surface grammar emits only unqualified
+          everywhere else in the AST. The surface grammar emits only unqualified
           columns inside a [primary key (...)] clause; the qualifier slot is
           present for uniformity but is always [None] in parsed input. *)
 
@@ -66,15 +61,39 @@ type type_expression = {
 
 type projection = column_reference list
 (** A [project] step's column list: the ordered references to keep from the
-    input relation. Order is preserved through lowering; the AST owns this type
-    so the surface form is independent of the resolved {!Plan.Projection.t}.
-    {!Lower.lower_projection} translates it at the AST-to-logical boundary. *)
+    input relation. Order is preserved through lowering. *)
+
+type comparison_op =
+  | Equal
+  | NotEqual
+  | Less
+  | LessEqual
+  | Greater
+  | GreaterEqual
+      (** The six binary comparison operators the parser admits inside a
+          {!Compare} expression. *)
+
+(** The surface expression sublanguage used inside {!Restrict} and {!Join}
+    predicates. {!Column} carries an AST-side {!column_reference}; resolution
+    against a row schema happens after lowering. *)
+type expression =
+  | Literal of Scalar.value
+      (** A literal scalar value as written in the source. *)
+  | Column of column_reference
+      (** A reference to a column by name (bare or qualified). *)
+  | Compare of { left : expression; op : comparison_op; right : expression }
+      (** A binary comparison between two sub-expressions. *)
+  | And of expression * expression
+      (** Logical conjunction, left-associative in the surface grammar. *)
+  | Or of expression * expression
+      (** Logical disjunction, left-associative in the surface grammar. *)
+  | Not of expression  (** Logical negation. *)
 
 type t =
   | Relation_name of string
       (** [Relation_name name] is a reference to the base relation called [name]
           — the surface syntax is just the bare identifier. *)
-  | Restrict of { input : t; predicate : Expression.t }
+  | Restrict of { input : t; predicate : expression }
       (** [Restrict { input; predicate }] is the surface form
           [input | restrict <predicate>]. The constructor name follows the
           relational-algebra term (σ); SQL's `SELECT` is intentionally avoided
@@ -89,13 +108,10 @@ type t =
           [left] and [right]; its schema is [left]'s fields followed by
           [right]'s, with each field carrying the qualifier it had on the way
           in. *)
-  | Join of { left : t; right : t; predicate : Expression.t }
+  | Join of { left : t; right : t; predicate : expression }
       (** [Join { left; right; predicate }] is the surface form
-          [left | join right on <predicate>]. Sugar for cross product followed
-          by a restriction: [Lower] desugars it to
-          [Logical.Restrict (Logical.CrossProduct { left; right }, predicate)],
-          and {!Translate} folds that shape into a single
-          [Physical.NestedLoopJoin]. The schema rule is the same as
+          [left | join right on <predicate>]. Sugar for a cross product followed
+          by a restriction on the same predicate. The schema rule is the same as
           [CrossProduct] -- both inputs' fields, each retaining its qualifier --
           so a [predicate] like [users.id = orders.user_id] resolves
           unambiguously across the combined schema. *)
@@ -125,18 +141,14 @@ type t =
   | Scalar_literal of Scalar.value
       (** [Scalar_literal value] is the surface form of a bare scalar at the
           head of a pipeline: [42], ["hello"], [true]. The pipeline's source is
-          the value itself; evaluation hands the value down the pipe as a
-          {!Term.Scalar_value}, and [| type] over a scalar literal yields the
-          corresponding {!Scalar.kind}. *)
+          the value itself. *)
   | Row_literal of (column_reference * Scalar.value) list
       (** [Row_literal fields] is the surface form of a bare row at the head of
           a pipeline: [(id = 1, name = "alice")] parses as a list of two fields
           whose column references are unqualified. A qualified spelling such as
           [(users.id = 1)] parses with [qualifier = Some "users"] on the
           reference. The empty row [()] parses as [Row_literal []]. Fields are
-          in source order; the parser rejects duplicate qualified-name pairs.
-          Evaluation hands the row down the pipe as a {!Term.Row_value}, and
-          [| type] over a row literal yields the corresponding {!Row.kind}. *)
+          in source order; the parser rejects duplicate qualified-name pairs. *)
   | Drop_table of { table_name : string }
       (** [Drop_table { table_name }] is the surface form [drop table <name>]. A
           leaf source -- nothing sits at pipeline-source position to its left.
@@ -148,15 +160,14 @@ type t =
     }
       (** [Create_table_empty { table_name; type_expression }] is the surface
           form [<type-expression> | create table <name>] -- creates an empty
-          table whose declared kind is the carried [type_expression]. {!Lower}
-          calls {!lower_relation_type} to resolve the type expression to a
-          {!Relation.kind}. Yields a one-row [(created : string)] relation. *)
+          table whose declared type is the carried [type_expression]. Yields a
+          one-row [(created : string)] relation. *)
   | Create_table_seeded of { table_name : string; source : t }
       (** [Create_table_seeded { table_name; source }] is the surface form
           [<value-pipeline> | create table <name>] -- creates [table_name] from
-          [source]'s row kind and seeds it with [source]'s rows. {!Lower}
-          recurses into [source]; the target kind is derived from [source]'s
-          kind at eval time. Yields a one-row [(created : string)] relation. *)
+          [source]'s row type and seeds it with [source]'s rows. The target type
+          is derived from [source]'s type at eval time. Yields a one-row
+          [(created : string)] relation. *)
   | Relation_literal of {
       relation_type : type_expression;
       rows : (column_reference * Scalar.value) list list;
@@ -166,15 +177,12 @@ type t =
           — a relation whose type is declared up front and whose rows are
           self-describing row literals. The empty form [relation (...) {}]
           parses with [rows = []]. Field names inside each row come straight
-          from the surface; {!Lower} resolves [relation_type] via
-          {!Lower.lower_relation_type} to a {!Relation.kind}, checks each row
-          against it and reorders the values to the kind's field order, then
-          emits a {!Plan.Logical.Relation_literal}. *)
+          from the surface; each row is validated and reordered against
+          [relation_type] during lowering. *)
   | Catalog_source
       (** [Catalog_source] is the surface form of the bare [catalog] keyword at
-          pipeline-source position. It yields the database's catalog as a
-          [Term.Catalog_value], whose entries are every table's name paired with
-          its rows. {!Lower} emits a logical [Catalog_source] node; the
+          pipeline-source position. It yields the database's catalog as a value
+          whose entries are every table's name paired with its rows. The
           evaluator opens a per-table cursor lazily for each entry, scoped to
           the read transaction. *)
   | Tables of { input : t }

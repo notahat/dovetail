@@ -204,6 +204,34 @@ let expression_or ~left ~right : Expression.t = Or (left, right)
 (** An [Expression.t] negating a sub-expression. *)
 let expression_not operand : Expression.t = Not operand
 
+(** An [Ast.expression] referring to a bare (unqualified) column. *)
+let ast_expression_column name : Surface_ra.Ast.expression =
+  Column (column_reference name)
+
+(** An [Ast.expression] referring to a qualified column. *)
+let ast_expression_qualified_column ~qualifier ~name : Surface_ra.Ast.expression
+    =
+  Column (qualified_column_reference ~qualifier ~name)
+
+(** An [Ast.expression] wrapping a literal value. *)
+let ast_expression_literal value : Surface_ra.Ast.expression = Literal value
+
+(** An [Ast.expression] comparing two sub-expressions. The keyword arguments
+    mirror the record fields so the call site reads close to the expression's
+    source form. *)
+let ast_expression_compare ~left ~op ~right : Surface_ra.Ast.expression =
+  Compare { left; op; right }
+
+(** An [Ast.expression] composing two sub-expressions with logical AND. *)
+let ast_expression_and ~left ~right : Surface_ra.Ast.expression =
+  And (left, right)
+
+(** An [Ast.expression] composing two sub-expressions with logical OR. *)
+let ast_expression_or ~left ~right : Surface_ra.Ast.expression = Or (left, right)
+
+(** An [Ast.expression] negating a sub-expression. *)
+let ast_expression_not operand : Surface_ra.Ast.expression = Not operand
+
 (** [expect_relation callback term] applies [callback] to the relation inside
     [term], failing the running test with [Alcotest.fail] if [term] is the
     relation-kind arm instead. Wraps an existing relation-shaped callback for

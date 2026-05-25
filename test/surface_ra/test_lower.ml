@@ -35,14 +35,18 @@ let test_pipeline_yields_fixture_rows () =
              Alcotest.(check row_list_testable)
                "five rows from AST" expected_users_rows rows)))
 
-let id_equals_three =
-  expression_compare ~left:(expression_column "id") ~op:Equal
-    ~right:(expression_literal (Scalar.Int64 3L))
+let id_equals_three_ast =
+  ast_expression_compare
+    ~left:(ast_expression_column "id")
+    ~op:Equal
+    ~right:(ast_expression_literal (Scalar.Int64 3L))
+
+let id_equals_three = Lower.lower_expression id_equals_three_ast
 
 let test_restrict_lowers_to_logical_restrict () =
   let ast =
     Ast.Restrict
-      { input = Ast.Relation_name "users"; predicate = id_equals_three }
+      { input = Ast.Relation_name "users"; predicate = id_equals_three_ast }
   in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
@@ -57,7 +61,7 @@ let test_restrict_pipeline_yields_filtered_rows () =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         Ast.Restrict
-          { input = Ast.Relation_name "users"; predicate = id_equals_three }
+          { input = Ast.Relation_name "users"; predicate = id_equals_three_ast }
       in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in
@@ -126,11 +130,14 @@ let test_cross_product_lowers_to_logical_cross_product () =
        { left = Scan { table = "users" }; right = Scan { table = "orders" } })
     logical
 
-let users_id_equals_orders_user_id =
-  expression_compare
-    ~left:(expression_qualified_column ~qualifier:"users" ~name:"id")
+let users_id_equals_orders_user_id_ast =
+  ast_expression_compare
+    ~left:(ast_expression_qualified_column ~qualifier:"users" ~name:"id")
     ~op:Equal
-    ~right:(expression_qualified_column ~qualifier:"orders" ~name:"user_id")
+    ~right:(ast_expression_qualified_column ~qualifier:"orders" ~name:"user_id")
+
+let users_id_equals_orders_user_id =
+  Lower.lower_expression users_id_equals_orders_user_id_ast
 
 let test_join_lowers_to_restrict_over_cross_product () =
   let ast =
@@ -138,7 +145,7 @@ let test_join_lowers_to_restrict_over_cross_product () =
       {
         left = Ast.Relation_name "users";
         right = Ast.Relation_name "orders";
-        predicate = users_id_equals_orders_user_id;
+        predicate = users_id_equals_orders_user_id_ast;
       }
   in
   let logical = Lower.lower ast in
@@ -219,8 +226,10 @@ let test_insert_mutation_lowers_relational_source () =
       {
         input = Relation_name "orders";
         predicate =
-          expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Scalar.Int64 1L));
+          ast_expression_compare
+            ~left:(ast_expression_column "id")
+            ~op:Equal
+            ~right:(ast_expression_literal (Scalar.Int64 1L));
       }
   in
   let plan : Ast.t = Insert { source; table = "orders" } in
