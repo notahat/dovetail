@@ -4,10 +4,9 @@
     or falls out the end of one. The evaluator's continuation receives a
     [Term.t]; the REPL's renderer dispatches on its arms.
 
-    The type covers the three rungs the language exposes — scalar, row, and
-    relation — on both faces: a [_value] arm for a runtime value and a [_kind]
-    arm for the static shape that classifies such a value. Further arms (e.g. a
-    catalog rung) grow incrementally as later work needs them. The [`Set] /
+    The type covers the four rungs the language exposes — scalar, row, relation,
+    and catalog — on both faces: a [_value] arm for a runtime value and a
+    [_kind] arm for the static shape that classifies such a value. The [`Set] /
     [`Bag] phantom on [Relation_value] is the same multiplicity tag
     {!Relation.t} carries; the other arms have no multiplicity to classify, so
     the tag is unconstrained when those arms are in use. *)
@@ -30,6 +29,13 @@ type 'tag t =
   | Relation_kind of Relation.kind
       (** A relation's kind: the shape-and-refinements descriptor a pipeline
           produces when it yields a type rather than rows. *)
+  | Catalog_value of Catalog.value
+      (** A catalog's value: the database's tables and their rows, produced by
+          the bare [catalog] source. Carries no [`Set] / [`Bag] phantom because
+          {!Catalog.value} pins each entry to [`Set] internally. *)
+  | Catalog_kind of Catalog.kind
+      (** A catalog's kind: the per-table relation kinds, produced when the
+          catalog rung yields a type rather than data. *)
   constraint 'tag = [< `Set | `Bag ]
 
 val format : Format.formatter -> 'tag t -> unit
@@ -38,4 +44,6 @@ val format : Format.formatter -> 'tag t -> unit
     {!Scalar.format_kind}; [Row_value] via {!Row.format}; [Row_kind] via
     {!Row.format_kind}; [Relation_value] in the canonical relation-literal
     syntax (via {!Relation.format}); [Relation_kind] in the surface
-    relation-type syntax (via {!Relation.format_kind}). *)
+    relation-type syntax (via {!Relation.format_kind}). The [Catalog_value] and
+    [Catalog_kind] arms currently emit a placeholder rendering; a real
+    catalog-literal renderer arrives in a follow-up step. *)

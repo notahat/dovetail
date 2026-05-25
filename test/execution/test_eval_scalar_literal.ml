@@ -16,13 +16,15 @@ module Scalar = Dovetail_core.Scalar
 let expect_scalar_value callback : [ `Bag ] Term.t -> 'a = function
   | Term.Scalar_value value -> callback value
   | Term.Scalar_kind _ | Term.Row_value _ | Term.Row_kind _
-  | Term.Relation_value _ | Term.Relation_kind _ ->
+  | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
+  | Term.Catalog_kind _ ->
       Alcotest.fail "expected a scalar value but got a different term arm"
 
 let expect_scalar_kind callback : [ `Bag ] Term.t -> 'a = function
   | Term.Scalar_kind kind -> callback kind
   | Term.Scalar_value _ | Term.Row_value _ | Term.Row_kind _
-  | Term.Relation_value _ | Term.Relation_kind _ ->
+  | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
+  | Term.Catalog_kind _ ->
       Alcotest.fail "expected a scalar kind but got a different term arm"
 
 let scalar_value_testable : Scalar.value Alcotest.testable =

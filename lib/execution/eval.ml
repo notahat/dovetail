@@ -135,10 +135,10 @@ and evaluate_unqualify environment transaction ~input continue =
         let kind = unqualify_row_kind row.kind in
         continue (Term.Row_value ({ kind; value = row.value } : Row.t))
     | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
-    | Term.Row_kind _ ->
+    | Term.Row_kind _ | Term.Catalog_value _ | Term.Catalog_kind _ ->
         (* [Unqualify] is only emitted over a relation- or row-yielding
-           sub-plan; the kind and scalar arms don't reach it through any
-           constructor available today. *)
+           sub-plan; the kind, scalar, and catalog arms don't reach it
+           through any constructor available today. *)
         assert false)
 
 (* Compute [input]'s static kind and hand [continue] the corresponding
@@ -199,10 +199,12 @@ and eval_input environment transaction plan continue =
   eval environment transaction plan (function
     | Term.Relation_value relation -> continue relation
     | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
-    | Term.Row_value _ | Term.Row_kind _ ->
+    | Term.Row_value _ | Term.Row_kind _ | Term.Catalog_value _
+    | Term.Catalog_kind _ ->
         (* By construction relational sub-plans only ever produce relation
-           values. Kinds arise from [Type_op]; the scalar and row arms have no
-           constructors that wire into a relational sub-plan today. *)
+           values. Kinds arise from [Type_op]; the scalar, row, and catalog
+           arms have no constructors that wire into a relational sub-plan
+           today. *)
         assert false)
 
 (* Stream the input through [eval], then wrap its value seq in a [Seq.filter]

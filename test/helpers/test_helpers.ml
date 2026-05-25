@@ -199,7 +199,8 @@ let expression_not operand : Expression.t = Not operand
 let expect_relation callback : [ `Bag ] Term.t -> 'a = function
   | Term.Relation_value relation -> callback relation
   | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
-  | Term.Row_value _ | Term.Row_kind _ ->
+  | Term.Row_value _ | Term.Row_kind _ | Term.Catalog_value _
+  | Term.Catalog_kind _ ->
       Alcotest.fail "expected a relation value but got a different term arm"
 
 (** A catalog callback that knows about no tables. Use in [Translate]-level unit
@@ -260,7 +261,8 @@ let with_query_kind query check_kind =
       Execution.Eval.eval environment transaction physical (function
         | Term.Relation_kind kind -> check_kind kind
         | Term.Relation_value _ | Term.Scalar_value _ | Term.Scalar_kind _
-        | Term.Row_value _ | Term.Row_kind _ ->
+        | Term.Row_value _ | Term.Row_kind _ | Term.Catalog_value _
+        | Term.Catalog_kind _ ->
             Alcotest.failf
               "expected %S to yield a relation kind but got a different term \
                arm"
@@ -288,7 +290,8 @@ let with_query_scalar_value query check_value =
       Execution.Eval.eval environment transaction physical (function
         | Term.Scalar_value value -> check_value value
         | Term.Scalar_kind _ | Term.Row_value _ | Term.Row_kind _
-        | Term.Relation_value _ | Term.Relation_kind _ ->
+        | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
+        | Term.Catalog_kind _ ->
             Alcotest.failf
               "expected %S to yield a scalar value but got a different term arm"
               query))
@@ -315,7 +318,8 @@ let with_query_scalar_kind query check_kind =
       Execution.Eval.eval environment transaction physical (function
         | Term.Scalar_kind kind -> check_kind kind
         | Term.Scalar_value _ | Term.Row_value _ | Term.Row_kind _
-        | Term.Relation_value _ | Term.Relation_kind _ ->
+        | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
+        | Term.Catalog_kind _ ->
             Alcotest.failf
               "expected %S to yield a scalar kind but got a different term arm"
               query))
@@ -342,7 +346,8 @@ let with_query_row_value query check_row =
       Execution.Eval.eval environment transaction physical (function
         | Term.Row_value row -> check_row row
         | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_kind _
-        | Term.Relation_value _ | Term.Relation_kind _ ->
+        | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
+        | Term.Catalog_kind _ ->
             Alcotest.failf
               "expected %S to yield a row value but got a different term arm"
               query))
@@ -369,7 +374,8 @@ let with_query_row_kind query check_kind =
       Execution.Eval.eval environment transaction physical (function
         | Term.Row_kind kind -> check_kind kind
         | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_value _
-        | Term.Relation_value _ | Term.Relation_kind _ ->
+        | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
+        | Term.Catalog_kind _ ->
             Alcotest.failf
               "expected %S to yield a row kind but got a different term arm"
               query))

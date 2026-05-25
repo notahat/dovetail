@@ -5,5 +5,6 @@
   test_expression
   test_expression_format
   test_relation
+  test_catalog
   test_term)
  (libraries alcotest dovetail.core test_helpers))

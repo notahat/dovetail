@@ -17,7 +17,8 @@ module Storage = Dovetail_storage
 let expect_relation_kind callback : [ `Bag ] Term.t -> 'a = function
   | Term.Relation_kind kind -> callback kind
   | Term.Relation_value _ | Term.Scalar_value _ | Term.Scalar_kind _
-  | Term.Row_value _ | Term.Row_kind _ ->
+  | Term.Row_value _ | Term.Row_kind _ | Term.Catalog_value _
+  | Term.Catalog_kind _ ->
       Alcotest.fail "expected a relation kind but got a different term arm"
 
 let kind_testable : Relation.kind Alcotest.testable =
