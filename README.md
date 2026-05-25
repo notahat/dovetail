@@ -85,6 +85,8 @@ additions, some are tooling and infrastructure; the order they land in
 is not committed to here.
 
 - Primary key range lookups.
+- Autoincrement columns.
+- UUID columns, with automatic UUIDv7 generation.
 - Secondary indexes on columns other than the primary key.
 - Hash join, for joins where neither side has a useful index.
 - NULL values and option-typed columns. Cross-cutting: touches `Value`,
@@ -92,7 +94,7 @@ is not committed to here.
 - Set operators: `distinct`, `union`, `intersect`, `difference`.
 - `sort` and `limit`.
 - Outer joins.
-- Aggregation, group by, having.
+- Aggregation (`count`, `sum`, etc.), group by, having.
 - Update and delete (the slice-11 DML deferrals), with the
   upstream-identity validator the DML design doc describes and an
   assignments expression sublanguage.
