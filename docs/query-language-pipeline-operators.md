@@ -239,10 +239,6 @@ followed by any refinements (today just `primary key (...)`).
 through `type` (`<input> | type | type`) is rejected -- the second
 `type`'s input is already a type, not a relation.
 
-This is the replacement for the retired `:describe` statement; see
-[`<name> | type` in the data-definition reference](query-language-data-definition.md)
-for the catalog-inspection use.
-
 ```
 > users | type
 (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id))

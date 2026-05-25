@@ -132,10 +132,7 @@ let check_for_duplicate_row_fields fields =
   walk StringSet.empty fields
 
 (* The lowercase kind keywords [int64], [string], and [bool] inside a type
-   expression. Distinct from the capitalised identifiers [Int64] / [String]
-   / [Bool] used by the [:create table] grammar; the two surfaces are
-   converging on the lowercase form but the legacy DDL parser still owns
-   the capitalised one. *)
+   expression. *)
 let type_expression_kind_keyword =
   keyword "int64" *> return (Scalar.Int64 : Scalar.kind)
   <|> keyword "string" *> return (Scalar.String : Scalar.kind)
@@ -589,10 +586,8 @@ let pipeline_parser =
   create_table_empty_form <|> value_pipeline
 
 (* The top-level grammar: optional leading whitespace, then a relational
-   pipeline. The leading [:] sigil that used to introduce a DDL
-   statement is no longer recognised, so [:list tables] and friends
-   are now plain parse errors. [end_of_input] at the tail enforces
-   full consumption, so trailing garbage is rejected. *)
+   pipeline. [end_of_input] at the tail enforces full consumption, so
+   trailing garbage is rejected. *)
 let program_parser = whitespace *> pipeline_parser <* whitespace <* end_of_input
 let parse input = parse_string ~consume:All program_parser input
 

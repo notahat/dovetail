@@ -6,9 +6,7 @@
     where the operators take their meaning from algebra rather than syntax.
 
     Every top-level input is a relational pipeline: an {!t} whose operators each
-    produce a relation, including write operators like {!Insert}. The older
-    two-universe shape (a pipeline-vs-DDL wrapper) has been retired along with
-    the [:]-sigil DDL grammar. *)
+    produce a relation, including write operators like {!Insert}. *)
 
 module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression

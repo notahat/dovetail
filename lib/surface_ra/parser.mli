@@ -5,8 +5,8 @@
     [restrict <predicate>], [project <columns>], [cross <relation>],
     [join <relation> on <predicate>], [type], and optionally a terminal sink
     ([insert into <table>]). Whitespace surrounding tokens is tolerated;
-    anything else (extra tokens, malformed identifiers, empty input, a leading
-    [:] sigil from the retired DDL grammar) is rejected.
+    anything else (extra tokens, malformed identifiers, empty input) is
+    rejected.
 
     The error type is currently a string passed straight from angstrom. When
     user-visible errors gain location information or structured cases this
@@ -23,9 +23,7 @@ val parse : string -> (Ast.t, error) result
 (** [parse input] parses [input] as a complete top-level pipeline. [Ast.Insert]
     sits inside [t] as a regular operator; the pipeline grammar enforces
     structurally that a sink terminates a pipeline -- a query operator after
-    [| insert into ...] is a parse error. A leading [:] is no longer recognised:
-    every DDL statement has been retired in favour of pipe-form operators, so
-    [:list tables] and friends are now plain parse errors.
+    [| insert into ...] is a parse error.
 
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)

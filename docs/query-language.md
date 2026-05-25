@@ -20,9 +20,6 @@ The guide is in several parts:
 - [Expression and projection reference](query-language-expressions.md)
   -- the sublanguages used inside `restrict`, `project`, and the
   `on` clause of `join`.
-- [Data definition reference](query-language-data-definition.md) --
-  redirect page; data definition lives entirely in the pipeline grammar
-  now (`create table`, `drop table`, `catalog | tables`, `| type`).
 
 ## Running the REPL
 

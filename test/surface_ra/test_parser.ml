@@ -481,19 +481,6 @@ let test_pipeline_parens_with_colon_and_equals_mixed_is_rejected () =
      and the parse is rejected. *)
   rejects "(name = \"x\", id: int64) | create table users"
 
-(* The retired DDL sigil. A leading [:] used to introduce a
-   data-definition statement; every form has since been retired in
-   favour of pipe-form operators. The sigil is no longer recognised
-   anywhere -- a leading [:list tables] is now a parse error just like
-   any other unknown input. *)
-
-let test_ddl_list_tables_is_no_longer_recognised () = rejects ":list tables"
-
-(* The [:drop table] DDL form has been retired in favour of the
-   [drop table <name>] pipe-source leaf. The sigil form is now
-   rejected outright. *)
-let test_ddl_drop_table_is_no_longer_recognised () = rejects ":drop table users"
-
 (* A bare [drop] at pipeline-source position commits to the [drop table
    <name>] leaf grammar; if [table] doesn't follow, the parse fails
    rather than silently treating [drop] as a relation name. Mirrors the
@@ -524,27 +511,16 @@ let test_pipeline_drop_followed_by_non_table_keyword_is_rejected () =
 let test_pipeline_keyword_table_is_a_relation_name () =
   parses "table" (Ast.Relation_name "table")
 
-let test_ddl_rejects_bare_sigil () = rejects ":"
-let test_ddl_rejects_unknown_body () = rejects ":list"
-let test_ddl_rejects_unknown_keyword () = rejects ":wibble"
-let test_ddl_rejects_trailing_garbage () = rejects ":list tables xyz"
+(* [:] is not part of the grammar anywhere. A bare leading [:],
+   anything immediately following it, and an embedded [:] mid-pipeline
+   all parse as ordinary syntax errors. *)
+let test_rejects_bare_colon () = rejects ":"
+let test_rejects_leading_colon () = rejects ":foo bar"
+let test_rejects_colon_mid_pipeline () = rejects "users | :foo"
 
-let test_ddl_sigil_mid_pipeline_is_parse_error () =
-  rejects "users | :drop table x"
-
-let test_ddl_describe_is_no_longer_recognised () =
-  (* [:describe] used to be a DDL statement; the [type] pipe operator
-     replaces it. The parser should now reject the sigil form. *)
-  rejects ":describe users"
-
-(* The [:create table] DDL form has been retired in favour of the
-   pipe-form sink ([<type-expr> | create table <name>]). The sigil
-   form should now be rejected outright. *)
-let test_ddl_create_table_is_no_longer_recognised () =
-  rejects ":create table widgets (id: Int64) primary key (id)"
-
-(* The DDL keyword [create] is not globally reserved -- matches the
-   [list] / [tables] / [drop] / [table] cases above. *)
+(* The pipeline keyword [create] is not globally reserved -- it is a
+   bare identifier outside the [<type-expr> | create table <name>] sink
+   form. Mirrors the [list] / [tables] / [drop] / [table] cases. *)
 let test_pipeline_keyword_create_is_a_relation_name () =
   parses "create" (Ast.Relation_name "create")
 
@@ -815,9 +791,8 @@ let test_relation_literal_rejects_missing_type_expression () =
 let test_relation_literal_rejects_missing_brace_block () =
   rejects "relation (id: int64)"
 
-(* The curly-brace form [{col: val}] was retired with the relation literal
-   syntax flip. Confirm the parser now rejects it; pipeline-source position no
-   longer accepts the curly form. *)
+(* The curly-brace form [{col: val}] is not part of the grammar; row
+   literals use the paren form [(col = val)]. *)
 let test_relation_literal_curly_form_is_a_parse_error () = rejects "{id: 7}"
 
 let test_relation_literal_followed_by_type_step () =
@@ -830,9 +805,8 @@ let test_relation_literal_followed_by_type_step () =
              { kind = id_int64_name_string_kind; rows = [ alice_row ] };
        })
 
-(* The DDL keywords are not globally reserved -- [list] and [tables] are
-   valid identifiers inside a pipeline. This locks in that the sigil is
-   what reserves them, and the reservation is bounded to the DDL body. *)
+(* [list] is not a reserved keyword -- it parses as an ordinary
+   relation name in a pipeline. *)
 let test_pipeline_keyword_list_is_a_relation_name () =
   parses "list" (Ast.Relation_name "list")
 
@@ -1037,7 +1011,7 @@ let () =
             `Quick test_relation_literal_rejects_missing_brace_block;
           Alcotest.test_case "typed literal feeds a [| type] step" `Quick
             test_relation_literal_followed_by_type_step;
-          Alcotest.test_case "the retired [{col: val}] form is a parse error"
+          Alcotest.test_case "the [{col: val}] curly form is a parse error"
             `Quick test_relation_literal_curly_form_is_a_parse_error;
         ] );
       ( "insert sink syntax",
@@ -1118,26 +1092,18 @@ let () =
           Alcotest.test_case "rejects parens that mix [:] and [=] bindings"
             `Quick test_pipeline_parens_with_colon_and_equals_mixed_is_rejected;
         ] );
-      ( "ddl syntax",
+      ( "catalog-shaped pipelines",
         [
-          Alcotest.test_case ":list tables is no longer recognised" `Quick
-            test_ddl_list_tables_is_no_longer_recognised;
-          Alcotest.test_case "rejects a bare sigil" `Quick
-            test_ddl_rejects_bare_sigil;
-          Alcotest.test_case "rejects an unknown body" `Quick
-            test_ddl_rejects_unknown_body;
-          Alcotest.test_case "rejects an unknown DDL keyword" `Quick
-            test_ddl_rejects_unknown_keyword;
-          Alcotest.test_case "rejects trailing garbage after the body" `Quick
-            test_ddl_rejects_trailing_garbage;
-          Alcotest.test_case "rejects a sigil mid-pipeline" `Quick
-            test_ddl_sigil_mid_pipeline_is_parse_error;
+          Alcotest.test_case "rejects a bare colon" `Quick
+            test_rejects_bare_colon;
+          Alcotest.test_case "rejects a leading colon" `Quick
+            test_rejects_leading_colon;
+          Alcotest.test_case "rejects a colon mid-pipeline" `Quick
+            test_rejects_colon_mid_pipeline;
           Alcotest.test_case "[list] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_list_is_a_relation_name;
           Alcotest.test_case "[tables] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_tables_is_a_relation_name;
-          Alcotest.test_case ":drop table is no longer a recognised statement"
-            `Quick test_ddl_drop_table_is_no_longer_recognised;
           Alcotest.test_case "bare [drop] in a pipeline is rejected" `Quick
             test_pipeline_keyword_drop_alone_is_rejected;
           Alcotest.test_case "[drop table <name>] parses as a Drop_table leaf"
@@ -1153,10 +1119,6 @@ let () =
             test_pipeline_drop_followed_by_non_table_keyword_is_rejected;
           Alcotest.test_case "[table] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_table_is_a_relation_name;
-          Alcotest.test_case ":describe is no longer a recognised statement"
-            `Quick test_ddl_describe_is_no_longer_recognised;
-          Alcotest.test_case ":create table is no longer a recognised statement"
-            `Quick test_ddl_create_table_is_no_longer_recognised;
           Alcotest.test_case "[create] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_create_is_a_relation_name;
           Alcotest.test_case "bare [catalog] parses as a Catalog_source leaf"

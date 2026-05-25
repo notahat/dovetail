@@ -1,9 +1,8 @@
 # Type system
 
-A design note, not a plan. It commits to a surface syntax for the
-ladder of values and types Dovetail already organises its core around
-— Scalar, Row, Relation, Catalog — and folds DDL into the same
-pipe-style language the surface RA already uses.
+Reference for Dovetail's surface syntax across the ladder of values and
+types its core organises — Scalar, Row, Relation, Catalog — and the
+single pipe-style language that covers them all.
 
 Pairs with:
 
@@ -36,23 +35,13 @@ syntax lands.
 
 ## The premise
 
-Dovetail's core already organises everything as types and values at
-four rungs: Scalar, Row, Relation, Catalog. The query language already
-composes operators through `|`. The DDL surface — a separate `:`-sigil
-grammar with its own AST — is the one place that doesn't fit. This
-note describes a syntax in which the ladder is a first-class part of
-the language, types are values that flow through pipes, and DDL
-becomes ordinary pipe-stages over them.
+Dovetail's core organises everything as types and values at four rungs:
+Scalar, Row, Relation, Catalog. The query language composes operators
+through `|`, and the ladder is a first-class part of it: types are
+values that flow through pipes, and catalog mutation is ordinary
+pipe-stages over them.
 
-The move is *not* "invent a pipe syntax." It is "extend the pipe
-syntax that already exists in `lib/surface_ra/parser.ml` so that
-types, rows, relations, and catalog operations live inside it instead
-of beside it."
-
-## The pipe is already there
-
-A quick orientation, because the move below leans on what the
-existing parser does:
+## How the pipe works
 
 - `|` is the only composition operator. It is left-associative; each
   step is a function from the upstream relation to a new one
@@ -64,20 +53,12 @@ existing parser does:
   `Filter` and `Project` wrap with `Seq.filter` / `Seq.map`;
   `FullScan` opens a live cursor. Pipelines compose without
   intermediate materialisation (`lib/execution/eval.ml`).
-- `insert into …` is a regular pipe operator that happens to terminate
-  a pipeline (the parser rejects anything after it). It produces a
-  one-row `(insert_count: int64)` relation, so downstream eval and
+- `insert into …`, `create table …`, and `drop table …` are regular
+  pipe operators that happen to terminate a pipeline (the parser
+  rejects anything after them). They produce a one-row result relation
+  (`insert_count`, `created`, `dropped`), so downstream eval and
   printing don't need a separate "mutation" universe
   (`parser.ml`'s `insert_sink` / `pipeline_parser`).
-
-DDL is the exception: a `:`-sigil grammar with its own AST
-(`lib/ddl/statement.ml`), its own executor (`Ddl_executor`), and a
-canonical-form printer that round-trips with the DDL parser
-(`lib/ddl/format.ml`). It does not pass through Lower / Translate /
-Physical / Eval. The REPL classifies a parsed top-level into either
-"pipeline" or "DDL statement" and dispatches accordingly.
-
-The aim is to remove that fork.
 
 ## Syntax at each rung
 
@@ -221,7 +202,7 @@ catalog | type                         → catalog { users: (…), orders: (…)
 
 It works at every rung. The REPL prints whatever falls out the end of
 the pipeline, so `users | type` typed alone renders the relation type
-of `users` — the same output `:describe users` produces today.
+of `users`.
 
 `type` applied to a type is an error: `(id: int64) | type` fails with
 "type: input is already a type." The system has no notion of "types
@@ -258,31 +239,19 @@ Some things to note about that table:
   relation-value. A type creates an empty table of that shape; a
   value creates the table *and* seeds it with the rows. This is one
   operator with two arities at the input rung, not two operators.
-- **`catalog | tables`** is the new spelling for `:list tables`. It is
-  a projection on the catalog record — "give me the field names" —
-  one rung up from `users | project name`. It is *not* a relation
-  operation; it returns a list, the same way the old DDL surface did.
-- **`insert into`** already exists and is unchanged. It accepts a
-  relation as upstream (existing) and now also a single row literal
-  (new — falls out of rows being first-class).
+- **`catalog | tables`** is a projection on the catalog record — "give
+  me the field names" — one rung up from `users | project name`. It
+  is *not* a relation operation; it returns a one-column
+  `(name: string)` relation of every table in the catalog.
+- **`insert into`** accepts a relation as upstream and also a single
+  row literal (the latter falls out of rows being first-class).
 
-## How the old DDL surface mapped over
+## Catalogs
 
-The `:`-sigil DDL universe has been fully retired. Every statement is
-now a pipe-form operator; `lib/ddl/` is gone, and the parser no longer
-recognises a leading `:`.
-
-| Retired DDL                                                 | Pipe-form replacement                                                |
-|-------------------------------------------------------------|----------------------------------------------------------------------|
-| `:list tables`                                              | `catalog \| tables`                                                  |
-| `:create table users (id: int64, …) primary key (id)`       | `(id: int64, …, primary key (id)) \| create table users`             |
-| `:drop table users`                                         | `drop table users`                                                   |
-| `:describe users`                                           | `users \| type`                                                      |
-
-The catalog value is a real, fully-populated value at the surface — the
-"data deliberately absent" stance recorded in slice 17's framework
-sketch was reversed once consumers (the `catalog` source and the
-`tables` operator) arrived. The single-catalog model still holds; a
+The catalog value is a fully-populated value at the surface: bare
+`catalog` typed in the REPL renders every table's rows, scoped to a
+single read transaction with lazy cursors. The single-catalog model
+holds — Dovetail has exactly one catalog per database — and a
 `create database` form and multi-catalog support are not committed.
 
 ## Qualifiers
