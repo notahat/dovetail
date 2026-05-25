@@ -674,6 +674,47 @@ let test_project_unknown_column_renders_with_project_prefix () =
     "rendered project unknown" "Project: unknown column \"missing\""
     (Typecheck.render error)
 
+let test_tables_over_non_catalog_input_reports_structured_error () =
+  (* [Scalar_literal] sits at the scalar rung. [Tables] requires a catalog
+     input, so this is a rung mismatch the typechecker should catch. *)
+  let plan : Logical.t = Tables { input = Scalar_literal (Scalar.Int64 42L) } in
+  let expected : Typecheck.error list =
+    [ Tables_input_wrong_rung { actual = Scalar } ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Tables_input_wrong_rung error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured tables rung error" expected errors
+
+let test_tables_input_wrong_rung_renders_with_tables_prefix () =
+  let error : Typecheck.error = Tables_input_wrong_rung { actual = Scalar } in
+  Alcotest.(check string)
+    "rendered tables rung error" "Tables: expected a catalog input, got scalar"
+    (Typecheck.render error)
+
+let test_unqualify_over_catalog_input_reports_structured_error () =
+  (* [Catalog_source] is the catalog rung. [Unqualify] only makes sense on
+     a relation or row input. *)
+  let plan : Logical.t = Unqualify { input = Catalog_source } in
+  let expected : Typecheck.error list =
+    [ Unqualify_input_wrong_rung { actual = Catalog } ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected an Unqualify_input_wrong_rung error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured unqualify rung error" expected errors
+
+let test_unqualify_input_wrong_rung_renders_with_unqualify_prefix () =
+  let error : Typecheck.error =
+    Unqualify_input_wrong_rung { actual = Catalog }
+  in
+  Alcotest.(check string)
+    "rendered unqualify rung error"
+    "Unqualify: expected a relation or row input, got catalog"
+    (Typecheck.render error)
+
 let test_restrict_ambiguous_bare_renders_with_match_list () =
   let error : Typecheck.error =
     Unresolved_column
@@ -787,6 +828,20 @@ let () =
           Alcotest.test_case "not-operand error renders with operator prefix"
             `Quick
             test_boolean_operand_required_not_renders_with_operator_prefix;
+        ] );
+      ( "operator-shape preconditions",
+        [
+          Alcotest.test_case
+            "Tables over non-catalog input produces a structured error" `Quick
+            test_tables_over_non_catalog_input_reports_structured_error;
+          Alcotest.test_case "Tables rung error renders with Tables prefix"
+            `Quick test_tables_input_wrong_rung_renders_with_tables_prefix;
+          Alcotest.test_case
+            "Unqualify over catalog input produces a structured error" `Quick
+            test_unqualify_over_catalog_input_reports_structured_error;
+          Alcotest.test_case
+            "Unqualify rung error renders with Unqualify prefix" `Quick
+            test_unqualify_input_wrong_rung_renders_with_unqualify_prefix;
         ] );
       ( "insert kind mismatch",
         [

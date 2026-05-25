@@ -16,6 +16,12 @@ module Expression = Dovetail_core.Expression
 module Row = Dovetail_core.Row
 module Scalar = Dovetail_core.Scalar
 
+(** Coarse classification of what a [Logical.t] subtree yields. Used by the
+    operator-shape preconditions ({!Tables_input_wrong_rung},
+    {!Unqualify_input_wrong_rung}) to describe what kind of value an operator's
+    input actually has when it has the wrong one. *)
+type rung = Scalar | Row | Relation | Catalog | Kind
+
 (** The variant of user-facing typecheck errors. Each constructor carries the
     structured detail an LSP needs; {!render} produces the user-facing string.
 *)
@@ -107,6 +113,15 @@ type error =
           reference for the renderer to echo back. Emitted once per duplicate
           occurrence beyond the first, so a column listed three times produces
           two errors. *)
+  | Tables_input_wrong_rung of { actual : rung }
+      (** A [Tables] operator's input is not a catalog. [actual] is the
+          best-effort rung classification of the input subtree. The renderer
+          turns it into [Tables: expected a catalog input, got <actual>]. *)
+  | Unqualify_input_wrong_rung of { actual : rung }
+      (** An [Unqualify] operator's input is neither a relation nor a row.
+          [actual] is the best-effort rung classification of the input subtree.
+          The renderer turns it into
+          [Unqualify: expected a relation or row input, got <actual>]. *)
   | Ordering_operator_on_unordered_kind of {
       operator : string;
       comparison_op : Expression.comparison_op;

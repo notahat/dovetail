@@ -626,9 +626,9 @@ let test_catalog_pipe_tables_pipe_type_renders_one_column_kind () =
     (render_query_against_fixture "catalog | tables | type")
 
 let test_tables_over_non_catalog_input_raises_user_facing_error () =
-  Alcotest.check_raises "tables over a scalar literal"
-    (Failure "Eval: tables: expected a catalog value, got a scalar value")
-    (fun () -> ignore (render_query_against_fixture "42 | tables"))
+  with_query_failure ~label:"tables over a scalar literal"
+    ~expected:(Failure "Tables: expected a catalog input, got scalar")
+    "42 | tables"
 
 let test_catalog_pipe_type_renders_fixture_catalog_kind () =
   let expected =
@@ -801,8 +801,7 @@ let () =
             "[catalog | tables | type] renders the (name: string) relation kind"
             `Quick test_catalog_pipe_tables_pipe_type_renders_one_column_kind;
           Alcotest.test_case
-            "[42 | tables] raises Eval: tables: expected a catalog value, got \
-             a scalar value"
+            "[42 | tables] raises Tables: expected a catalog input, got scalar"
             `Quick test_tables_over_non_catalog_input_raises_user_facing_error;
         ] );
       ( "scalar literal source",

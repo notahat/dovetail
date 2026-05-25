@@ -4,6 +4,8 @@ module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
 module Scalar = Dovetail_core.Scalar
 
+type rung = Scalar | Row | Relation | Catalog | Kind
+
 type error =
   | Insert_column_mismatch of {
       table_name : string;
@@ -44,6 +46,8 @@ type error =
       operator : string;
       column_reference : Row.column_reference;
     }
+  | Tables_input_wrong_rung of { actual : rung }
+  | Unqualify_input_wrong_rung of { actual : rung }
   | Ordering_operator_on_unordered_kind of {
       operator : string;
       comparison_op : Expression.comparison_op;
@@ -94,6 +98,13 @@ let multiset_difference ~expected ~actual =
   let missing = List.filter (fun name -> not (List.mem name actual)) expected in
   let extra = List.filter (fun name -> not (List.mem name expected)) actual in
   (missing, extra)
+
+let render_rung : rung -> string = function
+  | Scalar -> "scalar"
+  | Row -> "row"
+  | Relation -> "relation"
+  | Catalog -> "catalog"
+  | Kind -> "kind"
 
 let render = function
   | Insert_column_mismatch { table_name; missing; extra } ->
@@ -149,6 +160,12 @@ let render = function
   | Projection_duplicate_column { operator; column_reference } ->
       Printf.sprintf "%s: duplicate column %S" operator
         (Row.format_column_reference column_reference)
+  | Tables_input_wrong_rung { actual } ->
+      Printf.sprintf "Tables: expected a catalog input, got %s"
+        (render_rung actual)
+  | Unqualify_input_wrong_rung { actual } ->
+      Printf.sprintf "Unqualify: expected a relation or row input, got %s"
+        (render_rung actual)
   | Ordering_operator_on_unordered_kind { operator; comparison_op; kind } ->
       Printf.sprintf "%s: ordering operator %s is not defined for %s" operator
         (render_comparison_op comparison_op)
@@ -434,6 +451,28 @@ let check_column_references ~operator ~row_kind references : error list =
                }))
     references
 
+(* Best-effort classification of which rung [plan] sits at. Used by the
+   operator-shape preconditions to know whether an operator's input is the
+   right kind of value -- a relation, a row, a catalog, and so on. An
+   [Unqualify] whose own input has an invalid rung is reported via
+   {!Unqualify_input_wrong_rung}; here we degrade the outer [Unqualify]'s
+   rung to [Relation] so further outer-operator rung checks still have
+   something coherent to test. *)
+let rec rung_of (plan : Logical.t) : rung =
+  match plan with
+  | Scan _ | Restrict _ | Project _ | CrossProduct _ | Relation_literal _
+  | Insert _ | Drop_table _ | Create_table_empty _ | Create_table_seeded _
+  | Tables _ ->
+      Relation
+  | Scalar_literal _ -> Scalar
+  | Row_literal _ -> Row
+  | Catalog_source -> Catalog
+  | Type_op _ -> Kind
+  | Unqualify { input } -> (
+      match rung_of input with
+      | (Relation | Row) as inherited -> inherited
+      | Scalar | Catalog | Kind -> Relation)
+
 (* Post-order walk: gather errors from each subtree, then add any errors
    contributed by the operator itself. *)
 let rec collect_errors ~(catalog : Catalog.kind) (plan : Logical.t) : error list
@@ -446,11 +485,24 @@ let rec collect_errors ~(catalog : Catalog.kind) (plan : Logical.t) : error list
   | Relation_literal _ | Scalar_literal _ | Row_literal _ | Drop_table _
   | Create_table_empty _ | Catalog_source ->
       []
-  | Unqualify { input }
-  | Type_op { input }
-  | Tables { input }
-  | Create_table_seeded { source = input; _ } ->
+  | Type_op { input } | Create_table_seeded { source = input; _ } ->
       collect_errors ~catalog input
+  | Tables { input } ->
+      let input_errors = collect_errors ~catalog input in
+      let rung_errors =
+        match rung_of input with
+        | Catalog -> []
+        | actual -> [ Tables_input_wrong_rung { actual } ]
+      in
+      input_errors @ rung_errors
+  | Unqualify { input } ->
+      let input_errors = collect_errors ~catalog input in
+      let rung_errors =
+        match rung_of input with
+        | Relation | Row -> []
+        | actual -> [ Unqualify_input_wrong_rung { actual } ]
+      in
+      input_errors @ rung_errors
   | Project { input; columns } ->
       let input_errors = collect_errors ~catalog input in
       let input_row_kind = (kind_of ~catalog input).row_kind in

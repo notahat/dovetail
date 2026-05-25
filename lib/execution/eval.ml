@@ -163,20 +163,6 @@ and unqualify_row_kind input_row_kind =
    kind; a row input rebuilds the [Row.t] with the new kind. Other arms are
    internal invariant violations -- [Unqualify] only sits over a relational
    or row-yielding sub-plan today. *)
-(* Short description of a term arm for use in user-facing error messages.
-   Matches the spelling of the corresponding [Term.t] constructor so the
-   surface label and the implementation are easy to correlate when reading
-   a failure trace. *)
-and term_arm_description : [ `Set | `Bag ] Term.t -> string = function
-  | Term.Scalar_value _ -> "a scalar value"
-  | Term.Scalar_kind _ -> "a scalar kind"
-  | Term.Row_value _ -> "a row value"
-  | Term.Row_kind _ -> "a row kind"
-  | Term.Relation_value _ -> "a relation value"
-  | Term.Relation_kind _ -> "a relation kind"
-  | Term.Catalog_value _ -> "a catalog value"
-  | Term.Catalog_kind _ -> "a catalog kind"
-
 (* The static row shape [tables] reports: a one-column [name : string] row,
    one row per table in the input catalog. *)
 and tables_result_kind : Relation.kind =
@@ -186,8 +172,9 @@ and tables_result_kind : Relation.kind =
   }
 
 (* Walk [input]'s [Catalog_value] and stream one row per (table_name, _)
-   entry as a [`Set]-tagged relation with kind [(name: string)]. Any other
-   term arm raises a user-facing [Failure] naming what we got instead. *)
+   entry as a [`Set]-tagged relation with kind [(name: string)]. The
+   non-catalog arms are unreachable: [Plan.Typecheck] rejects a [Tables]
+   whose input sits at the wrong rung before [Eval] runs. *)
 and evaluate_tables environment transaction ~input continue =
   eval environment transaction input (function
     | Term.Catalog_value catalog ->
@@ -198,10 +185,11 @@ and evaluate_tables environment transaction ~input continue =
         continue
           (Term.Relation_value
              ({ kind = tables_result_kind; value } : [ `Set | `Bag ] Relation.t))
-    | other ->
-        failwith
-          (Printf.sprintf "Eval: tables: expected a catalog value, got %s"
-             (term_arm_description other)))
+    | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_value _
+    | Term.Row_kind _ | Term.Relation_value _ | Term.Relation_kind _
+    | Term.Catalog_kind _ ->
+        (* Typecheck has rejected a [Tables] over a non-catalog input. *)
+        assert false)
 
 and evaluate_unqualify environment transaction ~input continue =
   eval environment transaction input (function
@@ -218,9 +206,8 @@ and evaluate_unqualify environment transaction ~input continue =
         continue (Term.Row_value ({ kind; value = row.value } : Row.t))
     | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
     | Term.Row_kind _ | Term.Catalog_value _ | Term.Catalog_kind _ ->
-        (* [Unqualify] is only emitted over a relation- or row-yielding
-           sub-plan; the kind, scalar, and catalog arms don't reach it
-           through any constructor available today. *)
+        (* Typecheck has rejected an [Unqualify] over an input that is not
+           a relation or a row. *)
         assert false)
 
 (* Compute [input]'s static kind and hand [continue] the corresponding

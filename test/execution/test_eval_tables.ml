@@ -38,16 +38,6 @@ let test_tables_over_empty_environment_yields_no_rows () =
              Alcotest.(check row_list_testable)
                "empty environment yields no table-name rows" [] rows)))
 
-let test_tables_over_non_catalog_input_raises () =
-  with_fixture_environment @@ fun environment ->
-  Storage.Engine.with_read_transaction environment (fun transaction ->
-      let plan : Plan.Physical.t =
-        Tables { input = Scalar_literal (Scalar.Int64 42L) }
-      in
-      Alcotest.check_raises "non-catalog input"
-        (Failure "Eval: tables: expected a catalog value, got a scalar value")
-        (fun () -> Eval.eval environment transaction plan (fun _term -> ())))
-
 let () =
   Alcotest.run "eval_tables"
     [
@@ -58,8 +48,5 @@ let () =
             test_tables_over_catalog_source_streams_table_names;
           Alcotest.test_case "over an empty environment yields no rows" `Quick
             test_tables_over_empty_environment_yields_no_rows;
-          Alcotest.test_case
-            "over a non-catalog input raises a user-facing error" `Quick
-            test_tables_over_non_catalog_input_raises;
         ] );
     ]
