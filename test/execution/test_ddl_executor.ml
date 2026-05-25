@@ -82,10 +82,7 @@ let test_execute_write_drop_table_removes_catalog_and_storage () =
           (Ddl.Statement.Drop_table { table_name = "users" })
       with
       | Dropped name ->
-          Alcotest.(check string) "result names the dropped table" "users" name
-      | Created _ ->
-          (* Drop_table produces Dropped, never Created. *)
-          assert false);
+          Alcotest.(check string) "result names the dropped table" "users" name);
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.(check (option kind_testable))
         "catalog entry gone" None
@@ -135,132 +132,6 @@ let test_execute_write_drop_table_no_such_table_raises () =
         "users still present after aborted drop" (Some users_kind)
         (Storage.Catalog.get environment transaction ~table_name:"users"))
 
-(* The canonical [widgets] statement reused by the [Create_table] cases:
-   a single Int64 primary key with no other columns. Hand-built so the
-   test exercises the executor arm directly, without going through the
-   parser. *)
-let widgets_create_statement : Ddl.Statement.t =
-  Create_table
-    {
-      table_name = "widgets";
-      fields = [ { name = "id"; kind = Scalar.Int64 } ];
-      primary_key = [ "id" ];
-    }
-
-(* The schema [Create_table widgets ...] should write into the catalog:
-   the column qualifier is set to [Some "widgets"] so the read path can
-   treat it the same as any fixture-seeded schema. *)
-let widgets_expected_kind : Relation.kind =
-  {
-    row_kind =
-      [ { name = "id"; kind = Scalar.Int64; qualifier = Some "widgets" } ];
-    refinements = [ Primary_key [ "id" ] ];
-  }
-
-let test_execute_write_create_table_writes_catalog_and_storage () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      match
-        Ddl_executor.execute_write environment transaction
-          widgets_create_statement
-      with
-      | Created name ->
-          Alcotest.(check string)
-            "result names the created table" "widgets" name
-      | Dropped _ ->
-          (* Create_table produces Created, never Dropped. *)
-          assert false);
-  Storage.Engine.with_read_transaction environment (fun transaction ->
-      Alcotest.(check (option kind_testable))
-        "catalog entry written with qualifier set" (Some widgets_expected_kind)
-        (Storage.Catalog.get environment transaction ~table_name:"widgets");
-      Alcotest.(check bool)
-        "storage subDB created" true
-        (Storage.Engine.open_map environment transaction
-           ~name:(Storage.Catalog.table_subdb_name "widgets")
-        <> None))
-
-let test_execute_write_create_table_qualifier_per_field () =
-  (* A wider statement so the qualifier rule is checked against more
-     than the lone primary-key column. *)
-  let statement : Ddl.Statement.t =
-    Create_table
-      {
-        table_name = "widgets";
-        fields =
-          [
-            { name = "id"; kind = Scalar.Int64 };
-            { name = "name"; kind = Scalar.String };
-            { name = "active"; kind = Scalar.Bool };
-          ];
-        primary_key = [ "id" ];
-      }
-  in
-  let expected_kind : Relation.kind =
-    {
-      row_kind =
-        [
-          { name = "id"; kind = Scalar.Int64; qualifier = Some "widgets" };
-          { name = "name"; kind = Scalar.String; qualifier = Some "widgets" };
-          { name = "active"; kind = Scalar.Bool; qualifier = Some "widgets" };
-        ];
-      refinements = [ Primary_key [ "id" ] ];
-    }
-  in
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      let _ = Ddl_executor.execute_write environment transaction statement in
-      ());
-  Storage.Engine.with_read_transaction environment (fun transaction ->
-      Alcotest.(check (option kind_testable))
-        "qualifier set on every field" (Some expected_kind)
-        (Storage.Catalog.get environment transaction ~table_name:"widgets"))
-
-let test_execute_write_create_table_already_exists_raises () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  seed_table environment ~table_name:"widgets" widgets_expected_kind;
-  Alcotest.check_raises "table already exists raises Failure with DDL: prefix"
-    (Failure "DDL: create table \"widgets\": table already exists") (fun () ->
-      Storage.Engine.with_write_transaction environment (fun transaction ->
-          let _result =
-            Ddl_executor.execute_write environment transaction
-              widgets_create_statement
-          in
-          ()))
-
-let test_execute_write_create_table_rollback_on_raise () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  seed_table environment ~table_name:"widgets" widgets_expected_kind;
-  (try
-     Storage.Engine.with_write_transaction environment (fun transaction ->
-         let _result =
-           Ddl_executor.execute_write environment transaction
-             widgets_create_statement
-         in
-         ())
-   with Failure _ -> ());
-  (* The aborted transaction must leave the pre-call state intact: the
-     seeded schema is still bound, the seeded row is still readable. *)
-  Storage.Engine.with_read_transaction environment (fun transaction ->
-      Alcotest.(check (option kind_testable))
-        "seeded schema preserved" (Some widgets_expected_kind)
-        (Storage.Catalog.get environment transaction ~table_name:"widgets");
-      match
-        Storage.Engine.open_map environment transaction
-          ~name:(Storage.Catalog.table_subdb_name "widgets")
-      with
-      | None ->
-          Alcotest.fail
-            "seeded storage subDB should still exist after aborted create"
-      | Some map ->
-          Alcotest.(check (option string))
-            "seeded row preserved" (Some "any-value")
-            (Storage.Engine.get map transaction ~key:"any-key"))
-
 let () =
   Alcotest.run "ddl_executor"
     [
@@ -280,16 +151,5 @@ let () =
             test_execute_write_drop_table_leaves_sibling_tables_untouched;
           Alcotest.test_case "Drop_table on a missing table raises Failure"
             `Quick test_execute_write_drop_table_no_such_table_raises;
-          Alcotest.test_case
-            "Create_table writes the catalog entry and storage subDB" `Quick
-            test_execute_write_create_table_writes_catalog_and_storage;
-          Alcotest.test_case
-            "Create_table sets the qualifier on every catalog field" `Quick
-            test_execute_write_create_table_qualifier_per_field;
-          Alcotest.test_case "Create_table on an existing table raises Failure"
-            `Quick test_execute_write_create_table_already_exists_raises;
-          Alcotest.test_case
-            "Create_table that raises rolls back catalog and storage" `Quick
-            test_execute_write_create_table_rollback_on_raise;
         ] );
     ]

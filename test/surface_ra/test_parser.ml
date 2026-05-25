@@ -583,145 +583,11 @@ let test_ddl_describe_is_no_longer_recognised () =
      replaces it. The parser should now reject the sigil form. *)
   rejects ":describe users"
 
-(* [:create table <name> (col: kind, ...) primary key
-   (col, ...)] parses to [Statement.Create_table { table_name; fields;
-   primary_key }]. Kind names are resolved at parse time to
-   [Scalar.kind]; unknown kind names raise a parse error. Whitespace
-   and trailing commas are flexible inside the parentheses, matching
-   the canonical printer's output so [parse (format s) = Ok (Ddl s)]
-   holds for hand-built [Create_table] values. *)
-
-let test_ddl_create_table_int64_pk_parses () =
-  parses_program ":create table widgets (id: Int64) primary key (id)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "widgets";
-            fields = [ { name = "id"; kind = Int64 } ];
-            primary_key = [ "id" ];
-          }))
-
-let test_ddl_create_table_string_pk_parses () =
-  parses_program ":create table widgets (name: String) primary key (name)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "widgets";
-            fields = [ { name = "name"; kind = String } ];
-            primary_key = [ "name" ];
-          }))
-
-let test_ddl_create_table_bool_pk_parses () =
-  parses_program ":create table widgets (active: Bool) primary key (active)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "widgets";
-            fields = [ { name = "active"; kind = Bool } ];
-            primary_key = [ "active" ];
-          }))
-
-let test_ddl_create_table_compound_pk_parses () =
-  parses_program
-    ":create table pairs (left: Int64, right: Int64) primary key (left, right)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "pairs";
-            fields =
-              [
-                { name = "left"; kind = Int64 };
-                { name = "right"; kind = Int64 };
-              ];
-            primary_key = [ "left"; "right" ];
-          }))
-
-(* Trailing commas in both the column list and the primary key list are
-   tolerated. The canonical printer always emits a trailing comma on the
-   column list, so this directly supports the round-trip property. *)
-let test_ddl_create_table_trailing_comma_in_column_list_parses () =
-  parses_program ":create table widgets (id: Int64,) primary key (id)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "widgets";
-            fields = [ { name = "id"; kind = Int64 } ];
-            primary_key = [ "id" ];
-          }))
-
-let test_ddl_create_table_trailing_comma_in_primary_key_list_parses () =
-  parses_program ":create table widgets (id: Int64) primary key (id,)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "widgets";
-            fields = [ { name = "id"; kind = Int64 } ];
-            primary_key = [ "id" ];
-          }))
-
-(* The canonical multi-line form from the design doc parses identically
-   to the single-line equivalent -- whitespace inside parens is flexible. *)
-let test_ddl_create_table_multiline_canonical_form_parses () =
-  parses_program
-    ":create table users (\n\
-    \  id: Int64,\n\
-    \  name: String,\n\
-    \  email: String,\n\
-    \  active: Bool,\n\
-     ) primary key (id)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "users";
-            fields =
-              [
-                { name = "id"; kind = Int64 };
-                { name = "name"; kind = String };
-                { name = "email"; kind = String };
-                { name = "active"; kind = Bool };
-              ];
-            primary_key = [ "id" ];
-          }))
-
-let test_ddl_create_table_rejects_unknown_kind () =
-  rejects ":create table widgets (id: Int32) primary key (id)"
-
-(* An empty column list parses to a [Create_table] with [fields = []].
-   The grammar accepts it so the validator can produce a friendly
-   [DDL: create table ...: column list is empty] error rather than a
-   raw [parse error: satisfy: ...] from the angstrom field combinator. *)
-let test_ddl_create_table_empty_column_list_parses_with_empty_fields () =
-  parses_program ":create table widgets () primary key (id)"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          { table_name = "widgets"; fields = []; primary_key = [ "id" ] }))
-
-(* An empty primary-key list parses to a [Create_table] with
-   [primary_key = []]. Same rationale as the empty column list: the
-   validator's [primary key is empty] message is the user-friendly
-   path for this shape. *)
-let test_ddl_create_table_empty_primary_key_list_parses_with_empty_primary_key
-    () =
-  parses_program ":create table widgets (id: Int64) primary key ()"
-    (Ast.Ddl
-       (Ddl.Statement.Create_table
-          {
-            table_name = "widgets";
-            fields = [ { name = "id"; kind = Int64 } ];
-            primary_key = [];
-          }))
-
-let test_ddl_create_table_rejects_missing_primary_key_clause () =
-  rejects ":create table widgets (id: Int64)"
-
-let test_ddl_create_table_rejects_missing_colon_in_field () =
-  rejects ":create table widgets (id Int64) primary key (id)"
-
-let test_ddl_create_table_rejects_missing_kind () =
-  rejects ":create table widgets (id:) primary key (id)"
-
-let test_ddl_create_table_rejects_missing_table_name () =
-  rejects ":create table (id: Int64) primary key (id)"
+(* The [:create table] DDL form has been retired in favour of the
+   pipe-form sink ([<type-expr> | create table <name>]). The sigil
+   form should now be rejected outright. *)
+let test_ddl_create_table_is_no_longer_recognised () =
+  rejects ":create table widgets (id: Int64) primary key (id)"
 
 (* The DDL keyword [create] is not globally reserved -- matches the
    [list] / [tables] / [drop] / [table] cases above. *)
@@ -1336,48 +1202,8 @@ let () =
             test_pipeline_keyword_table_is_a_relation_name;
           Alcotest.test_case ":describe is no longer a recognised statement"
             `Quick test_ddl_describe_is_no_longer_recognised;
-          Alcotest.test_case
-            ":create table single-column Int64 PK parses to Ddl Create_table"
-            `Quick test_ddl_create_table_int64_pk_parses;
-          Alcotest.test_case
-            ":create table single-column String PK parses to Ddl Create_table"
-            `Quick test_ddl_create_table_string_pk_parses;
-          Alcotest.test_case
-            ":create table single-column Bool PK parses to Ddl Create_table"
-            `Quick test_ddl_create_table_bool_pk_parses;
-          Alcotest.test_case ":create table compound PK parses" `Quick
-            test_ddl_create_table_compound_pk_parses;
-          Alcotest.test_case
-            ":create table tolerates a trailing comma in the column list" `Quick
-            test_ddl_create_table_trailing_comma_in_column_list_parses;
-          Alcotest.test_case
-            ":create table tolerates a trailing comma in the primary key list"
-            `Quick
-            test_ddl_create_table_trailing_comma_in_primary_key_list_parses;
-          Alcotest.test_case
-            ":create table parses the canonical multi-line form" `Quick
-            test_ddl_create_table_multiline_canonical_form_parses;
-          Alcotest.test_case ":create table with an unknown kind rejects" `Quick
-            test_ddl_create_table_rejects_unknown_kind;
-          Alcotest.test_case
-            ":create table with an empty column list parses to fields = []"
-            `Quick
-            test_ddl_create_table_empty_column_list_parses_with_empty_fields;
-          Alcotest.test_case
-            ":create table with an empty primary key list parses to \
-             primary_key = []"
-            `Quick
-            test_ddl_create_table_empty_primary_key_list_parses_with_empty_primary_key;
-          Alcotest.test_case
-            ":create table without a primary key clause rejects" `Quick
-            test_ddl_create_table_rejects_missing_primary_key_clause;
-          Alcotest.test_case
-            ":create table missing the colon in a field rejects" `Quick
-            test_ddl_create_table_rejects_missing_colon_in_field;
-          Alcotest.test_case ":create table missing a field kind rejects" `Quick
-            test_ddl_create_table_rejects_missing_kind;
-          Alcotest.test_case ":create table without a table name rejects" `Quick
-            test_ddl_create_table_rejects_missing_table_name;
+          Alcotest.test_case ":create table is no longer a recognised statement"
+            `Quick test_ddl_create_table_is_no_longer_recognised;
           Alcotest.test_case "[create] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_create_is_a_relation_name;
         ] );

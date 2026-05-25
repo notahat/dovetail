@@ -231,10 +231,9 @@ relation (id: int64, description: string, amount: int64) {
 
 Yields `<input>`'s relation type rather than its rows -- no cursors
 open, no rows are pulled. The output is a one-line rendering of the
-type in the same surface syntax used by `:create table`: a
-parenthesised, comma-separated list of `<name>: <kind>` field
-declarations, followed by any refinements (today just
-`primary key (...)`).
+type in the surface type-expression syntax: a parenthesised,
+comma-separated list of `<name>: <kind>` field declarations,
+followed by any refinements (today just `primary key (...)`).
 
 `type` only applies at the relation rung; piping its output back
 through `type` (`<input> | type | type`) is rejected -- the second

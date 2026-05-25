@@ -2,9 +2,9 @@
 
     Built on [angstrom]. A top-level input is one of two universes, decided by
     the first non-whitespace character: a leading [:] introduces a DDL statement
-    ([:list tables], [:drop table <name>], [:create table ...]); anything else
-    is a relational pipeline -- a base relation reference followed by zero or
-    more pipe-separated steps: [restrict <predicate>], [project <columns>],
+    ([:list tables], [:drop table <name>]); anything else is a relational
+    pipeline -- a base relation reference followed by zero or more
+    pipe-separated steps: [restrict <predicate>], [project <columns>],
     [cross <relation>], [join <relation> on <predicate>], [type], and optionally
     a terminal sink ([insert into <table>]). Whitespace surrounding tokens is
     tolerated; anything else (extra tokens, malformed identifiers, empty input,

@@ -21,10 +21,9 @@ The guide is in several parts:
   -- the sublanguages used inside `restrict`, `project`, and the
   `on` clause of `join`.
 - [Data definition reference](query-language-data-definition.md) --
-  the `:`-prefixed statements that modify the catalog
-  (`:list tables`, `:create table <name> (...)`, `:drop table
-  <name>`), and the `type` pipeline operator that inspects a
-  relation's type.
+  the `:`-prefixed statements that inspect or modify the catalog
+  (`:list tables`, `:drop table <name>`), and the `type` pipeline
+  operator that inspects a relation's type.
 
 ## Running the REPL
 

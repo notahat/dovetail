@@ -186,7 +186,7 @@ let test_unqualify_unblocks_join_to_insert_chain () =
   let output =
     run_with_input
       [
-        ":create table joined (id: Int64, user_id: Int64) primary key (id)";
+        "(id: int64, user_id: int64, primary key (id)) | create table joined";
         "users | join orders on users.id = orders.user_id | project orders.id, \
          orders.user_id | unqualify | insert into joined";
       ]
@@ -249,127 +249,6 @@ let test_drop_nonexistent_table_reports_error_and_continues () =
     "DDL: drop table \"nonexistent\": no such table";
   check_contains "loop continues after drop error" output "users";
   check_contains "loop continues after drop error" output "orders"
-
-(* [Statement.validate] runs between parse and the transaction. All five
-   validate rules are reachable from the REPL -- the empty-list cases
-   surface as validate errors so the user sees the friendly
-   [DDL: create table ...] message rather than angstrom's raw [satisfy:
-   ')'] surface. Each REPL-level test feeds an offending [:create table]
-   line, asserts the rendered [error: DDL: ...] string verbatim, and
-   then runs [:list tables] to confirm the offending table never reached
-   the catalog. *)
-
-let test_create_table_empty_column_list_reports_validate_error () =
-  let output =
-    run_with_input
-      [ ":create table widgets () primary key (id)"; ":list tables" ]
-  in
-  check_contains "empty-column-list validate error" output
-    "error: DDL: create table \"widgets\": column list is empty";
-  Alcotest.(check bool)
-    "widgets not listed after validate error" false
-    (contains_substring output "\nwidgets\n")
-
-let test_create_table_empty_primary_key_list_reports_validate_error () =
-  let output =
-    run_with_input
-      [ ":create table widgets (id: Int64) primary key ()"; ":list tables" ]
-  in
-  check_contains "empty-primary-key-list validate error" output
-    "error: DDL: create table \"widgets\": primary key is empty";
-  Alcotest.(check bool)
-    "widgets not listed after validate error" false
-    (contains_substring output "\nwidgets\n")
-
-let test_create_table_duplicate_column_reports_validate_error () =
-  let output =
-    run_with_input
-      [
-        ":create table widgets (id: Int64, id: String) primary key (id)";
-        ":list tables";
-      ]
-  in
-  check_contains "duplicate-column validate error" output
-    "error: DDL: create table \"widgets\": column \"id\" appears twice";
-  Alcotest.(check bool)
-    "widgets not listed after validate error" false
-    (contains_substring output "\nwidgets\n")
-
-let test_create_table_primary_key_unknown_column_reports_validate_error () =
-  let output =
-    run_with_input
-      [
-        ":create table widgets (id: Int64, name: String) primary key (xyz)";
-        ":list tables";
-      ]
-  in
-  check_contains "unknown-pk-column validate error" output
-    "error: DDL: create table \"widgets\": primary key column \"xyz\" not in \
-     column list";
-  Alcotest.(check bool)
-    "widgets not listed after validate error" false
-    (contains_substring output "\nwidgets\n")
-
-let test_create_table_duplicate_primary_key_column_reports_validate_error () =
-  let output =
-    run_with_input
-      [
-        ":create table widgets (id: Int64) primary key (id, id)"; ":list tables";
-      ]
-  in
-  check_contains "duplicate-pk-column validate error" output
-    "error: DDL: create table \"widgets\": primary key column \"id\" appears \
-     twice";
-  Alcotest.(check bool)
-    "widgets not listed after validate error" false
-    (contains_substring output "\nwidgets\n")
-
-(* The [Created] renderer plus the end-to-end
-   exercise of [:create table]. The sequence creates [widgets], lists
-   the catalog (the new table appears alongside the fixture tables),
-   inspects [widgets]'s type via [widgets | type], drops it, and lists
-   again (it is gone). The fixture tables (orders, users) remain
-   present throughout so the test also sees that the create did not
-   disturb the sibling tables. *)
-let test_create_table_end_to_end_sequence () =
-  let output =
-    run_with_input
-      [
-        ":create table widgets (id: Int64, name: String) primary key (id)";
-        ":list tables";
-        "widgets | type";
-        ":drop table widgets";
-        ":list tables";
-      ]
-  in
-  check_contains "create status line" output "created table \"widgets\"";
-  check_contains "widgets | type renders the relation type" output
-    "(widgets.id: int64, widgets.name: string, primary key (id))";
-  check_contains "drop status line" output "dropped table \"widgets\"";
-  (* The substring [\nwidgets\n] is the listing-line shape: a table name
-     on its own line in a [:list tables] block. It appears exactly once
-     -- in the first listing, between the create and the drop. The
-     second listing comes after the drop and must not contain it. *)
-  Alcotest.(check int)
-    "widgets appears in the first listing but not the second" 1
-    (count_substring output "\nwidgets\n");
-  check_contains "fixture tables survive create+drop" output "orders";
-  check_contains "fixture tables survive create+drop" output "users"
-
-(* The catalog-aware "table already exists" check lives in the executor
-   and raises with a [DDL: create table ...] prefix; the REPL's generic
-   error guard turns the raise into an [error: ...] line and the loop
-   continues. Creating [users] (a fixture table) is the simplest way
-   to exercise this without pre-populating any extra state. *)
-let test_create_table_already_exists_reports_error_and_continues () =
-  let output =
-    run_with_input
-      [ ":create table users (id: Int64) primary key (id)"; ":list tables" ]
-  in
-  check_contains "already-exists error" output
-    "error: DDL: create table \"users\": table already exists";
-  check_contains "loop continues after create error" output "orders";
-  check_contains "loop continues after create error" output "users"
 
 let test_relation_literal_alone_prints_one_row () =
   let output =
@@ -450,33 +329,6 @@ let () =
           Alcotest.test_case
             ":drop table on a missing table reports the error and continues"
             `Quick test_drop_nonexistent_table_reports_error_and_continues;
-          Alcotest.test_case
-            ":create table with an empty column list reports a validate error"
-            `Quick test_create_table_empty_column_list_reports_validate_error;
-          Alcotest.test_case
-            ":create table with an empty primary key list reports a validate \
-             error"
-            `Quick
-            test_create_table_empty_primary_key_list_reports_validate_error;
-          Alcotest.test_case
-            ":create table with a duplicate column reports a validate error"
-            `Quick test_create_table_duplicate_column_reports_validate_error;
-          Alcotest.test_case
-            ":create table whose primary key names an unknown column reports a \
-             validate error"
-            `Quick
-            test_create_table_primary_key_unknown_column_reports_validate_error;
-          Alcotest.test_case
-            ":create table whose primary key repeats a column reports a \
-             validate error"
-            `Quick
-            test_create_table_duplicate_primary_key_column_reports_validate_error;
-          Alcotest.test_case
-            ":create table followed by list/type/drop/list round-trips" `Quick
-            test_create_table_end_to_end_sequence;
-          Alcotest.test_case
-            ":create table on an existing table reports the error and continues"
-            `Quick test_create_table_already_exists_reports_error_and_continues;
           Alcotest.test_case
             "a post-join relation renders as the canonical qualified literal"
             `Quick test_post_join_renders_canonical_qualified_literal;

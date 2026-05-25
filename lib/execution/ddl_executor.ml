@@ -1,16 +1,13 @@
 module Ddl = Dovetail_ddl
-module Row = Dovetail_core.Row
-module Relation = Dovetail_core.Relation
 module Storage = Dovetail_storage
 
 let execute_read environment transaction :
     Ddl.Statement.t -> Ddl.Statement.read_result = function
   | List_tables ->
       Listed (Storage.Catalog.list_table_names environment transaction)
-  | Drop_table _ | Create_table _ ->
-      (* Routing invariant: Drop_table and Create_table are write
-         statements; the REPL must classify and route them to
-         execute_write. *)
+  | Drop_table _ ->
+      (* Routing invariant: Drop_table is a write statement; the REPL
+         must classify and route it to execute_write. *)
       assert false
 
 (* Drop both halves of [table_name] (catalog entry and storage subDB)
@@ -31,49 +28,6 @@ let drop_table environment transaction table_name : Ddl.Statement.write_result =
   Storage.Catalog.delete environment transaction ~table_name;
   Dropped table_name
 
-(* Build the [Relation.kind] that a [Create_table] statement should write into
-   the catalog. The DDL surface has no qualifier on its [field] type, so
-   the executor stamps [Some table_name] onto every field -- this is the
-   shape the read path expects, and the rest of the catalog (including
-   tests' low-level seeders) matches it. Field order and primary-key
-   order are preserved exactly as the user typed them;
-   [Statement.validate] is responsible for the structural checks
-   (non-empty lists, no duplicates, PK columns drawn from the field
-   list) and is expected to have run already. *)
-let kind_of_create_fields ~table_name (fields : Ddl.Statement.field list)
-    ~primary_key : Relation.kind =
-  let row_kind =
-    List.map
-      (fun (field : Ddl.Statement.field) : Row.field ->
-        { name = field.name; kind = field.kind; qualifier = Some table_name })
-      fields
-  in
-  let refinements =
-    match primary_key with [] -> [] | keys -> [ Relation.Primary_key keys ]
-  in
-  { row_kind; refinements }
-
-(* Create both halves of [table_name] (catalog entry and storage subDB)
-   inside the caller's write transaction. The catalog-aware "table
-   already exists" check happens here, sharing the write transaction so
-   it cannot race against a concurrent create. The storage subDB is
-   created before the catalog entry; if anything raises in between, the
-   transaction aborts and rolls both halves back. *)
-let create_table environment transaction ~table_name ~fields ~primary_key :
-    Ddl.Statement.write_result =
-  (match Storage.Catalog.get environment transaction ~table_name with
-  | None -> ()
-  | Some _ ->
-      failwith
-        (Printf.sprintf "DDL: create table %S: table already exists" table_name));
-  let kind = kind_of_create_fields ~table_name fields ~primary_key in
-  let _map =
-    Storage.Engine.create_map environment transaction
-      ~name:(Storage.Catalog.table_subdb_name table_name)
-  in
-  Storage.Catalog.put environment transaction ~table_name kind;
-  Created table_name
-
 let execute_write environment transaction :
     Ddl.Statement.t -> Ddl.Statement.write_result = function
   | List_tables ->
@@ -81,5 +35,3 @@ let execute_write environment transaction :
          must classify and route it to execute_read. *)
       assert false
   | Drop_table { table_name } -> drop_table environment transaction table_name
-  | Create_table { table_name; fields; primary_key } ->
-      create_table environment transaction ~table_name ~fields ~primary_key

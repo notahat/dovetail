@@ -595,72 +595,7 @@ let ddl_drop_table =
   keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
   >>| fun table_name -> Ddl.Statement.Drop_table { table_name }
 
-(* Resolve a [:create table] column kind at parse time. The surface kind
-   position carries an identifier ([Int64], [String], [Bool]) and the
-   parser maps it to {!Scalar.kind} directly -- downstream code never
-   sees a raw kind string. An unknown identifier here raises a parse
-   error rather than deferring the diagnostic to validate, so
-   [Statement.t] values never carry a phantom kind. *)
-let create_table_kind : Scalar.kind Angstrom.t =
-  identifier >>= function
-  | "Int64" -> return (Scalar.Int64 : Scalar.kind)
-  | "String" -> return (Scalar.String : Scalar.kind)
-  | "Bool" -> return (Scalar.Bool : Scalar.kind)
-  | other -> fail (Printf.sprintf "unknown kind %S" other)
-
-(* A single column declaration: [<identifier> : <kind>]. Whitespace
-   around the colon is tolerated; both halves are required. *)
-let create_table_field =
-  identifier >>= fun field_name ->
-  whitespace *> char ':' *> whitespace *> create_table_kind
-  >>| fun field_kind ->
-  ({ name = field_name; kind = field_kind } : Ddl.Statement.field)
-
-(* A comma-separated list of column declarations with an optional trailing
-   comma. The empty list parses to [[]] -- the validator surfaces it as
-   [DDL: create table ...: column list is empty], which is friendlier
-   than angstrom's raw [satisfy: ')'] surface would be. Trailing commas
-   line up with how the canonical printer emits the column list (one
-   comma per field, including the last), so [parse (format s) = Ok (Ddl s)]
-   holds for [Create_table] values straight out of [Format.statement]. *)
-let create_table_field_list =
-  let nonempty =
-    create_table_field >>= fun first_field ->
-    many (whitespace *> char ',' *> whitespace *> create_table_field)
-    >>= fun more_fields ->
-    whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
-    first_field :: more_fields
-  in
-  nonempty <|> return []
-
-(* A comma-separated list of primary key column names with an optional
-   trailing comma. Shape mirrors {!create_table_field_list}: the empty
-   list parses to [[]] and the validator surfaces the friendly [DDL:
-   ...: primary key is empty] message. The validator also checks that
-   each name appears in the column list and that none repeats. *)
-let create_table_primary_key_list =
-  let nonempty =
-    identifier >>= fun first_column ->
-    many (whitespace *> char ',' *> whitespace *> identifier)
-    >>= fun more_columns ->
-    whitespace *> option false (char ',' *> return true) >>| fun _trailing ->
-    first_column :: more_columns
-  in
-  nonempty <|> return []
-
-let ddl_create_table =
-  keyword "create" *> whitespace *> keyword "table" *> whitespace *> identifier
-  >>= fun table_name ->
-  whitespace *> char '(' *> whitespace *> create_table_field_list
-  >>= fun fields ->
-  whitespace *> char ')' *> whitespace *> keyword "primary" *> whitespace
-  *> keyword "key" *> whitespace *> char '(' *> whitespace
-  *> create_table_primary_key_list
-  >>= fun primary_key ->
-  whitespace *> char ')'
-  *> return (Ddl.Statement.Create_table { table_name; fields; primary_key })
-
-let ddl_body = ddl_list_tables <|> ddl_drop_table <|> ddl_create_table
+let ddl_body = ddl_list_tables <|> ddl_drop_table
 
 (* The top-level grammar: optional leading whitespace, then dispatch on the
    first non-whitespace character. A leading [:] introduces a DDL statement

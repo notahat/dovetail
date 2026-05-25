@@ -12,12 +12,17 @@ the keywords `list`, `drop`, `create`, `table`, `tables`, and `key`
 are ordinary identifiers -- they only acquire special meaning after
 the sigil has been consumed.
 
-Three statements are supported:
+Two statements are supported:
 
 - `:list tables` -- list every table in the catalog.
-- `:create table <name> (<columns>) primary key (<columns>)` -- add
-  a new empty table to the catalog.
 - `:drop table <name>` -- remove a table and its rows.
+
+Adding a table is no longer a DDL statement: the
+`<type-expr> | create table <name>` and
+`<relation-value> | create table <name>` sinks live in the pipeline
+grammar instead. See the
+[`create table`](query-language-pipeline-operators.md#create-table)
+section of the pipeline-operators reference.
 
 To inspect a table's schema, pipe it into the `type` operator:
 `<name> | type`. The operator yields the relation's type without
@@ -36,68 +41,6 @@ modifies state.
 > :list tables
 orders
 users
-```
-
-## `:create table <name> (...) primary key (...)`
-
-**Syntax:** `:create table <identifier> (<field-list>) primary key
-(<column-list>)`
-
-Where:
-
-- `<field-list>` is a comma-separated sequence of `<name>: <kind>`
-  pairs, with an optional trailing comma. The supported kinds are
-  `Int64`, `String`, and `Bool`.
-- `<column-list>` is a comma-separated sequence of names drawn
-  from the field list, with an optional trailing comma. Names
-  appear in key order.
-
-Adds a new empty table to the catalog inside a single write
-transaction: the catalog entry and the storage backing the rows
-are created together. On success the REPL prints a status line
-naming the created table. The example below creates `widgets`,
-inspects it via `:list tables` and `widgets | type`, then drops
-it so subsequent sections see the same example-table catalog the
-section started with:
-
-```
-> :create table widgets (id: Int64, name: String) primary key (id)
-created table "widgets"
-> :list tables
-orders
-users
-widgets
-> widgets | type
-(widgets.id: int64, widgets.name: string, primary key (id))
-> :drop table widgets
-dropped table "widgets"
-```
-
-Structural checks run before any transaction opens. An empty
-column list, a duplicate column name, an empty primary-key list,
-a primary-key column not in the field list, and a duplicate
-primary-key column each raise before the writer lock is acquired:
-
-```
-> :create table widgets () primary key (id)
-error: DDL: create table "widgets": column list is empty
-> :create table widgets (id: Int64, id: String) primary key (id)
-error: DDL: create table "widgets": column "id" appears twice
-> :create table widgets (id: Int64) primary key ()
-error: DDL: create table "widgets": primary key is empty
-> :create table widgets (id: Int64, name: String) primary key (xyz)
-error: DDL: create table "widgets": primary key column "xyz" not in column list
-> :create table widgets (id: Int64) primary key (id, id)
-error: DDL: create table "widgets": primary key column "id" appears twice
-```
-
-The catalog-aware "table already exists" check runs inside the
-transaction: creating a table whose name is already bound raises
-and the loop continues:
-
-```
-> :create table users (id: Int64) primary key (id)
-error: DDL: create table "users": table already exists
 ```
 
 ## `:drop table <name>`
@@ -131,5 +74,5 @@ it back. Launching the REPL again with `--demo-data` re-seeds the
 example tables only when *both* `users` and `orders` are absent
 from the catalog -- the flag is a one-shot bootstrap rather than
 a per-table top-up. So after dropping a single example table, the
-way to get it back is `:create table` (and per-row inserts), not a
-relaunch with the flag.
+way to get it back is the `create table` pipe sink (and per-row
+inserts), not a relaunch with the flag.
