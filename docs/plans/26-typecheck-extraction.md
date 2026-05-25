@@ -167,6 +167,37 @@ related operators run `Expression.resolve` and
   name (when applicable).
 - Integration tests update prefixes.
 
+### Step 4.5: Move unknown-table detection
+
+The catalog snapshot Typecheck already takes makes "no such table"
+into a cheap structural check. `Scan { table }` and `Insert { table; _ }`
+both look the name up; today they trip `Eval: unknown table` (FullScan /
+IndexLookup) and `Translate: insert into ... unknown table` separately,
+each with its own prefix. Move both into Typecheck so the user sees
+one operator-named error and downstream layers can `assert false` on
+the missing-table arm.
+
+- `lib/plan/typecheck.{ml,mli}` -- add
+  `Unknown_table of { operator : string; table_name : string }`;
+  extend the renderer (`Scan: unknown table %S`,
+  `Insert: into %S: unknown table`).
+- `lib/plan/typecheck.ml` -- walker arms for `Scan` and `Insert`
+  consult the catalog snapshot.
+- `lib/plan/translate.ml` / `lib/execution/eval.ml` -- replace the
+  table-missing failwiths with `assert false`; the Typecheck guarantee
+  makes them unreachable.
+- Tests -- new structured-error cases in `test/plan/test_typecheck.ml`
+  (Scan and Insert), retire the direct-target failure tests in
+  `test/plan/test_translate.ml`, `test/execution/test_eval_full_scan.ml`,
+  `test/execution/test_eval_index_lookup.ml`. Integration tests
+  continue to pass through `with_query_failure`, which now picks up
+  the Typecheck wording.
+
+Out of scope: `Physical.kind_of`'s "unknown table" failwith. It's a
+static helper Translate calls after the catalog lookup it now trusts
+Typecheck for; the failwith remains as a guard against future callers
+that might bypass Typecheck.
+
 ### Step 5: Move `Eval`'s operator-shape preconditions
 
 The "input is not a catalog" / "input is not a relation or row"
