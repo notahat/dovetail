@@ -28,6 +28,17 @@ type error =
       right : Expression.t;
       right_kind : Scalar.kind;
     }
+  | Boolean_operand_required of {
+      operator : string;
+      logical_op : string;
+      operand : Expression.t;
+      operand_kind : Scalar.kind;
+    }
+  | Predicate_not_boolean of {
+      operator : string;
+      expression : Expression.t;
+      actual_kind : Scalar.kind;
+    }
   | Ordering_operator_on_unordered_kind of {
       operator : string;
       comparison_op : Expression.comparison_op;
@@ -114,6 +125,18 @@ let render = function
         (Scalar.kind_to_string left_kind)
         (describe_expression right)
         (Scalar.kind_to_string right_kind)
+  | Boolean_operand_required { operator; logical_op; operand; operand_kind } ->
+      let operand_description = describe_expression operand in
+      let operand_kind_name = Scalar.kind_to_string operand_kind in
+      if logical_op = "not" then
+        Printf.sprintf "%s: %s requires a Bool operand: %s is %s" operator
+          logical_op operand_description operand_kind_name
+      else
+        Printf.sprintf "%s: %s requires Bool operands: %s is %s" operator
+          logical_op operand_description operand_kind_name
+  | Predicate_not_boolean { operator; expression = _; actual_kind } ->
+      Printf.sprintf "%s: predicate position requires Bool, got %s" operator
+        (Scalar.kind_to_string actual_kind)
   | Ordering_operator_on_unordered_kind { operator; comparison_op; kind } ->
       Printf.sprintf "%s: ordering operator %s is not defined for %s" operator
         (render_comparison_op comparison_op)
@@ -292,10 +315,24 @@ let check_compare ~operator ~row_kind ~left ~op ~right : error list =
       ]
   | _ -> []
 
+(* Check that a single operand of an [And] / [Or] / [Not] node has scalar
+   kind [Bool]. Emits at most one [Boolean_operand_required]. When the
+   operand's kind cannot be determined (currently: an unresolved [Column]),
+   skips the check -- the unresolved-column error already covers it and
+   speculating about the missing kind would be noise. *)
+let check_boolean_operand ~operator ~logical_op ~row_kind operand : error list =
+  match expression_kind ~row_kind operand with
+  | Some Scalar.Bool | None -> []
+  | Some operand_kind ->
+      [
+        Boolean_operand_required { operator; logical_op; operand; operand_kind };
+      ]
+
 (* Walk [expression] once, accumulating every typecheck error it carries.
-   Covers unresolved column references at every [Column] node plus
-   per-[Compare] kind and ordering checks. [operator] becomes the
-   user-facing prefix on every error emitted by this walk. *)
+   Covers unresolved column references at every [Column] node, per-[Compare]
+   kind and ordering checks, and [And] / [Or] / [Not] operand-kind checks.
+   [operator] becomes the user-facing prefix on every error emitted by this
+   walk. *)
 let rec check_expression ~operator ~row_kind (expression : Expression.t) :
     error list =
   match expression with
@@ -317,10 +354,29 @@ let rec check_expression ~operator ~row_kind (expression : Expression.t) :
       let right_errors = check_expression ~operator ~row_kind right in
       let compare_errors = check_compare ~operator ~row_kind ~left ~op ~right in
       left_errors @ right_errors @ compare_errors
-  | And (left, right) | Or (left, right) ->
+  | And (left, right) ->
       check_expression ~operator ~row_kind left
       @ check_expression ~operator ~row_kind right
-  | Not operand -> check_expression ~operator ~row_kind operand
+      @ check_boolean_operand ~operator ~logical_op:"and" ~row_kind left
+      @ check_boolean_operand ~operator ~logical_op:"and" ~row_kind right
+  | Or (left, right) ->
+      check_expression ~operator ~row_kind left
+      @ check_expression ~operator ~row_kind right
+      @ check_boolean_operand ~operator ~logical_op:"or" ~row_kind left
+      @ check_boolean_operand ~operator ~logical_op:"or" ~row_kind right
+  | Not operand ->
+      check_expression ~operator ~row_kind operand
+      @ check_boolean_operand ~operator ~logical_op:"not" ~row_kind operand
+
+(* Check that the top expression in a predicate position has scalar kind
+   [Bool]. Emits at most one [Predicate_not_boolean]. As with
+   {!check_boolean_operand}, an unknown kind (unresolved column at the top
+   level) skips the check. *)
+let check_predicate_kind ~operator ~row_kind expression : error list =
+  match expression_kind ~row_kind expression with
+  | Some Scalar.Bool | None -> []
+  | Some actual_kind ->
+      [ Predicate_not_boolean { operator; expression; actual_kind } ]
 
 (* For each column reference [references] holds, emit an [Unresolved_column]
    error when it does not resolve to exactly one field of [row_kind].
@@ -367,7 +423,11 @@ let rec collect_errors ~catalog (plan : Logical.t) : error list =
       let predicate_errors =
         check_expression ~operator:"Restrict" ~row_kind:input_row_kind predicate
       in
-      input_errors @ predicate_errors
+      let predicate_kind_errors =
+        check_predicate_kind ~operator:"Restrict" ~row_kind:input_row_kind
+          predicate
+      in
+      input_errors @ predicate_errors @ predicate_kind_errors
   | CrossProduct { left; right } ->
       collect_errors ~catalog left @ collect_errors ~catalog right
   | Insert { table; source } ->

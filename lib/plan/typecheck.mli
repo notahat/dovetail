@@ -66,6 +66,31 @@ type error =
           operand sub-expressions, included so the renderer can describe them in
           the same source-flavoured wording the legacy resolve-time message
           uses. *)
+  | Boolean_operand_required of {
+      operator : string;
+      logical_op : string;
+      operand : Expression.t;
+      operand_kind : Scalar.kind;
+    }
+      (** An [And], [Or], or [Not] node carries an operand whose scalar kind is
+          not [Bool]. [operator] names the user-facing operator the expression
+          appears in (for example ["Restrict"]) and becomes the renderer's
+          prefix; [logical_op] is the source word for the offending node
+          (["and"], ["or"], or ["not"]) so the renderer can echo it back.
+          [operand] is the offending sub-expression, included so the renderer
+          can describe it in the source-flavoured wording the legacy
+          resolve-time message used. *)
+  | Predicate_not_boolean of {
+      operator : string;
+      expression : Expression.t;
+      actual_kind : Scalar.kind;
+    }
+      (** The top expression in a predicate position (today: a [Restrict]'s
+          predicate) has a scalar kind other than [Bool]. [operator] names the
+          user-facing operator the predicate belongs to and becomes the
+          renderer's prefix; [expression] is the whole offending predicate (kept
+          for LSP detail even though the renderer does not name it, matching the
+          legacy resolve-time message). *)
   | Ordering_operator_on_unordered_kind of {
       operator : string;
       comparison_op : Expression.comparison_op;

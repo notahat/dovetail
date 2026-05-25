@@ -421,6 +421,113 @@ let test_restrict_skips_ordering_check_when_kinds_disagree () =
       let count = List.length errors in
       Alcotest.(check int) "exactly one error" 1 count
 
+let test_restrict_with_non_bool_predicate_reports_structured_error () =
+  (* A bare [Column "id"] predicate evaluates to Int64; the predicate
+     position requires Bool. *)
+  let predicate : Expression.t = Column { qualifier = None; name = "id" } in
+  let plan : Logical.t = Restrict { input = two_column_literal; predicate } in
+  let expected : Typecheck.error list =
+    [
+      Predicate_not_boolean
+        { operator = "Restrict"; expression = predicate; actual_kind = Int64 };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Predicate_not_boolean error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured predicate kind" expected errors
+
+let test_predicate_not_boolean_renders_with_operator_prefix () =
+  let error : Typecheck.error =
+    Predicate_not_boolean
+      {
+        operator = "Restrict";
+        expression = Column { qualifier = None; name = "id" };
+        actual_kind = Int64;
+      }
+  in
+  Alcotest.(check string)
+    "rendered predicate-kind error"
+    "Restrict: predicate position requires Bool, got Int64"
+    (Typecheck.render error)
+
+let test_restrict_with_non_bool_and_operand_reports_structured_error () =
+  (* And requires Bool on both sides; supplying [id] (Int64) on the left
+     and a Bool literal on the right fires one [Boolean_operand_required]. *)
+  let left_operand : Expression.t = Column { qualifier = None; name = "id" } in
+  let predicate : Expression.t =
+    And (left_operand, Literal (Scalar.Bool true))
+  in
+  let plan : Logical.t = Restrict { input = two_column_literal; predicate } in
+  let expected : Typecheck.error list =
+    [
+      Boolean_operand_required
+        {
+          operator = "Restrict";
+          logical_op = "and";
+          operand = left_operand;
+          operand_kind = Int64;
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Boolean_operand_required error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured and-operand kind" expected errors
+
+let test_boolean_operand_required_and_renders_with_operator_prefix () =
+  let error : Typecheck.error =
+    Boolean_operand_required
+      {
+        operator = "Restrict";
+        logical_op = "and";
+        operand = Column { qualifier = None; name = "id" };
+        operand_kind = Int64;
+      }
+  in
+  Alcotest.(check string)
+    "rendered and-operand error"
+    "Restrict: and requires Bool operands: column \"id\" is Int64"
+    (Typecheck.render error)
+
+let test_restrict_with_non_bool_not_operand_reports_structured_error () =
+  let operand : Expression.t = Column { qualifier = None; name = "id" } in
+  let predicate : Expression.t = Not operand in
+  let plan : Logical.t = Restrict { input = two_column_literal; predicate } in
+  let expected : Typecheck.error list =
+    [
+      Boolean_operand_required
+        {
+          operator = "Restrict";
+          logical_op = "not";
+          operand;
+          operand_kind = Int64;
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Boolean_operand_required error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured not-operand kind" expected errors
+
+let test_boolean_operand_required_not_renders_with_operator_prefix () =
+  let error : Typecheck.error =
+    Boolean_operand_required
+      {
+        operator = "Restrict";
+        logical_op = "not";
+        operand = Column { qualifier = None; name = "id" };
+        operand_kind = Int64;
+      }
+  in
+  Alcotest.(check string)
+    "rendered not-operand error"
+    "Restrict: not requires a Bool operand: column \"id\" is Int64"
+    (Typecheck.render error)
+
 let test_project_with_unresolved_column_reports_structured_error () =
   let plan : Logical.t =
     Project
@@ -568,6 +675,29 @@ let () =
             `Quick test_ordering_on_bool_renders_with_operator_prefix;
           Alcotest.test_case "kind mismatch alone suppresses the ordering check"
             `Quick test_restrict_skips_ordering_check_when_kinds_disagree;
+        ] );
+      ( "restrict predicate kind",
+        [
+          Alcotest.test_case "non-Bool predicate produces a structured error"
+            `Quick
+            test_restrict_with_non_bool_predicate_reports_structured_error;
+          Alcotest.test_case "predicate-kind error renders with operator prefix"
+            `Quick test_predicate_not_boolean_renders_with_operator_prefix;
+        ] );
+      ( "boolean operand kind",
+        [
+          Alcotest.test_case "non-Bool and operand produces a structured error"
+            `Quick
+            test_restrict_with_non_bool_and_operand_reports_structured_error;
+          Alcotest.test_case "and-operand error renders with operator prefix"
+            `Quick
+            test_boolean_operand_required_and_renders_with_operator_prefix;
+          Alcotest.test_case "non-Bool not operand produces a structured error"
+            `Quick
+            test_restrict_with_non_bool_not_operand_reports_structured_error;
+          Alcotest.test_case "not-operand error renders with operator prefix"
+            `Quick
+            test_boolean_operand_required_not_renders_with_operator_prefix;
         ] );
       ( "insert kind mismatch",
         [
