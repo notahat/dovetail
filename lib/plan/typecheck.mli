@@ -12,6 +12,7 @@
     the success arm widens to that type then. *)
 
 module Catalog = Dovetail_core.Catalog
+module Row = Dovetail_core.Row
 module Scalar = Dovetail_core.Scalar
 
 (** The variant of user-facing typecheck errors. Each constructor carries the
@@ -38,6 +39,19 @@ type error =
           emitted in source row-order. Only fires once [Insert_column_mismatch]
           has not, so [column] is guaranteed to name a column present in both
           source and target. *)
+  | Unresolved_column of {
+      column_reference : Row.column_reference;
+      available_row_kind : Row.kind;
+      operator : string;
+    }
+      (** A column reference in an operator's expression or projection does not
+          resolve to exactly one field of the operator's input row kind. Covers
+          both unknown columns (no match) and ambiguous bare references (more
+          than one match across qualifiers); the renderer distinguishes them
+          from [column_reference] against [available_row_kind]. [operator] names
+          the user-facing operator the reference appears in (for example
+          ["Restrict"], ["Project"]); the renderer uses it as the error prefix.
+      *)
 
 val render : error -> string
 (** [render error] formats [error] for a human reader, with an operator-named

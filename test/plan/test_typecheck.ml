@@ -6,9 +6,12 @@
 
 open Dovetail_plan
 module Catalog = Dovetail_core.Catalog
+module Expression = Dovetail_core.Expression
 module Scalar = Dovetail_core.Scalar
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
+
+let empty_catalog : Catalog.kind = { relation_kinds = [] }
 
 let logical_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<logical>")) ( = )
@@ -171,6 +174,159 @@ let test_insert_kind_mismatch_renders_with_insert_prefix () =
     "Insert: into \"orders\": column \"amount\" expects Int64, got String"
     (Typecheck.render error)
 
+(* A two-column literal used as the input of [Restrict] / [Project] tests
+   below. Kind is declared inline so the typecheck walker can derive the
+   input row kind without a catalog lookup. *)
+let two_column_literal : Logical.t =
+  Relation_literal
+    {
+      kind =
+        {
+          row_kind =
+            [
+              { name = "id"; kind = Int64; qualifier = None };
+              { name = "description"; kind = String; qualifier = None };
+            ];
+          refinements = [];
+        };
+      rows = [];
+    }
+
+let two_column_row_kind : Row.kind =
+  [
+    { name = "id"; kind = Int64; qualifier = None };
+    { name = "description"; kind = String; qualifier = None };
+  ]
+
+let test_restrict_with_unresolved_column_reports_structured_error () =
+  let predicate : Expression.t =
+    Compare
+      {
+        left = Column { qualifier = None; name = "missing" };
+        op = Equal;
+        right = Literal (Scalar.Int64 1L);
+      }
+  in
+  let plan : Logical.t = Restrict { input = two_column_literal; predicate } in
+  let expected : Typecheck.error list =
+    [
+      Unresolved_column
+        {
+          column_reference = { qualifier = None; name = "missing" };
+          available_row_kind = two_column_row_kind;
+          operator = "Restrict";
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected an Unresolved_column error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured unresolved" expected errors
+
+let test_restrict_unknown_column_renders_with_restrict_prefix () =
+  let error : Typecheck.error =
+    Unresolved_column
+      {
+        column_reference = { qualifier = None; name = "missing" };
+        available_row_kind = two_column_row_kind;
+        operator = "Restrict";
+      }
+  in
+  Alcotest.(check string)
+    "rendered unknown column" "Restrict: unknown column \"missing\""
+    (Typecheck.render error)
+
+let test_restrict_qualified_unknown_renders_dotted () =
+  let error : Typecheck.error =
+    Unresolved_column
+      {
+        column_reference = { qualifier = Some "users"; name = "id" };
+        available_row_kind = two_column_row_kind;
+        operator = "Restrict";
+      }
+  in
+  Alcotest.(check string)
+    "rendered qualified unknown" "Restrict: unknown column \"users.id\""
+    (Typecheck.render error)
+
+let test_restrict_with_ambiguous_bare_reference_reports_structured_error () =
+  (* Cross-product produces a row kind with [id] in both qualifiers; a bare
+     [Column { name = "id" }] then refers to both. *)
+  let left : Logical.t =
+    Relation_literal
+      {
+        kind =
+          {
+            row_kind =
+              [ { name = "id"; kind = Int64; qualifier = Some "left" } ];
+            refinements = [];
+          };
+        rows = [];
+      }
+  in
+  let right : Logical.t =
+    Relation_literal
+      {
+        kind =
+          {
+            row_kind =
+              [ { name = "id"; kind = Int64; qualifier = Some "right" } ];
+            refinements = [];
+          };
+        rows = [];
+      }
+  in
+  let predicate : Expression.t =
+    Compare
+      {
+        left = Column { qualifier = None; name = "id" };
+        op = Equal;
+        right = Literal (Scalar.Int64 1L);
+      }
+  in
+  let plan : Logical.t =
+    Restrict { input = CrossProduct { left; right }; predicate }
+  in
+  let expected : Typecheck.error list =
+    [
+      Unresolved_column
+        {
+          column_reference = { qualifier = None; name = "id" };
+          available_row_kind =
+            [
+              { name = "id"; kind = Int64; qualifier = Some "left" };
+              { name = "id"; kind = Int64; qualifier = Some "right" };
+            ];
+          operator = "Restrict";
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected an Unresolved_column error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured ambiguous" expected errors
+
+let test_restrict_ambiguous_bare_renders_with_match_list () =
+  let error : Typecheck.error =
+    Unresolved_column
+      {
+        column_reference = { qualifier = None; name = "id" };
+        available_row_kind =
+          [
+            { name = "id"; kind = Int64; qualifier = Some "left" };
+            { name = "id"; kind = Int64; qualifier = Some "right" };
+          ];
+        operator = "Restrict";
+      }
+  in
+  Alcotest.(check string)
+    "rendered ambiguous"
+    "Restrict: ambiguous column reference \"id\": matches \"left.id\" and \
+     \"right.id\""
+    (Typecheck.render error)
+
 let () =
   Alcotest.run "typecheck"
     [
@@ -191,6 +347,20 @@ let () =
             test_insert_with_both_missing_and_unknown_renders_both_halves;
           Alcotest.test_case "unknown target table is not a typecheck error yet"
             `Quick test_insert_into_unknown_table_reports_no_typecheck_error;
+        ] );
+      ( "restrict unresolved column",
+        [
+          Alcotest.test_case "unknown column produces a structured error" `Quick
+            test_restrict_with_unresolved_column_reports_structured_error;
+          Alcotest.test_case "unknown column renders with Restrict prefix"
+            `Quick test_restrict_unknown_column_renders_with_restrict_prefix;
+          Alcotest.test_case "qualified unknown renders dotted" `Quick
+            test_restrict_qualified_unknown_renders_dotted;
+          Alcotest.test_case
+            "ambiguous bare reference produces a structured error" `Quick
+            test_restrict_with_ambiguous_bare_reference_reports_structured_error;
+          Alcotest.test_case "ambiguous bare reference renders with match list"
+            `Quick test_restrict_ambiguous_bare_renders_with_match_list;
         ] );
       ( "insert kind mismatch",
         [
