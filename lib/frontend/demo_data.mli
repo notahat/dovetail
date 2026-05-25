@@ -14,7 +14,8 @@ module Storage = Dovetail_storage
 val script : string list
 (** The example-table creation and row-insertion statements, one per element, in
     the order they must execute. Each element is a single REPL line: a
-    [:create table] statement or a [\{...\} | insert into <table>] pipeline. *)
+    [<type-expr> | create table <name>] sink or a
+    [<relation-literal> | insert into <table>] pipeline. *)
 
 val run : Storage.Engine.environment -> unit
 (** [run environment] seeds the example tables into [environment] by feeding

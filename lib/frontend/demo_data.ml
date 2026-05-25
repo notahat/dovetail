@@ -8,8 +8,8 @@ let demo_tables = [ "users"; "orders" ]
 
 let script =
   [
-    ":create table users (id: Int64, name: String, email: String, active: \
-     Bool) primary key (id)";
+    "(id: int64, name: string, email: string, active: bool, primary key (id)) \
+     | create table users";
     "relation (id: int64, name: string, email: string, active: bool) { (id = \
      1, name = \"Alice\", email = \"alice@example.com\", active = true) } | \
      insert into users";
@@ -25,8 +25,8 @@ let script =
     "relation (id: int64, name: string, email: string, active: bool) { (id = \
      5, name = \"Eve\", email = \"eve@example.com\", active = false) } | \
      insert into users";
-    ":create table orders (id: Int64, user_id: Int64, description: String, \
-     amount: Int64) primary key (id)";
+    "(id: int64, user_id: int64, description: string, amount: int64, primary \
+     key (id)) | create table orders";
     "relation (id: int64, user_id: int64, description: string, amount: int64) \
      { (id = 1, user_id = 1, description = \"Coffee\", amount = 5) } | insert \
      into orders";
