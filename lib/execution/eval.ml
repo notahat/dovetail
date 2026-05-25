@@ -97,10 +97,13 @@ let rec eval environment transaction plan continue =
       evaluate_type_op environment transaction ~input continue
   | Scalar_literal value -> continue (Term.Scalar_value value)
   | Row_literal { fields } -> evaluate_row_literal fields continue
-  (* TODO(create-drop-table): evaluator arms land in the dedicated steps for
-     each operator. Unreachable until the parser emits these nodes. *)
-  | Drop_table _ | Create_table_empty _ | Create_table_seeded _ ->
-      failwith "Eval: create/drop table not yet implemented"
+  | Drop_table { table_name } ->
+      evaluate_drop_table environment transaction ~table_name continue
+  (* TODO(create-drop-table): create_table arms land in the dedicated
+     steps for each operator. Unreachable until the parser emits these
+     nodes. *)
+  | Create_table_empty _ | Create_table_seeded _ ->
+      failwith "Eval: create table not yet implemented"
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified
@@ -531,3 +534,47 @@ and evaluate_insert environment transaction ~target_table ~source continue =
           ~target_map ~target_table ~write_transaction ~source_relation
       in
       continue (Term.Relation_value (insert_result_relation affected_rows)))
+
+(* The static row shape that drop table and create table report: a
+   one-column [(<verb> : string)] row carrying the affected table's
+   name. Mirrors {!Plan.Physical.drop_table_result_kind} and
+   {!Plan.Physical.create_table_result_kind}; rebuilt here so the
+   evaluator's runtime values line up with its module-level result-shape
+   constants without an extra dependency. *)
+and mutation_result_kind ~verb : Relation.kind =
+  {
+    row_kind = [ { name = verb; kind = Scalar.String; qualifier = None } ];
+    refinements = [];
+  }
+
+(* Wrap [table_name] as the one-row [(<verb> : string)] relation a
+   create / drop operator hands its continuation. *)
+and mutation_result_relation ~verb table_name : [ `Bag ] Relation.t =
+  {
+    kind = mutation_result_kind ~verb;
+    value = Seq.return [| Scalar.String table_name |];
+  }
+
+(* Drop [table_name] from the catalog and storage. Mirrors
+   {!Ddl_executor.drop_table}'s ordering: rejects an unknown table first,
+   then drops the storage subDB before the catalog entry so a partial
+   commit cannot leave orphan rows under a still-present catalog binding.
+
+   [transaction] is widened to a write transaction via [Obj.magic]: the
+   upstream invariant is that {!Plan.Logical.required_access} reports
+   [`Write] for any plan containing [Drop_table], so the REPL has already
+   opened a write transaction by the time this branch runs. Same
+   template as {!evaluate_insert}. *)
+and evaluate_drop_table environment transaction ~table_name continue =
+  let write_transaction : [ `Read | `Write ] Storage.Engine.transaction =
+    Obj.magic transaction
+  in
+  (match Storage.Catalog.get environment write_transaction ~table_name with
+  | Some _ -> ()
+  | None ->
+      failwith (Printf.sprintf "Eval: drop table %S: no such table" table_name));
+  Storage.Engine.drop_map environment write_transaction
+    ~name:(Storage.Catalog.table_subdb_name table_name);
+  Storage.Catalog.delete environment write_transaction ~table_name;
+  continue
+    (Term.Relation_value (mutation_result_relation ~verb:"dropped" table_name))
