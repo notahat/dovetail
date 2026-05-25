@@ -402,9 +402,12 @@ let with_query_row_kind query check_kind =
               "expected %S to yield a row kind but got a different term arm"
               query))
 
-(** [with_query_failure ~label ~expected query] runs [query] through the same
-    pipeline as {!with_query_result} but asserts that [Eval.eval] raises
-    [expected]. [label] is the description shown in test output. *)
+(** [with_query_failure ~label ~expected query] runs [query] through the full
+    pipeline ([Typecheck] included, mirroring the REPL) and asserts that the run
+    raises [expected]. Typecheck failures are repackaged as a [Failure] carrying
+    the rendered errors joined by newlines, so callers can match the user-facing
+    wording without caring which pass produced it. [label] is the description
+    shown in test output. *)
 let with_query_failure ~label ~expected query =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_read_transaction environment (fun transaction ->
@@ -414,9 +417,21 @@ let with_query_failure ~label ~expected query =
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
+      let catalog_snapshot =
+        Storage.Catalog.snapshot_kind environment transaction
+      in
       let catalog = make_catalog environment transaction in
-      let physical = Plan.Translate.translate ~catalog logical in
       Alcotest.check_raises label expected (fun () ->
+          let typechecked =
+            match
+              Plan.Typecheck.typecheck ~catalog:catalog_snapshot logical
+            with
+            | Ok plan -> plan
+            | Error errors ->
+                failwith
+                  (String.concat "\n" (List.map Plan.Typecheck.render errors))
+          in
+          let physical = Plan.Translate.translate ~catalog typechecked in
           Execution.Eval.eval environment transaction physical (fun _term -> ())))
 
 (** [evaluate_against_fixture plan] populates the standard fixture and evaluates

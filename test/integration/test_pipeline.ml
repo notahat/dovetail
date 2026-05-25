@@ -345,14 +345,13 @@ let test_cross_then_ambiguous_restrict_raises () =
   with_query_failure ~label:"ambiguous unqualified column"
     ~expected:
       (Failure
-         "Expression.resolve: ambiguous column reference \"id\": matches \
-          \"users.id\" and \"orders.id\"")
+         "Restrict: ambiguous column reference \"id\": matches \"users.id\" \
+          and \"orders.id\"")
     "users | cross orders | restrict id = 3"
 
 let test_restrict_with_non_bool_expression_raises () =
   with_query_failure ~label:"non-Bool predicate from int64 column"
-    ~expected:
-      (Failure "Expression.resolve: predicate position requires Bool, got Int64")
+    ~expected:(Failure "Restrict: predicate position requires Bool, got Int64")
     "users | restrict id"
 
 let test_type_on_users_yields_relation_type () =
@@ -382,8 +381,7 @@ let test_type_over_type_raises_at_lower () =
 
 let test_restrict_with_ordering_on_bool_raises () =
   with_query_failure ~label:"ordering operator on Bool operands"
-    ~expected:
-      (Failure "Expression.resolve: ordering operator > is not defined for Bool")
+    ~expected:(Failure "Restrict: ordering operator > is not defined for Bool")
     "users | restrict active > false"
 
 let scalar_value_testable : Scalar.value Alcotest.testable =
