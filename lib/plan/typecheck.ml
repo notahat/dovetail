@@ -46,6 +46,12 @@ type error =
       operator : string;
       column_reference : Row.column_reference;
     }
+  | Relation_literal_kind_mismatch of {
+      row_index : int;
+      column : string;
+      expected : Scalar.kind;
+      actual : Scalar.kind;
+    }
   | Tables_input_wrong_rung of { actual : rung }
   | Unqualify_input_wrong_rung of { actual : rung }
   | Ordering_operator_on_unordered_kind of {
@@ -160,6 +166,11 @@ let render = function
   | Projection_duplicate_column { operator; column_reference } ->
       Printf.sprintf "%s: duplicate column %S" operator
         (Row.format_column_reference column_reference)
+  | Relation_literal_kind_mismatch { row_index; column; expected; actual } ->
+      Printf.sprintf "Relation literal: row %d: column %S expects %s, got %s"
+        row_index column
+        (Scalar.kind_to_string expected)
+        (Scalar.kind_to_string actual)
   | Tables_input_wrong_rung { actual } ->
       Printf.sprintf "Tables: expected a catalog input, got %s"
         (render_rung actual)
@@ -451,6 +462,44 @@ let check_column_references ~operator ~row_kind references : error list =
                }))
     references
 
+(* Walk one row of a [Relation_literal], pairing each cell's value with the
+   declared kind's field at the same position and emitting one
+   [Relation_literal_kind_mismatch] per cell whose scalar kind disagrees.
+   [row_index] is quoted into each error so the user can locate the offending
+   row in source order.
+
+   Precondition: [row] has the same length as [row_kind]. Lower's
+   alignment step has already established this; a length mismatch here
+   would be an internal invariant violation. *)
+let check_relation_literal_row ~row_index ~(row_kind : Row.kind)
+    (row : Scalar.value list) : error list =
+  List.mapi
+    (fun column_index value ->
+      let field = List.nth row_kind column_index in
+      let actual_kind = Scalar.kind_of value in
+      if actual_kind = field.kind then None
+      else
+        Some
+          (Relation_literal_kind_mismatch
+             {
+               row_index;
+               column = field.name;
+               expected = field.kind;
+               actual = actual_kind;
+             }))
+    row
+  |> List.filter_map (fun result -> result)
+
+(* Walk every row of a [Relation_literal] in source order, accumulating
+   per-cell kind mismatches across all rows. *)
+let check_relation_literal ~(kind : Relation.kind)
+    ~(rows : Scalar.value list list) : error list =
+  List.concat
+    (List.mapi
+       (fun row_index row ->
+         check_relation_literal_row ~row_index ~row_kind:kind.row_kind row)
+       rows)
+
 (* Best-effort classification of which rung [plan] sits at. Used by the
    operator-shape preconditions to know whether an operator's input is the
    right kind of value -- a relation, a row, a catalog, and so on. An
@@ -482,8 +531,9 @@ let rec collect_errors ~(catalog : Catalog.kind) (plan : Logical.t) : error list
       match List.assoc_opt table catalog.relation_kinds with
       | Some _ -> []
       | None -> [ Unknown_table { operator = "Scan"; table_name = table } ])
-  | Relation_literal _ | Scalar_literal _ | Row_literal _ | Drop_table _
-  | Create_table_empty _ | Catalog_source ->
+  | Relation_literal { kind; rows } -> check_relation_literal ~kind ~rows
+  | Scalar_literal _ | Row_literal _ | Drop_table _ | Create_table_empty _
+  | Catalog_source ->
       []
   | Type_op { input } | Create_table_seeded { source = input; _ } ->
       collect_errors ~catalog input

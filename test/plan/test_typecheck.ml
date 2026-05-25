@@ -674,6 +674,51 @@ let test_project_unknown_column_renders_with_project_prefix () =
     "rendered project unknown" "Project: unknown column \"missing\""
     (Typecheck.render error)
 
+let test_relation_literal_with_kind_mismatch_reports_structured_error () =
+  (* The declared kind says [(id: int64)] but the lone row supplies a string,
+     which Typecheck catches per-cell. *)
+  let kind : Relation.kind =
+    {
+      row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+      refinements = [];
+    }
+  in
+  let plan : Logical.t =
+    Relation_literal { kind; rows = [ [ Scalar.String "oops" ] ] }
+  in
+  let expected : Typecheck.error list =
+    [
+      Relation_literal_kind_mismatch
+        {
+          row_index = 0;
+          column = "id";
+          expected = Scalar.Int64;
+          actual = Scalar.String;
+        };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Relation_literal_kind_mismatch error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured relation literal kind mismatch" expected errors
+
+let test_relation_literal_kind_mismatch_renders_with_relation_literal_prefix ()
+    =
+  let error : Typecheck.error =
+    Relation_literal_kind_mismatch
+      {
+        row_index = 0;
+        column = "id";
+        expected = Scalar.Int64;
+        actual = Scalar.String;
+      }
+  in
+  Alcotest.(check string)
+    "rendered relation literal kind mismatch"
+    "Relation literal: row 0: column \"id\" expects Int64, got String"
+    (Typecheck.render error)
+
 let test_tables_over_non_catalog_input_reports_structured_error () =
   (* [Scalar_literal] sits at the scalar rung. [Tables] requires a catalog
      input, so this is a rung mismatch the typechecker should catch. *)
@@ -828,6 +873,15 @@ let () =
           Alcotest.test_case "not-operand error renders with operator prefix"
             `Quick
             test_boolean_operand_required_not_renders_with_operator_prefix;
+        ] );
+      ( "relation literal kind mismatch",
+        [
+          Alcotest.test_case "mismatched value kind produces a structured error"
+            `Quick
+            test_relation_literal_with_kind_mismatch_reports_structured_error;
+          Alcotest.test_case
+            "kind mismatch renders with Relation literal prefix" `Quick
+            test_relation_literal_kind_mismatch_renders_with_relation_literal_prefix;
         ] );
       ( "operator-shape preconditions",
         [

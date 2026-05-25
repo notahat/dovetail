@@ -76,13 +76,13 @@ let lower_relation_type (type_expression : Ast.type_expression) : Relation.kind
 let format_field_display_name (field : Row.field) : string =
   Row.format_column_reference { qualifier = field.qualifier; name = field.name }
 
-(* Validate one self-describing row against a relation kind, returning the
-   row's values in the kind's field order. Matches each row entry against
-   its kind field by qualified name -- a kind field [users.id] is bound by
-   a row entry [(users.id = ...)] and not by [(id = ...)]. Raises [Failure]
-   with a user-facing message if the row's qualified names don't exactly
-   match the kind's, or if any value's kind doesn't match the declared
-   field kind. *)
+(* Align one self-describing row against a relation kind, returning the row's
+   values in the kind's field order. Matches each row entry against its kind
+   field by qualified name -- a kind field [users.id] is bound by a row entry
+   [(users.id = ...)] and not by [(id = ...)]. Raises [Failure] with a
+   user-facing message if the row's qualified names don't exactly match the
+   kind's. Per-cell value-kind checks happen in [Plan.Typecheck] once the
+   aligned values are in IR. *)
 let validate_typed_row (kind : Relation.kind)
     (row : (Ast.column_reference * Scalar.value) list) : Scalar.value list =
   let row_field_names =
@@ -116,18 +116,7 @@ let validate_typed_row (kind : Relation.kind)
     in
     value
   in
-  List.map
-    (fun (field : Row.field) ->
-      let value = lookup_value field in
-      let value_kind = Scalar.kind_of value in
-      if value_kind <> field.kind then
-        failwith
-          (Format.asprintf
-             "Lower: relation literal: field %S expected %a but got %a"
-             (format_field_display_name field)
-             Scalar.format_kind field.kind Scalar.format_kind value_kind);
-      value)
-    kind.row_kind
+  List.map lookup_value kind.row_kind
 
 let rec lower (ast : Ast.t) : Plan.Logical.t =
   match ast with

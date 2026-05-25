@@ -589,25 +589,6 @@ let test_relation_literal_typed_rejects_missing_field_in_row () =
     (Failure "Lower: relation literal: missing field \"name\"") (fun () ->
       ignore (Lower.lower ast))
 
-let test_relation_literal_typed_rejects_kind_mismatch () =
-  let ast : Ast.t =
-    Relation_literal
-      {
-        relation_type = users_type;
-        rows =
-          [
-            [
-              (column_reference "id", Scalar.String "wrong");
-              (column_reference "name", Scalar.String "alice");
-            ];
-          ];
-      }
-  in
-  Alcotest.check_raises "row with a kind mismatch is rejected"
-    (Failure
-       "Lower: relation literal: field \"id\" expected int64 but got string")
-    (fun () -> ignore (Lower.lower ast))
-
 let test_relation_literal_typed_empty_rows_lowers_to_empty_rows () =
   let ast : Ast.t =
     Relation_literal { relation_type = users_type; rows = [] }
@@ -667,9 +648,6 @@ let () =
             `Quick test_relation_literal_typed_rejects_extra_field_in_row;
           Alcotest.test_case "rejects a row missing a declared field" `Quick
             test_relation_literal_typed_rejects_missing_field_in_row;
-          Alcotest.test_case
-            "rejects a row whose value kind doesn't match the declared kind"
-            `Quick test_relation_literal_typed_rejects_kind_mismatch;
           Alcotest.test_case "empty rows yields an empty RelationLiteral" `Quick
             test_relation_literal_typed_empty_rows_lowers_to_empty_rows;
         ] );

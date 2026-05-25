@@ -113,6 +113,19 @@ type error =
           reference for the renderer to echo back. Emitted once per duplicate
           occurrence beyond the first, so a column listed three times produces
           two errors. *)
+  | Relation_literal_kind_mismatch of {
+      row_index : int;
+      column : string;
+      expected : Scalar.kind;
+      actual : Scalar.kind;
+    }
+      (** A cell in a [Relation_literal] row has a scalar kind different from
+          the declared kind's column at the same position. [row_index] is the
+          row's zero-based index in source order; [column] is the column name
+          taken from the declared kind. One error per mismatching cell. Lower
+          still raises on name-mismatch and missing-/extra-field structural
+          problems before this check fires, so [column] always names a real
+          declared column. *)
   | Tables_input_wrong_rung of { actual : rung }
       (** A [Tables] operator's input is not a catalog. [actual] is the
           best-effort rung classification of the input subtree. The renderer

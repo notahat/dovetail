@@ -538,18 +538,12 @@ let test_typed_relation_literal_project_narrows_columns () =
         [ [| Scalar.String "alice" |]; [| Scalar.String "bob" |] ]
         rows)
 
-let test_typed_relation_literal_rejects_kind_mismatch_at_lower () =
-  let ast =
-    match
-      Surface_ra.Parser.parse "relation (id: int64) { (id = \"oops\") }"
-    with
-    | Ok plan -> plan
-    | Error message -> Alcotest.failf "parse failed: %s" message
-  in
-  Alcotest.check_raises "row value kind doesn't match the declared kind"
-    (Failure
-       "Lower: relation literal: field \"id\" expected int64 but got string")
-    (fun () -> ignore (Surface_ra.Lower.lower ast))
+let test_typed_relation_literal_rejects_kind_mismatch () =
+  with_query_failure ~label:"row value kind doesn't match the declared kind"
+    ~expected:
+      (Failure
+         "Relation literal: row 0: column \"id\" expects Int64, got String")
+    "relation (id: int64) { (id = \"oops\") }"
 
 let test_unqualify_after_join_strips_qualifiers () =
   (* A bare [join ... | unqualify] would collide on `id`; the project step
@@ -850,8 +844,9 @@ let () =
             test_typed_relation_literal_restrict_filters_rows;
           Alcotest.test_case "project over a typed literal narrows columns"
             `Quick test_typed_relation_literal_project_narrows_columns;
-          Alcotest.test_case "value/kind mismatch in a row is rejected at Lower"
-            `Quick test_typed_relation_literal_rejects_kind_mismatch_at_lower;
+          Alcotest.test_case
+            "value/kind mismatch in a row is rejected by Typecheck" `Quick
+            test_typed_relation_literal_rejects_kind_mismatch;
         ] );
       ( "unqualify",
         [
