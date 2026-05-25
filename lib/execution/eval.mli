@@ -22,7 +22,7 @@ val eval :
   Storage.Engine.environment ->
   [> `Read ] Storage.Engine.transaction ->
   Plan.Physical.t ->
-  ([ `Bag ] Term.t -> 'a) ->
+  ([ `Set | `Bag ] Term.t -> 'a) ->
   'a
 (** [eval environment transaction plan continue] runs [plan] against the
     database open in [environment], using [transaction] for all reads, and

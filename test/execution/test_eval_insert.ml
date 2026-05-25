@@ -85,7 +85,7 @@ let test_insert_writes_row_and_reports_one_affected () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction mutation
-        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+        (expect_relation (fun (relation : [ `Set | `Bag ] Relation.t) ->
              Alcotest.(check (list string))
                "result kind has one insert_count column" [ "insert_count" ]
                (List.map
@@ -157,7 +157,7 @@ let test_insert_three_rows_reports_count_of_three () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction mutation
-        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+        (expect_relation (fun (relation : [ `Set | `Bag ] Relation.t) ->
              Alcotest.(check row_list_testable)
                "three rows inserted yields insert_count = 3"
                [ [| Scalar.Int64 3L |] ]

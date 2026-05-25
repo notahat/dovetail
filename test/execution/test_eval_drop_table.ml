@@ -19,7 +19,7 @@ let test_drop_table_removes_table_and_reports_dropped () =
   let plan : Plan.Physical.t = Drop_table { table_name = "orders" } in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction plan
-        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+        (expect_relation (fun (relation : [ `Set | `Bag ] Relation.t) ->
              Alcotest.(check (list string))
                "result kind has one (dropped : string) column" [ "dropped" ]
                (List.map

@@ -58,7 +58,7 @@ let evaluate_full_scan environment transaction table continue =
   let* relation =
     build_table_relation environment transaction ~table_name:table
   in
-  continue (Term.Relation_value (relation : [ `Bag ] Relation.t))
+  continue (Term.Relation_value (relation : [ `Set | `Bag ] Relation.t))
 
 (* Evaluate the bare [catalog] source. Enumerates the catalog's table names
    in cursor order, then folds across them with [build_table_relation] so
@@ -98,7 +98,7 @@ let evaluate_index_lookup environment transaction ~table ~key continue =
         Seq.return
           (Storage.Row_codec.decode_row kind (encoded_key, value_bytes))
   in
-  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
+  continue (Term.Relation_value ({ kind; value } : [ `Set | `Bag ] Relation.t))
 
 (* CPS-shaped executor. Every operator is in continuation-passing form so
    the consumer's [continue] runs inside whatever cursor and resource
@@ -143,12 +143,7 @@ let rec eval environment transaction plan continue =
       evaluate_create_table_seeded environment transaction ~table_name ~source
         continue
   | Catalog_source -> evaluate_catalog_source environment transaction continue
-  | Tables { input } ->
-      ignore input;
-      ignore continue;
-      (* The tables evaluator lands in a follow-up step alongside the
-         integration tests that exercise it end to end. *)
-      failwith "Eval: tables: the tables evaluator is not yet wired through"
+  | Tables { input } -> evaluate_tables environment transaction ~input continue
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified
@@ -165,6 +160,46 @@ and unqualify_row_kind input_row_kind =
    kind; a row input rebuilds the [Row.t] with the new kind. Other arms are
    internal invariant violations -- [Unqualify] only sits over a relational
    or row-yielding sub-plan today. *)
+(* Short description of a term arm for use in user-facing error messages.
+   Matches the spelling of the corresponding [Term.t] constructor so the
+   surface label and the implementation are easy to correlate when reading
+   a failure trace. *)
+and term_arm_description : [ `Set | `Bag ] Term.t -> string = function
+  | Term.Scalar_value _ -> "a scalar value"
+  | Term.Scalar_kind _ -> "a scalar kind"
+  | Term.Row_value _ -> "a row value"
+  | Term.Row_kind _ -> "a row kind"
+  | Term.Relation_value _ -> "a relation value"
+  | Term.Relation_kind _ -> "a relation kind"
+  | Term.Catalog_value _ -> "a catalog value"
+  | Term.Catalog_kind _ -> "a catalog kind"
+
+(* The static row shape [tables] reports: a one-column [name : string] row,
+   one row per table in the input catalog. *)
+and tables_result_kind : Relation.kind =
+  {
+    row_kind = [ { name = "name"; kind = Scalar.String; qualifier = None } ];
+    refinements = [];
+  }
+
+(* Walk [input]'s [Catalog_value] and stream one row per (table_name, _)
+   entry as a [`Set]-tagged relation with kind [(name: string)]. Any other
+   term arm raises a user-facing [Failure] naming what we got instead. *)
+and evaluate_tables environment transaction ~input continue =
+  eval environment transaction input (function
+    | Term.Catalog_value catalog ->
+        let row_of_entry (table_name, _) : Row.value =
+          [| Scalar.String table_name |]
+        in
+        let value = List.to_seq catalog.relations |> Seq.map row_of_entry in
+        continue
+          (Term.Relation_value
+             ({ kind = tables_result_kind; value } : [ `Set | `Bag ] Relation.t))
+    | other ->
+        failwith
+          (Printf.sprintf "Eval: tables: expected a catalog value, got %s"
+             (term_arm_description other)))
+
 and evaluate_unqualify environment transaction ~input continue =
   eval environment transaction input (function
     | Term.Relation_value relation ->
@@ -174,7 +209,7 @@ and evaluate_unqualify environment transaction ~input continue =
         in
         continue
           (Term.Relation_value
-             ({ kind; value = relation.value } : [ `Bag ] Relation.t))
+             ({ kind; value = relation.value } : [ `Set | `Bag ] Relation.t))
     | Term.Row_value row ->
         let kind = unqualify_row_kind row.kind in
         continue (Term.Row_value ({ kind; value = row.value } : Row.t))
@@ -244,7 +279,7 @@ and row_kind_of_fields fields : Row.kind =
    depend on a first row. *)
 and evaluate_relation_literal ~kind ~rows continue =
   let value = rows |> List.to_seq |> Seq.map Array.of_list in
-  continue (Term.Relation_value ({ kind; value } : [ `Bag ] Relation.t))
+  continue (Term.Relation_value ({ kind; value } : [ `Set | `Bag ] Relation.t))
 
 (* Materialise a row literal as a [Row.t] and hand [continue] the
    [Term.Row_value] arm. The kind is derived eagerly from the values'
@@ -285,7 +320,7 @@ and evaluate_filter environment transaction ~input ~predicate continue =
           kind = input_relation.kind;
           value = Seq.filter evaluate_predicate input_relation.value;
         }
-         : [ `Bag ] Relation.t))
+         : [ `Set | `Bag ] Relation.t))
 
 (* Stream the input through [eval], then wrap its value seq in a [Seq.map] that
    projects each row to the requested columns. The projected kind is computed
@@ -302,7 +337,7 @@ and evaluate_project environment transaction ~input ~columns continue =
           kind = projected_kind;
           value = Seq.map project_row input_relation.value;
         }
-         : [ `Bag ] Relation.t))
+         : [ `Set | `Bag ] Relation.t))
 
 (* Sequence the left scope and then the right scope via [let*]; the body
    below runs inside both. The right side is materialised via [List.of_seq]
@@ -328,7 +363,8 @@ and evaluate_cross_product environment transaction ~left ~right continue =
   in
   continue
     (Term.Relation_value
-       ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
+       ({ kind = combined_kind; value = combined_value }
+         : [ `Set | `Bag ] Relation.t))
 
 (* Resolve [outer_key_column] against the outer relation's row kind and
    verify that the resolved field is the [Int64] kind required by the
@@ -405,7 +441,8 @@ and evaluate_indexed_nested_loop_join environment transaction ~outer
   let combined_value = Seq.filter_map probe_outer_row outer_relation.value in
   continue
     (Term.Relation_value
-       ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
+       ({ kind = combined_kind; value = combined_value }
+         : [ `Set | `Bag ] Relation.t))
 
 (* Same shape as [evaluate_cross_product] -- left and right sequenced via
    [let*], right side materialised -- with the predicate resolved against
@@ -436,7 +473,8 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
   in
   continue
     (Term.Relation_value
-       ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
+       ({ kind = combined_kind; value = combined_value }
+         : [ `Set | `Bag ] Relation.t))
 
 (* Reject any source row whose fields carry qualifiers. Row-writing sinks
    (insert into, create table from a value pipeline) store rows under bare
@@ -570,7 +608,7 @@ and insert_result_kind : Relation.kind =
   }
 
 (* Wrap a row count as the one-row [insert_count : int64] relation. *)
-and insert_result_relation count : [ `Bag ] Relation.t =
+and insert_result_relation count : [ `Set | `Bag ] Relation.t =
   {
     kind = insert_result_kind;
     value = Seq.return [| Scalar.Int64 (Int64.of_int count) |];
@@ -615,7 +653,7 @@ and mutation_result_kind ~verb : Relation.kind =
 
 (* Wrap [table_name] as the one-row [(<verb> : string)] relation a
    create / drop operator hands its continuation. *)
-and mutation_result_relation ~verb table_name : [ `Bag ] Relation.t =
+and mutation_result_relation ~verb table_name : [ `Set | `Bag ] Relation.t =
   {
     kind = mutation_result_kind ~verb;
     value = Seq.return [| Scalar.String table_name |];

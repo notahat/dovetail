@@ -13,14 +13,14 @@ module Scalar = Dovetail_core.Scalar
 
 (* Extract a scalar value or fail the running test with a description of the
    wrong arm. *)
-let expect_scalar_value callback : [ `Bag ] Term.t -> 'a = function
+let expect_scalar_value callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Scalar_value value -> callback value
   | Term.Scalar_kind _ | Term.Row_value _ | Term.Row_kind _
   | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
   | Term.Catalog_kind _ ->
       Alcotest.fail "expected a scalar value but got a different term arm"
 
-let expect_scalar_kind callback : [ `Bag ] Term.t -> 'a = function
+let expect_scalar_kind callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Scalar_kind kind -> callback kind
   | Term.Scalar_value _ | Term.Row_value _ | Term.Row_kind _
   | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _

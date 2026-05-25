@@ -40,7 +40,7 @@ let test_seeded_from_literal_creates_table_and_writes_rows () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction plan
-        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+        (expect_relation (fun (relation : [ `Set | `Bag ] Relation.t) ->
              Alcotest.(check row_list_testable)
                "result is a single (created = \"widgets\") row"
                [ [| Scalar.String "widgets" |] ]
@@ -83,7 +83,7 @@ let test_seeded_from_unqualified_scan_creates_table_and_writes_rows () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction plan
-        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+        (expect_relation (fun (relation : [ `Set | `Bag ] Relation.t) ->
              Alcotest.(check row_list_testable)
                "result is a single (created = \"users_copy\") row"
                [ [| Scalar.String "users_copy" |] ]

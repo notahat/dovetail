@@ -10,7 +10,7 @@ module Term = Dovetail_core.Term
 (* Dispatch on the [Term.Catalog_value] arm or fail the running test with a
    description of the wrong arm. Mirrors the per-arm helpers in the other
    eval tests. *)
-let expect_catalog_value callback : [ `Bag ] Term.t -> 'a = function
+let expect_catalog_value callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Catalog_value value -> callback value
   | Term.Catalog_kind _ | Term.Relation_value _ | Term.Relation_kind _
   | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_value _

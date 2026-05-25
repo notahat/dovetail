@@ -38,7 +38,7 @@ let test_create_table_empty_writes_catalog_and_reports_created () =
   with_fixture_environment @@ fun environment ->
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Eval.eval environment transaction create_widgets
-        (expect_relation (fun (relation : [ `Bag ] Relation.t) ->
+        (expect_relation (fun (relation : [ `Set | `Bag ] Relation.t) ->
              Alcotest.(check (list string))
                "result kind has one (created : string) column" [ "created" ]
                (List.map

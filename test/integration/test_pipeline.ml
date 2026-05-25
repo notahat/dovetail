@@ -616,6 +616,31 @@ let render_query_against_fixture query =
       Execution.Eval.eval environment transaction physical (fun term ->
           Dovetail_core.Term.format formatter term))
 
+let test_catalog_pipe_tables_renders_fixture_table_names () =
+  let expected =
+    String.concat "\n"
+      [
+        "relation (name: string) {";
+        "  (name = \"orders\"),";
+        "  (name = \"users\")";
+        "}";
+      ]
+  in
+  Alcotest.(check string)
+    "catalog | tables renders one row per fixture table" expected
+    (render_query_against_fixture "catalog | tables")
+
+let test_catalog_pipe_tables_pipe_type_renders_one_column_kind () =
+  Alcotest.(check string)
+    "catalog | tables | type renders the (name: string) relation kind"
+    "(name: string)"
+    (render_query_against_fixture "catalog | tables | type")
+
+let test_tables_over_non_catalog_input_raises_user_facing_error () =
+  Alcotest.check_raises "tables over a scalar literal"
+    (Failure "Eval: tables: expected a catalog value, got a scalar value")
+    (fun () -> ignore (render_query_against_fixture "42 | tables"))
+
 let test_catalog_pipe_type_renders_fixture_catalog_kind () =
   let expected =
     "catalog { orders: (orders.id: int64, orders.user_id: int64, \
@@ -782,6 +807,16 @@ let () =
           Alcotest.test_case
             "[catalog | type] renders the fixture catalog kind end to end"
             `Quick test_catalog_pipe_type_renders_fixture_catalog_kind;
+          Alcotest.test_case
+            "[catalog | tables] renders one row per fixture table" `Quick
+            test_catalog_pipe_tables_renders_fixture_table_names;
+          Alcotest.test_case
+            "[catalog | tables | type] renders the (name: string) relation kind"
+            `Quick test_catalog_pipe_tables_pipe_type_renders_one_column_kind;
+          Alcotest.test_case
+            "[42 | tables] raises Eval: tables: expected a catalog value, got \
+             a scalar value"
+            `Quick test_tables_over_non_catalog_input_raises_user_facing_error;
         ] );
       ( "scalar literal source",
         [

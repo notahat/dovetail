@@ -14,7 +14,7 @@ module Storage = Dovetail_storage
 (** [expect_relation_kind callback term] applies [callback] to the kind inside
     [term], failing the running test with [Alcotest.fail] if [term] is the
     relation-value arm instead. *)
-let expect_relation_kind callback : [ `Bag ] Term.t -> 'a = function
+let expect_relation_kind callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Relation_kind kind -> callback kind
   | Term.Relation_value _ | Term.Scalar_value _ | Term.Scalar_kind _
   | Term.Row_value _ | Term.Row_kind _ | Term.Catalog_value _
@@ -47,7 +47,7 @@ let test_type_op_over_full_scan_yields_users_catalog_kind () =
 
 (* Dispatch on the [Term.Catalog_kind] arm or fail with a description of the
    wrong arm. *)
-let expect_catalog_kind callback : [ `Bag ] Term.t -> 'a = function
+let expect_catalog_kind callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Catalog_kind kind -> callback kind
   | Term.Catalog_value _ | Term.Relation_value _ | Term.Relation_kind _
   | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_value _

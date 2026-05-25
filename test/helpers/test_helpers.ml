@@ -196,7 +196,7 @@ let expression_not operand : Expression.t = Not operand
     [term], failing the running test with [Alcotest.fail] if [term] is the
     relation-kind arm instead. Wraps an existing relation-shaped callback for
     use against [Eval.eval], which hands its continuation a [Term.t]. *)
-let expect_relation callback : [ `Bag ] Term.t -> 'a = function
+let expect_relation callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Relation_value relation -> callback relation
   | Term.Relation_kind _ | Term.Scalar_value _ | Term.Scalar_kind _
   | Term.Row_value _ | Term.Row_kind _ | Term.Catalog_value _

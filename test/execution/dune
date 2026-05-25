@@ -17,6 +17,7 @@
   test_eval_scalar_literal
   test_eval_row_literal
   test_eval_catalog_source
+  test_eval_tables
   test_ddl_executor)
  (libraries
   alcotest

@@ -12,14 +12,14 @@ module Storage = Dovetail_storage
 module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 
-let expect_row_value callback : [ `Bag ] Term.t -> 'a = function
+let expect_row_value callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Row_value row -> callback row
   | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_kind _
   | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
   | Term.Catalog_kind _ ->
       Alcotest.fail "expected a row value but got a different term arm"
 
-let expect_row_kind callback : [ `Bag ] Term.t -> 'a = function
+let expect_row_kind callback : [ `Set | `Bag ] Term.t -> 'a = function
   | Term.Row_kind kind -> callback kind
   | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_value _
   | Term.Relation_value _ | Term.Relation_kind _ | Term.Catalog_value _
