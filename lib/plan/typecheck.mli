@@ -91,6 +91,12 @@ type error =
           renderer's prefix; [expression] is the whole offending predicate (kept
           for LSP detail even though the renderer does not name it, matching the
           legacy resolve-time message). *)
+  | Unknown_table of { operator : string; table_name : string }
+      (** A query refers to a table that does not exist in the catalog snapshot.
+          [operator] names the user-facing operator the reference appears in
+          ([{"Scan"}] for a source table, [{"Insert"}] for an insert target) and
+          becomes the renderer's prefix; [table_name] is the missing table's
+          name. *)
   | Projection_duplicate_column of {
       operator : string;
       column_reference : Row.column_reference;

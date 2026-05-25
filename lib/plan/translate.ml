@@ -330,14 +330,10 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   | Catalog_source -> Catalog_source
   | Tables { input } -> Tables { input = translate_relation ~catalog input }
 
-(* Confirm the target table exists in the catalog and translate the source.
-   Literal column-set and per-column kind agreement live in [Typecheck];
-   what stays here is the catalog lookup that proves the table is real. *)
+(* Translate the source; the target's existence and column / kind discipline
+   are [Typecheck]'s responsibility, so there's nothing for Translate to
+   re-validate here. *)
 and translate_insert ~catalog ~table ~source : Physical.t =
-  (match catalog table with
-  | Some _ -> ()
-  | None ->
-      failwith (Printf.sprintf "Translate: insert into %S: unknown table" table));
   Insert { table; source = translate_relation ~catalog source }
 
 let translate = translate_relation

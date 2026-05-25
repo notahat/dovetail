@@ -57,8 +57,16 @@ let insert_literal ~table ~pairs : Logical.t =
 let orders_catalog : Catalog.kind =
   { relation_kinds = [ ("orders", orders_kind) ] }
 
-let test_empty_pass_returns_input_unchanged () =
-  let catalog : Catalog.kind = { relation_kinds = [] } in
+let test_no_op_pass_returns_input_unchanged () =
+  (* The catalog has to know about the scanned table for the pass to be a
+     no-op now that Typecheck checks unknown sources. *)
+  let users_kind : Relation.kind =
+    {
+      row_kind = [ { name = "id"; kind = Int64; qualifier = Some "users" } ];
+      refinements = [];
+    }
+  in
+  let catalog : Catalog.kind = { relation_kinds = [ ("users", users_kind) ] } in
   let plan : Logical.t = Scan { table = "users" } in
   match Typecheck.typecheck ~catalog plan with
   | Ok result -> Alcotest.(check logical_testable) "plan unchanged" plan result
@@ -119,17 +127,45 @@ let test_insert_with_both_missing_and_unknown_renders_both_halves () =
      colour"
     (Typecheck.render error)
 
-let test_insert_into_unknown_table_reports_no_typecheck_error () =
-  (* Unknown-table reporting is not yet a Typecheck concern -- Translate still
-     handles it. The walker should pass through silently rather than
-     fabricate a column-mismatch error. *)
+let test_insert_into_unknown_table_reports_structured_error () =
   let plan =
     insert_literal ~table:"widgets" ~pairs:[ ("id", Scalar.Int64 1L) ]
   in
+  let expected : Typecheck.error list =
+    [ Unknown_table { operator = "Insert"; table_name = "widgets" } ]
+  in
   match Typecheck.typecheck ~catalog:orders_catalog plan with
-  | Ok _ -> ()
+  | Ok _ -> Alcotest.fail "expected an Unknown_table error"
   | Error errors ->
-      Alcotest.failf "expected Ok; got %d error(s)" (List.length errors)
+      Alcotest.(check error_list_testable)
+        "structured unknown insert target" expected errors
+
+let test_unknown_table_renders_with_insert_prefix () =
+  let error : Typecheck.error =
+    Unknown_table { operator = "Insert"; table_name = "widgets" }
+  in
+  Alcotest.(check string)
+    "rendered insert-target unknown-table error"
+    "Insert: into \"widgets\": unknown table" (Typecheck.render error)
+
+let test_scan_of_unknown_table_reports_structured_error () =
+  let plan : Logical.t = Scan { table = "ghost" } in
+  let expected : Typecheck.error list =
+    [ Unknown_table { operator = "Scan"; table_name = "ghost" } ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected an Unknown_table error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured unknown scan target" expected errors
+
+let test_unknown_table_renders_with_scan_prefix () =
+  let error : Typecheck.error =
+    Unknown_table { operator = "Scan"; table_name = "ghost" }
+  in
+  Alcotest.(check string)
+    "rendered scan unknown-table error" "Scan: unknown table \"ghost\""
+    (Typecheck.render error)
 
 let test_insert_with_kind_mismatch_reports_structured_error () =
   let plan =
@@ -663,7 +699,7 @@ let () =
       ( "no-op pass",
         [
           Alcotest.test_case "returns input unchanged" `Quick
-            test_empty_pass_returns_input_unchanged;
+            test_no_op_pass_returns_input_unchanged;
         ] );
       ( "insert column mismatch",
         [
@@ -675,8 +711,19 @@ let () =
             test_insert_with_unknown_columns_renders_with_insert_prefix;
           Alcotest.test_case "missing and unknown render together" `Quick
             test_insert_with_both_missing_and_unknown_renders_both_halves;
-          Alcotest.test_case "unknown target table is not a typecheck error yet"
-            `Quick test_insert_into_unknown_table_reports_no_typecheck_error;
+        ] );
+      ( "unknown table",
+        [
+          Alcotest.test_case
+            "Insert into an unknown table produces a structured error" `Quick
+            test_insert_into_unknown_table_reports_structured_error;
+          Alcotest.test_case "Insert unknown-table renders with Insert prefix"
+            `Quick test_unknown_table_renders_with_insert_prefix;
+          Alcotest.test_case
+            "Scan of an unknown table produces a structured error" `Quick
+            test_scan_of_unknown_table_reports_structured_error;
+          Alcotest.test_case "Scan unknown-table renders with Scan prefix"
+            `Quick test_unknown_table_renders_with_scan_prefix;
         ] );
       ( "restrict unresolved column",
         [

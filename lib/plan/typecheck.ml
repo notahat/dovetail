@@ -39,6 +39,7 @@ type error =
       expression : Expression.t;
       actual_kind : Scalar.kind;
     }
+  | Unknown_table of { operator : string; table_name : string }
   | Projection_duplicate_column of {
       operator : string;
       column_reference : Row.column_reference;
@@ -141,6 +142,10 @@ let render = function
   | Predicate_not_boolean { operator; expression = _; actual_kind } ->
       Printf.sprintf "%s: predicate position requires Bool, got %s" operator
         (Scalar.kind_to_string actual_kind)
+  | Unknown_table { operator = "Insert"; table_name } ->
+      Printf.sprintf "Insert: into %S: unknown table" table_name
+  | Unknown_table { operator; table_name } ->
+      Printf.sprintf "%s: unknown table %S" operator table_name
   | Projection_duplicate_column { operator; column_reference } ->
       Printf.sprintf "%s: duplicate column %S" operator
         (Row.format_column_reference column_reference)
@@ -196,22 +201,27 @@ let check_insert_value_kinds ~table_name ~(target_kind : Relation.kind)
              }))
     literal_kind.row_kind
 
-(* Errors specific to an [Insert] node: the literal source's column set
-   against the target's, then per-column kind agreement. The kind check is
-   skipped when the column-set check has already failed -- comparing
-   value kinds against mismatched names produces noise. Unknown target
-   tables pass through silently -- [Translate] still raises for those.
-   Non-literal sources have no compile-time kind to check against here. *)
+(* Errors specific to an [Insert] node: target-table existence first, then
+   (when the table exists) the literal source's column set against the
+   target's, then per-column kind agreement. The kind check is skipped
+   when the column-set check has already failed -- comparing value kinds
+   against mismatched names produces noise. Non-literal sources have no
+   compile-time kind to check against here. *)
 let check_insert ~(catalog : Catalog.kind) ~table ~(source : Logical.t) :
     error list =
-  match (List.assoc_opt table catalog.relation_kinds, source) with
-  | Some target_kind, Relation_literal { kind = literal_kind; _ } ->
-      let column_errors =
-        check_insert_columns ~table_name:table ~target_kind ~literal_kind
-      in
-      if column_errors <> [] then column_errors
-      else check_insert_value_kinds ~table_name:table ~target_kind ~literal_kind
-  | _ -> []
+  match List.assoc_opt table catalog.relation_kinds with
+  | None -> [ Unknown_table { operator = "Insert"; table_name = table } ]
+  | Some target_kind -> (
+      match source with
+      | Relation_literal { kind = literal_kind; _ } ->
+          let column_errors =
+            check_insert_columns ~table_name:table ~target_kind ~literal_kind
+          in
+          if column_errors <> [] then column_errors
+          else
+            check_insert_value_kinds ~table_name:table ~target_kind
+              ~literal_kind
+      | _ -> [])
 
 (* Fixed result kinds for the mutation and catalog-projecting operators,
    mirroring the values their evaluators hand back. Kept inline here so
@@ -426,10 +436,15 @@ let check_column_references ~operator ~row_kind references : error list =
 
 (* Post-order walk: gather errors from each subtree, then add any errors
    contributed by the operator itself. *)
-let rec collect_errors ~catalog (plan : Logical.t) : error list =
+let rec collect_errors ~(catalog : Catalog.kind) (plan : Logical.t) : error list
+    =
   match plan with
-  | Scan _ | Relation_literal _ | Scalar_literal _ | Row_literal _
-  | Drop_table _ | Create_table_empty _ | Catalog_source ->
+  | Scan { table } -> (
+      match List.assoc_opt table catalog.relation_kinds with
+      | Some _ -> []
+      | None -> [ Unknown_table { operator = "Scan"; table_name = table } ])
+  | Relation_literal _ | Scalar_literal _ | Row_literal _ | Drop_table _
+  | Create_table_empty _ | Catalog_source ->
       []
   | Unqualify { input }
   | Type_op { input }

@@ -54,17 +54,6 @@ let test_index_lookup_preserves_table_kind () =
     [ "id"; "name"; "email"; "active" ]
     field_names
 
-let test_index_lookup_raises_for_missing_table () =
-  with_temp_dir @@ fun dir ->
-  with_environment dir @@ fun environment ->
-  Fixture.populate_if_empty environment;
-  Storage.Engine.with_read_transaction environment (fun transaction ->
-      Alcotest.check_raises "missing table"
-        (Failure "Eval: unknown table \"nonexistent_table\"") (fun () ->
-          Eval.eval environment transaction
-            (Plan.Physical.IndexLookup { table = "nonexistent_table"; key = 1L })
-            (fun _term -> ())))
-
 let () =
   Alcotest.run "eval_index_lookup"
     [
@@ -78,7 +67,5 @@ let () =
             `Quick test_index_lookup_returns_no_rows_for_a_missing_key;
           Alcotest.test_case "preserves the table's kind and primary key" `Quick
             test_index_lookup_preserves_table_kind;
-          Alcotest.test_case "raises when the table is missing from the catalog"
-            `Quick test_index_lookup_raises_for_missing_table;
         ] );
     ]

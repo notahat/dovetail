@@ -8,13 +8,16 @@ module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 
 (* Look up the kind and storage handle for a table referenced in a plan.
-   Raises [Failure] if the catalog has no kind for [table], or if the catalog
-   has a kind but no storage subDB exists. *)
+   [Plan.Typecheck] guarantees the catalog has a kind for [table]; the
+   [Error] arm here would only fire if a caller bypassed Typecheck.
+   Raises [Failure] if the catalog has a kind but no storage subDB
+   exists (a true catalog/storage divergence). *)
 let lookup_table_resources environment transaction table =
   let kind =
     match Storage.Catalog.get environment transaction ~table_name:table with
     | Some kind -> kind
-    | None -> failwith (Printf.sprintf "Eval: unknown table %S" table)
+    (* Typecheck has validated every table reference. *)
+    | None -> assert false
   in
   let table_map =
     match
