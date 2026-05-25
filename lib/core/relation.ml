@@ -119,11 +119,14 @@ let format_kind formatter (kind : kind) =
         kind.refinements);
   Format.pp_print_string formatter ")"
 
-(* Rendered through a vertical Format box so that when a relation is
-   nested inside an enclosing box (e.g. a catalog literal), the rows
-   indent further than at depth 0. The closing brace uses [@;<0 -2>]
-   to back out to the column where the box opened. *)
-let format formatter relation =
+(* Emit the [relation (T) { rows }] literal into the formatter's currently-
+   open vertical box, without opening one of our own. Callers that need a
+   standalone rendering use [format], which wraps this in a fresh vbox at
+   depth 0. Composing callers (e.g. [Catalog.format]) open the vbox
+   themselves so an entry's prefix (e.g. ["users = "]) is inside the box and
+   the rows-cuts indent relative to the entry's start column rather than
+   the [relation] keyword's column. *)
+let format_into formatter relation =
   let row_kind = relation.kind.row_kind in
   let rows = List.of_seq relation.value in
   match rows with
@@ -133,7 +136,9 @@ let format formatter relation =
         Row.format formatter { kind = row_kind; value = row }
       in
       let separator formatter () = Format.fprintf formatter ",@," in
-      Format.fprintf formatter "@[<v 2>relation %a {@," format_kind
-        relation.kind;
+      Format.fprintf formatter "relation %a {@," format_kind relation.kind;
       Format.pp_print_list ~pp_sep:separator format_row formatter rows;
-      Format.fprintf formatter "@;<0 -2>}@]"
+      Format.fprintf formatter "@;<0 -2>}"
+
+let format formatter relation =
+  Format.fprintf formatter "@[<v 2>%a@]" format_into relation

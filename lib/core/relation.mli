@@ -73,3 +73,11 @@ val format : Format.formatter -> _ t -> unit
 
     No trailing newline is emitted after the closing brace, matching
     {!Scalar.format}, {!Row.format}, and {!format_kind}. *)
+
+val format_into : Format.formatter -> _ t -> unit
+(** [format_into formatter relation] writes the same surface syntax as {!format}
+    but assumes the caller has already opened an enclosing vertical Format box.
+    {!format} is just this function wrapped in [@[<v 2>...@]]; callers that want
+    to embed their own prefix inside the box (so that nested cuts indent
+    relative to the caller's start column rather than the [relation] keyword's
+    column) open the box themselves and use this. *)

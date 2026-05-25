@@ -44,6 +44,6 @@ val format : Format.formatter -> 'tag t -> unit
     {!Scalar.format_kind}; [Row_value] via {!Row.format}; [Row_kind] via
     {!Row.format_kind}; [Relation_value] in the canonical relation-literal
     syntax (via {!Relation.format}); [Relation_kind] in the surface
-    relation-type syntax (via {!Relation.format_kind}). The [Catalog_value] and
-    [Catalog_kind] arms currently emit a placeholder rendering; a real
-    catalog-literal renderer arrives in a follow-up step. *)
+    relation-type syntax (via {!Relation.format_kind}); [Catalog_value] in the
+    canonical catalog-literal syntax (via {!Catalog.format}); and [Catalog_kind]
+    in the surface catalog-type syntax (via {!Catalog.format_kind}). *)
