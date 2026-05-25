@@ -45,6 +45,26 @@ let test_type_op_over_full_scan_yields_users_catalog_kind () =
                "Type_op over FullScan yields the users catalog kind"
                expected_kind kind)))
 
+(* Dispatch on the [Term.Catalog_kind] arm or fail with a description of the
+   wrong arm. *)
+let expect_catalog_kind callback : [ `Bag ] Term.t -> 'a = function
+  | Term.Catalog_kind kind -> callback kind
+  | Term.Catalog_value _ | Term.Relation_value _ | Term.Relation_kind _
+  | Term.Scalar_value _ | Term.Scalar_kind _ | Term.Row_value _
+  | Term.Row_kind _ ->
+      Alcotest.fail "expected a catalog kind but got a different term arm"
+
+let test_type_op_over_catalog_source_yields_catalog_kind () =
+  with_fixture_environment @@ fun environment ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let plan : Plan.Physical.t = Type_op { input = Catalog_source } in
+      Eval.eval environment transaction plan
+        (expect_catalog_kind (fun kind ->
+             Alcotest.(check (list string))
+               "catalog kind lists the fixture's table names in cursor order"
+               [ "orders"; "users" ]
+               (List.map fst kind.relation_kinds))))
+
 let test_type_op_over_missing_table_raises () =
   with_temp_dir @@ fun dir ->
   with_environment dir @@ fun environment ->
@@ -67,5 +87,9 @@ let () =
             test_type_op_over_full_scan_yields_users_catalog_kind;
           Alcotest.test_case "raises when the input references an unknown table"
             `Quick test_type_op_over_missing_table_raises;
+          Alcotest.test_case
+            "over a Catalog_source yields a Catalog_kind without opening row \
+             cursors"
+            `Quick test_type_op_over_catalog_source_yields_catalog_kind;
         ] );
     ]

@@ -616,6 +616,17 @@ let render_query_against_fixture query =
       Execution.Eval.eval environment transaction physical (fun term ->
           Dovetail_core.Term.format formatter term))
 
+let test_catalog_pipe_type_renders_fixture_catalog_kind () =
+  let expected =
+    "catalog { orders: (orders.id: int64, orders.user_id: int64, \
+     orders.description: string, orders.amount: int64, primary key (id)), \
+     users: (users.id: int64, users.name: string, users.email: string, \
+     users.active: bool, primary key (id)) }"
+  in
+  Alcotest.(check string)
+    "catalog | type renders the fixture catalog kind end to end" expected
+    (render_query_against_fixture "catalog | type")
+
 let test_bare_catalog_renders_fixture_catalog_literal () =
   let expected =
     String.concat "\n"
@@ -768,6 +779,9 @@ let () =
           Alcotest.test_case
             "bare [catalog] renders the fixture catalog literal end to end"
             `Quick test_bare_catalog_renders_fixture_catalog_literal;
+          Alcotest.test_case
+            "[catalog | type] renders the fixture catalog kind end to end"
+            `Quick test_catalog_pipe_type_renders_fixture_catalog_kind;
         ] );
       ( "scalar literal source",
         [
