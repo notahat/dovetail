@@ -225,8 +225,7 @@ let with_query_result query check_rows =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -247,8 +246,7 @@ let with_query_kind query check_kind =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -274,8 +272,7 @@ let with_query_scalar_value query check_value =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -300,8 +297,7 @@ let with_query_scalar_kind query check_kind =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -326,8 +322,7 @@ let with_query_row_value query check_row =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -352,8 +347,7 @@ let with_query_row_kind query check_kind =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -376,8 +370,7 @@ let with_query_failure ~label ~expected query =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in

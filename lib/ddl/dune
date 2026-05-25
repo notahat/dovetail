@@ -1,4 +1,0 @@
-(library
- (name dovetail_ddl)
- (public_name dovetail.ddl)
- (libraries dovetail.core))

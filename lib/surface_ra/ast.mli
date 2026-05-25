@@ -5,19 +5,15 @@
     typed, and nothing more. {!Lower} converts the AST into a logical plan,
     where the operators take their meaning from algebra rather than syntax.
 
-    A top-level {!program} is one of two universes: a {!Pipeline} (the
-    relational-pipeline universe; every operator is a node in {!t} and produces
-    a relation, including write operators like {!Insert}), or a {!Ddl} (a
-    data-definition statement such as [:list tables]). The two universes meet
-    only at this top-level wrapper: DDL doesn't pass through {!Lower} /
-    {!Translate} / {!Physical} / {!Eval}, so those layers see only the {!t} that
-    lives inside {!Pipeline}. *)
+    Every top-level input is a relational pipeline: an {!t} whose operators each
+    produce a relation, including write operators like {!Insert}. The older
+    two-universe shape (a pipeline-vs-DDL wrapper) has been retired along with
+    the [:]-sigil DDL grammar. *)
 
 module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
-module Ddl = Dovetail_ddl
 module Plan = Dovetail_plan
 
 type type_field = {
@@ -158,14 +154,3 @@ type t =
           catalog value on the left and yields a one-column [(name: string)]
           relation, one row per table in [input], in the catalog's cursor order.
           A user-facing error fires at eval time if [input] is not a catalog. *)
-
-type program =
-  | Pipeline of t
-      (** [Pipeline plan] is the relational-pipeline universe: every non-DDL
-          input the surface language accepts. Threaded through {!Lower.lower},
-          {!Translate.translate}, and {!Eval.eval}. *)
-  | Ddl of Ddl.Statement.t
-      (** [Ddl statement] is the data-definition universe, marked at the surface
-          by the leading [:] sigil. {!Lower}, {!Translate}, and the physical
-          layers know nothing of DDL; the REPL hands the statement straight to
-          {!Ddl_executor.execute_read} or {!Ddl_executor.execute_write}. *)

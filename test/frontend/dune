@@ -4,7 +4,6 @@
   alcotest
   dovetail.core
   dovetail.storage
-  dovetail.ddl
   dovetail.plan
   dovetail.frontend
   test_helpers))

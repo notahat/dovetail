@@ -2,7 +2,6 @@ module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
-module Ddl = Dovetail_ddl
 module Plan = Dovetail_plan
 
 type type_field = {
@@ -39,5 +38,3 @@ type t =
     }
   | Catalog_source
   | Tables of { input : t }
-
-type program = Pipeline of t | Ddl of Ddl.Statement.t

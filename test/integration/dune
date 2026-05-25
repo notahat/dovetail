@@ -8,7 +8,6 @@
   alcotest
   dovetail.core
   dovetail.storage
-  dovetail.ddl
   dovetail.plan
   dovetail.surface_ra
   dovetail.execution

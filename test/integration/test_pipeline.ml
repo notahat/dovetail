@@ -373,8 +373,7 @@ let test_type_over_type_raises_at_lower () =
      can't catch it. Walk parse and lower by hand instead. *)
   let ast =
     match Surface_ra.Parser.parse "users | type | type" with
-    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-    | Ok (Surface_ra.Ast.Ddl _) -> .
+    | Ok plan -> plan
     | Error message -> Alcotest.failf "parse failed: %s" message
   in
   Alcotest.check_raises "type applied to a type"
@@ -486,8 +485,7 @@ let test_row_literal_type_over_type_raises_at_lower () =
      Eval. *)
   let ast =
     match Surface_ra.Parser.parse "(id = 1) | type | type" with
-    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-    | Ok (Surface_ra.Ast.Ddl _) -> .
+    | Ok plan -> plan
     | Error message -> Alcotest.failf "parse failed: %s" message
   in
   Alcotest.check_raises "type applied to a row's type"
@@ -547,8 +545,7 @@ let test_typed_relation_literal_rejects_kind_mismatch_at_lower () =
     match
       Surface_ra.Parser.parse "relation (id: int64) { (id = \"oops\") }"
     with
-    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-    | Ok (Surface_ra.Ast.Ddl _) -> .
+    | Ok plan -> plan
     | Error message -> Alcotest.failf "parse failed: %s" message
   in
   Alcotest.check_raises "row value kind doesn't match the declared kind"
@@ -600,8 +597,7 @@ let render_query_against_fixture query =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         match Surface_ra.Parser.parse query with
-        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-        | Ok (Surface_ra.Ast.Ddl _) -> .
+        | Ok plan -> plan
         | Error message -> Alcotest.failf "parse failed: %s" message
       in
       let logical = Surface_ra.Lower.lower ast in
@@ -693,8 +689,7 @@ let test_scalar_literal_type_over_type_raises_at_lower () =
      before Eval. *)
   let ast =
     match Surface_ra.Parser.parse "42 | type | type" with
-    | Ok (Surface_ra.Ast.Pipeline plan) -> plan
-    | Ok (Surface_ra.Ast.Ddl _) -> .
+    | Ok plan -> plan
     | Error message -> Alcotest.failf "parse failed: %s" message
   in
   Alcotest.check_raises "type applied to a scalar's type"

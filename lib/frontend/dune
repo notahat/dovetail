@@ -5,6 +5,5 @@
   dovetail.core
   dovetail.storage
   dovetail.plan
-  dovetail.ddl
   dovetail.surface_ra
   dovetail.execution))

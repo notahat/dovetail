@@ -1,4 +1,4 @@
 (library
  (name dovetail_execution)
  (public_name dovetail.execution)
- (libraries dovetail.core dovetail.storage dovetail.plan dovetail.ddl))
+ (libraries dovetail.core dovetail.storage dovetail.plan))

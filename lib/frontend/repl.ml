@@ -58,17 +58,14 @@ let evaluate_and_print environment ~output ~show_logical ~show_physical
   with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Process one input line: parse, lower, evaluate, print. Parse and eval
-   errors land in [output]; nothing is raised. The [Ddl] arm is reachable
-   only in principle -- [Ddl.Statement.t] has no constructors -- so the
-   refutation pattern handles it. *)
+   errors land in [output]; nothing is raised. *)
 let process_line environment ~output ~show_logical ~show_physical line =
   match Surface_ra.Parser.parse line with
   | Error message -> Format.fprintf output "parse error: %s@." message
-  | Ok (Surface_ra.Ast.Pipeline plan) ->
+  | Ok plan ->
       let logical_plan = Surface_ra.Lower.lower plan in
       evaluate_and_print environment ~output ~show_logical ~show_physical
         logical_plan
-  | Ok (Surface_ra.Ast.Ddl _) -> .
 
 let run ?(show_logical = false) ?(show_physical = false) environment ~read_line
     ~output =

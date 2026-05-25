@@ -589,15 +589,11 @@ let pipeline_parser =
   create_table_empty_form <|> value_pipeline
 
 (* The top-level grammar: optional leading whitespace, then a relational
-   pipeline. The DDL universe is empty; the leading [:] sigil that used
-   to introduce a DDL statement is no longer recognised, so [:list
-   tables] and friends are now plain parse errors. [end_of_input] at
-   the tail enforces full consumption, so trailing garbage is rejected. *)
-let program_parser =
-  whitespace *> pipeline_parser
-  >>| (fun plan -> Ast.Pipeline plan)
-  <* whitespace <* end_of_input
-
+   pipeline. The leading [:] sigil that used to introduce a DDL
+   statement is no longer recognised, so [:list tables] and friends
+   are now plain parse errors. [end_of_input] at the tail enforces
+   full consumption, so trailing garbage is rejected. *)
+let program_parser = whitespace *> pipeline_parser <* whitespace <* end_of_input
 let parse input = parse_string ~consume:All program_parser input
 
 (* Standalone expression entry point: parse a single expression with leading

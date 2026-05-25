@@ -6,18 +6,16 @@ module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Relation = Dovetail_core.Relation
 
-let ast_program_testable =
-  Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast-program>")) ( = )
+let ast_testable = Alcotest.testable (Fmt.of_to_string (fun _ -> "<ast>")) ( = )
 
-(* Wraps the expected [Ast.t] in [Ast.Pipeline] before comparing against the
-   parser's [Ast.program] output. The sink-production tests below build an
-   [Ast.Insert] inside the pipeline using {!parses_plan}. *)
-let parses input expected_inner_ast =
+(* Compare the parser's output against an expected [Ast.t]. The
+   sink-production tests below build an [Ast.Insert] using {!parses_plan}. *)
+let parses input expected_ast =
   match Parser.parse input with
-  | Ok actual_program ->
-      Alcotest.(check ast_program_testable)
+  | Ok actual_ast ->
+      Alcotest.(check ast_testable)
         (Printf.sprintf "%S parses" input)
-        (Ast.Pipeline expected_inner_ast) actual_program
+        expected_ast actual_ast
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 
@@ -256,10 +254,10 @@ let test_pipeline_join_on_keyword_prefix_is_a_column_name () =
 
 let parses_plan input expected_plan =
   match Parser.parse input with
-  | Ok actual_program ->
-      Alcotest.(check ast_program_testable)
+  | Ok actual_ast ->
+      Alcotest.(check ast_testable)
         (Printf.sprintf "%S parses to plan" input)
-        (Ast.Pipeline expected_plan) actual_program
+        expected_plan actual_ast
   | Error message ->
       Alcotest.failf "expected %S to parse but got error: %s" input message
 

@@ -266,29 +266,24 @@ Some things to note about that table:
   relation as upstream (existing) and now also a single row literal
   (new — falls out of rows being first-class).
 
-## How the existing DDL surface maps over
+## How the old DDL surface mapped over
 
-The DDL universe today is exactly three statements (see
-`lib/ddl/statement.mli`); a fourth, `:describe`, was retired once the
-`| type` operator landed and now lives only as a pipe stage:
+The `:`-sigil DDL universe has been fully retired. Every statement is
+now a pipe-form operator; `lib/ddl/` is gone, and the parser no longer
+recognises a leading `:`.
 
-| Existing DDL                                                | Pipe-form replacement                                                |
+| Retired DDL                                                 | Pipe-form replacement                                                |
 |-------------------------------------------------------------|----------------------------------------------------------------------|
 | `:list tables`                                              | `catalog \| tables`                                                  |
 | `:create table users (id: int64, …) primary key (id)`       | `(id: int64, …, primary key (id)) \| create table users`             |
 | `:drop table users`                                         | `drop table users`                                                   |
+| `:describe users`                                           | `users \| type`                                                      |
 
-`| type` is already built — `users | type` prints the relation type
-that `:describe users` used to print, up to spelling differences
-(`int64` lowercase, `:` between name and type). The remaining
-pipe-form replacements above are the design target; the `:`-sigil
-statements are what the parser dispatches to today.
-
-Once this is built, `lib/ddl/` becomes dead code: no `:`-sigil
-grammar, no `Ddl.Statement.t` AST, no `Ddl_executor`, no
-`Ddl.Format`. The pipe parser absorbs the full surface and dispatches
-to catalog-mutating sinks the same way it dispatches to
-relation-mutating ones today.
+The catalog value is a real, fully-populated value at the surface — the
+"data deliberately absent" stance recorded in slice 17's framework
+sketch was reversed once consumers (the `catalog` source and the
+`tables` operator) arrived. The single-catalog model still holds; a
+`create database` form and multi-catalog support are not committed.
 
 ## Qualifiers
 

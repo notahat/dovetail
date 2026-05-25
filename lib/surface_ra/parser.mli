@@ -19,16 +19,13 @@ module Expression = Dovetail_core.Expression
 type error = string
 (** Placeholder for parser errors. The string is whatever angstrom produced. *)
 
-val parse : string -> (Ast.program, error) result
-(** [parse input] parses [input] as a complete top-level program. The result is
-    always an {!Ast.Pipeline} carrying an {!Ast.t} ([Ast.Insert] sits inside [t]
-    as a regular operator); the {!Ast.Ddl} arm is uninhabited.
-
-    The pipeline grammar enforces structurally that a sink terminates a pipeline
-    -- a query operator after [| insert into ...] is a parse error. A leading
-    [:] is no longer recognised: every DDL statement has been retired in favour
-    of pipe-form operators, so [:list tables] and friends are now plain parse
-    errors.
+val parse : string -> (Ast.t, error) result
+(** [parse input] parses [input] as a complete top-level pipeline. [Ast.Insert]
+    sits inside [t] as a regular operator; the pipeline grammar enforces
+    structurally that a sink terminates a pipeline -- a query operator after
+    [| insert into ...] is a parse error. A leading [:] is no longer recognised:
+    every DDL statement has been retired in favour of pipe-form operators, so
+    [:list tables] and friends are now plain parse errors.
 
     Leading and trailing whitespace are accepted; the parser must consume the
     entire input. *)
