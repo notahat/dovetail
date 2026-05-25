@@ -70,6 +70,25 @@ type t =
           relation-typed inputs, so a scalar source flows through rungs that
           match it ([Type_op] today; row-level operators in later slices).
           Reports [`Read] from {!required_access}. *)
+  | Drop_table of { table_name : string }
+      (** [Drop_table { table_name }] removes [table_name] from the catalog and
+          its storage. A leaf operator with no input. Reports [`Write] from
+          {!required_access}. Yields a one-row relation
+          [(dropped: string) { (dropped = table_name) }]. *)
+  | Create_table_empty of { table_name : string; kind : Relation.kind }
+      (** [Create_table_empty { table_name; kind }] creates an empty table named
+          [table_name] with the declared [kind]. Carries the resolved
+          {!Relation.kind} -- the surface-level type expression has already been
+          lowered. A leaf operator with no relation-valued input; reports
+          [`Write] from {!required_access}. Yields a one-row relation
+          [(created: string) { (created = table_name) }]. *)
+  | Create_table_seeded of { table_name : string; source : t }
+      (** [Create_table_seeded { table_name; source }] creates [table_name] from
+          the row kind of [source] and seeds it with [source]'s rows, both in
+          the same write transaction. The target's kind is derived from
+          [source]'s kind at evaluation time. Reports [`Write] from
+          {!required_access} (and recurses into [source]'s access). Yields a
+          one-row relation [(created: string) { (created = table_name) }]. *)
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
       (** [Row_literal { fields }] is a pipeline whose source is a literal row,
           with no scan or storage involved. [fields] carries the row's bindings

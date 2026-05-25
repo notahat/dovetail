@@ -13,6 +13,9 @@ type t =
   | Unqualify of { input : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
+  | Drop_table of { table_name : string }
+  | Create_table_empty of { table_name : string; kind : Relation.kind }
+  | Create_table_seeded of { table_name : string; source : t }
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
 
 (* Walks a plan and reports the strongest transaction access any operator
@@ -32,6 +35,10 @@ let rec required_access = function
   | Type_op { input } -> required_access input
   | Scalar_literal _ -> `Read
   | Row_literal _ -> `Read
+  | Drop_table _ -> `Write
+  | Create_table_empty _ -> `Write
+  | Create_table_seeded { source; _ } ->
+      access_max `Write (required_access source)
 
 and access_max left right =
   match (left, right) with `Write, _ | _, `Write -> `Write | _ -> `Read
@@ -88,5 +95,17 @@ let rec format_at formatter indent plan =
       Format.fprintf formatter "%sRowLiteral(%a)@\n" prefix
         (Format.pp_print_list ~pp_sep:separator format_field)
         fields
+  | Drop_table { table_name } ->
+      Format.fprintf formatter "%sDropTable(%s)@\n" prefix table_name
+  | Create_table_empty { table_name; kind } ->
+      let columns =
+        List.map (fun (field : Row.field) -> field.name) kind.row_kind
+      in
+      Format.fprintf formatter "%sCreateTableEmpty(%s, columns=%s)@\n" prefix
+        table_name
+        (String.concat ", " columns)
+  | Create_table_seeded { table_name; source } ->
+      Format.fprintf formatter "%sCreateTableSeeded(%s)@\n" prefix table_name;
+      format_at formatter (indent + 1) source
 
 let format formatter plan = format_at formatter 0 plan

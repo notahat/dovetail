@@ -221,6 +221,74 @@ let test_unqualify_renders_header_with_indented_input () =
     "Unqualify prints a bare header with its input indented one level"
     "Unqualify\n  Scan(users)\n" (format_to_string plan)
 
+let users_kind : Dovetail_core.Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+      ];
+    refinements = [ Primary_key [ "id" ] ];
+  }
+
+let test_drop_table_requires_write_access () =
+  let plan : Logical.t = Drop_table { table_name = "users" } in
+  Alcotest.(check bool)
+    "Drop_table requires Write access" true
+    (Logical.required_access plan = `Write)
+
+let test_create_table_empty_requires_write_access () =
+  let plan : Logical.t =
+    Create_table_empty { table_name = "users"; kind = users_kind }
+  in
+  Alcotest.(check bool)
+    "Create_table_empty requires Write access" true
+    (Logical.required_access plan = `Write)
+
+let test_create_table_seeded_requires_write_access () =
+  let plan : Logical.t =
+    Create_table_seeded
+      { table_name = "users"; source = Scan { table = "other" } }
+  in
+  Alcotest.(check bool)
+    "Create_table_seeded requires Write access" true
+    (Logical.required_access plan = `Write)
+
+let test_drop_table_renders_with_table_name () =
+  let plan : Logical.t = Drop_table { table_name = "users" } in
+  Alcotest.(check string)
+    "DropTable on a single line" "DropTable(users)\n" (format_to_string plan)
+
+let test_create_table_empty_renders_columns () =
+  let plan : Logical.t =
+    Create_table_empty { table_name = "users"; kind = users_kind }
+  in
+  Alcotest.(check string)
+    "CreateTableEmpty lists table name and column names"
+    "CreateTableEmpty(users, columns=id, name)\n" (format_to_string plan)
+
+let test_create_table_seeded_renders_header_with_indented_source () =
+  let plan : Logical.t =
+    Create_table_seeded
+      {
+        table_name = "users";
+        source =
+          Relation_literal
+            {
+              kind =
+                {
+                  row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+                  refinements = [ Primary_key [ "id" ] ];
+                };
+              rows = [ [ Scalar.Int64 7L ] ];
+            };
+      }
+  in
+  Alcotest.(check string)
+    "CreateTableSeeded prints header with its source indented one level"
+    "CreateTableSeeded(users)\n  RelationLiteral(columns=id, rows=1)\n"
+    (format_to_string plan)
+
 let test_insert_renders_header_with_indented_source () =
   let plan : Logical.t =
     Insert
@@ -264,6 +332,12 @@ let () =
             test_row_literal_requires_read_access;
           Alcotest.test_case "Unqualify required_access passes through input"
             `Quick test_unqualify_required_access_passes_through;
+          Alcotest.test_case "Drop_table requires Write access" `Quick
+            test_drop_table_requires_write_access;
+          Alcotest.test_case "Create_table_empty requires Write access" `Quick
+            test_create_table_empty_requires_write_access;
+          Alcotest.test_case "Create_table_seeded requires Write access" `Quick
+            test_create_table_seeded_requires_write_access;
         ] );
       ( "format",
         [
@@ -289,5 +363,12 @@ let () =
             test_row_literal_renders_fields;
           Alcotest.test_case "Unqualify renders header with indented input"
             `Quick test_unqualify_renders_header_with_indented_input;
+          Alcotest.test_case "DropTable renders with table name" `Quick
+            test_drop_table_renders_with_table_name;
+          Alcotest.test_case "CreateTableEmpty renders columns" `Quick
+            test_create_table_empty_renders_columns;
+          Alcotest.test_case
+            "CreateTableSeeded renders header with indented source" `Quick
+            test_create_table_seeded_renders_header_with_indented_source;
         ] );
     ]

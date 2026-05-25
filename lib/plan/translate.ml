@@ -400,6 +400,11 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
   | Type_op { input } -> Type_op { input = translate_relation ~catalog input }
   | Scalar_literal value -> Scalar_literal value
   | Row_literal { fields } -> Row_literal { fields }
+  (* TODO(create-drop-table): translate these once Physical has the
+     matching constructors and the parser emits them. Unreachable until
+     then. *)
+  | Drop_table _ | Create_table_empty _ | Create_table_seeded _ ->
+      failwith "Translate: create/drop table not yet wired through Physical"
 
 (* Look up [target_table]'s kind in the catalog and validate the literal
    source's columns and value kinds against it. Returns the translated
