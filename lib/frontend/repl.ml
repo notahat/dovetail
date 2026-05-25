@@ -5,6 +5,12 @@ module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
 module Execution = Dovetail_execution
 
+(* Raised inside a transaction when [Typecheck] reports one or more
+   user-facing errors. The transaction's exception path aborts cleanly and
+   the outer [evaluate_and_print] catches and renders. Keeps a non-commit
+   exit out of the storage API. *)
+exception Typecheck_failed of Plan.Typecheck.error list
+
 let prompt = "> "
 
 (* Translate [logical_plan] inside [transaction] and, when the matching
@@ -15,6 +21,14 @@ let prompt = "> "
 let translate_in environment transaction ~output ~show_logical ~show_physical
     logical_plan =
   if show_logical then Plan.Logical.format output logical_plan;
+  let catalog_snapshot =
+    Storage.Catalog.snapshot_kind environment transaction
+  in
+  let logical_plan =
+    match Plan.Typecheck.typecheck ~catalog:catalog_snapshot logical_plan with
+    | Ok plan -> plan
+    | Error errors -> raise (Typecheck_failed errors)
+  in
   let catalog table_name =
     Storage.Catalog.get environment transaction ~table_name
   in
@@ -55,7 +69,13 @@ let evaluate_and_print environment ~output ~show_logical ~show_physical
         Storage.Engine.with_write_transaction environment (fun transaction ->
             print_result environment transaction ~output ~show_logical
               ~show_physical logical_plan)
-  with Failure message -> Format.fprintf output "error: %s@." message
+  with
+  | Failure message -> Format.fprintf output "error: %s@." message
+  | Typecheck_failed errors ->
+      List.iter
+        (fun error ->
+          Format.fprintf output "error: %s@." (Plan.Typecheck.render error))
+        errors
 
 (* Process one input line: parse, lower, evaluate, print. Parse and eval
    errors land in [output]; nothing is raised. *)

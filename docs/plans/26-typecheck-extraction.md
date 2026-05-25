@@ -43,7 +43,7 @@ slice introduces no new IR types.
   (unchanged in this slice) `Logical.t` on success or an
   accumulated error list on failure. In phase D the success arm
   widens to `Typed_logical.t`; the shape stays the same.
-- **Pipeline integration:** `Frontend.Cli` orchestrates. Sequence:
+- **Pipeline integration:** `Frontend.Repl` orchestrates. Sequence:
   Parse + Lower → `required_access` → open transaction → snapshot
   catalog from transaction → Typecheck → on empty errors, Translate
   + Eval; on non-empty, raise to abort the transaction, catch and
@@ -63,7 +63,7 @@ slice introduces no new IR types.
   retires them as the corresponding checks move. The CLAUDE.md
   rule ("prefix names the user-facing concept") is the alignment
   target.
-- **Transaction abort on error:** `Frontend.Cli` raises a typed
+- **Transaction abort on error:** `Frontend.Repl` raises a typed
   `Typecheck_failed of error list` inside the transaction block.
   `Storage.Engine.with_write_transaction`'s existing exception
   path aborts. Outer CLI catches and renders. Avoids adding a
@@ -101,7 +101,7 @@ exhaustive over `|`.
     (Logical.t, error list) result`, returning `Ok logical`
     always.
 - `lib/plan/dune` — add `typecheck` if dune doesn't auto-pick.
-- `lib/frontend/cli.ml` — wire the call between Lower and
+- `lib/frontend/repl.ml` — wire the call between Lower and
   Translate. Snapshot catalog from the open transaction. On `Ok`
   (the only path today), continue to Translate. The `Error`
   branch is plumbed but unreachable in this step.
@@ -234,7 +234,7 @@ surface.
   in error paths. Anything remaining either gets renamed
   (operator-named) or has its raise retired (Typecheck owns this
   case now).
-- Confirm `Frontend.Cli`'s `Typecheck_failed` path is the only way
+- Confirm `Frontend.Repl`'s `Typecheck_failed` path is the only way
   user-typed kind/resolution errors reach the user.
 - Final integration test pass — every error scenario rendered as
   `<Operator>: …`, never `Translate:` or `Eval:`.
