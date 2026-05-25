@@ -1,4 +1,5 @@
 module Relation = Dovetail_core.Relation
+module Catalog = Dovetail_core.Catalog
 
 (* TODO(catalog-format): replace the Marshal round-trip with a hand-rolled
    encoding that does not depend on OCaml's runtime representation and that
@@ -28,6 +29,20 @@ let list_table_names environment transaction =
   | Some map ->
       Engine.with_iter_seq map transaction (fun pairs ->
           pairs |> Seq.map (fun (key, _value) -> key) |> List.of_seq)
+
+let snapshot_kind environment transaction : Catalog.kind =
+  match Engine.open_map environment transaction ~name:map_name with
+  | None -> { relation_kinds = [] }
+  | Some map ->
+      Engine.with_iter_seq map transaction (fun pairs ->
+          let relation_kinds =
+            pairs
+            |> Seq.map (fun (table_name, bytes) ->
+                let kind : Relation.kind = Marshal.from_string bytes 0 in
+                (table_name, kind))
+            |> List.of_seq
+          in
+          ({ relation_kinds } : Catalog.kind))
 
 let delete environment transaction ~table_name =
   match Engine.open_map environment transaction ~name:map_name with

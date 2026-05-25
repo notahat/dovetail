@@ -2,6 +2,7 @@
 
 open Test_helpers
 module Storage = Dovetail_storage
+module Catalog = Dovetail_core.Catalog
 
 let users_kind : Relation.kind =
   {
@@ -28,6 +29,9 @@ let orders_kind : Relation.kind =
 
 let kind_testable =
   Alcotest.testable (Fmt.of_to_string (fun _ -> "<kind>")) ( = )
+
+let catalog_kind_testable =
+  Alcotest.testable (Fmt.of_to_string (fun _ -> "<catalog kind>")) ( = )
 
 let test_round_trip () =
   with_temp_dir @@ fun dir ->
@@ -126,6 +130,41 @@ let test_list_table_names_empty_catalog () =
         "no catalog yet returns empty list" []
         (Storage.Catalog.list_table_names environment transaction))
 
+let test_snapshot_kind_on_fresh_environment_is_empty () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  (* Fresh environment -- catalog subDB has never been created. *)
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      Alcotest.(check catalog_kind_testable)
+        "fresh environment snapshots empty"
+        ({ relation_kinds = [] } : Catalog.kind)
+        (Storage.Catalog.snapshot_kind environment transaction))
+
+let test_snapshot_kind_single_table () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      Storage.Catalog.put environment transaction ~table_name:"users" users_kind);
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      Alcotest.(check catalog_kind_testable)
+        "single-table snapshot"
+        ({ relation_kinds = [ ("users", users_kind) ] } : Catalog.kind)
+        (Storage.Catalog.snapshot_kind environment transaction))
+
+let test_snapshot_kind_multi_table_byte_sorted () =
+  with_temp_dir @@ fun dir ->
+  with_environment dir @@ fun environment ->
+  Storage.Engine.with_write_transaction environment (fun transaction ->
+      Storage.Catalog.put environment transaction ~table_name:"users" users_kind;
+      Storage.Catalog.put environment transaction ~table_name:"orders"
+        orders_kind);
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      Alcotest.(check catalog_kind_testable)
+        "multi-table snapshot is byte-sorted"
+        ({ relation_kinds = [ ("orders", orders_kind); ("users", users_kind) ] }
+          : Catalog.kind)
+        (Storage.Catalog.snapshot_kind environment transaction))
+
 let () =
   Alcotest.run "catalog"
     [
@@ -145,6 +184,15 @@ let () =
             test_list_table_names_returns_byte_sorted_names;
           Alcotest.test_case "returns empty list when catalog absent" `Quick
             test_list_table_names_empty_catalog;
+        ] );
+      ( "snapshot_kind",
+        [
+          Alcotest.test_case "fresh environment returns empty kind" `Quick
+            test_snapshot_kind_on_fresh_environment_is_empty;
+          Alcotest.test_case "single table" `Quick
+            test_snapshot_kind_single_table;
+          Alcotest.test_case "multi-table snapshot is byte-sorted" `Quick
+            test_snapshot_kind_multi_table_byte_sorted;
         ] );
       ( "delete",
         [

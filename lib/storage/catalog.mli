@@ -18,6 +18,7 @@
       catalog format is replaced wholesale once a hand-rolled encoding lands. *)
 
 module Relation = Dovetail_core.Relation
+module Catalog = Dovetail_core.Catalog
 
 val get :
   Engine.environment ->
@@ -46,6 +47,14 @@ val list_table_names :
     bound in the catalog, in byte-sorted (cursor) order. Returns [] if the
     catalog subDB has not yet been created. Safe to call inside a read-only
     transaction. *)
+
+val snapshot_kind :
+  Engine.environment -> [> `Read ] Engine.transaction -> Catalog.kind
+(** [snapshot_kind environment transaction] walks the catalog subDB and returns
+    a {!Catalog.kind} pairing each table name with its stored {!Relation.kind}.
+    Entries appear in cursor (byte-sorted) order, matching {!list_table_names}.
+    Returns [{ relation_kinds = [] }] when the catalog subDB has not yet been
+    created. Safe to call inside a read-only transaction. *)
 
 val delete :
   Engine.environment ->

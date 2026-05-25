@@ -1,4 +1,4 @@
-# Slice 25: Typecheck extraction
+# Slice 26: Typecheck extraction
 
 Extract a dedicated `Typecheck` pass that consolidates the
 kind-discipline and column-resolution checks currently scattered
