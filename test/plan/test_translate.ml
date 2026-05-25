@@ -425,37 +425,9 @@ let test_mutation_against_unknown_table_raises () =
     (Failure "Translate: insert into \"widgets\": unknown table") (fun () ->
       ignore (Translate.translate ~catalog:orders_catalog plan))
 
-let test_mutation_with_missing_column_raises () =
-  let plan =
-    insert_plan ~table:"orders"
-      ~pairs:
-        [
-          ("id", Scalar.Int64 9L);
-          ("user_id", Scalar.Int64 1L);
-          (* description and amount missing. *)
-        ]
-  in
-  Alcotest.check_raises "missing columns"
-    (Failure
-       "Translate: insert into \"orders\": missing column(s): description, \
-        amount") (fun () ->
-      ignore (Translate.translate ~catalog:orders_catalog plan))
-
-let test_mutation_with_unknown_column_raises () =
-  let plan =
-    insert_plan ~table:"orders"
-      ~pairs:
-        [
-          ("id", Scalar.Int64 9L);
-          ("user_id", Scalar.Int64 1L);
-          ("description", Scalar.String "Pretzel");
-          ("amount", Scalar.Int64 9L);
-          ("colour", Scalar.String "blue");
-        ]
-  in
-  Alcotest.check_raises "unknown column"
-    (Failure "Translate: insert into \"orders\": unknown column(s): colour")
-    (fun () -> ignore (Translate.translate ~catalog:orders_catalog plan))
+(* Column-set agreement is no longer Translate's responsibility -- those
+   cases now live in [test/plan/test_typecheck.ml]. Translate trusts that
+   [Typecheck] has validated the column names before it runs. *)
 
 let test_mutation_with_kind_mismatch_raises () =
   let plan =
@@ -572,13 +544,6 @@ let () =
             test_mutation_in_permuted_order_translates_through;
           Alcotest.test_case "Insert into an unknown table raises" `Quick
             test_mutation_against_unknown_table_raises;
-          Alcotest.test_case
-            "Insert missing some target columns names them in the error" `Quick
-            test_mutation_with_missing_column_raises;
-          Alcotest.test_case
-            "Insert with a column not in the target schema names it in the \
-             error"
-            `Quick test_mutation_with_unknown_column_raises;
           Alcotest.test_case
             "Insert whose value kind disagrees with the target column names \
              both kinds in the error"

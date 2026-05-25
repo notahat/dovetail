@@ -276,48 +276,12 @@ let rewrite_indexed_nested_loop_join ~translate_outer ~catalog ~left ~right
       | Some residual ->
           Some (Physical.Filter { input = join; predicate = residual }))
 
-(* Compare two string lists as multisets: returns the names present in
-   [expected] but not in [actual] and the names present in [actual] but not
-   in [expected]. Used by the literal/schema permutation check; the
-   non-overlapping difference is exactly the actionable error wording
-   ("missing columns: x, y" / "unknown columns: z"). *)
-let multiset_difference ~expected ~actual =
-  let missing = List.filter (fun name -> not (List.mem name actual)) expected in
-  let unknown = List.filter (fun name -> not (List.mem name expected)) actual in
-  (missing, unknown)
-
-(* Check that [literal_kind]'s field names are a permutation of
-   [target_kind]'s. Raises [Failure] naming the missing columns first, then
-   the unknown ones -- a single literal can hit both, and the missing-
-   columns message is the more directly actionable of the two. *)
-let check_columns_match ~target_table ~(target_kind : Relation.kind)
-    ~(literal_kind : Relation.kind) =
-  let target_column_names =
-    List.map (fun (field : Row.field) -> field.name) target_kind.row_kind
-  in
-  let literal_column_names =
-    List.map (fun (field : Row.field) -> field.name) literal_kind.row_kind
-  in
-  let missing, unknown =
-    multiset_difference ~expected:target_column_names
-      ~actual:literal_column_names
-  in
-  if missing <> [] then
-    failwith
-      (Printf.sprintf "Translate: insert into %S: missing column(s): %s"
-         target_table
-         (String.concat ", " missing));
-  if unknown <> [] then
-    failwith
-      (Printf.sprintf "Translate: insert into %S: unknown column(s): %s"
-         target_table
-         (String.concat ", " unknown))
-
 (* Check that each field in [literal_kind] has the same scalar kind as the
    target column with the same name. Raises [Failure] naming the column and
    both kinds.
 
-   Precondition: [check_columns_match] has passed, so every name in
+   Precondition: [Typecheck] has already verified that [literal_kind]'s
+   column names are a permutation of [target_kind]'s, so every name in
    [literal_kind] resolves in [target_kind.row_kind]. *)
 let check_value_kinds ~target_table ~(target_kind : Relation.kind)
     ~(literal_kind : Relation.kind) =
@@ -337,11 +301,9 @@ let check_value_kinds ~target_table ~(target_kind : Relation.kind)
              (Scalar.kind_to_string literal_field.kind)))
     literal_kind.row_kind
 
-(* Run the literal/target checks in order: column-set agreement, then
-   per-column kinds. Each helper raises [Failure] on its own contract; this
-   orchestrator just sequences them. *)
+(* Run the remaining literal/target checks (per-column kinds). The
+   column-set permutation check now lives in [Typecheck]. *)
 let validate_literal_against_target ~target_table ~target_kind ~literal_kind =
-  check_columns_match ~target_table ~target_kind ~literal_kind;
   check_value_kinds ~target_table ~target_kind ~literal_kind
 
 (* Run validation when the insert source is a [Relation_literal]; pass through

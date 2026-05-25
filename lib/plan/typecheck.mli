@@ -13,10 +13,19 @@
 
 module Catalog = Dovetail_core.Catalog
 
-(** The variant of user-facing typecheck errors. Empty until the first check
-    migrates over. Each constructor will carry the structured detail an LSP
-    needs; {!render} produces the user-facing string. *)
-type error = |
+(** The variant of user-facing typecheck errors. Each constructor carries the
+    structured detail an LSP needs; {!render} produces the user-facing string.
+*)
+type error =
+  | Insert_column_mismatch of {
+      table_name : string;
+      missing : string list;
+      extra : string list;
+    }
+      (** The source of an [Insert] has a different column set than the target
+          table. [missing] names the target's columns absent from the source, in
+          target row-order; [extra] names the source's columns absent from the
+          target, in source row-order. At least one of the two is non-empty. *)
 
 val render : error -> string
 (** [render error] formats [error] for a human reader, with an operator-named
