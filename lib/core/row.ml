@@ -46,6 +46,34 @@ let fields_with_position_matching_name (row_kind : kind) name =
   in
   scan 0 row_kind
 
+(* Find the first pair of fields in [row_kind] that share a bare [name] but
+   carry different qualifiers. Returns [Some (name, first, second)] for the
+   earliest such pair in source order, or [None] when every bare name is
+   unique. The pair is what [unqualify_kind] needs to report a collision. *)
+let find_bare_name_collision (row_kind : kind) =
+  let rec scan = function
+    | [] -> None
+    | (field : field) :: rest -> (
+        match
+          List.find_opt (fun (other : field) -> other.name = field.name) rest
+        with
+        | Some other -> Some (field.name, field, other)
+        | None -> scan rest)
+  in
+  scan row_kind
+
+let unqualify_kind (row_kind : kind) =
+  match find_bare_name_collision row_kind with
+  | Some (name, first, second) ->
+      Error
+        (Printf.sprintf "collision on %S: fields %S and %S" name
+           (format_field_name first) (format_field_name second))
+  | None ->
+      Ok
+        (List.map
+           (fun (field : field) -> { field with qualifier = None })
+           row_kind)
+
 let find_field (row_kind : kind) reference =
   let name_matches =
     fields_with_position_matching_name row_kind reference.name

@@ -95,6 +95,14 @@ type t =
           yields a one-row relation reporting the affected-row count. {!Eval}
           handles it as a regular case, writing rows inside the active write
           transaction and producing the (insert_count : int64) result. *)
+  | Unqualify of { input : t }
+      (** [Unqualify { input }] strips the qualifier from every field of
+          [input]'s row kind. {!Eval} runs the input, builds a new kind by
+          setting every field's qualifier to [None], and emits the input's rows
+          unchanged under the new kind. Accepts either a relation
+          ({!Term.Relation_value}) or a row ({!Term.Row_value}) on the input.
+          Raises [Failure] if two fields collide on their bare name after
+          stripping; {!kind_of} raises the same way. *)
   | Type_op of { input : t }
       (** [Type_op { input }] yields [input]'s relation kind rather than its
           rows. {!Eval} reads the static kind via {!kind_of} without opening any

@@ -177,6 +177,23 @@ let test_insert_from_join_is_rejected_with_unqualify_hint () =
   check_contains "names an offending qualified field" output "\"users.id\"";
   check_contains "points at unqualify" output "unqualify"
 
+(* The full join | project | unqualify | insert into chain: confirms the
+   downstream sink accepts the upstream pipeline's rows once the qualifiers
+   have been explicitly stripped. The test creates an empty target table
+   inside the same REPL session, runs the chain, and asserts the printed
+   affected-row count matches the join's six matched pairs. *)
+let test_unqualify_unblocks_join_to_insert_chain () =
+  let output =
+    run_with_input
+      [
+        ":create table joined (id: Int64, user_id: Int64) primary key (id)";
+        "users | join orders on users.id = orders.user_id | project orders.id, \
+         orders.user_id | unqualify | insert into joined";
+      ]
+  in
+  check_contains "insert succeeds and reports six affected rows" output
+    "insert_count = 6"
+
 (* [:list tables] runs through Parser → REPL DDL
    dispatch → Ddl_executor.execute_read → Catalog.list_table_names and
    prints each table name on its own line. The fixture seeds [users] and
@@ -421,6 +438,9 @@ let () =
             "insert into rejects a join's qualified output and suggests \
              unqualify"
             `Quick test_insert_from_join_is_rejected_with_unqualify_hint;
+          Alcotest.test_case
+            "join | project | unqualify | insert into chain writes the rows"
+            `Quick test_unqualify_unblocks_join_to_insert_chain;
           Alcotest.test_case
             ":list tables prints fixture tables in byte-sorted order" `Quick
             test_list_tables_prints_fixture_tables_in_byte_sorted_order;

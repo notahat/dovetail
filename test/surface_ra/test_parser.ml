@@ -556,6 +556,33 @@ let test_pipeline_parses_nested_type_step () =
   parses "users | type | type"
     (Ast.Type { input = Ast.Type { input = Ast.Relation_name "users" } })
 
+let test_pipeline_parses_unqualify_step () =
+  parses "users | unqualify"
+    (Ast.Unqualify { input = Ast.Relation_name "users" })
+
+let test_pipeline_parses_unqualify_after_join () =
+  parses "users | join orders on users.id = orders.user_id | unqualify"
+    (Ast.Unqualify
+       {
+         input =
+           Ast.Join
+             {
+               left = Ast.Relation_name "users";
+               right = Ast.Relation_name "orders";
+               predicate =
+                 Expression.Compare
+                   {
+                     left =
+                       Expression.Column
+                         { qualifier = Some "users"; name = "id" };
+                     op = Expression.Equal;
+                     right =
+                       Expression.Column
+                         { qualifier = Some "orders"; name = "user_id" };
+                   };
+             };
+       })
+
 let test_pipeline_keyword_type_is_a_relation_name () =
   (* [type] is reserved only in pipe-step position; as a pipeline head it's
      a bare identifier, same as the DDL keywords. *)
@@ -905,6 +932,14 @@ let () =
             test_pipeline_parses_nested_type_step;
           Alcotest.test_case "[type] is a relation name as a pipeline head"
             `Quick test_pipeline_keyword_type_is_a_relation_name;
+        ] );
+      ( "unqualify syntax",
+        [
+          Alcotest.test_case "parses [users | unqualify]" `Quick
+            test_pipeline_parses_unqualify_step;
+          Alcotest.test_case
+            "parses [users | join ... | unqualify] in pipeline order" `Quick
+            test_pipeline_parses_unqualify_after_join;
         ] );
       ( "scalar literal source",
         [

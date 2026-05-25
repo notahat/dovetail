@@ -53,6 +53,13 @@ val format : Format.formatter -> t -> unit
     {!format_field_name}, so qualifiers appear as [qualifier.name] when present
     and bare otherwise. Cell values render via {!Scalar.format}. *)
 
+val unqualify_kind : kind -> (kind, string) result
+(** [unqualify_kind row_kind] returns [row_kind] with every field's qualifier
+    stripped to [None]. Returns [Error message] if two fields would collide on
+    their bare name after stripping; the message names the colliding bare name
+    and the two original qualified spellings, so the caller can wrap it with its
+    own operator prefix. *)
+
 val find_field : kind -> column_reference -> (int * field, string) result
 (** [find_field row_kind reference] resolves [reference] against [row_kind] and
     returns the matching field's zero-based position together with the field

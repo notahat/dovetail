@@ -10,6 +10,7 @@ type t =
   | CrossProduct of { left : t; right : t }
   | Relation_literal of { kind : Relation.kind; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
+  | Unqualify of { input : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
@@ -27,6 +28,7 @@ let rec required_access = function
       access_max (required_access left) (required_access right)
   | Relation_literal _ -> `Read
   | Insert { source; _ } -> access_max `Write (required_access source)
+  | Unqualify { input } -> required_access input
   | Type_op { input } -> required_access input
   | Scalar_literal _ -> `Read
   | Row_literal _ -> `Read
@@ -67,6 +69,9 @@ let rec format_at formatter indent plan =
   | Insert { table; source } ->
       Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
       format_at formatter (indent + 1) source
+  | Unqualify { input } ->
+      Format.fprintf formatter "%sUnqualify@\n" prefix;
+      format_at formatter (indent + 1) input
   | Type_op { input } ->
       Format.fprintf formatter "%sType@\n" prefix;
       format_at formatter (indent + 1) input

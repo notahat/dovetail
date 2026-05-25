@@ -23,6 +23,7 @@ type t =
   | CrossProduct of { left : t; right : t }
   | Join of { left : t; right : t; predicate : Expression.t }
   | Insert of { table : string; source : t }
+  | Unqualify of { input : t }
   | Type of { input : t }
   | Scalar_literal of Scalar.value
   | Row_literal of (Row.column_reference * Scalar.value) list

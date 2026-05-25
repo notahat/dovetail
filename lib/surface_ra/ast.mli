@@ -85,6 +85,12 @@ type t =
           mutation universe. The grammar still admits the sink only in terminal
           position, but the structural guarantee no longer comes from the type.
       *)
+  | Unqualify of { input : t }
+      (** [Unqualify { input }] is the surface form [input | unqualify]. Drops
+          the qualifier from every field of [input]'s row kind so downstream
+          stages see bare names. A collision on the resulting bare names is
+          rejected at eval time. The operator accepts either a relation or a row
+          on the left. *)
   | Type of { input : t }
       (** [Type { input }] is the surface form [input | type]. Evaluation yields
           [input]'s relation type rather than its rows — no cursors open, no

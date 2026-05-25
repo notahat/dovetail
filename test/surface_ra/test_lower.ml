@@ -244,6 +244,14 @@ let test_type_lowers_to_type_op () =
     (Type_op { input = Scan { table = "users" } })
     logical
 
+let test_unqualify_lowers_through () =
+  let ast = Ast.Unqualify { input = Ast.Relation_name "users" } in
+  let logical = Lower.lower ast in
+  Alcotest.(check logical_testable)
+    "Ast.Unqualify -> Logical.Unqualify wrapping the lowered input"
+    (Unqualify { input = Scan { table = "users" } })
+    logical
+
 let test_type_over_type_is_rejected () =
   let ast =
     Ast.Type { input = Ast.Type { input = Ast.Relation_name "users" } }
@@ -593,6 +601,11 @@ let () =
             test_type_lowers_to_type_op;
           Alcotest.test_case "rejects Ast.Type applied to Ast.Type" `Quick
             test_type_over_type_is_rejected;
+        ] );
+      ( "unqualify",
+        [
+          Alcotest.test_case "lowers Ast.Unqualify to Logical.Unqualify" `Quick
+            test_unqualify_lowers_through;
         ] );
       ( "insert mutation",
         [

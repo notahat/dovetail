@@ -395,6 +395,8 @@ let rec translate_relation ~catalog (plan : Logical.t) : Physical.t =
         }
   | Relation_literal { kind; rows } -> Relation_literal { kind; rows }
   | Insert { table; source } -> translate_insert ~catalog ~table ~source
+  | Unqualify { input } ->
+      Unqualify { input = translate_relation ~catalog input }
   | Type_op { input } -> Type_op { input = translate_relation ~catalog input }
   | Scalar_literal value -> Scalar_literal value
   | Row_literal { fields } -> Row_literal { fields }

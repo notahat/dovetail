@@ -226,6 +226,15 @@ let test_row_literal_translates_through () =
     (Physical.Row_literal { fields })
     physical
 
+let test_unqualify_translates_through () =
+  let logical : Logical.t = Unqualify { input = Scan { table = "users" } } in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
+  Alcotest.(check physical_testable)
+    "Logical.Unqualify translates to Physical.Unqualify with the input \
+     translated"
+    (Physical.Unqualify { input = Physical.FullScan { table = "users" } })
+    physical
+
 let test_standalone_cross_product_does_not_trigger_join_rewrite () =
   let logical =
     Logical.CrossProduct
@@ -457,6 +466,11 @@ let () =
         [
           Alcotest.test_case "translates Logical.Row_literal through unchanged"
             `Quick test_row_literal_translates_through;
+        ] );
+      ( "unqualify",
+        [
+          Alcotest.test_case "translates Logical.Unqualify through unchanged"
+            `Quick test_unqualify_translates_through;
         ] );
       ( "nested loop join rewrite",
         [

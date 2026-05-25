@@ -18,6 +18,7 @@ type t =
     }
   | Relation_literal of { kind : Relation.kind; rows : Scalar.value list list }
   | Insert of { table : string; source : t }
+  | Unqualify of { input : t }
   | Type_op of { input : t }
   | Scalar_literal of Scalar.value
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
@@ -78,6 +79,9 @@ let rec format_at formatter indent plan =
   | Insert { table; source } ->
       Format.fprintf formatter "%sInsert(%s)@\n" prefix table;
       format_at formatter (indent + 1) source
+  | Unqualify { input } ->
+      Format.fprintf formatter "%sUnqualify@\n" prefix;
+      format_at formatter (indent + 1) input
   | Type_op { input } ->
       Format.fprintf formatter "%sType@\n" prefix;
       format_at formatter (indent + 1) input
@@ -140,6 +144,12 @@ let rec kind_of ~catalog (plan : t) : Relation.kind =
       | `Right -> concatenated_kind outer_row_kind inner_row_kind)
   | Relation_literal { kind; rows = _ } -> kind
   | Insert _ -> insert_result_kind
+  | Unqualify { input } -> (
+      let input_kind = kind_of ~catalog input in
+      match Row.unqualify_kind input_kind.row_kind with
+      | Ok row_kind -> { row_kind; refinements = input_kind.refinements }
+      | Error detail ->
+          failwith (Printf.sprintf "Physical.kind_of: unqualify: %s" detail))
   | Type_op _ ->
       (* [Type_op]'s evaluation result is a relation kind, not a relation
          value, so it has no [Relation.kind] of its own. The [Eval] layer

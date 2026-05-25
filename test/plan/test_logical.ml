@@ -209,6 +209,18 @@ let test_row_literal_renders_fields () =
     "Empty Row_literal renders with no inner content" "RowLiteral()\n"
     (format_to_string empty_plan)
 
+let test_unqualify_required_access_passes_through () =
+  let plan : Logical.t = Unqualify { input = Scan { table = "users" } } in
+  Alcotest.(check bool)
+    "Unqualify over a read-only input is read-only" true
+    (Logical.required_access plan = `Read)
+
+let test_unqualify_renders_header_with_indented_input () =
+  let plan : Logical.t = Unqualify { input = users_scan } in
+  Alcotest.(check string)
+    "Unqualify prints a bare header with its input indented one level"
+    "Unqualify\n  Scan(users)\n" (format_to_string plan)
+
 let test_insert_renders_header_with_indented_source () =
   let plan : Logical.t =
     Insert
@@ -250,6 +262,8 @@ let () =
             test_scalar_literal_requires_read_access;
           Alcotest.test_case "Row_literal requires Read access" `Quick
             test_row_literal_requires_read_access;
+          Alcotest.test_case "Unqualify required_access passes through input"
+            `Quick test_unqualify_required_access_passes_through;
         ] );
       ( "format",
         [
@@ -273,5 +287,7 @@ let () =
             test_scalar_literal_renders_value;
           Alcotest.test_case "RowLiteral renders fields comma-separated" `Quick
             test_row_literal_renders_fields;
+          Alcotest.test_case "Unqualify renders header with indented input"
+            `Quick test_unqualify_renders_header_with_indented_input;
         ] );
     ]

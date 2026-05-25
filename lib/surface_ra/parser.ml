@@ -474,12 +474,19 @@ let join_step =
    downstream with a user-facing message. *)
 let type_step = keyword "type" >>| fun () input -> Ast.Type { input }
 
+(* An unqualify pipeline step: [| unqualify]. Unary with no arguments. The
+   strip and collision check live in Eval; the parser just wraps the
+   upstream into the AST node. *)
+let unqualify_step =
+  keyword "unqualify" >>| fun () input -> Ast.Unqualify { input }
+
 (* A single pipeline step. Each branch wraps its [Ast.t] argument with
    the step's effect, so the caller can fold a list of steps
    left-to-right over the base. *)
 let pipeline_step =
   whitespace *> char '|' *> whitespace
-  *> (restrict_step <|> project_step <|> cross_step <|> join_step <|> type_step)
+  *> (restrict_step <|> project_step <|> cross_step <|> join_step <|> type_step
+    <|> unqualify_step)
 
 (* A query pipeline: a relation reference followed by zero or more
    query-operator steps, folded left-associatively. The result is an

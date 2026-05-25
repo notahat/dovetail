@@ -209,6 +209,48 @@ let test_insert_returns_insert_count_kind () =
     "Insert reports a one-column (insert_count : int64) result" expected
     (Physical.kind_of ~catalog:fixture_catalog plan)
 
+let test_unqualify_strips_qualifiers_from_input_kind () =
+  let plan : Physical.t = Unqualify { input = FullScan { table = "users" } } in
+  let strip_qualifier (field : Dovetail_core.Row.field) =
+    { field with qualifier = None }
+  in
+  let expected : Relation.kind =
+    {
+      row_kind = List.map strip_qualifier users_kind.row_kind;
+      refinements = users_kind.refinements;
+    }
+  in
+  Alcotest.(check kind_testable)
+    "Unqualify drops the qualifier from every field of the input kind" expected
+    (Physical.kind_of ~catalog:fixture_catalog plan)
+
+let test_unqualify_rejects_collision_on_bare_name () =
+  let plan : Physical.t =
+    Unqualify
+      {
+        input =
+          Project
+            {
+              input =
+                CrossProduct
+                  {
+                    left = FullScan { table = "users" };
+                    right = FullScan { table = "orders" };
+                  };
+              columns =
+                [
+                  qualified_column_reference ~qualifier:"users" ~name:"id";
+                  qualified_column_reference ~qualifier:"orders" ~name:"id";
+                ];
+            };
+      }
+  in
+  Alcotest.check_raises "Unqualify collision on bare \"id\""
+    (Failure
+       "Physical.kind_of: unqualify: collision on \"id\": fields \"users.id\" \
+        and \"orders.id\"") (fun () ->
+      ignore (Physical.kind_of ~catalog:fixture_catalog plan))
+
 let test_type_op_raises_because_result_is_a_kind () =
   let plan : Physical.t = Type_op { input = FullScan { table = "users" } } in
   Alcotest.check_raises "Type_op has no relation kind"
@@ -268,5 +310,10 @@ let () =
             test_scalar_literal_raises_because_result_is_a_scalar;
           Alcotest.test_case "Row_literal raises because its result is a row"
             `Quick test_row_literal_raises_because_result_is_a_row;
+          Alcotest.test_case "Unqualify strips qualifiers from the input kind"
+            `Quick test_unqualify_strips_qualifiers_from_input_kind;
+          Alcotest.test_case
+            "Unqualify raises on bare-name collision after stripping" `Quick
+            test_unqualify_rejects_collision_on_bare_name;
         ] );
     ]

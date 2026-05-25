@@ -559,6 +559,40 @@ let test_typed_relation_literal_rejects_kind_mismatch_at_lower () =
        "Lower: relation literal: field \"id\" expected int64 but got string")
     (fun () -> ignore (Surface_ra.Lower.lower ast))
 
+let test_unqualify_after_join_strips_qualifiers () =
+  (* A bare [join ... | unqualify] would collide on `id`; the project step
+     selects two columns with distinct bare names so the strip is clean. *)
+  with_query_result
+    "users | join orders on users.id = orders.user_id | project users.id, \
+     orders.user_id | unqualify" (fun rows ->
+      Alcotest.(check int)
+        "six matched (user, order) pairs survive unqualify"
+        six_matched_user_order_pairs (List.length rows))
+
+let test_unqualify_after_join_rejects_collision () =
+  with_query_failure ~label:"collision on bare id"
+    ~expected:
+      (Failure
+         "Eval: unqualify: collision on \"id\": fields \"users.id\" and \
+          \"orders.id\"")
+    "users | join orders on users.id = orders.user_id | project users.id, \
+     orders.id | unqualify"
+
+let test_unqualify_on_already_unqualified_relation_is_a_noop () =
+  with_query_result "users | unqualify" (fun rows ->
+      Alcotest.(check row_list_testable)
+        "unqualify on a bare-scan relation passes the fixture rows through"
+        expected_users_rows rows)
+
+let test_unqualify_on_row_literal_strips_qualifiers () =
+  with_query_row_value "(users.id = 1) | unqualify" (fun row ->
+      Alcotest.(check (list (option string)))
+        "the resulting row's single field has qualifier = None" [ None ]
+        (List.map (fun (field : Row.field) -> field.qualifier) row.kind);
+      Alcotest.(check string)
+        "the resulting row's single field has bare name \"id\"" "id"
+        (List.hd row.kind).name)
+
 let test_scalar_literal_type_over_type_raises_at_lower () =
   (* The Lower-time rejection of [type | type] now triggers on a scalar
      source too. Walk parse and lower by hand since the rejection happens
@@ -714,6 +748,20 @@ let () =
             `Quick test_typed_relation_literal_project_narrows_columns;
           Alcotest.test_case "value/kind mismatch in a row is rejected at Lower"
             `Quick test_typed_relation_literal_rejects_kind_mismatch_at_lower;
+        ] );
+      ( "unqualify",
+        [
+          Alcotest.test_case
+            "post-join unqualify yields the same matched-pair count" `Quick
+            test_unqualify_after_join_strips_qualifiers;
+          Alcotest.test_case
+            "unqualify after a project that lifts both PKs is rejected" `Quick
+            test_unqualify_after_join_rejects_collision;
+          Alcotest.test_case
+            "unqualify on a bare-scan relation passes rows through unchanged"
+            `Quick test_unqualify_on_already_unqualified_relation_is_a_noop;
+          Alcotest.test_case "unqualify on a qualified row literal strips it"
+            `Quick test_unqualify_on_row_literal_strips_qualifiers;
         ] );
       ( "errors",
         [

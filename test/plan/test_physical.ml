@@ -160,6 +160,12 @@ let test_row_literal_renders_fields () =
     "Empty Row_literal renders with no inner content" "RowLiteral()\n"
     (format_to_string empty_plan)
 
+let test_unqualify_renders_header_with_indented_input () =
+  let plan : Physical.t = Unqualify { input = users_full_scan } in
+  Alcotest.(check string)
+    "Unqualify prints a bare header with its input indented one level"
+    "Unqualify\n  FullScan(users)\n" (format_to_string plan)
+
 let test_nested_indentation_compounds () =
   (* A Filter wrapping a CrossProduct: confirms that each level of nesting
      adds two spaces, not just the immediate one. *)
@@ -208,6 +214,8 @@ let () =
             test_scalar_literal_renders_value;
           Alcotest.test_case "RowLiteral renders fields comma-separated" `Quick
             test_row_literal_renders_fields;
+          Alcotest.test_case "Unqualify renders header with indented input"
+            `Quick test_unqualify_renders_header_with_indented_input;
           Alcotest.test_case "nested indentation compounds across levels" `Quick
             test_nested_indentation_compounds;
         ] );

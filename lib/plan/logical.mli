@@ -47,6 +47,14 @@ type t =
           yields a one-row relation reporting the affected-row count. Insert
           declares [`Write] in {!required_access}, which is how the REPL knows
           to open a write transaction for any plan that contains it. *)
+  | Unqualify of { input : t }
+      (** [Unqualify { input }] strips the qualifier from every field of
+          [input]'s row kind, leaving the bare names. [input] is either a
+          relation (yields a relation with the same rows under the unqualified
+          kind) or a row (yields a row under the unqualified kind). Fails at
+          eval time -- and at {!Physical.kind_of} time -- when two fields would
+          collide on their bare name after stripping. The identity on inputs
+          that already have no qualifiers. *)
   | Type_op of { input : t }
       (** [Type_op { input }] yields [input]'s relation type rather than its
           rows. {!Eval} reads the static {!Relation.kind} via

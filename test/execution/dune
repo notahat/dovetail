@@ -10,6 +10,7 @@
   test_eval_relation_literal
   test_eval_insert
   test_eval_type_op
+  test_eval_unqualify
   test_eval_scalar_literal
   test_eval_row_literal
   test_ddl_executor)
