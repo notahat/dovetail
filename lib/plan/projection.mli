@@ -21,16 +21,14 @@ val format : Format.formatter -> t -> unit
     [Project] operator's [columns] parameter through this function. *)
 
 val resolve : Relation.kind -> t -> Relation.kind * (Row.value -> Row.value)
-(** [resolve input_kind columns] validates [columns] against [input_kind] and
-    returns the projected {!Relation.kind} together with a closure that builds
-    the projected row.
+(** [resolve input_kind columns] returns the projected {!Relation.kind} together
+    with a closure that builds the projected row.
 
-    Validation, performed once at resolve time:
-
-    - Every column reference in [columns] must resolve uniquely against
-      [input_kind].
-    - No column reference (in its source form -- bare or dotted) may appear more
-      than once in [columns].
+    {!Plan.Typecheck} is the home for column resolution and duplicate-column
+    detection; callers are expected to have run it. [resolve] does no validation
+    of its own -- it looks each reference up against [input_kind.row_kind] and
+    captures the field-order position so the per-row closure does only
+    [List.length columns] array indexes.
 
     The returned kind has its [row_kind] in the order requested by [columns],
     each field carrying the kind and qualifier it had in [input_kind]. The
@@ -38,9 +36,6 @@ val resolve : Relation.kind -> t -> Relation.kind * (Row.value -> Row.value)
     key information at this stage of the project, even when the projected
     columns happen to include the input's primary key.
 
-    Each column's field-order position in the input row kind is captured at
-    resolve time, so the per-row closure does only [List.length columns] array
-    indexes -- no name lookup happens per row.
-
-    Raises [Failure] if a column reference is unknown or ambiguous against
-    [input_kind], or if the same reference appears more than once. *)
+    Pre: [columns] has been validated by {!Plan.Typecheck} against [input_kind].
+    Every reference resolves uniquely and no reference is duplicated. Violations
+    are caught earlier; the closure may [assert false] if they reach it. *)

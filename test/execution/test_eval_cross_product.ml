@@ -61,25 +61,6 @@ let test_cross_product_then_filter_yields_matched_pairs () =
   let _kind, rows = evaluate_against_fixture plan in
   Alcotest.(check int) "six matched (user, order) pairs" 6 (List.length rows)
 
-let test_cross_product_with_ambiguous_unqualified_filter_raises () =
-  (* Both inputs have an [id] column, so an unqualified [id = 3] predicate
-     can't pick one. Resolution should fail with the ambiguity message. *)
-  let plan : Plan.Physical.t =
-    Filter
-      {
-        input = users_cross_orders_plan;
-        predicate =
-          expression_compare ~left:(expression_column "id") ~op:Equal
-            ~right:(expression_literal (Scalar.Int64 3L));
-      }
-  in
-  Alcotest.check_raises "ambiguous unqualified column"
-    (Failure
-       "Expression.resolve: ambiguous column reference \"id\": matches \
-        \"users.id\" and \"orders.id\"") (fun () ->
-      let _ = evaluate_against_fixture plan in
-      ())
-
 let () =
   Alcotest.run "eval_cross_product"
     [
@@ -89,16 +70,11 @@ let () =
             "yields one row per (left, right) pair from the inputs" `Quick
             test_cross_product_yields_thirty_rows;
           Alcotest.test_case
-            "result kind concatenates left then right with qualifiers \
-             preserved"
+            "result kind concatenates left then right with qualifiers preserved"
             `Quick
             test_cross_product_kind_concatenates_with_qualifiers_preserved;
           Alcotest.test_case
             "filter on the cross product yields the matched (user, order) pairs"
             `Quick test_cross_product_then_filter_yields_matched_pairs;
-          Alcotest.test_case
-            "filter using an unqualified column that matches both inputs \
-             raises with the ambiguity message"
-            `Quick test_cross_product_with_ambiguous_unqualified_filter_raises;
         ] );
     ]

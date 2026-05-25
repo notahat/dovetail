@@ -1,6 +1,10 @@
 (** End-to-end tests for [Eval] on [Physical.Project]. Includes the two
     project/filter combinations, since they exercise projection's interaction
-    with filter resolution. *)
+    with filter resolution.
+
+    Column-resolution and duplicate-column validation live in [Plan.Typecheck];
+    these tests exercise the happy-path closure behaviour against fixture rows.
+*)
 
 open Dovetail_execution
 open Test_helpers
@@ -133,22 +137,6 @@ let test_filter_then_project () =
   in
   Alcotest.(check row_list_testable) "three active names" expected rows
 
-let test_project_unknown_column_raises () =
-  Alcotest.check_raises "unknown column"
-    (Failure "Projection.resolve: unknown column \"unknown_col\"") (fun () ->
-      let _ =
-        evaluate_users_project ~input_plan:users_full_scan [ "unknown_col" ]
-      in
-      ())
-
-let test_project_duplicate_column_raises () =
-  Alcotest.check_raises "duplicate column"
-    (Failure "Projection.resolve: duplicate column \"name\"") (fun () ->
-      let _ =
-        evaluate_users_project ~input_plan:users_full_scan [ "name"; "name" ]
-      in
-      ())
-
 let () =
   Alcotest.run "eval_project"
     [
@@ -166,10 +154,5 @@ let () =
           Alcotest.test_case
             "filter then project narrows the survivors to the named columns"
             `Quick test_filter_then_project;
-          Alcotest.test_case "unknown column raises before any rows are pulled"
-            `Quick test_project_unknown_column_raises;
-          Alcotest.test_case
-            "duplicate column raises before any rows are pulled" `Quick
-            test_project_duplicate_column_raises;
         ] );
     ]

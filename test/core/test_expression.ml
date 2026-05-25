@@ -243,102 +243,6 @@ let test_qualified_column_resolves_identically_to_unqualified () =
     [ List.nth users_rows 2 ]
     matched
 
-let test_unknown_qualifier_raises () =
-  Alcotest.check_raises "unknown qualified column"
-    (Failure "Expression.resolve: unknown column \"orders.id\"") (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_compare
-             ~left:(expression_qualified_column ~qualifier:"orders" ~name:"id")
-             ~op:Equal
-             ~right:(expression_literal (Scalar.Int64 3L)))
-      in
-      ())
-
-let test_unknown_column_on_left_raises () =
-  Alcotest.check_raises "unknown column"
-    (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_compare
-             ~left:(expression_column "unknown_col")
-             ~op:Equal
-             ~right:(expression_literal (Scalar.Int64 3L)))
-      in
-      ())
-
-let test_unknown_column_on_right_raises () =
-  Alcotest.check_raises "unknown column"
-    (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_compare ~left:(expression_column "id") ~op:Equal
-             ~right:(expression_column "unknown_col"))
-      in
-      ())
-
-let test_type_mismatch_column_vs_literal_raises () =
-  Alcotest.check_raises "type mismatch"
-    (Failure
-       "Expression.resolve: type mismatch: column \"name\" is String, literal \
-        Int64 is Int64") (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_compare ~left:(expression_column "name") ~op:Equal
-             ~right:(expression_literal (Scalar.Int64 1L)))
-      in
-      ())
-
-let test_ordering_on_bool_column_raises () =
-  (* Bool participates in = and <> but not <, <=, >, >=. The resolver must
-     reject ordering on Bool with a message that names the operator and the
-     offending kind. *)
-  Alcotest.check_raises "ordering operator on Bool"
-    (Failure "Expression.resolve: ordering operator > is not defined for Bool")
-    (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_compare
-             ~left:(expression_column "active")
-             ~op:Greater
-             ~right:(expression_literal (Scalar.Bool false)))
-      in
-      ())
-
-let test_non_bool_predicate_raises () =
-  (* The top-level kind check fires when a standalone non-Bool expression
-     reaches a predicate position. Today the only way to construct one is
-     to pass a non-Bool column or literal to [resolve]. *)
-  Alcotest.check_raises "non-Bool top-level expression"
-    (Failure "Expression.resolve: predicate position requires Bool, got Int64")
-    (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind (expression_column "id")
-      in
-      ())
-
-let test_non_bool_literal_predicate_raises () =
-  Alcotest.check_raises "non-Bool literal predicate"
-    (Failure "Expression.resolve: predicate position requires Bool, got String")
-    (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_literal (Scalar.String "hello"))
-      in
-      ())
-
-let test_type_mismatch_column_vs_column_raises () =
-  Alcotest.check_raises "type mismatch column vs column"
-    (Failure
-       "Expression.resolve: type mismatch: column \"id\" is Int64, column \
-        \"name\" is String") (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_compare ~left:(expression_column "id") ~op:Equal
-             ~right:(expression_column "name"))
-      in
-      ())
-
 let test_and_returns_intersection () =
   let matched =
     filter_users
@@ -417,42 +321,6 @@ let test_double_not_is_identity () =
     [ List.nth users_rows 0; List.nth users_rows 2; List.nth users_rows 3 ]
     matched
 
-let test_not_with_non_bool_operand_raises () =
-  Alcotest.check_raises "non-Bool operand of not"
-    (Failure
-       "Expression.resolve: not requires a Bool operand: column \"id\" is Int64")
-    (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_not (expression_column "id"))
-      in
-      ())
-
-let test_and_with_non_bool_operand_raises () =
-  Alcotest.check_raises "non-Bool operand of and"
-    (Failure
-       "Expression.resolve: and requires Bool operands: column \"id\" is Int64")
-    (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_and ~left:(expression_column "id")
-             ~right:(expression_column "active"))
-      in
-      ())
-
-let test_or_with_non_bool_operand_raises () =
-  Alcotest.check_raises "non-Bool operand of or"
-    (Failure
-       "Expression.resolve: or requires Bool operands: column \"id\" is Int64")
-    (fun () ->
-      let (_ : Row.value -> bool) =
-        Expression.resolve users_row_kind
-          (expression_or
-             ~left:(expression_column "active")
-             ~right:(expression_column "id"))
-      in
-      ())
-
 let () =
   Alcotest.run "expression"
     [
@@ -509,36 +377,5 @@ let () =
             test_not_inverts_a_bool_column;
           Alcotest.test_case "not not is the identity" `Quick
             test_double_not_is_identity;
-        ] );
-      ( "errors",
-        [
-          Alcotest.test_case "unknown column on left raises naming the column"
-            `Quick test_unknown_column_on_left_raises;
-          Alcotest.test_case "unknown column on right raises naming the column"
-            `Quick test_unknown_column_on_right_raises;
-          Alcotest.test_case
-            "type mismatch column vs literal raises naming both sides" `Quick
-            test_type_mismatch_column_vs_literal_raises;
-          Alcotest.test_case
-            "type mismatch column vs column raises naming both sides" `Quick
-            test_type_mismatch_column_vs_column_raises;
-          Alcotest.test_case
-            "qualified reference to a column not in this schema raises" `Quick
-            test_unknown_qualifier_raises;
-          Alcotest.test_case "non-Bool column at the predicate position raises"
-            `Quick test_non_bool_predicate_raises;
-          Alcotest.test_case "non-Bool literal at the predicate position raises"
-            `Quick test_non_bool_literal_predicate_raises;
-          Alcotest.test_case
-            "ordering operator on Bool operands raises naming the kind" `Quick
-            test_ordering_on_bool_column_raises;
-          Alcotest.test_case
-            "and with a non-Bool operand raises naming the kind" `Quick
-            test_and_with_non_bool_operand_raises;
-          Alcotest.test_case "or with a non-Bool operand raises naming the kind"
-            `Quick test_or_with_non_bool_operand_raises;
-          Alcotest.test_case
-            "not with a non-Bool operand raises naming the kind" `Quick
-            test_not_with_non_bool_operand_raises;
         ] );
     ]

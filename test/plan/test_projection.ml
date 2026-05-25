@@ -143,24 +143,6 @@ let test_projected_kind_has_no_refinements () =
     "no refinements even when projection includes the input PK" 0
     (List.length projected_kind.refinements)
 
-let test_unknown_column_raises () =
-  Alcotest.check_raises "unknown column"
-    (Failure "Projection.resolve: unknown column \"unknown_col\"") (fun () ->
-      let _ =
-        Projection.resolve users_kind
-          [ row_column_reference "name"; row_column_reference "unknown_col" ]
-      in
-      ())
-
-let test_unknown_qualifier_raises () =
-  Alcotest.check_raises "unknown qualified column"
-    (Failure "Projection.resolve: unknown column \"orders.id\"") (fun () ->
-      let _ =
-        Projection.resolve users_kind
-          [ qualified_row_column_reference ~qualifier:"orders" ~name:"id" ]
-      in
-      ())
-
 (* Render a [Projection.t] to a string via [Projection.format]. *)
 let format_to_string projection =
   let buffer = Buffer.create 64 in
@@ -193,15 +175,6 @@ let test_format_multiple_columns_joined_by_commas () =
 let test_format_empty_projection_renders_empty_string () =
   Alcotest.(check string)
     "empty list renders as the empty string" "" (format_to_string [])
-
-let test_duplicate_column_raises () =
-  Alcotest.check_raises "duplicate column"
-    (Failure "Projection.resolve: duplicate column \"name\"") (fun () ->
-      let _ =
-        Projection.resolve users_kind
-          [ row_column_reference "name"; row_column_reference "name" ]
-      in
-      ())
 
 let () =
   Alcotest.run "projection"
@@ -236,15 +209,5 @@ let () =
             test_format_multiple_columns_joined_by_commas;
           Alcotest.test_case "empty projection renders as the empty string"
             `Quick test_format_empty_projection_renders_empty_string;
-        ] );
-      ( "errors",
-        [
-          Alcotest.test_case "unknown column raises naming the column" `Quick
-            test_unknown_column_raises;
-          Alcotest.test_case
-            "qualified reference to a column not in this schema raises" `Quick
-            test_unknown_qualifier_raises;
-          Alcotest.test_case "duplicate column raises naming the column" `Quick
-            test_duplicate_column_raises;
         ] );
     ]

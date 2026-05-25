@@ -65,31 +65,18 @@ val format : Format.formatter -> t -> unit
     back through the parser. *)
 
 val resolve : Row.kind -> t -> Row.value -> bool
-(** [resolve row_kind expression] validates [expression] against [row_kind] and
-    returns a closure that evaluates [expression] against a single row as a
-    boolean predicate.
+(** [resolve row_kind expression] returns a closure that evaluates [expression]
+    against a single row as a boolean predicate.
 
-    Validation, performed once at resolve time:
+    {!Plan.Typecheck} is the home for kind discipline and column resolution;
+    callers are expected to have run it. [resolve] does no validation of its own
+    -- it walks [expression] once, looks each [Column] up against [row_kind],
+    and assembles operator closures. The closure does a constant number of array
+    indices and structural comparisons per call.
 
-    - Every {!Column} sub-expression must resolve uniquely against [row_kind] --
-      a qualified reference must match exactly one field; an unqualified one
-      must match exactly one field by name.
-    - Each {!Compare}'s left and right sub-expressions must agree on
-      {!Scalar.kind}.
-    - Ordering operators ({!Less}, {!LessEqual}, {!Greater}, {!GreaterEqual})
-      require the kind to be ordered: {!Scalar.Int64} or {!Scalar.String}.
-    - Both operands of an {!And} or {!Or}, and the operand of a {!Not}, must
-      have kind {!Scalar.Bool}.
-    - The whole expression's kind must be {!Scalar.Bool}. Predicate positions
-      accept only Bool-valued expressions, so a standalone {!Column} of kind
-      {!Scalar.Bool} is a valid predicate ([restrict active]), while a standalone
-      {!Column} of any other kind is rejected.
-
-    The closure does a constant number of array indices and structural
-    comparisons per call. Each {!Column}'s field-order position is captured at
-    resolve time, so no name lookup happens per row.
-
-    Raises [Failure] if a column reference is unknown or ambiguous, two sides of
-    a {!Compare} disagree on kind, an ordering operator is applied to a
-    non-ordered kind, an {!And} / {!Or} / {!Not} has a non-Bool operand, or the
-    top-level expression does not have {!Scalar.Bool}. *)
+    Pre: [expression] has been validated by {!Plan.Typecheck} against
+    [row_kind]. Every column resolves uniquely, every {!Compare}'s operands
+    agree on kind (and ordering operators only see ordered kinds), every {!And}
+    / {!Or} / {!Not} operand is {!Scalar.Bool}, and the whole expression is
+    {!Scalar.Bool}. Violations are caught earlier; the closure may
+    [assert false] if they reach it. *)

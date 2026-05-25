@@ -1,4 +1,7 @@
-(** End-to-end tests for [Eval] on [Physical.Filter]. *)
+(** End-to-end tests for [Eval] on [Physical.Filter].
+
+    Predicate validation lives in [Plan.Typecheck]; these tests exercise the
+    happy-path closure behaviour against fixture rows. *)
 
 open Dovetail_execution
 open Test_helpers
@@ -85,30 +88,6 @@ let test_filter_column_equals_column_yields_no_rows () =
   in
   Alcotest.(check row_list_testable) "no rows where name = email" [] rows
 
-let test_filter_unknown_column_raises () =
-  Alcotest.check_raises "unknown column"
-    (Failure "Expression.resolve: unknown column \"unknown_col\"") (fun () ->
-      let _ =
-        evaluate_users_filter
-          (expression_compare
-             ~left:(expression_column "unknown_col")
-             ~op:Equal
-             ~right:(expression_literal (Scalar.Int64 3L)))
-      in
-      ())
-
-let test_filter_type_mismatch_raises () =
-  Alcotest.check_raises "type mismatch"
-    (Failure
-       "Expression.resolve: type mismatch: column \"name\" is String, literal \
-        Int64 is Int64") (fun () ->
-      let _ =
-        evaluate_users_filter
-          (expression_compare ~left:(expression_column "name") ~op:Equal
-             ~right:(expression_literal (Scalar.Int64 1L)))
-      in
-      ())
-
 let () =
   Alcotest.run "eval_filter"
     [
@@ -128,9 +107,5 @@ let () =
             test_filter_matches_zero_rows;
           Alcotest.test_case "column = column with no matches yields no rows"
             `Quick test_filter_column_equals_column_yields_no_rows;
-          Alcotest.test_case "unknown column raises before any rows are pulled"
-            `Quick test_filter_unknown_column_raises;
-          Alcotest.test_case "type mismatch raises before any rows are pulled"
-            `Quick test_filter_type_mismatch_raises;
         ] );
     ]

@@ -306,9 +306,9 @@ and eval_input environment transaction plan continue =
         assert false)
 
 (* Stream the input through [eval], then wrap its value seq in a [Seq.filter]
-   guarded by the resolved predicate. The kind is unchanged. Resolution
-   happens inside the input's scope so type errors still surface before any
-   rows are pulled. *)
+   guarded by the resolved predicate. The kind is unchanged.
+   [Expression.resolve] is a closure-builder now -- column resolution and
+   kind discipline run in [Plan.Typecheck] before we get here. *)
 and evaluate_filter environment transaction ~input ~predicate continue =
   let* input_relation = eval_input environment transaction input in
   let evaluate_predicate =
@@ -322,10 +322,10 @@ and evaluate_filter environment transaction ~input ~predicate continue =
         }
          : [ `Set | `Bag ] Relation.t))
 
-(* Stream the input through [eval], then wrap its value seq in a [Seq.map] that
-   projects each row to the requested columns. The projected kind is computed
-   eagerly inside the input's scope so column-resolution errors surface before
-   any rows are pulled. *)
+(* Stream the input through [eval], then wrap its value seq in a [Seq.map]
+   that projects each row to the requested columns. [Projection.resolve] is
+   a closure-builder now -- column resolution and duplicate-column detection
+   run in [Plan.Typecheck] before we get here. *)
 and evaluate_project environment transaction ~input ~columns continue =
   let* input_relation = eval_input environment transaction input in
   let projected_kind, project_row =

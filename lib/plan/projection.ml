@@ -4,28 +4,12 @@ module Relation = Dovetail_core.Relation
 type t = Row.column_reference list
 
 (* Look up [reference] in [input_row_kind] and return its (position, field).
-   Raises [Failure] with the [Projection.resolve:] prefix on unknown or
-   ambiguous references. *)
+   Pre: [Plan.Typecheck] has validated [reference] -- the lookup never
+   reaches the [Error] arm. *)
 let resolve_column input_row_kind reference =
   match Row.find_field input_row_kind reference with
   | Ok result -> result
-  | Error message -> failwith ("Projection.resolve: " ^ message)
-
-(* Walk [columns] left to right, raising if the same column reference (in its
-   source form) appears twice. [List.mem] is O(n^2) overall, which is fine
-   for projection sizes -- a handful of columns at most -- and lets the
-   function stay pure-functional. *)
-let check_no_duplicates columns =
-  let rec walk seen = function
-    | [] -> ()
-    | reference :: rest ->
-        let key = Row.format_column_reference reference in
-        if List.mem key seen then
-          failwith
-            (Printf.sprintf "Projection.resolve: duplicate column %S" key);
-        walk (key :: seen) rest
-  in
-  walk [] columns
+  | Error _ -> assert false
 
 let format formatter columns =
   let rendered =
@@ -34,7 +18,6 @@ let format formatter columns =
   Format.pp_print_string formatter rendered
 
 let resolve (input_kind : Relation.kind) columns =
-  check_no_duplicates columns;
   let resolved =
     List.map
       (fun reference -> resolve_column input_kind.row_kind reference)
