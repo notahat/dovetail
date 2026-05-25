@@ -102,10 +102,9 @@ let rec eval environment transaction plan continue =
   | Create_table_empty { table_name; kind } ->
       evaluate_create_table_empty environment transaction ~table_name ~kind
         continue
-  (* TODO(create-drop-table): the seeded form lands in its own step.
-     Unreachable until the parser emits this node. *)
-  | Create_table_seeded _ ->
-      failwith "Eval: create table seeded not yet implemented"
+  | Create_table_seeded { table_name; source } ->
+      evaluate_create_table_seeded environment transaction ~table_name ~source
+        continue
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified
@@ -599,6 +598,42 @@ and validate_target_kind ~table_name (kind : Relation.kind) =
       fail (Printf.sprintf "primary key column %S appears twice" name)
   | None -> ()
 
+(* Raise an [Eval: create table %S: table already exists] error if the
+   catalog already binds [table_name]. Shared between the empty and seeded
+   create_table evaluators. *)
+and reject_existing_table environment transaction ~table_name =
+  match Storage.Catalog.get environment transaction ~table_name with
+  | None -> ()
+  | Some _ ->
+      failwith
+        (Printf.sprintf "Eval: create table %S: table already exists" table_name)
+
+(* Provision storage and catalog for a new table named [table_name] with
+   shape [kind]. Creates the storage subDB before writing the catalog
+   entry so anything raising in between rolls both halves back via the
+   enclosing write transaction. Returns the freshly-opened map handle so
+   a seeded create can write rows into it without re-opening. *)
+and provision_table environment transaction ~table_name ~kind =
+  let target_map =
+    Storage.Engine.create_map environment transaction
+      ~name:(Storage.Catalog.table_subdb_name table_name)
+  in
+  Storage.Catalog.put environment transaction ~table_name kind;
+  target_map
+
+(* Stamp [Some qualifier] onto every field of [kind]'s row kind, leaving
+   refinements untouched. Used by the seeded create_table evaluator to
+   turn a source row kind (unqualified after the qualifier-rejection
+   check) into the target catalog kind, which is qualified by the new
+   table's name to match the rest of the catalog. *)
+and stamp_qualifier_on_kind ~qualifier (kind : Relation.kind) : Relation.kind =
+  let row_kind =
+    List.map
+      (fun (field : Row.field) -> { field with qualifier = Some qualifier })
+      kind.row_kind
+  in
+  { row_kind; refinements = kind.refinements }
+
 (* Create [table_name] from a pre-resolved [kind]. Runs the structural
    checks first, then the catalog "table already exists" check, all
    before any storage mutation: a validation failure leaves the catalog
@@ -614,18 +649,47 @@ and evaluate_create_table_empty environment transaction ~table_name ~kind
     Obj.magic transaction
   in
   validate_target_kind ~table_name kind;
-  (match Storage.Catalog.get environment write_transaction ~table_name with
-  | None -> ()
-  | Some _ ->
-      failwith
-        (Printf.sprintf "Eval: create table %S: table already exists" table_name));
-  let _map =
-    Storage.Engine.create_map environment write_transaction
-      ~name:(Storage.Catalog.table_subdb_name table_name)
+  reject_existing_table environment write_transaction ~table_name;
+  let _target_map =
+    provision_table environment write_transaction ~table_name ~kind
   in
-  Storage.Catalog.put environment write_transaction ~table_name kind;
   continue
     (Term.Relation_value (mutation_result_relation ~verb:"created" table_name))
+
+(* Create [table_name] from [source]'s row kind and seed it with [source]'s
+   rows in a single write transaction. Derivation order matches the
+   layered validation: read the source's static kind, reject a qualified
+   source (pointing at [unqualify]), stamp the new table's name onto every
+   field, run the structural checks (no-PK is the user-visible one),
+   reject a name collision -- all before any storage mutation. Then
+   provision storage and catalog, evaluate [source], and stream its rows
+   through {!write_source_rows_into_table}. *)
+and evaluate_create_table_seeded environment transaction ~table_name ~source
+    continue =
+  let write_transaction : [ `Read | `Write ] Storage.Engine.transaction =
+    Obj.magic transaction
+  in
+  let catalog table_name =
+    Storage.Catalog.get environment write_transaction ~table_name
+  in
+  let source_kind = Plan.Physical.kind_of ~catalog source in
+  reject_qualified_source_for_target ~operation:"create table"
+    ~target_table:table_name ~source_row_kind:source_kind.row_kind;
+  let target_kind = stamp_qualifier_on_kind ~qualifier:table_name source_kind in
+  validate_target_kind ~table_name target_kind;
+  reject_existing_table environment write_transaction ~table_name;
+  let target_map =
+    provision_table environment write_transaction ~table_name ~kind:target_kind
+  in
+  eval_input environment transaction source (fun source_relation ->
+      let _written =
+        write_source_rows_into_table ~operation:"create table" ~target_kind
+          ~target_map ~target_table:table_name ~write_transaction
+          ~source_relation
+      in
+      continue
+        (Term.Relation_value
+           (mutation_result_relation ~verb:"created" table_name)))
 
 (* Drop [table_name] from the catalog and storage. Mirrors
    {!Ddl_executor.drop_table}'s ordering: rejects an unknown table first,
