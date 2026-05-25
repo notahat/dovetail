@@ -2,6 +2,7 @@ module Scalar = Dovetail_core.Scalar
 module Row = Dovetail_core.Row
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
+module Catalog = Dovetail_core.Catalog
 module Term = Dovetail_core.Term
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
@@ -58,6 +59,28 @@ let evaluate_full_scan environment transaction table continue =
     build_table_relation environment transaction ~table_name:table
   in
   continue (Term.Relation_value (relation : [ `Bag ] Relation.t))
+
+(* Evaluate the bare [catalog] source. Enumerates the catalog's table names
+   in cursor order, then folds across them with [build_table_relation] so
+   every per-table cursor is open at the moment [continue] is called.
+   Hands the assembled [Catalog.value] down as [Term.Catalog_value]. Each
+   per-table relation is tagged [`Set] -- every base table in storage is
+   a set today. *)
+let evaluate_catalog_source environment transaction continue =
+  let table_names = Storage.Catalog.list_table_names environment transaction in
+  let rec collect collected = function
+    | [] ->
+        let relations = List.rev collected in
+        continue (Term.Catalog_value ({ relations } : Catalog.value))
+    | table_name :: rest ->
+        let* relation =
+          build_table_relation environment transaction ~table_name
+        in
+        collect
+          ((table_name, (relation : [ `Set ] Relation.t)) :: collected)
+          rest
+  in
+  collect [] table_names
 
 (* Encode [key], probe the table's storage subDB with [Storage.Engine.get], and
    hand [continue] a relation whose [value] seq has either one element
@@ -119,11 +142,7 @@ let rec eval environment transaction plan continue =
   | Create_table_seeded { table_name; source } ->
       evaluate_create_table_seeded environment transaction ~table_name ~source
         continue
-  | Catalog_source ->
-      (* The catalog evaluator lands in a follow-up step alongside the
-         integration test that exercises it end to end. *)
-      ignore continue;
-      failwith "Eval: catalog: the catalog evaluator is not yet wired through"
+  | Catalog_source -> evaluate_catalog_source environment transaction continue
 
 (* Strip the qualifier from every field in [input_row_kind], or fail with a
    user-facing message naming the colliding bare name and both qualified

@@ -593,6 +593,69 @@ let test_unqualify_on_row_literal_strips_qualifiers () =
         "the resulting row's single field has bare name \"id\"" "id"
         (List.hd row.kind).name)
 
+(* Parse [query] through the full parse / lower / translate / eval pipeline
+   against the populated fixture, render the resulting [Term.t] the way
+   Repl does, and return the rendered string. Covers the parse-to-eval
+   path for queries whose result is not a relation (catalog, future
+   operators), where [with_query_result] doesn't apply. *)
+let render_query_against_fixture query =
+  with_fixture_environment @@ fun environment ->
+  Storage.Engine.with_read_transaction environment (fun transaction ->
+      let ast =
+        match Surface_ra.Parser.parse query with
+        | Ok (Surface_ra.Ast.Pipeline plan) -> plan
+        | Ok (Surface_ra.Ast.Ddl _) ->
+            Alcotest.failf "expected a pipeline but got a DDL statement: %s"
+              query
+        | Error message -> Alcotest.failf "parse failed: %s" message
+      in
+      let logical = Surface_ra.Lower.lower ast in
+      let catalog = make_catalog environment transaction in
+      let physical = Plan.Translate.translate ~catalog logical in
+      with_captured_formatter @@ fun formatter ->
+      Execution.Eval.eval environment transaction physical (fun term ->
+          Dovetail_core.Term.format formatter term))
+
+let test_bare_catalog_renders_fixture_catalog_literal () =
+  let expected =
+    String.concat "\n"
+      [
+        "catalog {";
+        "  orders = relation (orders.id: int64, orders.user_id: int64, \
+         orders.description: string, orders.amount: int64, primary key (id)) {";
+        "    (orders.id = 1, orders.user_id = 1, orders.description = \
+         \"Coffee\", orders.amount = 5),";
+        "    (orders.id = 2, orders.user_id = 1, orders.description = \
+         \"Bagel\", orders.amount = 4),";
+        "    (orders.id = 3, orders.user_id = 2, orders.description = \"Tea\", \
+         orders.amount = 3),";
+        "    (orders.id = 4, orders.user_id = 3, orders.description = \
+         \"Sandwich\", orders.amount = 8),";
+        "    (orders.id = 5, orders.user_id = 3, orders.description = \
+         \"Cake\", orders.amount = 6),";
+        "    (orders.id = 6, orders.user_id = 5, orders.description = \
+         \"Cookie\", orders.amount = 2)";
+        "  },";
+        "  users = relation (users.id: int64, users.name: string, users.email: \
+         string, users.active: bool, primary key (id)) {";
+        "    (users.id = 1, users.name = \"Alice\", users.email = \
+         \"alice@example.com\", users.active = true),";
+        "    (users.id = 2, users.name = \"Bob\", users.email = \
+         \"bob@example.com\", users.active = false),";
+        "    (users.id = 3, users.name = \"Carol\", users.email = \
+         \"carol@example.com\", users.active = true),";
+        "    (users.id = 4, users.name = \"Dave\", users.email = \
+         \"dave@example.com\", users.active = true),";
+        "    (users.id = 5, users.name = \"Eve\", users.email = \
+         \"eve@example.com\", users.active = false)";
+        "  }";
+        "}";
+      ]
+  in
+  Alcotest.(check string)
+    "bare catalog renders the fixture catalog literal end to end" expected
+    (render_query_against_fixture "catalog")
+
 let test_scalar_literal_type_over_type_raises_at_lower () =
   (* The Lower-time rejection of [type | type] now triggers on a scalar
      source too. Walk parse and lower by hand since the rejection happens
@@ -699,6 +762,12 @@ let () =
             `Quick test_type_on_users_yields_relation_type;
           Alcotest.test_case "users | type | type raises at Lower" `Quick
             test_type_over_type_raises_at_lower;
+        ] );
+      ( "catalog source",
+        [
+          Alcotest.test_case
+            "bare [catalog] renders the fixture catalog literal end to end"
+            `Quick test_bare_catalog_renders_fixture_catalog_literal;
         ] );
       ( "scalar literal source",
         [
