@@ -119,18 +119,21 @@ let format_kind formatter (kind : kind) =
         kind.refinements);
   Format.pp_print_string formatter ")"
 
+(* Rendered through a vertical Format box so that when a relation is
+   nested inside an enclosing box (e.g. a catalog literal), the rows
+   indent further than at depth 0. The closing brace uses [@;<0 -2>]
+   to back out to the column where the box opened. *)
 let format formatter relation =
   let row_kind = relation.kind.row_kind in
   let rows = List.of_seq relation.value in
-  Format.fprintf formatter "relation %a {" format_kind relation.kind;
-  (match rows with
-  | [] -> ()
+  match rows with
+  | [] -> Format.fprintf formatter "relation %a {}" format_kind relation.kind
   | _ ->
       let format_row formatter row =
         Row.format formatter { kind = row_kind; value = row }
       in
-      let separator formatter () = Format.pp_print_string formatter ",\n  " in
-      Format.pp_print_string formatter "\n  ";
+      let separator formatter () = Format.fprintf formatter ",@," in
+      Format.fprintf formatter "@[<v 2>relation %a {@," format_kind
+        relation.kind;
       Format.pp_print_list ~pp_sep:separator format_row formatter rows;
-      Format.pp_print_string formatter "\n");
-  Format.pp_print_string formatter "}"
+      Format.fprintf formatter "@;<0 -2>}@]"
