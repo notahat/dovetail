@@ -14,8 +14,8 @@ val lower_row_type : Ast.type_expression -> Row.kind
     {!Row.kind}. Each {!Ast.type_field} becomes a {!Row.field} with
     [qualifier = None] — the surface row-type syntax has no qualifier form.
     [type_expression.refinements] must be empty; {!Parser.parse_row_type}
-    guarantees this for parsed input. Not yet called from anywhere; stands ready
-    for the literal-syntax-flip slice steps that wire it in. *)
+    guarantees this for parsed input. Not yet called from anywhere; wired in
+    once the lowering pipeline grows a row-type path. *)
 
 val lower_relation_type : Ast.type_expression -> Relation.kind
 (** [lower_relation_type type_expression] turns a parsed relation-type
@@ -33,4 +33,5 @@ val lower : Ast.t -> Plan.Logical.t
     [Logical] has no [Join] node; the join is just sugar at this layer, and
     {!Translate} is responsible for collapsing the
     [Restrict]-over-[CrossProduct] shape into [Physical.NestedLoopJoin].
-    [Ast.Insert] maps to [Logical.Insert] with the source lowered in place. *)
+    [Ast.Insert] maps to [Logical.Insert] with the source lowered in place;
+    [Ast.Unqualify] maps to [Logical.Unqualify] the same way. *)
