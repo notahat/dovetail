@@ -303,16 +303,18 @@ let drop_table_body =
 
 (* A bare identifier at pipeline-source position: a [true] / [false] scalar
    literal, the [relation] keyword introducing a relation literal, the
-   [drop] keyword introducing a [drop table <name>] leaf, or a relation
-   name. The leading-letter character class is shared, so we parse the
-   identifier eagerly and dispatch on its spelling. The [relation] and
-   [drop] cases commit to their respective sub-grammars. *)
+   [drop] keyword introducing a [drop table <name>] leaf, the bare [catalog]
+   keyword yielding the catalog as a value, or a relation name. The leading-
+   letter character class is shared, so we parse the identifier eagerly and
+   dispatch on its spelling. The [relation] and [drop] cases commit to their
+   respective sub-grammars; [catalog] is nullary and stands alone. *)
 let identifier_relation_or_bool_literal =
   identifier >>= function
   | "true" -> return (Ast.Scalar_literal (Scalar.Bool true))
   | "false" -> return (Ast.Scalar_literal (Scalar.Bool false))
   | "relation" -> relation_literal_body
   | "drop" -> drop_table_body
+  | "catalog" -> return Ast.Catalog_source
   | name -> return (Ast.Relation_name name)
 
 (* The leading position of a pipeline: a row literal, a bare scalar literal,

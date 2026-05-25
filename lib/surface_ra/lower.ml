@@ -113,3 +113,8 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
         { table_name; kind = lower_relation_type type_expression }
   | Create_table_seeded { table_name; source } ->
       Create_table_seeded { table_name; source = lower source }
+  | Catalog_source ->
+      (* The catalog rung is not yet wired through the logical / physical
+         layers; a follow-up step lands [Logical.Catalog_source] and the
+         matching translate and eval arms. *)
+      failwith "Lower: catalog: the catalog rung is not yet wired through"

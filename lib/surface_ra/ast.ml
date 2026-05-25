@@ -37,5 +37,6 @@ type t =
       kind : Relation.kind;
       rows : (Row.column_reference * Scalar.value) list list;
     }
+  | Catalog_source
 
 type program = Pipeline of t | Ddl of Ddl.Statement.t

@@ -577,6 +577,21 @@ let test_ddl_create_table_is_no_longer_recognised () =
 let test_pipeline_keyword_create_is_a_relation_name () =
   parses "create" (Ast.Relation_name "create")
 
+(* The bare [catalog] keyword at pipeline-source position is reserved: it
+   yields the database's catalog rather than naming a relation called
+   [catalog]. *)
+let test_pipeline_bare_catalog_parses_as_catalog_source () =
+  parses "catalog" Ast.Catalog_source
+
+let test_pipeline_catalog_tolerates_surrounding_whitespace () =
+  parses "  catalog\n" Ast.Catalog_source
+
+let test_pipeline_catalog_allows_downstream_pipeline_step () =
+  (* Catalog_source is a leaf; downstream steps compose over it just like
+     any other leaf source. The [type] step is the simplest grammatical
+     witness; semantic checks land in later steps. *)
+  parses "catalog | type" (Ast.Type { input = Ast.Catalog_source })
+
 let test_pipeline_parses_type_step () =
   parses "users | type" (Ast.Type { input = Ast.Relation_name "users" })
 
@@ -1175,5 +1190,12 @@ let () =
             `Quick test_ddl_create_table_is_no_longer_recognised;
           Alcotest.test_case "[create] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_create_is_a_relation_name;
+          Alcotest.test_case "bare [catalog] parses as a Catalog_source leaf"
+            `Quick test_pipeline_bare_catalog_parses_as_catalog_source;
+          Alcotest.test_case "[catalog] tolerates surrounding whitespace" `Quick
+            test_pipeline_catalog_tolerates_surrounding_whitespace;
+          Alcotest.test_case
+            "[catalog | <step>] parses with the step over the leaf" `Quick
+            test_pipeline_catalog_allows_downstream_pipeline_step;
         ] );
     ]

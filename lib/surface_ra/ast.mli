@@ -146,6 +146,13 @@ type t =
           from the surface; {!Lower} checks each row against [kind] and reorders
           the values to [kind]'s field order, then emits a
           {!Plan.Logical.Relation_literal}. *)
+  | Catalog_source
+      (** [Catalog_source] is the surface form of the bare [catalog] keyword at
+          pipeline-source position. It yields the database's catalog as a
+          [Term.Catalog_value], whose entries are every table's name paired with
+          its rows. {!Lower} emits a logical [Catalog_source] node; the
+          evaluator opens a per-table cursor lazily for each entry, scoped to
+          the read transaction. *)
 
 type program =
   | Pipeline of t
