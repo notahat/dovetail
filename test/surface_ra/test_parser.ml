@@ -415,6 +415,89 @@ let test_pipeline_create_table_then_insert_into_is_rejected () =
 let test_pipeline_insert_into_then_create_table_is_rejected () =
   rejects "users | insert into a | create table b"
 
+(* The [create table] sink in its empty form. A type expression on the
+   left of the sink builds an [Ast.Create_table_empty] node carrying
+   the parsed [type_expression] verbatim. The dispatcher at the top of
+   the pipeline grammar uses bounded lookahead to tell a type expression
+   ([(name: kind, ...)]) from a value-literal ([(name = value, ...)])
+   or the empty form [()]; the type-expression path commits only to the
+   [create table] sink, so a type expression piped into anything else
+   is a parse error. *)
+
+let test_pipeline_create_table_empty_with_simple_type_expression_parses () =
+  parses_plan "(id: int64, name: string) | create table users"
+    (Ast.Create_table_empty
+       {
+         table_name = "users";
+         type_expression =
+           {
+             fields =
+               [
+                 { qualifier = None; name = "id"; kind = Int64 };
+                 { qualifier = None; name = "name"; kind = String };
+               ];
+             refinements = [];
+           };
+       })
+
+let test_pipeline_create_table_empty_with_primary_key_parses () =
+  parses_plan "(id: int64, name: string, primary key (id)) | create table users"
+    (Ast.Create_table_empty
+       {
+         table_name = "users";
+         type_expression =
+           {
+             fields =
+               [
+                 { qualifier = None; name = "id"; kind = Int64 };
+                 { qualifier = None; name = "name"; kind = String };
+               ];
+             refinements = [ Relation.Primary_key [ "id" ] ];
+           };
+       })
+
+let test_pipeline_create_table_empty_tolerates_extra_whitespace () =
+  parses_plan "  (id:  int64)\n  |  create   table   users  "
+    (Ast.Create_table_empty
+       {
+         table_name = "users";
+         type_expression =
+           {
+             fields = [ { qualifier = None; name = "id"; kind = Int64 } ];
+             refinements = [];
+           };
+       })
+
+let test_pipeline_empty_parens_dispatches_to_value_literal_branch () =
+  (* Empty parens [()] are ambiguous between an empty type expression
+     and an empty row literal. The dispatcher resolves them as the
+     value-literal form to preserve the existing behaviour of [()] as a
+     row literal; the downstream [create table] sink therefore builds a
+     [Create_table_seeded] over a [Row_literal []]. The structural
+     "column list is empty" check fires later, at evaluation time. *)
+  parses_plan "() | create table foo"
+    (Ast.Create_table_seeded { table_name = "foo"; source = Ast.Row_literal [] })
+
+let test_pipeline_type_expression_piped_into_restrict_is_rejected () =
+  rejects "(id: int64) | restrict id = 5"
+
+let test_pipeline_type_expression_piped_into_insert_into_is_rejected () =
+  rejects "(id: int64) | insert into users"
+
+let test_pipeline_bare_type_expression_without_sink_is_rejected () =
+  (* A type expression on its own is not a value-yielding pipeline; the
+     dispatcher's type-expression branch commits only to the [create
+     table] sink, so a bare type expression with no sink is a parse
+     error. *)
+  rejects "(id: int64)"
+
+let test_pipeline_parens_with_colon_and_equals_mixed_is_rejected () =
+  (* [(name = "x", id: int64)] is neither a valid row literal (the [:]
+     is not a row-literal token) nor a valid type expression (the [=]
+     is not a type-expression token), so both dispatcher branches fail
+     and the parse is rejected. *)
+  rejects "(name = \"x\", id: int64) | create table users"
+
 (* The DDL sigil. A leading [:] (after any optional whitespace) marks a
    DDL statement. The sigil is recognised only at the top of input -- a
    [:] inside a pipeline is a parse error rather than an embedded DDL
@@ -1167,6 +1250,31 @@ let () =
           Alcotest.test_case
             "rejects [insert into] followed by a [create table] sink" `Quick
             test_pipeline_insert_into_then_create_table_is_rejected;
+        ] );
+      ( "create table sink syntax (type-expression source)",
+        [
+          Alcotest.test_case
+            "[<type-expr> | create table <name>] parses as Create_table_empty"
+            `Quick
+            test_pipeline_create_table_empty_with_simple_type_expression_parses;
+          Alcotest.test_case
+            "type expression with [primary key] refinement carries through"
+            `Quick test_pipeline_create_table_empty_with_primary_key_parses;
+          Alcotest.test_case
+            "the type-expression form tolerates extra whitespace" `Quick
+            test_pipeline_create_table_empty_tolerates_extra_whitespace;
+          Alcotest.test_case
+            "empty parens [()] dispatch to the value-literal branch" `Quick
+            test_pipeline_empty_parens_dispatches_to_value_literal_branch;
+          Alcotest.test_case "rejects a type expression piped into [restrict]"
+            `Quick test_pipeline_type_expression_piped_into_restrict_is_rejected;
+          Alcotest.test_case
+            "rejects a type expression piped into [insert into]" `Quick
+            test_pipeline_type_expression_piped_into_insert_into_is_rejected;
+          Alcotest.test_case "rejects a bare type expression with no sink"
+            `Quick test_pipeline_bare_type_expression_without_sink_is_rejected;
+          Alcotest.test_case "rejects parens that mix [:] and [=] bindings"
+            `Quick test_pipeline_parens_with_colon_and_equals_mixed_is_rejected;
         ] );
       ( "ddl syntax",
         [

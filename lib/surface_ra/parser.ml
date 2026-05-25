@@ -532,20 +532,55 @@ let create_table_seeded_sink =
    keyword and does not backtrack across sinks. *)
 let sink_step = insert_sink <|> create_table_seeded_sink
 
+(* The [create table] sink's empty form, with a type expression at
+   pipeline-source position: [<type-expression> | create table <name>]
+   parses as [Ast.Create_table_empty]. A type expression is not a
+   value-yielding pipeline, so this branch commits only to the [create
+   table] sink -- a type expression piped into anything else (or with
+   no sink at all) is a parse error. The dispatcher in {!pipeline_parser}
+   tries this branch first; on failure it rewinds and falls through to
+   the value-pipeline form, which carries the [create table] sink's
+   seeded form alongside [insert into]. *)
+let create_table_empty_form =
+  whitespace *> type_expression_body >>= fun items ->
+  (* Empty parens [()] are ambiguous between an empty type expression
+     and an empty row literal. Fall through to the value-pipeline path
+     so [() | create table foo] parses as a seeded form over an empty
+     row literal, preserving the existing meaning of [()]. The
+     downstream "column list is empty" check fires later, in [Eval]. *)
+  if items = [] then fail "empty parens are not a type expression"
+  else
+    let fields, refinements = partition_type_expression_items items in
+    let type_expression : Ast.type_expression = { fields; refinements } in
+    whitespace *> char '|' *> whitespace *> keyword "create" *> whitespace
+    *> keyword "table" *> whitespace *> identifier
+    >>| fun table_name -> Ast.Create_table_empty { table_name; type_expression }
+
 (* The pipeline grammar: a query pipeline, optionally terminated by a
    single sink step. With the sink, the result is the matching sink AST
    node wrapping the upstream pipeline; without it, the upstream pipeline
    is the whole [Ast.t]. The "at most one sink, in terminal position" rule
    is enforced by [program_parser]'s trailing [end_of_input], which
-   rejects any further input after the pipeline. *)
+   rejects any further input after the pipeline.
+
+   The {!create_table_empty_form} alternative is tried first so that a
+   type expression on the left of the sink can be recognised before the
+   value-pipeline grammar attempts to parse the same parens as a row
+   literal. Both alternatives back off cleanly on inner failure thanks
+   to [<|>]'s no-commit behaviour, so a value-pipeline starting with
+   [(] (e.g. a row literal) reaches the second alternative once the
+   type-expression branch fails. *)
 let pipeline_parser =
-  query_pipeline >>= fun upstream ->
-  let with_sink =
-    whitespace *> char '|' *> whitespace *> sink_step >>| fun build_sink ->
-    build_sink upstream
+  let value_pipeline =
+    query_pipeline >>= fun upstream ->
+    let with_sink =
+      whitespace *> char '|' *> whitespace *> sink_step >>| fun build_sink ->
+      build_sink upstream
+    in
+    let without_sink = return upstream in
+    with_sink <|> without_sink
   in
-  let without_sink = return upstream in
-  with_sink <|> without_sink
+  create_table_empty_form <|> value_pipeline
 
 (* The DDL body grammar: the productions admitted after the [:]
    sigil has been consumed. The disjunction relies on [<|>]'s backtracking

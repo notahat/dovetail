@@ -72,6 +72,41 @@ let test_users_join_orders_prints_matched_pairs () =
           stdout_text)
     [ "Alice"; "Bob"; "Carol"; "Eve" ]
 
+(* Helper used by the [create table] / [drop table] tests: assert that
+   every expected substring appears in the captured stdout. *)
+let expect_stdout_contains stdout_text expected_substrings =
+  List.iter
+    (fun expected ->
+      if not (contains_substring stdout_text expected) then
+        Alcotest.failf "expected stdout to contain %S\n--- stdout ---\n%s"
+          expected stdout_text)
+    expected_substrings
+
+let test_create_table_empty_form_creates_and_reports () =
+  with_temp_dir @@ fun environment_path ->
+  let stdin_text =
+    "(id: int64, name: string, primary key (id)) | create table widgets\n\
+     :list tables\n"
+  in
+  let stdout_text = run_binary ~environment_path ~stdin_text in
+  expect_stdout_contains stdout_text [ "widgets"; "created" ]
+
+let test_create_table_seeded_form_creates_and_seeds () =
+  with_temp_dir @@ fun environment_path ->
+  let stdin_text =
+    "relation (id: int64, name: string, primary key (id)) { (id = 1, name = \
+     \"alice\") } | create table greeters\n\
+     greeters\n"
+  in
+  let stdout_text = run_binary ~environment_path ~stdin_text in
+  expect_stdout_contains stdout_text [ "greeters"; "created"; "alice" ]
+
+let test_drop_table_leaf_drops_and_reports () =
+  with_temp_dir @@ fun environment_path ->
+  let stdin_text = "drop table orders\n:list tables\n" in
+  let stdout_text = run_binary ~environment_path ~stdin_text in
+  expect_stdout_contains stdout_text [ "orders"; "dropped" ]
+
 let () =
   Alcotest.run "dovetail"
     [
@@ -82,5 +117,14 @@ let () =
           Alcotest.test_case
             "users join orders prints only matched (user, order) pairs" `Slow
             test_users_join_orders_prints_matched_pairs;
+          Alcotest.test_case
+            "[<type-expr> | create table <name>] creates the table" `Slow
+            test_create_table_empty_form_creates_and_reports;
+          Alcotest.test_case
+            "[<relation-literal> | create table <name>] creates and seeds the \
+             table"
+            `Slow test_create_table_seeded_form_creates_and_seeds;
+          Alcotest.test_case "[drop table <name>] drops the table" `Slow
+            test_drop_table_leaf_drops_and_reports;
         ] );
     ]
