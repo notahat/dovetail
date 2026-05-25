@@ -169,7 +169,7 @@ follows lib code's convention straight through — no opens.
   start command, the wait-for-rebuild protocol, the rules for what NOT
   to run while the watcher is up, and the failure modes. The wait
   script lives in the skill at
-  `~/.claude/skills/dune-watcher/scripts/wait-for-watcher.sh` — invoke
+  `~/.claude/skills/dune-watcher/scripts/wait-for-watcher.py` — invoke
   it from there; there is no project-local copy. The empirical
   findings behind the script are in the skill's
   `references/dune-watcher.md`.
