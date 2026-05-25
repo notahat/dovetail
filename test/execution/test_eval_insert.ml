@@ -26,6 +26,24 @@ let kind_from_pairs pairs : Relation.kind =
     refinements = [];
   }
 
+(* Build a [Physical.Insert] whose source is a single-row [Relation_literal]
+   with the same target schema as [insert_mutation], but with [qualifier]
+   stamped onto each source field. Lets a test exercise the sink's
+   qualified-input rejection without going through a join. *)
+let insert_mutation_qualified ~table ~qualifier ~pairs : Plan.Physical.t =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        List.map
+          (fun (name, value) : Row.field ->
+            { name; kind = Scalar.kind_of value; qualifier = Some qualifier })
+          pairs;
+      refinements = [];
+    }
+  in
+  let values = List.map snd pairs in
+  Insert { table; source = Relation_literal { kind; rows = [ values ] } }
+
 (* Build a [Physical.Insert] sourced from a multi-row literal in target
    schema order, so the count-reporting tests can vary the source size.
    [column_kinds] declares the literal's kind; every row in [rows] has the
@@ -174,6 +192,27 @@ let test_insert_with_existing_primary_key_raises () =
              Alcotest.(check row_list_testable)
                "orders unchanged after aborted insert" expected_orders_rows rows)))
 
+let test_insert_with_qualified_source_field_is_rejected () =
+  with_fixture_environment @@ fun environment ->
+  let mutation =
+    insert_mutation_qualified ~table:"orders" ~qualifier:"orders"
+      ~pairs:
+        [
+          ("id", Scalar.Int64 9L);
+          ("user_id", Scalar.Int64 1L);
+          ("description", Scalar.String "Pretzel");
+          ("amount", Scalar.Int64 9L);
+        ]
+  in
+  Alcotest.check_raises "qualified source rejected"
+    (Failure
+       "Eval: insert into \"orders\": source has qualified field(s) \
+        \"orders.id\", \"orders.user_id\", \"orders.description\", \
+        \"orders.amount\"; pipe through unqualify to drop qualifiers")
+    (fun () ->
+      Storage.Engine.with_write_transaction environment (fun transaction ->
+          Eval.eval environment transaction mutation (fun _ -> ())))
+
 let () =
   Alcotest.run "eval_insert"
     [
@@ -187,5 +226,8 @@ let () =
           Alcotest.test_case
             "raises and leaves storage untouched on a primary-key collision"
             `Quick test_insert_with_existing_primary_key_raises;
+          Alcotest.test_case
+            "rejects a source row whose fields carry qualifiers" `Quick
+            test_insert_with_qualified_source_field_is_rejected;
         ] );
     ]

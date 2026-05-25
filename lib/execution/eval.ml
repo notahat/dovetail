@@ -328,6 +328,32 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
     (Term.Relation_value
        ({ kind = combined_kind; value = combined_value } : [ `Bag ] Relation.t))
 
+(* Reject any source row whose fields carry qualifiers. The sink stores rows
+   under bare names, so a qualified source -- typically the output of a join --
+   is ambiguous: we won't silently drop the qualifier. The error names every
+   offending field and points at the [unqualify] operator as the explicit
+   strip. *)
+and reject_qualified_source ~target_table ~source_row_kind =
+  let qualified_fields =
+    List.filter
+      (fun (field : Row.field) -> field.qualifier <> None)
+      source_row_kind
+  in
+  match qualified_fields with
+  | [] -> ()
+  | _ ->
+      let formatted_names =
+        List.map
+          (fun field -> Printf.sprintf "%S" (Row.format_field_name field))
+          qualified_fields
+        |> String.concat ", "
+      in
+      failwith
+        (Printf.sprintf
+           "Eval: insert into %S: source has qualified field(s) %s; pipe \
+            through unqualify to drop qualifiers"
+           target_table formatted_names)
+
 (* For each target field, find the position in [source_row_kind] that supplies
    its value. Raises [Failure] if a target field has no matching source
    column. Source columns absent from the target are tolerated here;
@@ -435,6 +461,8 @@ and evaluate_insert environment transaction ~target_table ~source continue =
      folding the count through a [Seq.fold_left] accumulator. *)
   let affected_rows = ref 0 in
   eval_input environment transaction source (fun source_relation ->
+      reject_qualified_source ~target_table
+        ~source_row_kind:source_relation.kind.row_kind;
       let position_map =
         build_source_position_map ~target_table
           ~source_row_kind:source_relation.kind.row_kind ~target_kind

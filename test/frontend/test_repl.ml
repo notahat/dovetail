@@ -161,6 +161,22 @@ let test_insert_into_orders_writes_row_and_reports_count () =
   check_contains "inserted row's description" output "Pretzel";
   check_contains "inserted row's id field" output "orders.id = 9"
 
+(* A join produces qualified field names, and piping that directly into
+   [insert into] is the prototypical mistake the sink's qualifier check
+   catches. The error names every offending field and points the user
+   at [unqualify] as the explicit strip. *)
+let test_insert_from_join_is_rejected_with_unqualify_hint () =
+  let output =
+    run_with_input
+      [
+        "users | join orders on users.id = orders.user_id | insert into orders";
+      ]
+  in
+  check_contains "rejects qualified source" output
+    "Eval: insert into \"orders\":";
+  check_contains "names an offending qualified field" output "\"users.id\"";
+  check_contains "points at unqualify" output "unqualify"
+
 (* [:list tables] runs through Parser → REPL DDL
    dispatch → Ddl_executor.execute_read → Catalog.list_table_names and
    prints each table name on its own line. The fixture seeds [users] and
@@ -401,6 +417,10 @@ let () =
             "insert into orders writes the row and prints the insert_count \
              relation"
             `Quick test_insert_into_orders_writes_row_and_reports_count;
+          Alcotest.test_case
+            "insert into rejects a join's qualified output and suggests \
+             unqualify"
+            `Quick test_insert_from_join_is_rejected_with_unqualify_hint;
           Alcotest.test_case
             ":list tables prints fixture tables in byte-sorted order" `Quick
             test_list_tables_prints_fixture_tables_in_byte_sorted_order;
