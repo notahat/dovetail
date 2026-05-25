@@ -12,7 +12,6 @@ module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
-module Plan = Dovetail_plan
 
 type column_reference = { qualifier : string option; name : string }
 (** A reference to a column by name, with an optional dotted qualifier. The
@@ -65,6 +64,12 @@ type type_expression = {
     The empty form [()] parses as [{ fields = []; refinements = [] }] in either
     context. *)
 
+type projection = column_reference list
+(** A [project] step's column list: the ordered references to keep from the
+    input relation. Order is preserved through lowering; the AST owns this type
+    so the surface form is independent of the resolved {!Plan.Projection.t}.
+    {!Lower.lower_projection} translates it at the AST-to-logical boundary. *)
+
 type t =
   | Relation_name of string
       (** [Relation_name name] is a reference to the base relation called [name]
@@ -74,7 +79,7 @@ type t =
           [input | restrict <predicate>]. The constructor name follows the
           relational-algebra term (σ); SQL's `SELECT` is intentionally avoided
           because it names a different operation. *)
-  | Project of { input : t; columns : Plan.Projection.t }
+  | Project of { input : t; columns : projection }
       (** [Project { input; columns }] is the surface form
           [input | project <columns>]. The constructor name follows the
           relational-algebra term (π). *)

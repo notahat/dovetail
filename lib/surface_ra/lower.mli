@@ -29,6 +29,12 @@ val lower_refinement : Ast.refinement -> Relation.refinement
     identifiers inside a [primary key (...)] clause, so qualified references are
     an upstream-invariant violation. *)
 
+val lower_projection : Ast.projection -> Plan.Projection.t
+(** [lower_projection projection] translates an AST-side projection into its
+    {!Plan.Projection.t} counterpart by mapping {!lower_column_reference} over
+    each column. Structurally identity today — both sides are a list of column
+    references — with the helper existing for the layering. *)
+
 val lower_relation_type : Ast.type_expression -> Relation.kind
 (** [lower_relation_type type_expression] turns a parsed relation-type
     expression into a {!Relation.kind}. The fields become the [row_kind] (each

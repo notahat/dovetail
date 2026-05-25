@@ -34,6 +34,9 @@ let lower_refinement (refinement : Ast.refinement) : Relation.refinement =
       in
       Relation.Primary_key (List.map column_name references)
 
+let lower_projection (projection : Ast.projection) : Plan.Projection.t =
+  List.map lower_column_reference projection
+
 let lower_relation_type (type_expression : Ast.type_expression) : Relation.kind
     =
   {
@@ -105,7 +108,8 @@ let rec lower (ast : Ast.t) : Plan.Logical.t =
   match ast with
   | Relation_name name -> Scan { table = name }
   | Restrict { input; predicate } -> Restrict { input = lower input; predicate }
-  | Project { input; columns } -> Project { input = lower input; columns }
+  | Project { input; columns } ->
+      Project { input = lower input; columns = lower_projection columns }
   | CrossProduct { left; right } ->
       CrossProduct { left = lower left; right = lower right }
   | Join { left; right; predicate } ->

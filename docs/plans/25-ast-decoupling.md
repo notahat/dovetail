@@ -25,8 +25,14 @@ that don't need re-decoupling first).
   - `Relation.kind` (where it appears inside `Relation_literal`)
   - `Plan.Projection.t`
   - `Expression.t` (and its `comparison_op`)
-- `surface_ra/dune` drops the `dovetail.plan` dependency. The
-  `dovetail.core` dependency stays (`Scalar.kind` and
+- `ast.{ml,mli}` and `parser.{ml,mli}` no longer reference any
+  type from `dovetail.plan`; the only remaining `Plan` references
+  in `surface_ra` are inside `lower.{ml,mli}`, which is the
+  AST-to-logical boundary by design. `surface_ra/dune` keeps the
+  `dovetail.plan` dependency because `Lower` still lives in the
+  library; dropping the dep entirely would require splitting
+  `Lower` into its own sublibrary, which is out of scope here.
+  The `dovetail.core` dependency stays (`Scalar.kind` and
   `Scalar.value` are primitive tags/payloads, not semantic
   forms).
 - `Lower` grows the translation logic for each decoupled type.
@@ -190,9 +196,15 @@ step that drops the `dovetail.plan` dependency from
   `lower_projection : Ast.projection -> Plan.Projection.t`.
   Trivially structural since `Plan.Projection.t` is also a list of
   column references.
-- `lib/surface_ra/dune` — remove `dovetail.plan` from the
-  `libraries` list. Verify the build still passes; this is the
-  architectural achievement of the step.
+- `lib/surface_ra/dune` keeps `dovetail.plan` in the `libraries`
+  list: `Lower` lives inside `surface_ra` and still produces
+  `Plan.Logical.t`, so the library as a whole still depends on
+  `plan`. The architectural achievement is narrower —
+  `ast.{ml,mli}` and `parser.{ml,mli}` no longer reference `Plan`
+  at all; `Plan` references are now confined to `lower.{ml,mli}`,
+  the AST-to-logical boundary. Moving `Lower` to its own
+  sublibrary so the dep can actually be dropped is a possible
+  later move, not part of this slice.
 - Tests update to the AST-side type.
 
 ### Step 5: Decouple `Expression.t`
@@ -268,9 +280,11 @@ The slice's safety relies on:
 - **Per-step test updates.** Each step's diff covers both source
   changes and corresponding test updates in one commit. A step
   that compiles but breaks tests is incomplete.
-- **The build's library-dependency check.** Step 4 verifies the
-  `dovetail.plan` dep can be dropped; if the build fails, an
-  unmigrated site remains.
+- **A grep for `Plan` references in `ast.{ml,mli}` and
+  `parser.{ml,mli}`.** After step 4 there should be none; any
+  remaining hit is an unmigrated site. The full dep drop in
+  `surface_ra/dune` isn't a check we can run while `Lower` still
+  lives in the library.
 
 No expected performance impact: Lower's new translation helpers
 add a constant-factor walk per AST node, identical in shape to

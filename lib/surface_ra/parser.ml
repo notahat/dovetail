@@ -448,14 +448,7 @@ let restrict_step =
 
 (* A project pipeline step: [| project <columns>]. *)
 let project_step =
-  keyword "project" *> whitespace *> project_columns
-  >>| fun parsed_columns input ->
-  let columns =
-    List.map
-      (fun (reference : Ast.column_reference) : Row.column_reference ->
-        { qualifier = reference.qualifier; name = reference.name })
-      parsed_columns
-  in
+  keyword "project" *> whitespace *> project_columns >>| fun columns input ->
   Ast.Project { input; columns }
 
 (* A cross-product pipeline step: [| cross <relation>]. The right-hand side

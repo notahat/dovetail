@@ -70,12 +70,16 @@ let test_restrict_pipeline_yields_filtered_rows () =
                [ List.nth expected_users_rows 2 ]
                rows)))
 
+let name_then_email_ast : Ast.projection =
+  [ column_reference "name"; column_reference "email" ]
+
 let name_then_email : Plan.Projection.t =
-  [ row_column_reference "name"; row_column_reference "email" ]
+  Lower.lower_projection name_then_email_ast
 
 let test_project_lowers_to_logical_project () =
   let ast =
-    Ast.Project { input = Ast.Relation_name "users"; columns = name_then_email }
+    Ast.Project
+      { input = Ast.Relation_name "users"; columns = name_then_email_ast }
   in
   let logical = Lower.lower ast in
   Alcotest.(check logical_testable)
@@ -90,7 +94,7 @@ let test_project_pipeline_yields_projected_rows () =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       let ast =
         Ast.Project
-          { input = Ast.Relation_name "users"; columns = name_then_email }
+          { input = Ast.Relation_name "users"; columns = name_then_email_ast }
       in
       let logical = Lower.lower ast in
       let catalog = make_catalog environment transaction in

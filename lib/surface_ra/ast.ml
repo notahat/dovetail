@@ -2,7 +2,6 @@ module Scalar = Dovetail_core.Scalar
 module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 module Row = Dovetail_core.Row
-module Plan = Dovetail_plan
 
 type column_reference = { qualifier : string option; name : string }
 
@@ -23,10 +22,12 @@ type type_expression = {
   refinements : refinement list;
 }
 
+type projection = column_reference list
+
 type t =
   | Relation_name of string
   | Restrict of { input : t; predicate : Expression.t }
-  | Project of { input : t; columns : Plan.Projection.t }
+  | Project of { input : t; columns : projection }
   | CrossProduct of { left : t; right : t }
   | Join of { left : t; right : t; predicate : Expression.t }
   | Insert of { table : string; source : t }
