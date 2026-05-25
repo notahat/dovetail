@@ -510,23 +510,38 @@ let query_pipeline =
 
 (* An insert sink: [insert into <identifier>]. Returned as a function
    from the upstream relation to an [Ast.Insert] node, so the caller
-   can thread the upstream pipeline through. Currently the only sink
-   the grammar admits; future sinks (delete, ...) sit alongside this
-   one inside a [sink_step] disjunction. *)
+   can thread the upstream pipeline through. Sits alongside
+   {!create_table_seeded_sink} in the tail-position disjunction. *)
 let insert_sink =
   keyword "insert" *> whitespace *> keyword "into" *> whitespace *> identifier
   >>| fun target_table source -> Ast.Insert { source; table = target_table }
 
+(* A [create table <name>] sink in its seeded form: a value-yielding
+   upstream pipeline followed by the sink builds an
+   [Ast.Create_table_seeded] node carrying the upstream as the source.
+   The empty form ([<type-expression> | create table <name>] →
+   [Create_table_empty]) is handled by a separate dispatcher at the top
+   of the pipeline grammar and never reaches this branch. *)
+let create_table_seeded_sink =
+  keyword "create" *> whitespace *> keyword "table" *> whitespace *> identifier
+  >>| fun target_table source ->
+  Ast.Create_table_seeded { table_name = target_table; source }
+
+(* The tail-position sink disjunction. The two sinks start with distinct
+   keywords ([insert] / [create]), so the disjunction commits on the
+   keyword and does not backtrack across sinks. *)
+let sink_step = insert_sink <|> create_table_seeded_sink
+
 (* The pipeline grammar: a query pipeline, optionally terminated by a
-   single sink step. With the sink, the result is an [Ast.Insert] node
-   wrapping the upstream pipeline; without it, the upstream pipeline is
-   the whole [Ast.t]. The "at most one sink, in terminal position" rule
+   single sink step. With the sink, the result is the matching sink AST
+   node wrapping the upstream pipeline; without it, the upstream pipeline
+   is the whole [Ast.t]. The "at most one sink, in terminal position" rule
    is enforced by [program_parser]'s trailing [end_of_input], which
    rejects any further input after the pipeline. *)
 let pipeline_parser =
   query_pipeline >>= fun upstream ->
   let with_sink =
-    whitespace *> char '|' *> whitespace *> insert_sink >>| fun build_sink ->
+    whitespace *> char '|' *> whitespace *> sink_step >>| fun build_sink ->
     build_sink upstream
   in
   let without_sink = return upstream in

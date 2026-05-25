@@ -339,6 +339,82 @@ let test_pipeline_rejects_sink_without_into_keyword () =
 let test_pipeline_rejects_two_sinks () =
   rejects "users | insert into orders | insert into orders"
 
+(* The [create table] sink in its seeded form. A value-yielding upstream
+   pipeline followed by [| create table <name>] parses as
+   [Ast.Create_table_seeded]. The empty form (a type expression on the
+   left) is handled by a separate dispatcher introduced later; for now,
+   only the value-pipeline source is admitted by the sink itself. *)
+
+let test_pipeline_create_table_seeded_with_relation_literal_source_parses () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [];
+    }
+  in
+  parses_plan
+    "relation (id: int64, name: string) { (id = 1, name = \"alice\") } | \
+     create table users"
+    (Ast.Create_table_seeded
+       {
+         table_name = "users";
+         source =
+           Ast.Relation_literal
+             {
+               kind;
+               rows =
+                 [
+                   [
+                     (column_reference "id", Scalar.Int64 1L);
+                     (column_reference "name", Scalar.String "alice");
+                   ];
+                 ];
+             };
+       })
+
+let test_pipeline_create_table_seeded_with_relation_name_source_parses () =
+  parses_plan "users | create table users_copy"
+    (Ast.Create_table_seeded
+       { table_name = "users_copy"; source = Ast.Relation_name "users" })
+
+let test_pipeline_create_table_seeded_with_upstream_steps_parses () =
+  parses_plan "users | project id | create table user_ids"
+    (Ast.Create_table_seeded
+       {
+         table_name = "user_ids";
+         source =
+           Ast.Project
+             {
+               input = Ast.Relation_name "users";
+               columns = [ column_reference "id" ];
+             };
+       })
+
+let test_pipeline_create_table_sink_rejects_query_op_after_it () =
+  rejects "users | create table users_copy | restrict id = 1"
+
+let test_pipeline_create_table_sink_rejects_with_nothing_before_it () =
+  rejects "| create table users"
+
+let test_pipeline_create_table_sink_rejects_without_target_table () =
+  rejects "users | create table"
+
+let test_pipeline_create_table_sink_rejects_without_table_keyword () =
+  rejects "users | create users_copy"
+
+let test_pipeline_create_table_sink_rejects_two_sinks () =
+  rejects "users | create table aaa | create table bbb"
+
+let test_pipeline_create_table_then_insert_into_is_rejected () =
+  rejects "users | create table a | insert into b"
+
+let test_pipeline_insert_into_then_create_table_is_rejected () =
+  rejects "users | insert into a | create table b"
+
 (* The DDL sigil. A leading [:] (after any optional whitespace) marks a
    DDL statement. The sigil is recognised only at the top of input -- a
    [:] inside a pipeline is a parse error rather than an embedded DDL
@@ -1058,6 +1134,39 @@ let () =
             test_pipeline_rejects_sink_without_into_keyword;
           Alcotest.test_case "rejects two sinks in the same pipeline" `Quick
             test_pipeline_rejects_two_sinks;
+        ] );
+      ( "create table sink syntax (value-pipeline source)",
+        [
+          Alcotest.test_case
+            "[<relation-literal> | create table <name>] parses as \
+             Create_table_seeded"
+            `Quick
+            test_pipeline_create_table_seeded_with_relation_literal_source_parses;
+          Alcotest.test_case
+            "[<relation-name> | create table <name>] parses as \
+             Create_table_seeded"
+            `Quick
+            test_pipeline_create_table_seeded_with_relation_name_source_parses;
+          Alcotest.test_case
+            "[<upstream-pipeline> | create table <name>] parses as \
+             Create_table_seeded"
+            `Quick test_pipeline_create_table_seeded_with_upstream_steps_parses;
+          Alcotest.test_case "rejects a query operator after the sink" `Quick
+            test_pipeline_create_table_sink_rejects_query_op_after_it;
+          Alcotest.test_case "rejects the sink with nothing before it" `Quick
+            test_pipeline_create_table_sink_rejects_with_nothing_before_it;
+          Alcotest.test_case "rejects the sink without a target table" `Quick
+            test_pipeline_create_table_sink_rejects_without_target_table;
+          Alcotest.test_case "rejects the sink without the [table] keyword"
+            `Quick test_pipeline_create_table_sink_rejects_without_table_keyword;
+          Alcotest.test_case "rejects two create-table sinks in one pipeline"
+            `Quick test_pipeline_create_table_sink_rejects_two_sinks;
+          Alcotest.test_case
+            "rejects [create table] followed by an [insert into] sink" `Quick
+            test_pipeline_create_table_then_insert_into_is_rejected;
+          Alcotest.test_case
+            "rejects [insert into] followed by a [create table] sink" `Quick
+            test_pipeline_insert_into_then_create_table_is_rejected;
         ] );
       ( "ddl syntax",
         [
