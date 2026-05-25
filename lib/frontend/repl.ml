@@ -65,31 +65,15 @@ let print_ddl_read_result ~output = function
   | Ddl.Statement.Listed names ->
       List.iter (fun name -> Format.fprintf output "%s@." name) names
 
-(* Render the result of a write DDL statement to [output]. [Dropped] is
-   the single status line [dropped table "<name>"]; quoting is explicit so
-   the wording is consistent regardless of identifier shape. *)
-let print_ddl_write_result ~output = function
-  | Ddl.Statement.Dropped table_name ->
-      Format.fprintf output "dropped table \"%s\"@." table_name
-
 (* Execute a DDL statement against [environment] and write the rendered
-   result to [output]. The classifier picks the transaction kind,
-   mirroring the [Logical.required_access] dispatch above for pipelines;
-   [Failure] raised inside [execute_*] lands in the [error: ...] line
-   through the shared guard. *)
+   result to [output]. Today's only DDL statement is [:list tables], which
+   runs inside a read transaction; [Failure] raised inside [execute_read]
+   lands in the [error: ...] line through the shared guard. *)
 let execute_and_print_ddl environment ~output statement =
   try
-    match Ddl.Statement.classify statement with
-    | `Read ->
-        Storage.Engine.with_read_transaction environment (fun transaction ->
-            print_ddl_read_result ~output
-              (Execution.Ddl_executor.execute_read environment transaction
-                 statement))
-    | `Write ->
-        Storage.Engine.with_write_transaction environment (fun transaction ->
-            print_ddl_write_result ~output
-              (Execution.Ddl_executor.execute_write environment transaction
-                 statement))
+    Storage.Engine.with_read_transaction environment (fun transaction ->
+        print_ddl_read_result ~output
+          (Execution.Ddl_executor.execute_read environment transaction statement))
   with Failure message -> Format.fprintf output "error: %s@." message
 
 (* Process one input line: parse, dispatch on the program universe (a

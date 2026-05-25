@@ -1,31 +1,23 @@
 (** Tests for [Statement].
 
-    Covers [classify] for each constructor: the read/write routing decision that
-    drives transaction selection in the REPL. The constructor surface itself is
-    exercised through the parser ({!Test_parser}) and the executor
-    ({!Test_ddl_executor}). *)
+    With the write-side DDL forms retired, [Statement.t] is a single nullary
+    constructor and there's nothing left to assert at the type level. The sanity
+    check below pins that today's only constructor remains constructible from
+    outside the library. *)
 
 module Ddl = Dovetail_ddl
 
-let test_list_tables_classifies_as_read () =
+let test_list_tables_is_constructible () =
   Alcotest.(check bool)
-    "List_tables classifies as Read" true
-    (Ddl.Statement.classify Ddl.Statement.List_tables = `Read)
-
-let test_drop_table_classifies_as_write () =
-  Alcotest.(check bool)
-    "Drop_table classifies as Write" true
-    (Ddl.Statement.classify (Ddl.Statement.Drop_table { table_name = "users" })
-    = `Write)
+    "List_tables is the sole constructor of Ddl.Statement.t" true
+    (match Ddl.Statement.List_tables with Ddl.Statement.List_tables -> true)
 
 let () =
   Alcotest.run "statement"
     [
-      ( "classify",
+      ( "constructors",
         [
-          Alcotest.test_case "List_tables classifies as Read" `Quick
-            test_list_tables_classifies_as_read;
-          Alcotest.test_case "Drop_table classifies as Write" `Quick
-            test_drop_table_classifies_as_write;
+          Alcotest.test_case "List_tables is constructible" `Quick
+            test_list_tables_is_constructible;
         ] );
     ]

@@ -222,14 +222,14 @@ let test_list_tables_prints_fixture_tables_in_byte_sorted_order () =
     "orders precedes users (byte-sorted)" true
     (orders_position < users_position)
 
-(* End-to-end: [:drop table <name>] parses, classifies
-   as a write, removes the catalog entry and storage subDB inside a
-   write transaction, and prints the [dropped table "<name>"] status.
-   The follow-up [:list tables] confirms the table is gone while its
-   sibling remains. *)
+(* End-to-end: the pipe-source leaf [drop table <name>] parses,
+   classifies as a write, removes the catalog entry and storage subDB
+   inside a write transaction, and yields a one-row
+   [(dropped = "<name>")] relation. The follow-up [:list tables]
+   confirms the table is gone while its sibling remains. *)
 let test_drop_table_removes_table_and_reports_status () =
-  let output = run_with_input [ ":drop table users"; ":list tables" ] in
-  check_contains "drop status line" output "dropped table \"users\"";
+  let output = run_with_input [ "drop table users"; ":list tables" ] in
+  check_contains "drop result row" output "dropped = \"users\"";
   check_contains "orders still listed after drop" output "orders";
   Alcotest.(check bool)
     "users not listed after drop" false
@@ -240,13 +240,13 @@ let test_drop_table_removes_table_and_reports_status () =
     (contains_substring output "\nusers\n")
 
 (* The "no such table" error path: dropping an unseeded table raises in
-   [Ddl_executor.execute_write], the REPL catches it via its generic error
-   guard, prints the failure with the [DDL: drop table ...: no such table]
-   prefix, and continues so the follow-up query still executes. *)
+   [Eval], the REPL catches it via its generic error guard, prints the
+   failure with the [Eval: drop table ...: no such table] prefix, and
+   continues so the follow-up query still executes. *)
 let test_drop_nonexistent_table_reports_error_and_continues () =
-  let output = run_with_input [ ":drop table nonexistent"; ":list tables" ] in
+  let output = run_with_input [ "drop table nonexistent"; ":list tables" ] in
   check_contains "no-such-table error" output
-    "DDL: drop table \"nonexistent\": no such table";
+    "Eval: drop table \"nonexistent\": no such table";
   check_contains "loop continues after drop error" output "users";
   check_contains "loop continues after drop error" output "orders"
 
@@ -324,11 +324,11 @@ let () =
             ":list tables prints fixture tables in byte-sorted order" `Quick
             test_list_tables_prints_fixture_tables_in_byte_sorted_order;
           Alcotest.test_case
-            ":drop table removes the table and prints the status line" `Quick
-            test_drop_table_removes_table_and_reports_status;
+            "[drop table <name>] removes the table and yields a result row"
+            `Quick test_drop_table_removes_table_and_reports_status;
           Alcotest.test_case
-            ":drop table on a missing table reports the error and continues"
-            `Quick test_drop_nonexistent_table_reports_error_and_continues;
+            "[drop table <missing>] reports the error and continues" `Quick
+            test_drop_nonexistent_table_reports_error_and_continues;
           Alcotest.test_case
             "a post-join relation renders as the canonical qualified literal"
             `Quick test_post_join_renders_canonical_qualified_literal;

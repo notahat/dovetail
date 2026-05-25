@@ -583,19 +583,12 @@ let pipeline_parser =
   create_table_empty_form <|> value_pipeline
 
 (* The DDL body grammar: the productions admitted after the [:]
-   sigil has been consumed. The disjunction relies on [<|>]'s backtracking
-   on inner failure: each branch starts with a distinct keyword
-   ([list]/[drop]/[create]), so a failed first branch rewinds to the
-   start of the body and the next branch tries from the same position. *)
+   sigil has been consumed. Today's only DDL form is [:list tables]. *)
 let ddl_list_tables =
   keyword "list" *> whitespace *> keyword "tables"
   *> return Ddl.Statement.List_tables
 
-let ddl_drop_table =
-  keyword "drop" *> whitespace *> keyword "table" *> whitespace *> identifier
-  >>| fun table_name -> Ddl.Statement.Drop_table { table_name }
-
-let ddl_body = ddl_list_tables <|> ddl_drop_table
+let ddl_body = ddl_list_tables
 
 (* The top-level grammar: optional leading whitespace, then dispatch on the
    first non-whitespace character. A leading [:] introduces a DDL statement

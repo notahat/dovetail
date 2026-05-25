@@ -518,27 +518,10 @@ let test_ddl_list_tables_tolerates_extra_whitespace_between_keywords () =
 let test_ddl_list_tables_tolerates_trailing_whitespace () =
   parses_program ":list tables    " (Ast.Ddl Ddl.Statement.List_tables)
 
-let test_ddl_drop_table_parses () =
-  parses_program ":drop table users"
-    (Ast.Ddl (Ddl.Statement.Drop_table { table_name = "users" }))
-
-let test_ddl_drop_table_tolerates_extra_whitespace () =
-  parses_program ":drop    table    users"
-    (Ast.Ddl (Ddl.Statement.Drop_table { table_name = "users" }))
-
-let test_ddl_drop_table_accepts_identifier_with_digits () =
-  parses_program ":drop table users_2"
-    (Ast.Ddl (Ddl.Statement.Drop_table { table_name = "users_2" }))
-
-let test_ddl_drop_table_rejects_missing_target () = rejects ":drop table"
-let test_ddl_drop_table_rejects_missing_table_keyword () = rejects ":drop users"
-
-let test_ddl_drop_table_rejects_quoted_name () =
-  (* Identifiers are bare; a string literal is not a valid target. *)
-  rejects ":drop table \"users\""
-
-let test_ddl_drop_table_rejects_trailing_garbage () =
-  rejects ":drop table users xyz"
+(* The [:drop table] DDL form has been retired in favour of the
+   [drop table <name>] pipe-source leaf. The sigil form is now
+   rejected outright. *)
+let test_ddl_drop_table_is_no_longer_recognised () = rejects ":drop table users"
 
 (* A bare [drop] at pipeline-source position commits to the [drop table
    <name>] leaf grammar; if [table] doesn't follow, the parse fails
@@ -1169,22 +1152,8 @@ let () =
             test_pipeline_keyword_list_is_a_relation_name;
           Alcotest.test_case "[tables] is a relation name in a pipeline" `Quick
             test_pipeline_keyword_tables_is_a_relation_name;
-          Alcotest.test_case ":drop table <name> parses to Ddl Drop_table"
-            `Quick test_ddl_drop_table_parses;
-          Alcotest.test_case
-            ":drop table tolerates extra whitespace between keywords" `Quick
-            test_ddl_drop_table_tolerates_extra_whitespace;
-          Alcotest.test_case
-            ":drop table accepts an identifier with digits and underscores"
-            `Quick test_ddl_drop_table_accepts_identifier_with_digits;
-          Alcotest.test_case ":drop table without a target rejects" `Quick
-            test_ddl_drop_table_rejects_missing_target;
-          Alcotest.test_case ":drop without the table keyword rejects" `Quick
-            test_ddl_drop_table_rejects_missing_table_keyword;
-          Alcotest.test_case ":drop table with a quoted name rejects" `Quick
-            test_ddl_drop_table_rejects_quoted_name;
-          Alcotest.test_case ":drop table with trailing garbage rejects" `Quick
-            test_ddl_drop_table_rejects_trailing_garbage;
+          Alcotest.test_case ":drop table is no longer a recognised statement"
+            `Quick test_ddl_drop_table_is_no_longer_recognised;
           Alcotest.test_case "bare [drop] in a pipeline is rejected" `Quick
             test_pipeline_keyword_drop_alone_is_rejected;
           Alcotest.test_case "[drop table <name>] parses as a Drop_table leaf"
