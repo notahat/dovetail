@@ -235,6 +235,50 @@ let test_unqualify_translates_through () =
     (Physical.Unqualify { input = Physical.FullScan { table = "users" } })
     physical
 
+let users_kind_no_qualifier : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+      ];
+    refinements = [ Primary_key [ "id" ] ];
+  }
+
+let test_drop_table_translates_through () =
+  let logical : Logical.t = Drop_table { table_name = "users" } in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
+  Alcotest.(check physical_testable)
+    "Logical.Drop_table -> Physical.Drop_table"
+    (Physical.Drop_table { table_name = "users" })
+    physical
+
+let test_create_table_empty_translates_through () =
+  let logical : Logical.t =
+    Create_table_empty { table_name = "users"; kind = users_kind_no_qualifier }
+  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
+  Alcotest.(check physical_testable)
+    "Logical.Create_table_empty -> Physical.Create_table_empty with same kind"
+    (Physical.Create_table_empty
+       { table_name = "users"; kind = users_kind_no_qualifier })
+    physical
+
+let test_create_table_seeded_recurses_into_source () =
+  let logical : Logical.t =
+    Create_table_seeded
+      { table_name = "copy_of_users"; source = Scan { table = "users" } }
+  in
+  let physical = Translate.translate ~catalog:noop_catalog logical in
+  Alcotest.(check physical_testable)
+    "Logical.Create_table_seeded translates source via translate_relation"
+    (Physical.Create_table_seeded
+       {
+         table_name = "copy_of_users";
+         source = Physical.FullScan { table = "users" };
+       })
+    physical
+
 let test_standalone_cross_product_does_not_trigger_join_rewrite () =
   let logical =
     Logical.CrossProduct
@@ -471,6 +515,16 @@ let () =
         [
           Alcotest.test_case "translates Logical.Unqualify through unchanged"
             `Quick test_unqualify_translates_through;
+        ] );
+      ( "create / drop table",
+        [
+          Alcotest.test_case "translates Logical.Drop_table through unchanged"
+            `Quick test_drop_table_translates_through;
+          Alcotest.test_case
+            "translates Logical.Create_table_empty through unchanged" `Quick
+            test_create_table_empty_translates_through;
+          Alcotest.test_case "Logical.Create_table_seeded recurses into source"
+            `Quick test_create_table_seeded_recurses_into_source;
         ] );
       ( "nested loop join rewrite",
         [
