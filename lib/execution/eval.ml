@@ -491,10 +491,10 @@ and reject_qualified_source_for_target ~error_prefix ~source_row_kind =
            error_prefix formatted_names)
 
 (* For each target field, find the position in [source_row_kind] that supplies
-   its value. Raises [Failure] if a target field has no matching source
-   column. Source columns absent from the target are tolerated here;
-   Translate-level validation rejects them upstream. *)
-and build_source_to_target_position_map ~error_prefix ~source_row_kind
+   its value. [Plan.Typecheck]'s [Insert_column_mismatch] check rejects any
+   plan whose source is missing a target column, so the missing arm is an
+   upstream-invariant violation by the time this helper runs. *)
+and build_source_to_target_position_map ~source_row_kind
     ~(target_kind : Relation.kind) =
   List.map
     (fun (target_field : Row.field) ->
@@ -503,11 +503,9 @@ and build_source_to_target_position_map ~error_prefix ~source_row_kind
           { qualifier = None; name = target_field.name }
       with
       | Ok (position, _source_field) -> position
-      | Error _ ->
-          failwith
-            (Printf.sprintf
-               "%s: source is missing column %S required by target kind"
-               error_prefix target_field.name))
+      (* Typecheck has rejected an Insert whose source is missing a target
+         column before Eval runs. *)
+      | Error _ -> assert false)
     target_kind.row_kind
 
 (* Reorder [source_row] into a row matching [target_kind]'s field order, by
@@ -567,7 +565,7 @@ and write_source_rows_into_table ~error_prefix ~target_kind ~target_map
   reject_qualified_source_for_target ~error_prefix
     ~source_row_kind:source_relation.kind.row_kind;
   let position_map =
-    build_source_to_target_position_map ~error_prefix
+    build_source_to_target_position_map
       ~source_row_kind:source_relation.kind.row_kind ~target_kind
   in
   (* The row-write is the point of the iteration and the count is

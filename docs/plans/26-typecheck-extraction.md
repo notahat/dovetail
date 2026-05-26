@@ -246,14 +246,14 @@ as the source. That helper was construction-only from the start;
 the actual validation lives in Eval.)
 
 - `lib/plan/typecheck.{ml,mli}` — add
-  `Relation_type_no_fields of { table_name : string }`,
-  `Relation_type_duplicate_field of { table_name : string; name :
-  string }`,
-  `Primary_key_empty of { table_name : string }`,
-  `Primary_key_unknown_column of { table_name : string; column :
-  string }`,
-  `Primary_key_duplicate_column of { table_name : string; column :
-  string }`. Renderer prefixes are operator-named
+  `Create_table_empty_no_fields of { table_name : string }`,
+  `Create_table_empty_duplicate_field of { table_name : string;
+  column : string }`,
+  `Create_table_empty_primary_key_empty of { table_name : string }`,
+  `Create_table_empty_primary_key_unknown_column of { table_name :
+  string; column : string }`,
+  `Create_table_empty_primary_key_duplicate_column of { table_name :
+  string; column : string }`. Renderer prefixes are operator-named
   (`Create table: "X": ...`) so the user-facing string stops
   saying `Eval:`.
 - `lib/plan/typecheck.ml` — walker arm for `Create_table_empty`
@@ -303,6 +303,13 @@ Worth being explicit because the diff will be large:
 - Eval's `Term.t` envelope is unchanged. Eval's signature is
   unchanged. What changes is what Eval no longer has to validate.
 - The surface AST is unchanged. The parser is unchanged.
+- `IndexedNestedLoopJoin`'s runtime checks stay in Eval. The
+  operator is a physical-only node Translate introduces, so it is
+  not visible to Typecheck-on-Logical at all. Its outer-key column
+  resolution and `Int64`-kind check (`Join: outer key column: …`,
+  `Join: requires Int64 outer key column …`) are effectively a
+  physical-typecheck concern; a pass over `Physical.t` is its own
+  later slice.
 - `Create_table_seeded`'s `validate_target_kind` call stays in
   Eval. The target kind there is derived from the source via
   `Physical.kind_of`; moving the validation up to Typecheck would
