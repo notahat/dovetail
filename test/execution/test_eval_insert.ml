@@ -177,8 +177,7 @@ let test_insert_with_existing_primary_key_raises () =
         ]
   in
   Alcotest.check_raises "primary-key collision"
-    (Failure
-       "Eval: insert into \"orders\": row with primary key 1 already exists")
+    (Failure "Insert: into \"orders\": row with primary key 1 already exists")
     (fun () ->
       Storage.Engine.with_write_transaction environment (fun transaction ->
           Eval.eval environment transaction mutation (fun _ -> ())));
@@ -206,10 +205,9 @@ let test_insert_with_qualified_source_field_is_rejected () =
   in
   Alcotest.check_raises "qualified source rejected"
     (Failure
-       "Eval: insert into \"orders\": source has qualified field(s) \
-        \"orders.id\", \"orders.user_id\", \"orders.description\", \
-        \"orders.amount\"; pipe through unqualify to drop qualifiers")
-    (fun () ->
+       "Insert: into \"orders\": source has qualified field(s) \"orders.id\", \
+        \"orders.user_id\", \"orders.description\", \"orders.amount\"; pipe \
+        through unqualify to drop qualifiers") (fun () ->
       Storage.Engine.with_write_transaction environment (fun transaction ->
           Eval.eval environment transaction mutation (fun _ -> ())))
 

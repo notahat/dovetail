@@ -559,8 +559,7 @@ let test_unqualify_after_join_rejects_collision () =
   with_query_failure ~label:"collision on bare id"
     ~expected:
       (Failure
-         "Eval: unqualify: collision on \"id\": fields \"users.id\" and \
-          \"orders.id\"")
+         "Unqualify: collision on \"id\": fields \"users.id\" and \"orders.id\"")
     "users | join orders on users.id = orders.user_id | project users.id, \
      orders.id | unqualify"
 

@@ -105,7 +105,7 @@ let test_seeded_rejects_qualified_source () =
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Alcotest.check_raises "qualified source"
         (Failure
-           "Eval: create table \"users_copy\": source has qualified field(s) \
+           "Create table: \"users_copy\": source has qualified field(s) \
             \"users.id\", \"users.name\", \"users.email\", \"users.active\"; \
             pipe through unqualify to drop qualifiers") (fun () ->
           Eval.eval environment transaction plan (fun _ -> ())))
@@ -128,8 +128,8 @@ let test_seeded_rejects_source_without_primary_key () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Alcotest.check_raises "no primary key in derived source kind"
-        (Failure "Eval: create table \"widgets\": primary key is empty")
-        (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
+        (Failure "Create table: \"widgets\": primary key is empty") (fun () ->
+          Eval.eval environment transaction plan (fun _ -> ())))
 
 let test_seeded_rejects_existing_table () =
   with_fixture_environment @@ fun environment ->
@@ -139,8 +139,8 @@ let test_seeded_rejects_existing_table () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Alcotest.check_raises "orders is in the fixture"
-        (Failure "Eval: create table \"orders\": table already exists")
-        (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
+        (Failure "Create table: \"orders\": table already exists") (fun () ->
+          Eval.eval environment transaction plan (fun _ -> ())))
 
 let () =
   Alcotest.run "eval create_table_seeded"

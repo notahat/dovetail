@@ -148,8 +148,8 @@ let test_indexed_join_raises_when_outer_key_column_is_not_int64 () =
   Storage.Engine.with_read_transaction environment (fun transaction ->
       Alcotest.check_raises "non-Int64 outer key column"
         (Failure
-           "Eval: IndexedNestedLoopJoin: requires Int64 outer key column, got \
-            String for \"orders.description\"") (fun () ->
+           "Join: requires Int64 outer key column, got String for \
+            \"orders.description\"") (fun () ->
           Eval.eval environment transaction plan (fun _term -> ())))
 
 let () =

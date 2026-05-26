@@ -67,8 +67,8 @@ let test_create_table_empty_table_already_exists_raises () =
   in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Alcotest.check_raises "orders already in the fixture"
-        (Failure "Eval: create table \"orders\": table already exists")
-        (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
+        (Failure "Create table: \"orders\": table already exists") (fun () ->
+          Eval.eval environment transaction plan (fun _ -> ())))
 
 let () =
   Alcotest.run "eval create_table_empty"

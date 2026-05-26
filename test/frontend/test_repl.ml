@@ -172,8 +172,7 @@ let test_insert_from_join_is_rejected_with_unqualify_hint () =
         "users | join orders on users.id = orders.user_id | insert into orders";
       ]
   in
-  check_contains "rejects qualified source" output
-    "Eval: insert into \"orders\":";
+  check_contains "rejects qualified source" output "Insert: into \"orders\":";
   check_contains "names an offending qualified field" output "\"users.id\"";
   check_contains "points at unqualify" output "unqualify"
 
@@ -212,14 +211,14 @@ let test_drop_table_removes_table_and_reports_status () =
 
 (* The "no such table" error path: dropping an unseeded table raises in
    [Eval], the REPL catches it via its generic error guard, prints the
-   failure with the [Eval: drop table ...: no such table] prefix, and
+   failure with the [Drop table: ...: no such table] prefix, and
    continues so the follow-up query still executes. *)
 let test_drop_nonexistent_table_reports_error_and_continues () =
   let output =
     run_with_input [ "drop table nonexistent"; "catalog | tables" ]
   in
   check_contains "no-such-table error" output
-    "Eval: drop table \"nonexistent\": no such table";
+    "Drop table: \"nonexistent\": no such table";
   check_contains "loop continues after drop error" output "name = \"users\"";
   check_contains "loop continues after drop error" output "name = \"orders\""
 

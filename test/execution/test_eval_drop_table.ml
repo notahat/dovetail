@@ -42,7 +42,7 @@ let test_drop_table_unknown_table_raises () =
   let plan : Plan.Physical.t = Drop_table { table_name = "ghost" } in
   Storage.Engine.with_write_transaction environment (fun transaction ->
       Alcotest.check_raises "no such table"
-        (Failure "Eval: drop table \"ghost\": no such table") (fun () ->
+        (Failure "Drop table: \"ghost\": no such table") (fun () ->
           Eval.eval environment transaction plan (fun _ -> ())))
 
 let () =

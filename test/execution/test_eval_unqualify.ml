@@ -88,7 +88,7 @@ let test_unqualify_rejects_collision_on_bare_name () =
       in
       Alcotest.check_raises "collision on bare \"id\""
         (Failure
-           "Eval: unqualify: collision on \"id\": fields \"users.id\" and \
+           "Unqualify: collision on \"id\": fields \"users.id\" and \
             \"orders.id\"") (fun () ->
           Eval.eval environment transaction plan (fun _ -> ())))
 

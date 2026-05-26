@@ -156,7 +156,7 @@ let rec eval environment transaction plan continue =
 and unqualify_row_kind input_row_kind =
   match Row.unqualify_kind input_row_kind with
   | Ok stripped_row_kind -> stripped_row_kind
-  | Error detail -> failwith (Printf.sprintf "Eval: unqualify: %s" detail)
+  | Error detail -> failwith (Printf.sprintf "Unqualify: %s" detail)
 
 (* Run [input] and hand [continue] the same value under an unqualified kind.
    A relation input passes its row sequence through unchanged with a new
@@ -366,17 +366,13 @@ and resolve_int64_outer_key_position outer_row_kind outer_key_column =
     match Row.find_field outer_row_kind outer_key_column with
     | Ok result -> result
     | Error message ->
-        failwith
-          (Printf.sprintf "Eval: IndexedNestedLoopJoin: outer key column: %s"
-             message)
+        failwith (Printf.sprintf "Join: outer key column: %s" message)
   in
   match field.kind with
   | Int64 -> position
   | other_kind ->
       failwith
-        (Printf.sprintf
-           "Eval: IndexedNestedLoopJoin: requires Int64 outer key column, got \
-            %s for %S"
+        (Printf.sprintf "Join: requires Int64 outer key column, got %s for %S"
            (Scalar.kind_to_string other_kind)
            (Row.format_column_reference outer_key_column))
 
@@ -471,10 +467,9 @@ and evaluate_nested_loop_join environment transaction ~left ~right ~predicate
    names, so a qualified source -- typically the output of a join -- is
    ambiguous: we won't silently drop the qualifier. The error names every
    offending field and points at the [unqualify] operator as the explicit
-   strip. [target_table] is quoted into the prefix so the error matches the
-   surface operation the user wrote. *)
-and reject_qualified_source_for_target ~operation ~target_table ~source_row_kind
-    =
+   strip. [error_prefix] is the already-formatted operator-named prefix
+   (e.g. [Insert: into "orders"]) the caller supplies. *)
+and reject_qualified_source_for_target ~error_prefix ~source_row_kind =
   let qualified_fields =
     List.filter
       (fun (field : Row.field) -> field.qualifier <> None)
@@ -491,16 +486,16 @@ and reject_qualified_source_for_target ~operation ~target_table ~source_row_kind
       in
       failwith
         (Printf.sprintf
-           "Eval: %s %S: source has qualified field(s) %s; pipe through \
-            unqualify to drop qualifiers"
-           operation target_table formatted_names)
+           "%s: source has qualified field(s) %s; pipe through unqualify to \
+            drop qualifiers"
+           error_prefix formatted_names)
 
 (* For each target field, find the position in [source_row_kind] that supplies
    its value. Raises [Failure] if a target field has no matching source
    column. Source columns absent from the target are tolerated here;
    Translate-level validation rejects them upstream. *)
-and build_source_to_target_position_map ~operation ~target_table
-    ~source_row_kind ~(target_kind : Relation.kind) =
+and build_source_to_target_position_map ~error_prefix ~source_row_kind
+    ~(target_kind : Relation.kind) =
   List.map
     (fun (target_field : Row.field) ->
       match
@@ -511,9 +506,8 @@ and build_source_to_target_position_map ~operation ~target_table
       | Error _ ->
           failwith
             (Printf.sprintf
-               "Eval: %s %S: source is missing column %S required by target \
-                kind"
-               operation target_table target_field.name))
+               "%s: source is missing column %S required by target kind"
+               error_prefix target_field.name))
     target_kind.row_kind
 
 (* Reorder [source_row] into a row matching [target_kind]'s field order, by
@@ -545,8 +539,8 @@ and primary_key_value_text (target_kind : Relation.kind) target_row =
 
 (* Encode one source row in target form, fail on PK collision, else write
    it. *)
-and write_one_row ~operation ~target_kind ~target_map ~target_table
-    ~write_transaction ~position_map source_row =
+and write_one_row ~error_prefix ~target_kind ~target_map ~write_transaction
+    ~position_map source_row =
   let target_row = project_to_target_order ~position_map source_row in
   let key_bytes, value_bytes =
     Storage.Row_codec.encode_row target_kind target_row
@@ -555,8 +549,8 @@ and write_one_row ~operation ~target_kind ~target_map ~target_table
   | None -> ()
   | Some _ ->
       failwith
-        (Printf.sprintf "Eval: %s %S: row with primary key %s already exists"
-           operation target_table
+        (Printf.sprintf "%s: row with primary key %s already exists"
+           error_prefix
            (primary_key_value_text target_kind target_row)));
   Storage.Engine.put target_map write_transaction ~key:key_bytes
     ~value:value_bytes
@@ -564,15 +558,16 @@ and write_one_row ~operation ~target_kind ~target_map ~target_table
 (* Stream [source_relation]'s rows into [target_table]. Runs the
    qualifier-rejection check on the source, builds the source-to-target
    position map once, then iterates source rows through [write_one_row].
-   Returns the number of rows written. [operation] (e.g. "insert into",
-   "create table") is quoted into all user-facing errors so they line up
-   with the surface operation the user wrote. *)
-and write_source_rows_into_table ~operation ~target_kind ~target_map
-    ~target_table ~write_transaction ~(source_relation : _ Relation.t) =
-  reject_qualified_source_for_target ~operation ~target_table
+   Returns the number of rows written. [error_prefix] is the already-
+   formatted operator-named prefix (e.g. [Insert: into "orders"]) the
+   caller supplies; it appears in every user-facing error this helper or
+   its callees raise. *)
+and write_source_rows_into_table ~error_prefix ~target_kind ~target_map
+    ~write_transaction ~(source_relation : _ Relation.t) =
+  reject_qualified_source_for_target ~error_prefix
     ~source_row_kind:source_relation.kind.row_kind;
   let position_map =
-    build_source_to_target_position_map ~operation ~target_table
+    build_source_to_target_position_map ~error_prefix
       ~source_row_kind:source_relation.kind.row_kind ~target_kind
   in
   (* The row-write is the point of the iteration and the count is
@@ -581,8 +576,8 @@ and write_source_rows_into_table ~operation ~target_kind ~target_map
   let written_rows = ref 0 in
   Seq.iter
     (fun source_row ->
-      write_one_row ~operation ~target_kind ~target_map ~target_table
-        ~write_transaction ~position_map source_row;
+      write_one_row ~error_prefix ~target_kind ~target_map ~write_transaction
+        ~position_map source_row;
       incr written_rows)
     source_relation.value;
   !written_rows
@@ -622,10 +617,11 @@ and evaluate_insert environment transaction ~target_table ~source continue =
   let target_kind, target_map =
     lookup_table_resources environment write_transaction target_table
   in
+  let error_prefix = Printf.sprintf "Insert: into %S" target_table in
   eval_input environment transaction source (fun source_relation ->
       let affected_rows =
-        write_source_rows_into_table ~operation:"insert into" ~target_kind
-          ~target_map ~target_table ~write_transaction ~source_relation
+        write_source_rows_into_table ~error_prefix ~target_kind ~target_map
+          ~write_transaction ~source_relation
       in
       continue (Term.Relation_value (insert_result_relation affected_rows)))
 
@@ -664,12 +660,13 @@ and first_duplicate items =
 (* Run the five structural checks on a target [kind] proposed for
    [table_name]: non-empty fields; no duplicate field names; non-empty
    primary key; PK columns drawn from the field list; no duplicate PK
-   columns. Raises [Failure] with an [Eval: create table %S: ...] prefix
-   on the first failing rule. Reused by both create_table evaluators
-   (the empty form's carried kind, and the seeded form's derived kind). *)
+   columns. Raises [Failure] with a [Create table: %S: ...] prefix on
+   the first failing rule. Used by the seeded create_table evaluator,
+   whose derived kind isn't visible to [Plan.Typecheck]; the empty form
+   gets the same checks at typecheck time. *)
 and validate_target_kind ~table_name (kind : Relation.kind) =
   let fail detail =
-    failwith (Printf.sprintf "Eval: create table %S: %s" table_name detail)
+    failwith (Printf.sprintf "Create table: %S: %s" table_name detail)
   in
   let field_names =
     List.map (fun (field : Row.field) -> field.name) kind.row_kind
@@ -691,15 +688,15 @@ and validate_target_kind ~table_name (kind : Relation.kind) =
       fail (Printf.sprintf "primary key column %S appears twice" name)
   | None -> ()
 
-(* Raise an [Eval: create table %S: table already exists] error if the
-   catalog already binds [table_name]. Shared between the empty and seeded
+(* Raise a [Create table: %S: table already exists] error if the catalog
+   already binds [table_name]. Shared between the empty and seeded
    create_table evaluators. *)
 and reject_existing_table environment transaction ~table_name =
   match Storage.Catalog.get environment transaction ~table_name with
   | None -> ()
   | Some _ ->
       failwith
-        (Printf.sprintf "Eval: create table %S: table already exists" table_name)
+        (Printf.sprintf "Create table: %S: table already exists" table_name)
 
 (* Provision storage and catalog for a new table named [table_name] with
    shape [kind]. Creates the storage subDB before writing the catalog
@@ -768,8 +765,9 @@ and evaluate_create_table_seeded environment transaction ~table_name ~source
     Storage.Catalog.get environment write_transaction ~table_name
   in
   let source_kind = Plan.Physical.kind_of ~catalog source in
-  reject_qualified_source_for_target ~operation:"create table"
-    ~target_table:table_name ~source_row_kind:source_kind.row_kind;
+  let error_prefix = Printf.sprintf "Create table: %S" table_name in
+  reject_qualified_source_for_target ~error_prefix
+    ~source_row_kind:source_kind.row_kind;
   let target_kind = stamp_qualifier_on_kind ~qualifier:table_name source_kind in
   validate_target_kind ~table_name target_kind;
   reject_existing_table environment write_transaction ~table_name;
@@ -778,9 +776,8 @@ and evaluate_create_table_seeded environment transaction ~table_name ~source
   in
   eval_input environment transaction source (fun source_relation ->
       let _written =
-        write_source_rows_into_table ~operation:"create table" ~target_kind
-          ~target_map ~target_table:table_name ~write_transaction
-          ~source_relation
+        write_source_rows_into_table ~error_prefix ~target_kind ~target_map
+          ~write_transaction ~source_relation
       in
       continue
         (Term.Relation_value
@@ -802,8 +799,7 @@ and evaluate_drop_table environment transaction ~table_name continue =
   in
   (match Storage.Catalog.get environment write_transaction ~table_name with
   | Some _ -> ()
-  | None ->
-      failwith (Printf.sprintf "Eval: drop table %S: no such table" table_name));
+  | None -> failwith (Printf.sprintf "Drop table: %S: no such table" table_name));
   Storage.Engine.drop_map environment write_transaction
     ~name:(Storage.Catalog.table_subdb_name table_name);
   Storage.Catalog.delete environment write_transaction ~table_name;
