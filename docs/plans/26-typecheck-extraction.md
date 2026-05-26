@@ -303,6 +303,17 @@ Worth being explicit because the diff will be large:
 - Eval's `Term.t` envelope is unchanged. Eval's signature is
   unchanged. What changes is what Eval no longer has to validate.
 - The surface AST is unchanged. The parser is unchanged.
+- `Relation_literal`'s name-set check stays in Lower
+  (`Lower: relation literal: missing/unexpected field`). Lifting it
+  would untangle the diagnostic from Lower's row-alignment step,
+  which today uses the same name lookup to produce the aligned
+  `Scalar.value list` rows the Logical IR carries. The clean path
+  is the planned positional-rows rework: once rows are positional
+  from the parser the name-set goes away entirely, and the only
+  remaining structural check (row arity vs kind arity) becomes a
+  trivial Typecheck arm with no alignment coupling. Lifting before
+  that rework means either widening the Logical IR or duplicating
+  the check.
 - `IndexedNestedLoopJoin`'s runtime checks stay in Eval. The
   operator is a physical-only node Translate introduces, so it is
   not visible to Typecheck-on-Logical at all. Its outer-key column
