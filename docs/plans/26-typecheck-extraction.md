@@ -232,27 +232,45 @@ Lower emits the `Logical.Relation_literal` unchecked.
   checks; Lower now does the structural emit only.
 - Tests as before.
 
-### Step 7: Move `Lower.lower_relation_type`'s validation pieces
+### Step 7: Move `Eval.validate_target_kind`'s checks for `Create_table_empty`
 
-`lower_relation_type` is two things in one: it builds a
-`Relation.kind` from a `type_expression`, and it validates the
-fields (no duplicates, refinements reference real columns).
-Separate the validation from the construction.
+`Eval.validate_target_kind` runs five static checks on the kind
+proposed for a new table: non-empty fields, no duplicate field
+names, non-empty primary key, PK columns drawn from the field
+list, no duplicate PK columns. For `Create_table_empty` the kind
+comes straight from the user's type expression and is known at
+typecheck time; move all five checks into Typecheck.
+
+(The plan as originally written named `Lower.lower_relation_type`
+as the source. That helper was construction-only from the start;
+the actual validation lives in Eval.)
 
 - `lib/plan/typecheck.{ml,mli}` — add
-  `Relation_type_duplicate_field of { name : string }`,
-  `Refinement_unknown_column of { refinement : string; column :
-  string }` (and any others surfaced by the existing checks).
-- `lib/plan/typecheck.ml` — walker visits `Create_table_empty`
-  (and any other operator that carries a `Relation.kind`) and
-  re-validates. Note this is partial duplication: Lower still
-  builds the `Relation.kind` value, but it builds it
-  optimistically and Typecheck reports problems with the result.
-  Future slice (phase A0 or beyond) can collapse the duplication
-  once the AST owns its own relation-type expression.
-- `lib/surface_ra/lower.ml` — `lower_relation_type` becomes
-  construction-only.
-- Tests as before.
+  `Relation_type_no_fields of { table_name : string }`,
+  `Relation_type_duplicate_field of { table_name : string; name :
+  string }`,
+  `Primary_key_empty of { table_name : string }`,
+  `Primary_key_unknown_column of { table_name : string; column :
+  string }`,
+  `Primary_key_duplicate_column of { table_name : string; column :
+  string }`. Renderer prefixes are operator-named
+  (`Create table: "X": ...`) so the user-facing string stops
+  saying `Eval:`.
+- `lib/plan/typecheck.ml` — walker arm for `Create_table_empty`
+  runs the same structural checks `validate_target_kind` runs.
+  The kind must be qualifier-stamped first (same as Eval) so the
+  checks see the names the catalog will store.
+- `lib/execution/eval.ml` — `evaluate_create_table_empty` drops
+  its `validate_target_kind` call; the function stays for
+  `evaluate_create_table_seeded`.
+- Tests — Typecheck unit tests for all five variants (structured +
+  rendered). Retire the corresponding `test_eval_create_table_empty`
+  direct-failure tests (Typecheck owns them now). Integration tests
+  pick up the new `Create table:` prefix via `with_query_failure`.
+
+Scope note: `Create_table_seeded` is out of scope, per "What this
+slice doesn't change". Its `validate_target_kind` call stays in
+Eval until Typed_logical removes the duplication.
 
 ### Step 8: Cleanup and prefix sweep
 
@@ -285,6 +303,15 @@ Worth being explicit because the diff will be large:
 - Eval's `Term.t` envelope is unchanged. Eval's signature is
   unchanged. What changes is what Eval no longer has to validate.
 - The surface AST is unchanged. The parser is unchanged.
+- `Create_table_seeded`'s `validate_target_kind` call stays in
+  Eval. The target kind there is derived from the source via
+  `Physical.kind_of`; moving the validation up to Typecheck would
+  require a parallel `kind_of_logical` derivation that mirrors
+  Physical's, plus the qualifier-stamping step, and the two paths
+  would have to stay in lockstep. Phase D's `Typed_logical.t`
+  collapses the duplication; until then the seeded form's checks
+  remain at Eval (the user-visible failure today is "source has no
+  primary key").
 
 Phase A's whole investment is in extracting the cross-cutting
 concern; structural change happens in later phases.

@@ -126,6 +126,35 @@ type error =
           still raises on name-mismatch and missing-/extra-field structural
           problems before this check fires, so [column] always names a real
           declared column. *)
+  | Create_table_empty_no_fields of { table_name : string }
+      (** A [Create_table_empty] declares an empty column list. The user typed a
+          type expression like [() | create table foo]; the renderer turns this
+          into [Create table: "foo": column list is empty]. *)
+  | Create_table_empty_duplicate_field of {
+      table_name : string;
+      column : string;
+    }
+      (** A [Create_table_empty]'s declared row kind names the same column
+          twice. [column] is the duplicated name. One error per duplicate
+          occurrence beyond the first. *)
+  | Create_table_empty_primary_key_empty of { table_name : string }
+      (** A [Create_table_empty] declares no primary key. Either no
+          [Primary_key] refinement is present, or one is present but carries an
+          empty column list. *)
+  | Create_table_empty_primary_key_unknown_column of {
+      table_name : string;
+      column : string;
+    }
+      (** A [Create_table_empty]'s primary-key refinement names a column that
+          does not appear in the declared field list. [column] is the offending
+          name. One error per unknown column, in primary-key order. *)
+  | Create_table_empty_primary_key_duplicate_column of {
+      table_name : string;
+      column : string;
+    }
+      (** A [Create_table_empty]'s primary-key refinement names the same column
+          twice. [column] is the duplicated name. One error per duplicate
+          occurrence beyond the first. *)
   | Tables_input_wrong_rung of { actual : rung }
       (** A [Tables] operator's input is not a catalog. [actual] is the
           best-effort rung classification of the input subtree. The renderer

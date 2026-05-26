@@ -70,95 +70,6 @@ let test_create_table_empty_table_already_exists_raises () =
         (Failure "Eval: create table \"orders\": table already exists")
         (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
 
-let test_create_table_empty_rejects_empty_column_list () =
-  with_fixture_environment @@ fun environment ->
-  let kind : Relation.kind =
-    { row_kind = []; refinements = [ Primary_key [ "id" ] ] }
-  in
-  let plan : Plan.Physical.t =
-    Create_table_empty { table_name = "widgets"; kind }
-  in
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      Alcotest.check_raises "empty fields"
-        (Failure "Eval: create table \"widgets\": column list is empty")
-        (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
-
-let test_create_table_empty_rejects_duplicate_column_name () =
-  with_fixture_environment @@ fun environment ->
-  let kind : Relation.kind =
-    {
-      row_kind =
-        [
-          { name = "id"; kind = Int64; qualifier = None };
-          { name = "id"; kind = String; qualifier = None };
-        ];
-      refinements = [ Primary_key [ "id" ] ];
-    }
-  in
-  let plan : Plan.Physical.t =
-    Create_table_empty { table_name = "widgets"; kind }
-  in
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      Alcotest.check_raises "duplicate column name"
-        (Failure "Eval: create table \"widgets\": column \"id\" appears twice")
-        (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
-
-let test_create_table_empty_rejects_missing_primary_key () =
-  with_fixture_environment @@ fun environment ->
-  let kind : Relation.kind =
-    {
-      row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
-      refinements = [];
-    }
-  in
-  let plan : Plan.Physical.t =
-    Create_table_empty { table_name = "widgets"; kind }
-  in
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      Alcotest.check_raises "no primary key"
-        (Failure "Eval: create table \"widgets\": primary key is empty")
-        (fun () -> Eval.eval environment transaction plan (fun _ -> ())))
-
-let test_create_table_empty_rejects_primary_key_column_not_in_fields () =
-  with_fixture_environment @@ fun environment ->
-  let kind : Relation.kind =
-    {
-      row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
-      refinements = [ Primary_key [ "missing" ] ];
-    }
-  in
-  let plan : Plan.Physical.t =
-    Create_table_empty { table_name = "widgets"; kind }
-  in
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      Alcotest.check_raises "PK column not in field list"
-        (Failure
-           "Eval: create table \"widgets\": primary key column \"missing\" not \
-            in column list") (fun () ->
-          Eval.eval environment transaction plan (fun _ -> ())))
-
-let test_create_table_empty_rejects_duplicate_primary_key_column () =
-  with_fixture_environment @@ fun environment ->
-  let kind : Relation.kind =
-    {
-      row_kind =
-        [
-          { name = "id"; kind = Int64; qualifier = None };
-          { name = "name"; kind = String; qualifier = None };
-        ];
-      refinements = [ Primary_key [ "id"; "id" ] ];
-    }
-  in
-  let plan : Plan.Physical.t =
-    Create_table_empty { table_name = "widgets"; kind }
-  in
-  Storage.Engine.with_write_transaction environment (fun transaction ->
-      Alcotest.check_raises "duplicate PK column"
-        (Failure
-           "Eval: create table \"widgets\": primary key column \"id\" appears \
-            twice") (fun () ->
-          Eval.eval environment transaction plan (fun _ -> ())))
-
 let () =
   Alcotest.run "eval create_table_empty"
     [
@@ -169,16 +80,5 @@ let () =
             test_create_table_empty_writes_catalog_and_reports_created;
           Alcotest.test_case "raises when the table already exists" `Quick
             test_create_table_empty_table_already_exists_raises;
-          Alcotest.test_case "rejects an empty column list" `Quick
-            test_create_table_empty_rejects_empty_column_list;
-          Alcotest.test_case "rejects a duplicate column name" `Quick
-            test_create_table_empty_rejects_duplicate_column_name;
-          Alcotest.test_case "rejects a missing primary key" `Quick
-            test_create_table_empty_rejects_missing_primary_key;
-          Alcotest.test_case
-            "rejects a primary key column not in the field list" `Quick
-            test_create_table_empty_rejects_primary_key_column_not_in_fields;
-          Alcotest.test_case "rejects a duplicate primary key column" `Quick
-            test_create_table_empty_rejects_duplicate_primary_key_column;
         ] );
     ]

@@ -779,6 +779,184 @@ let test_restrict_ambiguous_bare_renders_with_match_list () =
      \"right.id\""
     (Typecheck.render error)
 
+(* A well-formed two-column kind with a single-column primary key. The
+   [Create_table_empty] tests below build degraded variants of this. *)
+let widgets_kind : Relation.kind =
+  {
+    row_kind =
+      [
+        { name = "id"; kind = Int64; qualifier = None };
+        { name = "name"; kind = String; qualifier = None };
+      ];
+    refinements = [ Primary_key [ "id" ] ];
+  }
+
+let test_create_table_empty_with_no_fields_reports_structured_error () =
+  let kind : Relation.kind =
+    { row_kind = []; refinements = [ Primary_key [ "id" ] ] }
+  in
+  let plan : Logical.t = Create_table_empty { table_name = "widgets"; kind } in
+  let expected : Typecheck.error list =
+    [ Create_table_empty_no_fields { table_name = "widgets" } ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Create_table_empty_no_fields error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured no-fields" expected errors
+
+let test_create_table_empty_no_fields_renders_with_create_table_prefix () =
+  let error : Typecheck.error =
+    Create_table_empty_no_fields { table_name = "widgets" }
+  in
+  Alcotest.(check string)
+    "rendered no-fields" "Create table: \"widgets\": column list is empty"
+    (Typecheck.render error)
+
+let test_create_table_empty_with_duplicate_field_reports_structured_error () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "id"; kind = String; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "id" ] ];
+    }
+  in
+  let plan : Logical.t = Create_table_empty { table_name = "widgets"; kind } in
+  let expected : Typecheck.error list =
+    [
+      Create_table_empty_duplicate_field
+        { table_name = "widgets"; column = "id" };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> Alcotest.fail "expected a Create_table_empty_duplicate_field error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured duplicate field" expected errors
+
+let test_create_table_empty_duplicate_field_renders_with_create_table_prefix ()
+    =
+  let error : Typecheck.error =
+    Create_table_empty_duplicate_field { table_name = "widgets"; column = "id" }
+  in
+  Alcotest.(check string)
+    "rendered duplicate field"
+    "Create table: \"widgets\": column \"id\" appears twice"
+    (Typecheck.render error)
+
+let test_create_table_empty_with_empty_primary_key_reports_structured_error () =
+  let kind : Relation.kind =
+    {
+      row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+      refinements = [];
+    }
+  in
+  let plan : Logical.t = Create_table_empty { table_name = "widgets"; kind } in
+  let expected : Typecheck.error list =
+    [ Create_table_empty_primary_key_empty { table_name = "widgets" } ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ ->
+      Alcotest.fail "expected a Create_table_empty_primary_key_empty error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured empty primary key" expected errors
+
+let test_create_table_empty_primary_key_empty_renders_with_create_table_prefix
+    () =
+  let error : Typecheck.error =
+    Create_table_empty_primary_key_empty { table_name = "widgets" }
+  in
+  Alcotest.(check string)
+    "rendered empty primary key"
+    "Create table: \"widgets\": primary key is empty" (Typecheck.render error)
+
+let test_create_table_empty_with_unknown_primary_key_column_reports_structured_error
+    () =
+  let kind : Relation.kind =
+    {
+      row_kind = [ { name = "id"; kind = Int64; qualifier = None } ];
+      refinements = [ Primary_key [ "missing" ] ];
+    }
+  in
+  let plan : Logical.t = Create_table_empty { table_name = "widgets"; kind } in
+  let expected : Typecheck.error list =
+    [
+      Create_table_empty_primary_key_unknown_column
+        { table_name = "widgets"; column = "missing" };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ ->
+      Alcotest.fail
+        "expected a Create_table_empty_primary_key_unknown_column error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured unknown primary key column" expected errors
+
+let test_create_table_empty_primary_key_unknown_column_renders_with_create_table_prefix
+    () =
+  let error : Typecheck.error =
+    Create_table_empty_primary_key_unknown_column
+      { table_name = "widgets"; column = "missing" }
+  in
+  Alcotest.(check string)
+    "rendered unknown primary key column"
+    "Create table: \"widgets\": primary key column \"missing\" not in column \
+     list"
+    (Typecheck.render error)
+
+let test_create_table_empty_with_duplicate_primary_key_column_reports_structured_error
+    () =
+  let kind : Relation.kind =
+    {
+      row_kind =
+        [
+          { name = "id"; kind = Int64; qualifier = None };
+          { name = "name"; kind = String; qualifier = None };
+        ];
+      refinements = [ Primary_key [ "id"; "id" ] ];
+    }
+  in
+  let plan : Logical.t = Create_table_empty { table_name = "widgets"; kind } in
+  let expected : Typecheck.error list =
+    [
+      Create_table_empty_primary_key_duplicate_column
+        { table_name = "widgets"; column = "id" };
+    ]
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ ->
+      Alcotest.fail
+        "expected a Create_table_empty_primary_key_duplicate_column error"
+  | Error errors ->
+      Alcotest.(check error_list_testable)
+        "structured duplicate primary key column" expected errors
+
+let test_create_table_empty_primary_key_duplicate_column_renders_with_create_table_prefix
+    () =
+  let error : Typecheck.error =
+    Create_table_empty_primary_key_duplicate_column
+      { table_name = "widgets"; column = "id" }
+  in
+  Alcotest.(check string)
+    "rendered duplicate primary key column"
+    "Create table: \"widgets\": primary key column \"id\" appears twice"
+    (Typecheck.render error)
+
+let test_create_table_empty_with_well_formed_kind_passes () =
+  let plan : Logical.t =
+    Create_table_empty { table_name = "widgets"; kind = widgets_kind }
+  in
+  match Typecheck.typecheck ~catalog:empty_catalog plan with
+  | Ok _ -> ()
+  | Error errors ->
+      Alcotest.failf "expected no errors, got: %s"
+        (String.concat " | " (List.map Typecheck.render errors))
+
 let () =
   Alcotest.run "typecheck"
     [
@@ -903,5 +1081,41 @@ let () =
             `Quick test_insert_with_kind_mismatch_reports_structured_error;
           Alcotest.test_case "kind mismatch renders with Insert prefix" `Quick
             test_insert_kind_mismatch_renders_with_insert_prefix;
+        ] );
+      ( "create table empty static-shape checks",
+        [
+          Alcotest.test_case "empty column list produces a structured error"
+            `Quick
+            test_create_table_empty_with_no_fields_reports_structured_error;
+          Alcotest.test_case
+            "empty column list renders with Create table prefix" `Quick
+            test_create_table_empty_no_fields_renders_with_create_table_prefix;
+          Alcotest.test_case "duplicate field produces a structured error"
+            `Quick
+            test_create_table_empty_with_duplicate_field_reports_structured_error;
+          Alcotest.test_case "duplicate field renders with Create table prefix"
+            `Quick
+            test_create_table_empty_duplicate_field_renders_with_create_table_prefix;
+          Alcotest.test_case "empty primary key produces a structured error"
+            `Quick
+            test_create_table_empty_with_empty_primary_key_reports_structured_error;
+          Alcotest.test_case
+            "empty primary key renders with Create table prefix" `Quick
+            test_create_table_empty_primary_key_empty_renders_with_create_table_prefix;
+          Alcotest.test_case
+            "unknown primary key column produces a structured error" `Quick
+            test_create_table_empty_with_unknown_primary_key_column_reports_structured_error;
+          Alcotest.test_case
+            "unknown primary key column renders with Create table prefix" `Quick
+            test_create_table_empty_primary_key_unknown_column_renders_with_create_table_prefix;
+          Alcotest.test_case
+            "duplicate primary key column produces a structured error" `Quick
+            test_create_table_empty_with_duplicate_primary_key_column_reports_structured_error;
+          Alcotest.test_case
+            "duplicate primary key column renders with Create table prefix"
+            `Quick
+            test_create_table_empty_primary_key_duplicate_column_renders_with_create_table_prefix;
+          Alcotest.test_case "well-formed kind passes" `Quick
+            test_create_table_empty_with_well_formed_kind_passes;
         ] );
     ]

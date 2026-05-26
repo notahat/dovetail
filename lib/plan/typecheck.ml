@@ -52,6 +52,20 @@ type error =
       expected : Scalar.kind;
       actual : Scalar.kind;
     }
+  | Create_table_empty_no_fields of { table_name : string }
+  | Create_table_empty_duplicate_field of {
+      table_name : string;
+      column : string;
+    }
+  | Create_table_empty_primary_key_empty of { table_name : string }
+  | Create_table_empty_primary_key_unknown_column of {
+      table_name : string;
+      column : string;
+    }
+  | Create_table_empty_primary_key_duplicate_column of {
+      table_name : string;
+      column : string;
+    }
   | Tables_input_wrong_rung of { actual : rung }
   | Unqualify_input_wrong_rung of { actual : rung }
   | Ordering_operator_on_unordered_kind of {
@@ -171,6 +185,20 @@ let render = function
         row_index column
         (Scalar.kind_to_string expected)
         (Scalar.kind_to_string actual)
+  | Create_table_empty_no_fields { table_name } ->
+      Printf.sprintf "Create table: %S: column list is empty" table_name
+  | Create_table_empty_duplicate_field { table_name; column } ->
+      Printf.sprintf "Create table: %S: column %S appears twice" table_name
+        column
+  | Create_table_empty_primary_key_empty { table_name } ->
+      Printf.sprintf "Create table: %S: primary key is empty" table_name
+  | Create_table_empty_primary_key_unknown_column { table_name; column } ->
+      Printf.sprintf
+        "Create table: %S: primary key column %S not in column list" table_name
+        column
+  | Create_table_empty_primary_key_duplicate_column { table_name; column } ->
+      Printf.sprintf "Create table: %S: primary key column %S appears twice"
+        table_name column
   | Tables_input_wrong_rung { actual } ->
       Printf.sprintf "Tables: expected a catalog input, got %s"
         (render_rung actual)
@@ -500,6 +528,67 @@ let check_relation_literal ~(kind : Relation.kind)
          check_relation_literal_row ~row_index ~row_kind:kind.row_kind row)
        rows)
 
+(* Walk [items] left-to-right and return the names that appear more than
+   once, in order of second appearance. The result has one entry per
+   duplicate occurrence beyond the first, mirroring the per-occurrence
+   error policy used elsewhere in this module. *)
+let duplicates_in_order items =
+  let rec walk seen duplicates = function
+    | [] -> List.rev duplicates
+    | item :: rest ->
+        if List.mem item seen then walk seen (item :: duplicates) rest
+        else walk (item :: seen) duplicates rest
+  in
+  walk [] [] items
+
+(* Run the five static-shape checks on a [Create_table_empty] target
+   [kind]: non-empty fields; no duplicate field names; non-empty primary
+   key; primary-key columns drawn from the field list; no duplicate
+   primary-key columns. Errors accumulate so a kind with several flaws
+   reports all of them in one pass. *)
+let check_create_table_empty ~table_name (kind : Relation.kind) : error list =
+  let field_names =
+    List.map (fun (field : Row.field) -> field.name) kind.row_kind
+  in
+  let no_fields_errors =
+    if field_names = [] then [ Create_table_empty_no_fields { table_name } ]
+    else []
+  in
+  let duplicate_field_errors =
+    List.map
+      (fun column -> Create_table_empty_duplicate_field { table_name; column })
+      (duplicates_in_order field_names)
+  in
+  let primary_key = Relation.primary_key_names kind in
+  let primary_key_empty_errors =
+    if primary_key = [] then
+      [ Create_table_empty_primary_key_empty { table_name } ]
+    else []
+  in
+  (* Skip the PK-membership check when the field list is empty: every PK
+     column would trivially be "unknown", which is just noise atop the
+     no-fields error. *)
+  let primary_key_unknown_errors =
+    if field_names = [] then []
+    else
+      List.filter_map
+        (fun column ->
+          if List.mem column field_names then None
+          else
+            Some
+              (Create_table_empty_primary_key_unknown_column
+                 { table_name; column }))
+        primary_key
+  in
+  let primary_key_duplicate_errors =
+    List.map
+      (fun column ->
+        Create_table_empty_primary_key_duplicate_column { table_name; column })
+      (duplicates_in_order primary_key)
+  in
+  no_fields_errors @ duplicate_field_errors @ primary_key_empty_errors
+  @ primary_key_unknown_errors @ primary_key_duplicate_errors
+
 (* Best-effort classification of which rung [plan] sits at. Used by the
    operator-shape preconditions to know whether an operator's input is the
    right kind of value -- a relation, a row, a catalog, and so on. An
@@ -532,9 +621,9 @@ let rec collect_errors ~(catalog : Catalog.kind) (plan : Logical.t) : error list
       | Some _ -> []
       | None -> [ Unknown_table { operator = "Scan"; table_name = table } ])
   | Relation_literal { kind; rows } -> check_relation_literal ~kind ~rows
-  | Scalar_literal _ | Row_literal _ | Drop_table _ | Create_table_empty _
-  | Catalog_source ->
-      []
+  | Create_table_empty { table_name; kind } ->
+      check_create_table_empty ~table_name kind
+  | Scalar_literal _ | Row_literal _ | Drop_table _ | Catalog_source -> []
   | Type_op { input } | Create_table_seeded { source = input; _ } ->
       collect_errors ~catalog input
   | Tables { input } ->

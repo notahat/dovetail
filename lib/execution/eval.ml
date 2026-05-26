@@ -727,10 +727,12 @@ and stamp_qualifier_on_kind ~qualifier (kind : Relation.kind) : Relation.kind =
   in
   { row_kind; refinements = kind.refinements }
 
-(* Create [table_name] from a pre-resolved [kind]. Runs the structural
-   checks first, then the catalog "table already exists" check, all
-   before any storage mutation: a validation failure leaves the catalog
-   and storage untouched. On success, provisions the storage subDB
+(* Create [table_name] from a pre-resolved [kind]. Runs the catalog
+   "table already exists" check before any storage mutation: a name
+   collision leaves the catalog and storage untouched. The static-shape
+   checks (non-empty fields, no duplicate field names, primary-key
+   well-formedness) live in [Plan.Typecheck] and have already run by
+   the time Eval sees [kind]. On success, provisions the storage subDB
    before the catalog entry; if anything raises in between, the
    transaction aborts and rolls both halves back.
 
@@ -742,7 +744,6 @@ and evaluate_create_table_empty environment transaction ~table_name ~kind
     Obj.magic transaction
   in
   let target_kind = stamp_qualifier_on_kind ~qualifier:table_name kind in
-  validate_target_kind ~table_name target_kind;
   reject_existing_table environment write_transaction ~table_name;
   let _target_map =
     provision_table environment write_transaction ~table_name ~kind:target_kind
