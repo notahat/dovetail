@@ -59,7 +59,7 @@ puts them in your data directory.
 
 ### `users`
 
-| column   | kind   | notes                                |
+| column   | type   | notes                                |
 | -------- | ------ | ------------------------------------ |
 | `id`     | Int64  | primary key                          |
 | `name`   | String |                                      |
@@ -79,7 +79,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 
 ### `orders`
 
-| column        | kind   | notes                            |
+| column        | type   | notes                            |
 | ------------- | ------ | -------------------------------- |
 | `id`          | Int64  | primary key                      |
 | `user_id`     | Int64  | foreign key into `users.id`      |

@@ -38,9 +38,9 @@ conventions.
 
 Launched with `--demo-data`, the REPL seeds two example tables,
 `users` and `orders`, for queries to read against. Pipeline
-operators (`restrict`, `project`, `cross`, `join`) compose with
-`|`, and the canonical multi-operator query joins them and
-projects:
+operators (`restrict`, `project`, `cross`, `join`, `unqualify`,
+`type`, `insert into`, `tables`) compose with `|`, and the
+canonical multi-operator query joins them and projects:
 
 ```
 > users | join orders on users.id = orders.user_id | project name, description, amount
@@ -62,15 +62,12 @@ projection sublanguages.
 
 ### Next up
 
-Ordered. Each item lands as its own slice plan (`docs/plans/NN-...`)
-with sub-steps; the ordering here is firm, but the scope of slice 17
-will be pinned down when that slice starts.
-
-1. **Slice 17 — Minimal SQL frontend.** A second front-end — SQL
-   parser, SQL AST, SQL→logical lowering — feeding the existing logical
-   and physical IRs. Deliberately limited (no NULLs, scope otherwise
-   TBD): the focus is on how the architecture splits between two
-   surface languages, not on covering SQL.
+The next slice lands as its own plan in `docs/plans/`. Likely
+direction: a minimal SQL frontend — SQL parser, SQL AST, and
+SQL→logical lowering feeding the existing logical and physical IRs.
+Deliberately limited (no NULLs, scope otherwise TBD); the focus is
+on how the architecture splits between two surface languages, not
+on covering SQL.
 
 ### Beyond
 
@@ -102,7 +99,6 @@ is not committed to here.
 - Additional data types: date/time, decimal, floating point, blob.
 - Exposed transaction commands (begin / commit / rollback).
 - EXPLAIN-style plan introspection.
-- Schema introspection (list tables, describe table).
 - A cost-based query optimiser: statistics collection, a cost model,
   plan search.
 - SQL elaboration beyond the first slice — joins, aggregation,

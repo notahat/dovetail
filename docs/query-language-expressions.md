@@ -16,7 +16,7 @@ narrative introduction, see the
 **Syntax:** `<int64-literal>` | `"<string-literal>"` |
 `true` | `false`
 
-Three literal kinds match the three value kinds in the schema:
+Three literal forms match the three value types in the schema:
 
 - **Int64** literals are signed decimal: `-1`, `0`, `42`. There is
   no separate unsigned form.
@@ -63,9 +63,9 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 `<`, `<=`, `>`, `>=`
 
 Comparisons take two sub-expressions and produce a Bool. The two
-sides' kinds must agree:
+sides' types must agree:
 
-- `=` and `<>` accept any matching kind (Int64, String, or Bool).
+- `=` and `<>` accept any matching type (Int64, String, or Bool).
 - The four ordering operators (`<`, `<=`, `>`, `>=`) accept Int64
   or String only -- comparing Bool with an ordering operator is
   rejected at resolve time.
@@ -88,7 +88,7 @@ relation (orders.id: int64, orders.user_id: int64, orders.description: string, o
 
 `and`, `or`, and `not` combine Bool-valued sub-expressions. Both
 operands of `and` and `or`, and the single operand of `not`, must
-be of kind Bool; non-Bool operands are rejected at resolve time
+be of type Bool; non-Bool operands are rejected at resolve time
 (so `not active` is fine but `not name` is not).
 
 `and` and `or` short-circuit left-to-right: the right operand is

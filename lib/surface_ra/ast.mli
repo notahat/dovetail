@@ -132,12 +132,10 @@ type t =
           on the left. *)
   | Type of { input : t }
       (** [Type { input }] is the surface form [input | type]. Evaluation yields
-          [input]'s relation type rather than its rows — no cursors open, no
-          rows pulled. The constructor sits at the root of a pipeline only;
-          {!Lower} rejects [input | type | type] because the second [type]'s
-          input is a type, not a relation. The parser does not yet produce this
-          node — until it does, the only way to reach it is by building one
-          directly. *)
+          [input]'s type rather than its value — no cursors open, no rows
+          pulled. [input] can be a scalar, row, relation, or catalog; downstream
+          type-checking rejects [input | type | type] because the second
+          [type]'s input is already a type. *)
   | Scalar_literal of Scalar.value
       (** [Scalar_literal value] is the surface form of a bare scalar at the
           head of a pipeline: [42], ["hello"], [true]. The pipeline's source is

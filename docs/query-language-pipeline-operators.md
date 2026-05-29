@@ -9,12 +9,19 @@ and projection sublanguages that appear inside `restrict`,
 `project`, and the `on` clause of `join`, see the
 [expression and projection reference](query-language-expressions.md).
 
-A pipeline starts with one of four source forms: a relation
-reference (a bare table name) or a literal at any of the scalar,
-row, or relation rungs. The literal forms let you feed a value
-into the pipeline without first putting it in a table -- useful
-for trying out operators, asking `| type` what a value's type is,
-and (for relation literals) seeding tables through `insert into`.
+A pipeline starts with one of six source forms: a relation
+reference (a bare table name), a literal at any of the scalar,
+row, or relation rungs, the bare `catalog` keyword, or a `drop
+table <name>` leaf. (A bare type expression also stands at
+pipeline-source position, but only as the upstream for the
+empty form of `create table` -- see that section.) The literal
+forms let you feed a value into the pipeline without first
+putting it in a table -- useful for trying out operators,
+asking `| type` what a value's type is, and (for relation
+literals) seeding tables through `insert into`. The `catalog`
+source surfaces the database's catalog so operators like
+`tables` can read it. `drop table` is a complete pipeline on
+its own; nothing sits to its left.
 
 ## Relation references
 
@@ -41,12 +48,12 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 **Syntax:** `<int64-literal>` | `"<string-literal>"` | `true` | `false`
 
 A bare scalar at the head of a pipeline yields that scalar value.
-The supported forms are the same three kinds the
+The supported forms are the same three the
 [expression reference](query-language-expressions.md#literals)
 describes: signed decimal integers, double-quoted strings (with
 `\"` and `\\` escapes), and the keywords `true` and `false`. The
 only operator that consumes a scalar is `type`, which yields the
-scalar's kind.
+scalar's type.
 
 ```
 > 42
@@ -69,7 +76,7 @@ written order. The empty form `()` yields the empty row. Field
 names must be unique within the literal; values are scalar
 literals (no expressions or column references at the row-literal
 level). The only operator that consumes a row is `type`, which
-yields the row's kind.
+yields the row's type.
 
 ```
 > (id = 1, name = "alice")
@@ -86,12 +93,12 @@ yields the row's kind.
 
 A `relation` keyword followed by a parenthesised relation type and
 a brace-delimited body of row literals yields a relation of that
-type. The head's parenthesised list is a row type (`<name>: <kind>`
+type. The head's parenthesised list is a row type (`<name>: <type>`
 declarations) optionally interleaved with refinements (today just
 `primary key (...)`); the body is zero or more row literals,
 comma-separated, with a permitted trailing comma. Every row's
 fields must be a permutation of the declared row type's fields,
-and each value must match its field's kind. The empty body is
+and each value must match its field's type. The empty body is
 allowed and produces a header-only table.
 
 Relation literals are the form `insert into` accepts as its
@@ -105,6 +112,30 @@ relation (id: int64, name: string) {
 }
 > relation (id: int64, name: string) {} | type
 (id: int64, name: string)
+```
+
+## catalog
+
+**Syntax:** `catalog`
+
+A bare `catalog` at the head of a pipeline yields the database's
+catalog as a value -- every table's name paired with its rows. The
+catalog is the top rung of the type ladder; unlike scalars, rows,
+and relations it has no surface literal form, so this keyword is
+the only way to produce one. The operators that consume a catalog
+are [`tables`](#tables), which projects out the table-name column
+as a one-column relation, and [`type`](#type), which renders the
+catalog's type rather than its rows.
+
+A bare `catalog` against the example tables prints both tables in
+full -- a few dozen rows of structured output. The shape (a `catalog
+{ ... }` literal whose entries are `<name> = relation (...) { ... }`)
+is more useful than the rows, so the type form below is the more
+common interrogation:
+
+```
+> catalog | type
+catalog { orders: (orders.id: int64, orders.user_id: int64, orders.description: string, orders.amount: int64, primary key (id)), users: (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) }
 ```
 
 ## restrict
@@ -205,10 +236,10 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 
 **Syntax:** `<input> | unqualify`
 
-Strips the qualifier from every field of `<input>`'s row kind,
+Strips the qualifier from every field of `<input>`'s row type,
 leaving the bare names. `<input>` is either a relation (yields a
-relation with the same rows under the unqualified kind) or a row
-(yields a row under the unqualified kind). It's a no-op on an input
+relation with the same rows under the unqualified type) or a row
+(yields a row under the unqualified type). It's a no-op on an input
 that already has no qualifiers, and is rejected when two fields
 would collide on their bare name after stripping -- the error names
 the colliding bare name and the two original qualified spellings.
@@ -225,19 +256,38 @@ relation (id: int64, description: string, amount: int64) {
 }
 ```
 
+## tables
+
+**Syntax:** `<input> | tables`
+
+Takes a catalog on the left and yields a one-column relation
+`(name: string)` with one row per table, in the catalog's cursor
+order. `<input>` must be a catalog; any other input is a user-facing
+error. The canonical use is `catalog | tables` for a quick "what
+tables exist" listing.
+
+```
+> catalog | tables
+relation (name: string) {
+  (name = "orders"),
+  (name = "users")
+}
+```
+
 ## type
 
 **Syntax:** `<input> | type`
 
-Yields `<input>`'s relation type rather than its rows -- no cursors
-open, no rows are pulled. The output is a one-line rendering of the
-type in the surface type-expression syntax: a parenthesised,
-comma-separated list of `<name>: <kind>` field declarations,
-followed by any refinements (today just `primary key (...)`).
+Yields `<input>`'s type rather than its value -- no cursors open,
+no rows are pulled. `<input>` can be a scalar, a row, a relation,
+or a catalog; the output renders in the surface type-expression
+syntax appropriate to the input's rung (a bare type name like
+`int64` for a scalar, a parenthesised field list for a row or
+relation, a `catalog { ... }` for a catalog).
 
-`type` only applies at the relation rung; piping its output back
-through `type` (`<input> | type | type`) is rejected -- the second
-`type`'s input is already a type, not a relation.
+The one rung `type` does not accept is its own output: piping a
+type back through `type` (`<input> | type | type`) is rejected,
+because the second `type`'s input is already a type.
 
 ```
 > users | type
@@ -253,7 +303,7 @@ relation `(insert_count: int64)` reporting how many rows were
 written. `<input>` is currently a relation literal of the form
 `relation (column: type, ...) { (column = value, ...), ... }`; the
 literal's columns must be a permutation of the target's columns, and
-each value must match its target column's kind. Arbitrary upstream
+each value must match its target column's type. Arbitrary upstream
 pipelines (insert-from-query) are deferred to a later slice.
 
 Insert is a regular pipeline operator with one surface restriction:
@@ -266,5 +316,62 @@ the transaction and the table is unchanged.
 > relation (id: int64, user_id: int64, description: string, amount: int64) { (id = 7, user_id = 4, description = "Muffin", amount = 2) } | insert into orders
 relation (insert_count: int64) {
   (insert_count = 1)
+}
+```
+
+## create table
+
+**Syntax:** `<type-expression> | create table <table-name>` (empty
+form) or `<value-pipeline> | create table <table-name>` (seeded
+form).
+
+Adds a new table to the catalog. The empty form takes a relation
+type on the left (a parenthesised `<name>: <type>` list with
+optional refinements like `primary key (...)`) and creates an empty
+table of that type. The seeded form takes any value-yielding
+pipeline; the new table's type is derived from the upstream's row
+type, and its rows are the upstream's rows. Either form yields a
+one-row relation `(created: string)` reporting the new table's
+name.
+
+The seeded form rejects sources whose row type carries qualifiers
+-- pipe through `unqualify` first if the upstream is a base
+relation -- and rejects sources whose derived type has no primary
+key. A primary key is required because tables are index-organised.
+
+`create table` is a terminal sink: the parser rejects any pipe-step
+after `create table <name>`, and at most one sink (`create table`
+or `insert into`) is allowed per pipeline. The whole operation runs
+in one write transaction; a name collision with an existing table
+(or any other failure) aborts the transaction and the catalog is
+unchanged.
+
+```
+> (id: int64, name: string, primary key (id)) | create table widgets
+relation (created: string) {
+  (created = "widgets")
+}
+> users | unqualify | create table users_copy
+relation (created: string) {
+  (created = "users_copy")
+}
+```
+
+## drop table
+
+**Syntax:** `drop table <table-name>`
+
+Removes `<table-name>` from the catalog and reclaims its storage,
+and yields a one-row relation `(dropped: string)` reporting the
+dropped table's name. `drop table` is a leaf source: nothing sits
+to its left, and the parser rejects any pipe-step after it. The
+operation runs in one write transaction; a missing-table error (or
+any other failure) aborts the transaction and the catalog is
+unchanged.
+
+```
+> drop table widgets
+relation (dropped: string) {
+  (dropped = "widgets")
 }
 ```
