@@ -1,4 +1,4 @@
-# 07 — Slice 7: Expression language
+# Slice 7: Expression language
 
 The seventh vertical slice. End-state: the predicate sublanguage
 becomes a small general expression language with ordering

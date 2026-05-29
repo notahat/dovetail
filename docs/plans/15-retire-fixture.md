@@ -1,4 +1,4 @@
-# 15 — Slice 15: Retire the fixture
+# Slice 15: Retire the fixture
 
 The first slice with no new query-language surface. End-state:
 the REPL boots empty, and a `--demo-data` flag seeds the

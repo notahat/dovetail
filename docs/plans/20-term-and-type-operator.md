@@ -1,11 +1,11 @@
-# 20 — Slice 20: Term carrier and the type operator
+# Slice 20: Term carrier and the type operator
 
 First substantive slice of the [type-system work](../type-system.md).
 Introduces `Core.Term`, the unified pipeline-payload carrier; threads
 it through every IR layer; lands the `type` operator at the relation
 rung; retires `:describe`.
 
-Depends on [slice 19](19-slice-19-collapse-mutations-into-pipeline.md)
+Depends on [slice 19](19-collapse-mutations-into-pipeline.md)
 — the pipeline is already one universe by the time this slice runs.
 
 ## Goal
@@ -57,13 +57,13 @@ Other arms grow incrementally as later slices need them.
 ## Out of scope
 
 - Scalar / row / catalog rungs of `type`. They come online
-  automatically in [slice 21](21-slice-21-literal-syntax-flip.md) when
+  automatically in [slice 21](21-literal-syntax-flip.md) when
   the literal forms become valid pipeline sources, and in
-  [slice 23](23-slice-23-catalog-rung.md) for catalog. `Term.t` only
+  [slice 24](24-catalog-rung.md) for catalog. `Term.t` only
   grows arms for new things this slice constructs.
 - Literal-syntax changes (the curly-brace relation literal stays
   as-is).
-- `Core.Catalog`. Catalog rung lands in slice 23 alongside its
+- `Core.Catalog`. Catalog rung lands in slice 24 alongside its
   consumer operators.
 
 ## Key design decisions made during planning

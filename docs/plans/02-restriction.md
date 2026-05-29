@@ -1,4 +1,4 @@
-# 03 — Slice 2: Restriction (σ) via the RA language
+# Slice 2: Restriction (σ) via the RA language
 
 The second vertical slice. End-state: typing `users | restrict id = 3`
 at the REPL returns the matching row. The predicate sublanguage starts

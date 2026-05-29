@@ -1,13 +1,13 @@
-# 23 — Slice 23: `create table` and `drop table` as pipeline operators
+# Slice 23: `create table` and `drop table` as pipeline operators
 
 Lands the pipe-form for `create table` and `drop table` from
 [`docs/type-system.md`](../type-system.md). Retires the
 corresponding `:`-sigil DDL statements.
 
-Depends on [slice 21](21-slice-21-literal-syntax-flip.md) for the
+Depends on [slice 21](21-literal-syntax-flip.md) for the
 type-expression grammar and the new relation literal (`create
 table`'s left side), and on
-[slice 22](22-slice-22-qualifiers.md) for the no-silent-drop rule
+[slice 22](22-qualifiers.md) for the no-silent-drop rule
 that `create table`'s input validation reuses (qualified field on
 the left → error pointing at `unqualify`).
 

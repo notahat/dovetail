@@ -1,4 +1,4 @@
-# 24 — Slice 24: Catalog rung
+# Slice 24: Catalog rung
 
 Lands the catalog rung from
 [`docs/type-system.md`](../type-system.md). Introduces `Core.Catalog`
@@ -6,7 +6,7 @@ Lands the catalog rung from
 and rendering for the catalog literal. Retires `:list tables` and
 deletes `lib/ddl/` entirely.
 
-Depends on [slice 23](23-slice-23-create-and-drop-table.md) — only
+Depends on [slice 23](23-create-and-drop-table.md) — only
 `:list tables` remains in DDL after that slice; this one finishes
 the retirement.
 

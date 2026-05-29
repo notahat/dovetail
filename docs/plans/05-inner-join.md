@@ -1,4 +1,4 @@
-# 05 — Slice 5: Inner join (`Join`)
+# Slice 5: Inner join (`Join`)
 
 The fifth vertical slice. End-state: typing
 `users | join orders on users.id = orders.user_id` at the REPL yields

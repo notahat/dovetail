@@ -72,7 +72,7 @@ the call to `eval`.
 
 See [`lib/execution/eval.mli`](../lib/execution/eval.mli) for the
 entry-point signature and slice 6
-([`docs/plans/06-slice-6-streaming-cps-executor.md`](plans/06-slice-6-streaming-cps-executor.md))
+([`docs/plans/06-streaming-cps-executor.md`](plans/06-streaming-cps-executor.md))
 for the rationale behind the conversion to CPS.
 
 ## IR — Intermediate representation

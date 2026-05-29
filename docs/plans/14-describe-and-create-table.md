@@ -1,4 +1,4 @@
-# 14 — Slice 14: Describe and create table
+# Slice 14: Describe and create table
 
 The second DDL slice. End-state: a user at the REPL can type
 `:create table widgets (id: Int64, name: String) primary key (id)`
@@ -723,7 +723,7 @@ markdown file.
 
 Three small cleanups bundled into this commit:
 
-- `docs/plans/12-slice-12-list-and-drop-tables.md` has an
+- `docs/plans/12-list-and-drop-tables.md` has an
   internal numbering inconsistency: the intro lists "Slice
   12 / 13 / 14" while the out-of-scope section lists "14 /
   15". Bring the intro into line with the renumbering that

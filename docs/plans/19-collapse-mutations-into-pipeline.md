@@ -1,4 +1,4 @@
-# 19 — Slice 19: Collapse mutations into the pipeline universe
+# Slice 19: Collapse mutations into the pipeline universe
 
 Prep slice for the [type-system work](../type-system.md). No new
 user-visible features; reshapes the pipeline so every operator
@@ -40,7 +40,7 @@ that asks each operator whether it needs write access.
 
 - Anything to do with `Core.Term`, the `type` operator, or non-relation
   outputs. This slice still has every pipeline producing a `_
-  Relation.t`. `Term` lands in [slice 20](20-slice-20-term-and-type-operator.md).
+  Relation.t`. `Term` lands in [slice 20](20-term-and-type-operator.md).
 - DDL retirement. `:`-sigil DDL still works after this slice; the
   `lib/ddl/` library is untouched.
 
@@ -65,7 +65,7 @@ that asks each operator whether it needs write access.
 - Slice 20 introduces `Core.Term` and routes `Insert`'s output through
   it (as `Term.Relation_value`). The collapse done here makes that
   one boundary instead of two.
-- The `(insert_count = N)` result is provisional. When [slice 22](22-slice-22-create-and-drop-table.md)
+- The `(insert_count = N)` result is provisional. When [slice 23](23-create-and-drop-table.md)
   adds `create_table` and `drop_table`, those operators return their
   own result-row shapes (e.g. `(created: string) { (created = "users")
   }`). Consider whether a uniform shape across sinks is worth

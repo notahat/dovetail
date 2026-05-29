@@ -1,4 +1,4 @@
-# 22 — Slice 22: Qualifier syntax and canonical output
+# Slice 22: Qualifier syntax and canonical output
 
 Lands the qualifier extension from
 [`docs/type-system.md`](../type-system.md): qualified names in row
@@ -7,7 +7,7 @@ the `unqualify` pipe stage, and the no-silent-drop rule at sinks.
 Closes the gap left over from slice 21 — relation output was supposed
 to flip to the canonical relation-literal form there but slipped.
 
-Depends on [slice 21](21-slice-21-literal-syntax-flip.md). The
+Depends on [slice 21](21-literal-syntax-flip.md). The
 formatters this slice extends (`Row.format`, `Row.format_kind`,
 `Relation.format`, `Relation.format_kind`) all landed in slice 21;
 the type-expression grammar this slice extends is from the same

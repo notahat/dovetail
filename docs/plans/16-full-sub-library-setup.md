@@ -1,4 +1,4 @@
-# 16 — Slice 16: Full sub-library setup
+# Slice 16: Full sub-library setup
 
 The structural extraction that slice 13 began. Five more
 libraries come out of residual `lib/` — `storage`, `plan`,

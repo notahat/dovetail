@@ -1,4 +1,4 @@
-# 03 — Slice 3: Projection (π) via the RA language
+# Slice 3: Projection (π) via the RA language
 
 The third vertical slice. End-state: typing `users | project name, email`
 at the REPL returns the named columns. The projection sublanguage starts
@@ -6,7 +6,7 @@ at its smallest — a comma-separated list of bare column names that must
 exist in the input schema.
 
 > **Save location:** When work begins, this plan should live at
-> `docs/plans/03-slice-3-projection.md` (per the project convention of
+> `docs/plans/03-projection.md` (per the project convention of
 > numbered, accumulating plan files), and be committed before the first
 > sub-step starts. The version under `~/.claude/plans/` is the planning
 > workspace.

@@ -1,4 +1,4 @@
-# 11 — Slice 11: Insert
+# Slice 11: Insert
 
 The eleventh vertical slice, and the first to write data into
 the database under user direction. End-state: a user at the

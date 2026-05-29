@@ -1,4 +1,4 @@
-# 10 — Slice 10: Query-language documentation
+# Slice 10: Query-language documentation
 
 The tenth vertical slice, and the first that delivers no
 runtime behaviour. End-state: a new `docs/query-language.md`

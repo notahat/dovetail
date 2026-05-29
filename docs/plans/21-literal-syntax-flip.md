@@ -1,4 +1,4 @@
-# 21 — Slice 21: Literal-syntax flip
+# Slice 21: Literal-syntax flip
 
 Replaces the current `{col: val}` relation literal with the new
 `relation (type) { rows }` form from
@@ -7,7 +7,7 @@ scalar literals as pipeline sources. Introduces the type-expression
 grammar (the bit inside the parens of a relation literal). Grows
 `Term.t` to cover the scalar and row rungs.
 
-Depends on [slice 20](20-slice-20-term-and-type-operator.md) — `Term`
+Depends on [slice 20](20-term-and-type-operator.md) — `Term`
 is already threaded through every layer; this slice adds arms to it
 and adds new source-side AST nodes that produce those arms.
 

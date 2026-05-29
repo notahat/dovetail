@@ -1,4 +1,4 @@
-# 12 — Slice 12: List and drop tables
+# Slice 12: List and drop tables
 
 The twelfth vertical slice, and the first to extend the surface
 language beyond pipelines. End-state: a user at the REPL can type
@@ -119,7 +119,7 @@ than insert/update/delete were:
   round-trip property `parse(format(s)) ≡ s` is the design's
   strongest correctness anchor and lands cleanest when both ends
   are in one PR. (Slice 13 is the DDL sub-library extraction
-  that preceded it; see `13-slice-13-ddl-and-library-prep.md`.)
+  that preceded it; see `13-ddl-and-library-prep.md`.)
 - **Slice 15: fixture retirement.** Removes `lib/fixture.ml` and
   migrates tests to construct tables via DDL. Held back until
   create exists.

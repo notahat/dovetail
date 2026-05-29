@@ -1,4 +1,4 @@
-# 01 — Initial plan
+# Initial plan
 
 Dovetail is a relational database, built primarily as a learning project,
 with the goal of evolving it into a useful tool. It implements relational
@@ -204,7 +204,7 @@ firm; later ones are sketches and will evolve.
   the result. Inserted ahead of PK range scans because real-table
   workloads were going to need streaming before the planner had to
   start making physical-operator choices. See
-  `06-slice-6-streaming-cps-executor.md`.
+  `06-streaming-cps-executor.md`.
 - **Slice 7** — Expression language. Generalises the predicate
   sublanguage from a single `Compare` to an expression tree;
   adds ordering comparisons (`<`, `<=`, `>`, `>=`), boolean
@@ -213,7 +213,7 @@ firm; later ones are sketches and will evolve.
   range scans because the predicate forms needed to recognise a
   PK range (ordering ops + `and`-conjunctions) didn't yet exist
   in the surface language. See
-  `07-slice-7-expression-language.md`.
+  `07-expression-language.md`.
 - **Slice 8** — Primary-key range scans (`IndexScan` physical
   operator). First time the physical IR has a real choice;
   logical→physical picks `IndexScan` over `FullScan` when the

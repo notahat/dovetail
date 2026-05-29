@@ -1,4 +1,4 @@
-# 08 — Slice 8: Primary-key point lookup
+# Slice 8: Primary-key point lookup
 
 The eighth vertical slice. End-state: `users | restrict id = 5`
 produces an `IndexLookup` physical operator that fetches the

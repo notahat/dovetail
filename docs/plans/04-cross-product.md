@@ -1,4 +1,4 @@
-# 04 — Slice 4: Cross product (×)
+# Slice 4: Cross product (×)
 
 The fourth vertical slice. End-state: typing `users | cross orders` at
 the REPL yields every (user, order) pair, and

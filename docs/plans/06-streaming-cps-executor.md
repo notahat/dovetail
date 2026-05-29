@@ -1,4 +1,4 @@
-# 06 — Slice 6: Streaming CPS executor
+# Slice 6: Streaming CPS executor
 
 Not a query-language slice. End-state: `Eval` becomes a streaming
 continuation-passing executor, where the storage cursor's lifetime

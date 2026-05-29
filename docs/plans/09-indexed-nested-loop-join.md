@@ -1,4 +1,4 @@
-# 09 — Slice 9: Indexed nested-loop join over the primary key
+# Slice 9: Indexed nested-loop join over the primary key
 
 The ninth vertical slice. End-state: `users | join orders on
 users.id = orders.user_id` produces an `IndexedNestedLoopJoin`

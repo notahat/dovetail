@@ -1,4 +1,4 @@
-# 17 — Slice 17: Apply the ladder framework
+# Slice 17: Apply the ladder framework
 
 Refactor `lib/core/` so the type vocabulary matches the conceptual
 ladder developed in

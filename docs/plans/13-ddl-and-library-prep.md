@@ -1,4 +1,4 @@
-# 13 — Slice 13: DDL and library prep
+# Slice 13: DDL and library prep
 
 A preparatory restructure slice with no user-visible behaviour
 change. Splits the current `Ddl` module into `Statement` (the DDL
@@ -222,7 +222,7 @@ others aren't, which reads worse than one coherent move.
 
 ### Forward-references in older docs
 
-`docs/plans/12-slice-12-list-and-drop-tables.md` and
+`docs/plans/12-list-and-drop-tables.md` and
 `docs/plans/ddl-design.md` mention "slice 13: describe and
 create" and "slice 14: fixture retirement" — both off by one
 under the new numbering. Step 1 updates these references as a
@@ -281,7 +281,7 @@ Call-site updates:
 
 Documentation cleanup bundled into this commit:
 
-- `docs/plans/12-slice-12-list-and-drop-tables.md`: forward
+- `docs/plans/12-list-and-drop-tables.md`: forward
   references to slices 13/14 updated to 14/15.
 - `docs/plans/ddl-design.md`: same.
 

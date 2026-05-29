@@ -1,4 +1,4 @@
-# 18 — Slice 18: Rename `Value` → `Scalar` and `data` → `value`
+# Slice 18: Rename `Value` → `Scalar` and `data` → `value`
 
 Align the `lib/core/` vocabulary with the surface language committed
 to in [`docs/type-system.md`](../type-system.md). The ladder's

@@ -1,4 +1,4 @@
-# 02 — Slice 1: Scan a table via the RA language
+# Slice 1: Scan a table via the RA language
 
 The first vertical slice. End-state: the binary opens an LMDB env, populates
 a `users` fixture if the catalog is empty, drops to a REPL, and typing
