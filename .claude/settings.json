@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(dune *)",
-      "Bash(~/.claude/skills/dune-watcher/scripts/wait-for-watcher.py *)"
+      "Bash(~/.claude/skills/dune-watcher/scripts/dune-watch)",
+      "Bash(~/.claude/skills/dune-watcher/scripts/dune-check)"
     ]
   },
   "hooks": {
