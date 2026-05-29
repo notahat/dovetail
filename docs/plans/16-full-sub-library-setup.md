@@ -8,7 +8,7 @@ mirror the new layout in parallel. No user-visible behaviour
 changes anywhere.
 
 The design that shapes this slice lives in
-[`docs/plans/library-structure.md`](library-structure.md). That
+[`docs/archive/library-structure.md`](../archive/library-structure.md). That
 document covers the seven-library layout, the wrapping model,
 the alias conventions, and the inner-module rename for
 `storage`. This slice plan implements the remainder of that
@@ -254,7 +254,7 @@ No code moves. Three doc files updated:
   (13/14/15) drop off; what was item 5 (Minimal SQL frontend)
   becomes the next forward-looking entry after slice 16. Body
   text reflects slice 16 in progress, slice 17 ahead.
-- **docs/plans/library-structure.md.** Brought current:
+- **docs/archive/library-structure.md.** Brought current:
   `lib/ddl/` content listed as `statement.ml` plus
   `format.ml`; `frontend` content listed as `cli`, `repl`,
   `demo_data` (not `fixture`); the directory layout sketch

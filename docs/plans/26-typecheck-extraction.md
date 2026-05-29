@@ -4,7 +4,7 @@ Extract a dedicated `Typecheck` pass that consolidates the
 kind-discipline and column-resolution checks currently scattered
 across `Lower`, `Translate`, and `Eval`. This is phase A of the
 larger architectural shift described in
-[`docs/ir-types.md`](../ir-types.md): one home for user-facing
+[`docs/design/ir-types.md`](../design/ir-types.md): one home for user-facing
 type errors, structured error values for a future LSP, and a
 cleanly separable Logical → Translate boundary.
 

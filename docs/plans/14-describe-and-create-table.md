@@ -8,7 +8,7 @@ round-trip property `parse(format(s)) ≡ s` lands in one PR — the
 strongest correctness anchor for the DDL surface.
 
 The design that shapes this slice continues to live in
-[`docs/plans/ddl-design.md`](ddl-design.md). Slice 12 landed the
+[`docs/archive/ddl-design.md`](../archive/ddl-design.md). Slice 12 landed the
 DDL wrapper (sigil, `Ast.program`, REPL dispatch arm) and the
 list/drop subset of the design. Slice 13 split the `Ddl` module
 into `Statement` (AST) and `Ddl_executor` (executor) and
@@ -728,7 +728,7 @@ Three small cleanups bundled into this commit:
   12 / 13 / 14" while the out-of-scope section lists "14 /
   15". Bring the intro into line with the renumbering that
   slice 13 step 1 was meant to apply.
-- `docs/plans/ddl-design.md` previously used `Ddl:` error
+- `docs/archive/ddl-design.md` previously used `Ddl:` error
   prefixes in its examples (e.g. `Ddl: create table
   "users": column "email" appears twice`). Update those
   examples to `DDL:` per slice 13's reframe so the doc

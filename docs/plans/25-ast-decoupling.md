@@ -8,7 +8,7 @@ relation types are AST-side types. `Lower` becomes the wall that
 translates each to its semantic counterpart.
 
 This is phase A0 from
-[`docs/ir-types.md`](../ir-types.md): preparation that makes the
+[`docs/design/ir-types.md`](../design/ir-types.md): preparation that makes the
 AST genuinely an island. It lands before slice 26
 (Typecheck extraction) so Typecheck's work targets a stable AST
 shape, and unblocks phase D's GADT work (no name collisions

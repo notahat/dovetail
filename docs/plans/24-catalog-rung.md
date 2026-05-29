@@ -1,7 +1,7 @@
 # Slice 24: Catalog rung
 
 Lands the catalog rung from
-[`docs/type-system.md`](../type-system.md). Introduces `Core.Catalog`
+[`docs/design/type-system.md`](../design/type-system.md). Introduces `Core.Catalog`
 (kind + value), the bare `catalog` source, the `tables` operator,
 and rendering for the catalog literal. Retires `:list tables` and
 deletes `lib/ddl/` entirely.
@@ -65,7 +65,7 @@ catalog | tables        -> one-column relation (name: string), one
   statements remain. Remove the dune library, the directory, the
   `module Ddl = Dovetail_ddl` aliases. `Ast.program` loses its
   `Ddl` arm. REPL stops dispatching on it.
-- **Type-system doc amendment.** `docs/type-system.md`'s line
+- **Type-system doc amendment.** `docs/design/type-system.md`'s line
   `catalog | type → catalog { users: ..., ... }` is consistent with
   this slice's design (value flows in, kind comes out) — no
   amendment needed there. But slice 17's "data deliberately absent"
@@ -279,7 +279,7 @@ same commit).
     `Pipeline of t` alternative, so the REPL stops dispatching
     on it (the wrapper itself can also be retired if nothing
     else needs the distinction — a `Pipeline of t` alternative
-    around a `t` is just `t`). Amend `docs/type-system.md` per
+    around a `t` is just `t`). Amend `docs/design/type-system.md` per
     the slice-17 reversal noted in scope (catalog values are no
     longer "deliberately absent"). If this step exceeds ~5 files
     / ~200 lines after the alias and `Pipeline` cleanups, split

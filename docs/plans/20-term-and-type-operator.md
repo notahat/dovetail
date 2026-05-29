@@ -1,6 +1,6 @@
 # Slice 20: Term carrier and the type operator
 
-First substantive slice of the [type-system work](../type-system.md).
+First substantive slice of the [type-system work](../design/type-system.md).
 Introduces `Core.Term`, the unified pipeline-payload carrier; threads
 it through every IR layer; lands the `type` operator at the relation
 rung; retires `:describe`.
@@ -73,7 +73,7 @@ Other arms grow incrementally as later slices need them.
   the only non-relation case is `Type_op`. Hybrid C (Term only at the
   Eval boundary) was considered and rejected: we want to commit to the
   unified universe sooner rather than later. See [type-system.md
-  §"pipe stages across the ladder"](../type-system.md).
+  §"pipe stages across the ladder"](../design/type-system.md).
 - **No GADTs for the IR.** Flat sums with the lowering pass
   responsible for producing well-formed combinations; bugs produce
   clear runtime failures rather than silent wrong behaviour. Revisit
@@ -140,7 +140,7 @@ Add `Row.format_kind` rendering a row kind as
 `(name: type, name: type)`, or `()` for the empty row kind. Builds on
 step 1's `Scalar.format_kind` for the type side. Qualifiers are
 dropped (the surface syntax has no qualifier form; see
-[type-system.md §"qualifiers on row fields"](../type-system.md)).
+[type-system.md §"qualifiers on row fields"](../design/type-system.md)).
 
 *Tests:* unit tests covering empty, single-field, multi-field, and
 qualifier-stripping cases.

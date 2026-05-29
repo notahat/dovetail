@@ -57,7 +57,7 @@ underlying tool's vocabulary.
 
 The static shape of a value goes by two names depending on which side
 of the wall you're on. They are the same concept — see
-[`docs/type-system.md`](docs/type-system.md) for the framing.
+[`docs/design/type-system.md`](docs/design/type-system.md) for the framing.
 
 - **Inside the code**, the name is `kind`: `Scalar.kind`, `Row.kind`,
   `Relation.kind`. OCaml's `type` is a keyword, so we cannot use it

@@ -8,7 +8,7 @@ by the cases it doesn't have to handle. Which subset lands in any
 particular slice is a slice-plan decision, not a design-doc decision.
 
 This is a design document, not a slice plan. It is parallel in form
-and intent to [`docs/plans/dml-design.md`](dml-design.md), which
+and intent to [`docs/design/dml-design.md`](../design/dml-design.md), which
 covers `insert`, `update`, and `delete`.
 
 ## Scope

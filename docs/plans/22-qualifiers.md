@@ -1,7 +1,7 @@
 # Slice 22: Qualifier syntax and canonical output
 
 Lands the qualifier extension from
-[`docs/type-system.md`](../type-system.md): qualified names in row
+[`docs/design/type-system.md`](../design/type-system.md): qualified names in row
 literals and type expressions, qualifier-preserving canonical output,
 the `unqualify` pipe stage, and the no-silent-drop rule at sinks.
 Closes the gap left over from slice 21 — relation output was supposed

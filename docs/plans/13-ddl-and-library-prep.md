@@ -9,7 +9,7 @@ policy — that slice 16's full sub-library extraction will follow
 uniformly.
 
 The design that shapes this slice lives in
-[`docs/plans/library-structure.md`](library-structure.md). That
+[`docs/archive/library-structure.md`](../archive/library-structure.md). That
 document covers the eventual seven-library layout, the wrapping
 model, the alias conventions, and the `Ddl` split rationale.
 This slice plan implements the seed of that design: the `Ddl`
@@ -223,7 +223,7 @@ others aren't, which reads worse than one coherent move.
 ### Forward-references in older docs
 
 `docs/plans/12-list-and-drop-tables.md` and
-`docs/plans/ddl-design.md` mention "slice 13: describe and
+`docs/archive/ddl-design.md` mention "slice 13: describe and
 create" and "slice 14: fixture retirement" — both off by one
 under the new numbering. Step 1 updates these references as a
 small docs cleanup. Slice plans aren't load-bearing historical
@@ -283,7 +283,7 @@ Documentation cleanup bundled into this commit:
 
 - `docs/plans/12-list-and-drop-tables.md`: forward
   references to slices 13/14 updated to 14/15.
-- `docs/plans/ddl-design.md`: same.
+- `docs/archive/ddl-design.md`: same.
 
 ### Step 2 — Extract `Ddl_executor` module
 

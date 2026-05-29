@@ -20,7 +20,7 @@ update + delete share the upstream-identity validator that
 naturally bundles them together.
 
 The design that shapes this slice lives in
-[`docs/plans/dml-design.md`](dml-design.md). That document
+[`docs/design/dml-design.md`](../design/dml-design.md). That document
 covers insert, update, and delete coherently so that insert's
 surface isn't quietly determined by the cases it doesn't have
 to handle. This slice plan implements the insert-shaped

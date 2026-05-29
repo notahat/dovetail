@@ -1,6 +1,6 @@
 # Slice 19: Collapse mutations into the pipeline universe
 
-Prep slice for the [type-system work](../type-system.md). No new
+Prep slice for the [type-system work](../design/type-system.md). No new
 user-visible features; reshapes the pipeline so every operator
 produces a relation, removing the today fork between queries and
 mutations.

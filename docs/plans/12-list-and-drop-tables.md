@@ -15,7 +15,7 @@ landing together, and fixture retirement deserves its own slice
 once the create path exists.
 
 The design that shapes this slice lives in
-[`docs/plans/ddl-design.md`](ddl-design.md). That document covers
+[`docs/archive/ddl-design.md`](../archive/ddl-design.md). That document covers
 all four DDL statements (create, drop, describe, list) coherently
 so that any single statement's shape isn't quietly determined by
 the cases it doesn't have to handle. This slice plan implements
@@ -141,7 +141,7 @@ column-list position they remain regular identifiers. The sigil is
 what reserves them, and only at top of input. This bounds the
 surface cost of DDL's universe to a single character.
 
-See [`docs/plans/ddl-design.md`](ddl-design.md) §"The sigil" for
+See [`docs/archive/ddl-design.md`](../archive/ddl-design.md) §"The sigil" for
 the full justification.
 
 ### Wrapper lives only at Ast

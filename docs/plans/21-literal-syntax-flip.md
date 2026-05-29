@@ -2,7 +2,7 @@
 
 Replaces the current `{col: val}` relation literal with the new
 `relation (type) { rows }` form from
-[`docs/type-system.md`](../type-system.md). Adds standalone row and
+[`docs/design/type-system.md`](../design/type-system.md). Adds standalone row and
 scalar literals as pipeline sources. Introduces the type-expression
 grammar (the bit inside the parens of a relation literal). Grows
 `Term.t` to cover the scalar and row rungs.

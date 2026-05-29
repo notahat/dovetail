@@ -40,7 +40,7 @@ The top rung of the type ladder, though the framework-shaped
 value type for a catalog hasn't been built yet — today the
 catalog exists only as the operations against persistent
 storage that read and write it. The target shape is sketched in
-[`docs/type-ladder.md`](type-ladder.md); the as-built operations
+[`docs/design/type-ladder.md`](design/type-ladder.md); the as-built operations
 live in
 [`lib/storage/catalog.mli`](../lib/storage/catalog.mli).
 
@@ -124,7 +124,7 @@ the transaction does. That lifetime constraint is the reason
 the executor is CPS-shaped (see above).
 
 The third rung of the type ladder; see
-[`docs/type-ladder.md`](type-ladder.md) and
+[`docs/design/type-ladder.md`](design/type-ladder.md) and
 [`lib/core/relation.mli`](../lib/core/relation.mli).
 
 ## Row
@@ -141,7 +141,7 @@ that might otherwise have name collisions. Qualifiers are how
 joins and cross products keep their columns apart.
 
 The second rung of the type ladder; see
-[`docs/type-ladder.md`](type-ladder.md) and
+[`docs/design/type-ladder.md`](design/type-ladder.md) and
 [`lib/core/row.mli`](../lib/core/row.mli).
 
 ## Scalar
@@ -152,5 +152,5 @@ compute with. A scalar has a *kind* (which of the supported types
 it is) and a payload (the bits for that type).
 
 The bottom rung of the type ladder; see
-[`docs/type-ladder.md`](type-ladder.md) and
+[`docs/design/type-ladder.md`](design/type-ladder.md) and
 [`lib/core/scalar.mli`](../lib/core/scalar.mli).

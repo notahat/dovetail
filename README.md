@@ -58,12 +58,6 @@ See [`docs/query-language.md`](docs/query-language.md) for the full
 guide -- tutorial, per-operator reference, and the expression and
 projection sublanguages.
 
-## Architecture
-
-See [`docs/architecture.md`](docs/architecture.md) for the layer
-diagram, per-layer reference for the query pipeline and storage stack,
-and the sub-library dependency graph under `lib/`.
-
 ## Roadmap
 
 ### Next up

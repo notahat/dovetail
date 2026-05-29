@@ -1,7 +1,7 @@
 # Slice 18: Rename `Value` → `Scalar` and `data` → `value`
 
 Align the `lib/core/` vocabulary with the surface language committed
-to in [`docs/type-system.md`](../type-system.md). The ladder's
+to in [`docs/design/type-system.md`](../design/type-system.md). The ladder's
 bottom-rung module becomes `Scalar` (no longer `Value`), and the
 "data" half of every rung becomes `value`. After this slice, the code
 and the surface speak the same words at every rung, with `kind` as
@@ -12,7 +12,7 @@ No behaviour changes. Pure rename, compiler-guided.
 
 ## Context
 
-`docs/type-system.md` commits to user-facing vocabulary that maps the
+`docs/design/type-system.md` commits to user-facing vocabulary that maps the
 ladder onto two patterns: `name: type` for the static-shape half and
 `name = value` for the payload half. The internal code calls these
 `kind` and `data` respectively. The `kind` → `type` split is forced
@@ -31,7 +31,7 @@ ordered row vs a stream of rows — so the name fits, and the rename
 removes the only naming awkwardness the field-rename would otherwise
 introduce.
 
-[`type-ladder.md`](../type-ladder.md) is the documented exception:
+[`type-ladder.md`](../design/type-ladder.md) is the documented exception:
 it describes the as-built code shape and uses `kind` and (after this
 slice) `value`, with the `Scalar` module name updated throughout.
 
@@ -69,10 +69,10 @@ Files renamed:
 - `lib/core/dune` module list updated
 
 Architectural docs updated to the new vocabulary:
-- `docs/type-ladder.md`
-- `docs/architecture.md`
-- `docs/literals-as-a-ladder.md`
-- `docs/type-system.md`
+- `docs/design/type-ladder.md`
+- `docs/design/architecture.md`
+- `docs/design/literals-as-a-ladder.md`
+- `docs/design/type-system.md`
 - `docs/ubiquitous-language.md`
 
 Old slice plans (`docs/plans/00-…` through `17-…`) are *not* updated

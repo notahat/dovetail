@@ -2,7 +2,7 @@
 
 Refactor `lib/core/` so the type vocabulary matches the conceptual
 ladder developed in
-[`docs/literals-as-a-ladder.md`](../literals-as-a-ladder.md): at each
+[`docs/design/literals-as-a-ladder.md`](../design/literals-as-a-ladder.md): at each
 rung of the data model (value, row, relation, catalog) there is a
 *kind* type describing shape, a *data* type holding values, and where
 useful a *bundled* `t` type pairing them. No behaviour changes. No
@@ -68,7 +68,7 @@ End-state artefacts in `lib/core/`:
    - `type 'tag t = { kind; data } constraint 'tag = [< `Set | `Bag ]`,
      preserving the phantom tag
 4. Every consumer (`lib/`, `bin/`, `test/`) updated to the new names.
-5. `docs/architecture.md` notes the new vocabulary.
+5. `docs/design/architecture.md` notes the new vocabulary.
 
 The catalog rung is deliberately not part of this slice. Unlike the
 row and relation rungs, `Catalog.kind` and `Catalog.invariant` have
