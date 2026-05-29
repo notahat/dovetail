@@ -1,29 +1,29 @@
 # Query language: pipeline operators reference
 
 Part of the [query-language guide](query-language.md). One
-subsection per pipeline operator: syntax, semantics, and a single
+subsection per pipeline form: syntax, semantics, and a single
 worked example against the example tables. For a narrative
-introduction,
-see the [tutorial](query-language-tutorial.md); for the expression
-and projection sublanguages that appear inside `restrict`,
-`project`, and the `on` clause of `join`, see the
+introduction, see the [tutorial](query-language-tutorial.md); for
+the expression and projection sublanguages that appear inside
+`restrict`, `project`, and the `on` clause of `join`, see the
 [expression and projection reference](query-language-expressions.md).
 
-A pipeline starts with one of six source forms: a relation
-reference (a bare table name), a literal at any of the scalar,
-row, or relation rungs, the bare `catalog` keyword, or a `drop
-table <name>` leaf. (A bare type expression also stands at
-pipeline-source position, but only as the upstream for the
-empty form of `create table` -- see that section.) The literal
-forms let you feed a value into the pipeline without first
-putting it in a table -- useful for trying out operators,
-asking `| type` what a value's type is, and (for relation
-literals) seeding tables through `insert into`. The `catalog`
-source surfaces the database's catalog so operators like
-`tables` can read it. `drop table` is a complete pipeline on
-its own; nothing sits to its left.
+Every pipeline starts at a **source**, threads through zero or
+more **operators**, and may end at a **sink** that writes to the
+catalog or a table. The three groups each get a section below.
 
-## Relation references
+## Sources
+
+A source produces the initial value at the head of the pipeline.
+The most common is a bare table name, which reads the whole
+table. The three literal forms feed a value straight in without
+going via a table -- useful for trying out operators, asking
+`| type` what a value's type is, and (for relation literals)
+seeding tables through `insert into`. The `catalog` keyword
+surfaces the database's catalog so the `tables` and `type`
+operators can read it.
+
+### Relation references
 
 **Syntax:** `<table-name>`
 
@@ -43,7 +43,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 }
 ```
 
-## Scalar literals
+### Scalar literals
 
 **Syntax:** `<int64-literal>` | `"<string-literal>"` | `true` | `false`
 
@@ -66,7 +66,7 @@ true
 int64
 ```
 
-## Row literals
+### Row literals
 
 **Syntax:** `(<name> = <scalar>, ...)`
 
@@ -87,7 +87,7 @@ yields the row's type.
 ()
 ```
 
-## Relation literals
+### Relation literals
 
 **Syntax:** `relation (<row-type> [, <refinement>...]) { <row-literal>, ... }`
 
@@ -114,7 +114,7 @@ relation (id: int64, name: string) {
 (id: int64, name: string)
 ```
 
-## catalog
+### catalog
 
 **Syntax:** `catalog`
 
@@ -138,7 +138,14 @@ common interrogation:
 catalog { orders: (orders.id: int64, orders.user_id: int64, orders.description: string, orders.amount: int64, primary key (id)), users: (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id)) }
 ```
 
-## restrict
+## Operators
+
+An operator transforms its left-hand input and yields a new value.
+Most operate on a relation; `tables` consumes a catalog; `type`
+reaches across every rung and yields the input's type rather than
+its value.
+
+### restrict
 
 **Syntax:** `<input> | restrict <predicate>`
 
@@ -157,7 +164,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 }
 ```
 
-## project
+### project
 
 **Syntax:** `<input> | project <column-list>`
 
@@ -181,7 +188,7 @@ relation (users.name: string, users.email: string) {
 }
 ```
 
-## cross
+### cross
 
 **Syntax:** `<input> | cross <relation>`
 
@@ -209,7 +216,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 }
 ```
 
-## join
+### join
 
 **Syntax:** `<input> | join <relation> on <predicate>`
 
@@ -232,7 +239,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 }
 ```
 
-## unqualify
+### unqualify
 
 **Syntax:** `<input> | unqualify`
 
@@ -256,7 +263,7 @@ relation (id: int64, description: string, amount: int64) {
 }
 ```
 
-## tables
+### tables
 
 **Syntax:** `<input> | tables`
 
@@ -274,7 +281,7 @@ relation (name: string) {
 }
 ```
 
-## type
+### type
 
 **Syntax:** `<input> | type`
 
@@ -294,7 +301,15 @@ because the second `type`'s input is already a type.
 (users.id: int64, users.name: string, users.email: string, users.active: bool, primary key (id))
 ```
 
-## insert into
+## Sinks
+
+A sink mutates the catalog or a table and reports the result as a
+one-row status relation. Every sink is terminal: the parser
+rejects any pipe-step after it, and at most one sink may appear
+per pipeline. The whole sink runs in one write transaction; any
+failure aborts the transaction and the database is unchanged.
+
+### insert into
 
 **Syntax:** `<input> | insert into <table-name>`
 
@@ -306,12 +321,6 @@ literal's columns must be a permutation of the target's columns, and
 each value must match its target column's type. Arbitrary upstream
 pipelines (insert-from-query) are deferred to a later slice.
 
-Insert is a regular pipeline operator with one surface restriction:
-the parser rejects any pipe-step after `insert into <name>`, so it
-always appears as the last step. The whole insert runs in one write
-transaction; a primary-key collision (or any other failure) aborts
-the transaction and the table is unchanged.
-
 ```
 > relation (id: int64, user_id: int64, description: string, amount: int64) { (id = 7, user_id = 4, description = "Muffin", amount = 2) } | insert into orders
 relation (insert_count: int64) {
@@ -319,7 +328,7 @@ relation (insert_count: int64) {
 }
 ```
 
-## create table
+### create table
 
 **Syntax:** `<type-expression> | create table <table-name>` (empty
 form) or `<value-pipeline> | create table <table-name>` (seeded
@@ -339,13 +348,6 @@ The seeded form rejects sources whose row type carries qualifiers
 relation -- and rejects sources whose derived type has no primary
 key. A primary key is required because tables are index-organised.
 
-`create table` is a terminal sink: the parser rejects any pipe-step
-after `create table <name>`, and at most one sink (`create table`
-or `insert into`) is allowed per pipeline. The whole operation runs
-in one write transaction; a name collision with an existing table
-(or any other failure) aborts the transaction and the catalog is
-unchanged.
-
 ```
 > (id: int64, name: string, primary key (id)) | create table widgets
 relation (created: string) {
@@ -357,17 +359,15 @@ relation (created: string) {
 }
 ```
 
-## drop table
+### drop table
 
 **Syntax:** `drop table <table-name>`
 
 Removes `<table-name>` from the catalog and reclaims its storage,
 and yields a one-row relation `(dropped: string)` reporting the
-dropped table's name. `drop table` is a leaf source: nothing sits
-to its left, and the parser rejects any pipe-step after it. The
-operation runs in one write transaction; a missing-table error (or
-any other failure) aborts the transaction and the catalog is
-unchanged.
+dropped table's name. Unlike the other sinks `drop table` takes
+no upstream -- nothing sits to its left, and the whole pipeline
+is just `drop table <name>`.
 
 ```
 > drop table widgets
