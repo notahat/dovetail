@@ -17,7 +17,7 @@ Learn the query language from the ground up.
 One file per pipeline source, operator, sink, expression form, and
 type, with a worked example for each.
 
-- [Reference index](reference/README.md)
+- [Reference index](reference/ra/README.md)
 
 ## Internals — understanding the implementation
 

@@ -15,9 +15,9 @@ The guide is in several parts:
   tables every example reads against.
 - [Tutorial](walkthrough.md) -- one query grown stage
   by stage, introducing each operator in turn.
-- [Pipeline operators reference](../reference/README.md)
+- [Pipeline operators reference](../reference/ra/README.md)
   -- per-operator syntax and semantics.
-- [Expression and projection reference](../reference/README.md)
+- [Expression and projection reference](../reference/ra/README.md)
   -- the sublanguages used inside `restrict`, `project`, and the
   `on` clause of `join`.
 

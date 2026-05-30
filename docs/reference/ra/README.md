@@ -2,8 +2,8 @@
 
 One file per item: each pipeline source, operator, sink, expression
 form, and type. For a narrative introduction see the
-[tutorial](../tutorial/walkthrough.md); every example reads against the
-[example tables](../tutorial/README.md#the-example-tables).
+[tutorial](../../tutorial/walkthrough.md); every example reads against the
+[example tables](../../tutorial/README.md#the-example-tables).
 
 A pipeline starts at a **source**, threads through zero or more
 **operators**, and may end at a **sink** that writes to the catalog or a
