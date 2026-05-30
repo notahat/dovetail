@@ -24,3 +24,15 @@ across every rung and yields the input's type rather than its value.
 - [unqualify](unqualify.md) — strip column qualifiers
 - [tables](tables.md) — list a catalog's tables
 - [type](type.md) — report the input's type
+
+## Sinks
+
+A sink mutates the catalog or a table and reports the result as a
+one-row status relation. Every sink is terminal: the parser rejects any
+pipe-step after it, and at most one sink may appear per pipeline. The
+whole sink runs in one write transaction; any failure aborts the
+transaction and the database is unchanged.
+
+- [insert into](insert-into.md) — append rows to a table
+- [create table](create-table.md) — add a new table, empty or seeded
+- [drop table](drop-table.md) — remove a table and its storage
