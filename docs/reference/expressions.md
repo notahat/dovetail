@@ -7,7 +7,7 @@ clause, and the projection language used in `project`. This file
 covers both.
 
 For the pipeline operators themselves, see the
-[operator reference](pipeline-operators.md); for a
+[operator reference](README.md); for a
 narrative introduction, see the
 [tutorial](../tutorial/walkthrough.md).
 

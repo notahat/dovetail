@@ -15,7 +15,7 @@ The guide is in several parts:
   tables every example reads against.
 - [Tutorial](walkthrough.md) -- one query grown stage
   by stage, introducing each operator in turn.
-- [Pipeline operators reference](../reference/pipeline-operators.md)
+- [Pipeline operators reference](../reference/README.md)
   -- per-operator syntax and semantics.
 - [Expression and projection reference](../reference/expressions.md)
   -- the sublanguages used inside `restrict`, `project`, and the

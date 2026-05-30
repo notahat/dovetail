@@ -11,6 +11,20 @@ table. The **expression** and **projection** sublanguages appear inside
 operators like `restrict`, `project`, and `join`. The **types** are what
 `| type` reports for a value at each rung.
 
+## Sources
+
+A source produces the initial value at the head of the pipeline. The
+most common is a bare table name, which reads the whole table. The three
+literal forms feed a value straight in without going via a table. The
+`catalog` keyword surfaces the database's catalog so the `tables` and
+`type` operators can read it.
+
+- [Relation references](relation-reference.md) — read a table by name
+- [Scalar literals](scalar-literal.md) — `42`, `"hello"`, `true`
+- [Row literals](row-literal.md) — `(id = 1, name = "alice")`
+- [Relation literals](relation-literal.md) — `relation (...) { ... }`
+- [catalog](catalog.md) — the database's catalog as a value
+
 ## Operators
 
 An operator transforms its left-hand input and yields a new value. Most
