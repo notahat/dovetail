@@ -54,8 +54,8 @@ relation (users.name: string, orders.description: string, orders.amount: int64) 
 }
 ```
 
-See [`docs/query-language.md`](docs/query-language.md) for the full
-guide -- tutorial, per-operator reference, and the expression and
+See [the query-language guide](docs/tutorial/README.md) for the full
+walkthrough -- tutorial, per-operator reference, and the expression and
 projection sublanguages.
 
 ## Roadmap

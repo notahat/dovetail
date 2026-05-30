@@ -15,8 +15,8 @@ open Test_helpers
     in [test/integration/dune] mirror each file into the build tree. *)
 let verified_files =
   [
-    "../../docs/query-language.md";
-    "../../docs/query-language-tutorial.md";
+    "../../docs/tutorial/README.md";
+    "../../docs/tutorial/walkthrough.md";
     "../../docs/query-language-pipeline-operators.md";
     "../../docs/query-language-expressions.md";
     "../../README.md";

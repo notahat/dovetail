@@ -25,7 +25,7 @@ in combinations that are semantically nonsense. Those checks
 belong to later layers.
 
 In Dovetail the AST lives in
-[`lib/surface_ra/ast.mli`](../lib/surface_ra/ast.mli), and is the
+[`lib/surface_ra/ast.mli`](../../lib/surface_ra/ast.mli), and is the
 output of the parser and the input to `Lower`.
 
 ## Catalog
@@ -40,9 +40,9 @@ The top rung of the type ladder, though the framework-shaped
 value type for a catalog hasn't been built yet — today the
 catalog exists only as the operations against persistent
 storage that read and write it. The target shape is sketched in
-[`docs/design/type-ladder.md`](design/type-ladder.md); the as-built operations
+[`docs/design/type-ladder.md`](../design/type-ladder.md); the as-built operations
 live in
-[`lib/storage/catalog.mli`](../lib/storage/catalog.mli).
+[`lib/storage/catalog.mli`](../../lib/storage/catalog.mli).
 
 ## CPS — Continuation-passing style
 
@@ -70,9 +70,9 @@ relation, and tears the cursors down when the continuation
 returns. The relation's lifetime is structurally bounded by
 the call to `eval`.
 
-See [`lib/execution/eval.mli`](../lib/execution/eval.mli) for the
+See [`lib/execution/eval.mli`](../../lib/execution/eval.mli) for the
 entry-point signature and slice 6
-([`docs/plans/06-streaming-cps-executor.md`](plans/06-streaming-cps-executor.md))
+([`docs/plans/06-streaming-cps-executor.md`](../plans/06-streaming-cps-executor.md))
 for the rationale behind the conversion to CPS.
 
 ## IR — Intermediate representation
@@ -87,13 +87,13 @@ about.
 Dovetail has two IRs between the AST and the executor:
 
 - **Logical IR**
-  ([`lib/plan/logical.mli`](../lib/plan/logical.mli)) —
+  ([`lib/plan/logical.mli`](../../lib/plan/logical.mli)) —
   relational algebra. Says *what* the query computes:
   scans, restrictions, projections, products, joins.
   Independent of execution strategy. The output of `Lower`,
   the input of `Translate`.
 - **Physical IR**
-  ([`lib/plan/physical.mli`](../lib/plan/physical.mli)) —
+  ([`lib/plan/physical.mli`](../../lib/plan/physical.mli)) —
   concrete execution plan. Says *how* the query runs:
   cursors, filters, nested-loop joins, point lookups. The
   output of `Translate`, the input of `Eval`.
@@ -124,8 +124,8 @@ the transaction does. That lifetime constraint is the reason
 the executor is CPS-shaped (see above).
 
 The third rung of the type ladder; see
-[`docs/design/type-ladder.md`](design/type-ladder.md) and
-[`lib/core/relation.mli`](../lib/core/relation.mli).
+[`docs/design/type-ladder.md`](../design/type-ladder.md) and
+[`lib/core/relation.mli`](../../lib/core/relation.mli).
 
 ## Row
 
@@ -141,8 +141,8 @@ that might otherwise have name collisions. Qualifiers are how
 joins and cross products keep their columns apart.
 
 The second rung of the type ladder; see
-[`docs/design/type-ladder.md`](design/type-ladder.md) and
-[`lib/core/row.mli`](../lib/core/row.mli).
+[`docs/design/type-ladder.md`](../design/type-ladder.md) and
+[`lib/core/row.mli`](../../lib/core/row.mli).
 
 ## Scalar
 
@@ -152,5 +152,5 @@ compute with. A scalar has a *kind* (which of the supported types
 it is) and a payload (the bits for that type).
 
 The bottom rung of the type ladder; see
-[`docs/design/type-ladder.md`](design/type-ladder.md) and
-[`lib/core/scalar.mli`](../lib/core/scalar.mli).
+[`docs/design/type-ladder.md`](../design/type-ladder.md) and
+[`lib/core/scalar.mli`](../../lib/core/scalar.mli).

@@ -84,7 +84,7 @@ hardcoded rows; the seeder is opt-in.
 | `Relation` | `Relation.kind = { row_kind; refinements }` adds refinements (currently just `Primary_key`). `Relation.t` is a kind plus a `Row.value Seq.t`. |
 
 `Scalar`, `Row`, and `Relation` form a deliberate three-rung type
-ladder; see [`type-ladder.md`](type-ladder.md) for the per-rung
+ladder; see [`type-ladder.md`](../design/type-ladder.md) for the per-rung
 `kind`/`value`/`t` pattern and the rules for adding refinements.
 
 ## Sub-library dependencies

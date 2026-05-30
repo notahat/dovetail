@@ -1,13 +1,13 @@
 # Query language tutorial
 
-Part of the [query-language guide](query-language.md). This file
+Part of the [query-language tutorial](README.md). This file
 grows one query, one operator at a time. By the end you'll have
 built the canonical multi-operator query -- a join with a trailing
 projection -- and seen enough of the pipeline shape to make the
 operator reference feel familiar.
 
 Every query reads against the example tables described in the
-[guide overview](query-language.md#the-example-tables), so you can
+[overview](README.md#the-example-tables), so you can
 compare each transformation to what came before.
 
 ## Start with a table
@@ -140,8 +140,8 @@ That's the canonical join-and-project shape. The full operator
 set is wider -- the literal source forms, `unqualify`, `type`,
 `tables`, `catalog`, the `insert into`, `create table`, and
 `drop table` sinks -- and the
-[pipeline operator reference](query-language-pipeline-operators.md)
+[pipeline operator reference](../query-language-pipeline-operators.md)
 systematises each one. The
-[expression and projection reference](query-language-expressions.md)
+[expression and projection reference](../query-language-expressions.md)
 covers the sublanguages used inside `restrict`, `project`, and the
 `on` clause of `join`.
