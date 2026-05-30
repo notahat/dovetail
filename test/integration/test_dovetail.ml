@@ -185,6 +185,29 @@ let test_sql_where_non_bool_predicate_reports_error () =
   in
   expect_stdout_contains stdout_text [ "error:" ]
 
+(* A column-list select narrows the result to the named columns: [name, id]
+   keeps both, in that order, and drops [email] and [active] -- so the rows'
+   email addresses no longer appear, while every user's name still does. *)
+let test_sql_column_list_projects_named_columns () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT name, id FROM users\n" ()
+  in
+  expect_stdout_contains stdout_text
+    [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve"; "(5 rows)" ];
+  expect_stdout_omits stdout_text [ "email"; "alice@example.com"; "active" ]
+
+(* Projecting a column the table does not have is rejected by the same
+   typecheck path the RA surface uses, printing an [error:] rather than rows. *)
+let test_sql_unknown_projected_column_reports_error () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT nonexistent FROM users\n" ()
+  in
+  expect_stdout_contains stdout_text [ "error:" ]
+
 let () =
   Alcotest.run "dovetail"
     [
@@ -218,5 +241,11 @@ let () =
           Alcotest.test_case
             "[--sql] SELECT * ... WHERE <non-bool> reports a typecheck error"
             `Slow test_sql_where_non_bool_predicate_reports_error;
+          Alcotest.test_case
+            "[--sql] SELECT <columns> ... narrows to the named columns" `Slow
+            test_sql_column_list_projects_named_columns;
+          Alcotest.test_case
+            "[--sql] SELECT <unknown column> reports a typecheck error" `Slow
+            test_sql_unknown_projected_column_reports_error;
         ] );
     ]

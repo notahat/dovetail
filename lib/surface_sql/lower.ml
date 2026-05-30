@@ -6,6 +6,9 @@ let lower_column_reference (reference : Ast.column_reference) :
     Row.column_reference =
   { qualifier = reference.qualifier; name = reference.name }
 
+let lower_projection (columns : Ast.column_reference list) : Plan.Projection.t =
+  List.map lower_column_reference columns
+
 let lower_comparison_op (op : Ast.comparison_op) : Expression.comparison_op =
   match op with
   | Equal -> Equal
@@ -42,7 +45,5 @@ let lower (ast : Ast.t) : Plan.Logical.t =
       in
       match select_list with
       | All -> filtered
-      | Columns _ ->
-          (* TODO(sql-project): lower the column list to a Project over the
-             filtered sub-plan. *)
-          failwith "column-list SELECT is not yet supported")
+      | Columns columns ->
+          Project { input = filtered; columns = lower_projection columns })
