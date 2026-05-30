@@ -6,7 +6,7 @@ A pipeline operator. Part of the [query-language reference](README.md).
 
 Keeps rows of `<input>` for which `<predicate>` evaluates to true.
 The predicate is any expression that resolves to a Bool; see the
-[expression reference](expressions.md) for the full grammar. The
+[expression reference](README.md) for the full grammar. The
 short version: literals, column references, comparisons (`=`, `<>`,
 `<`, `<=`, `>`, `>=`), and the boolean operators `and`, `or`, `not`.
 Output schema and column qualifiers are `<input>`'s, unchanged.

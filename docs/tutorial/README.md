@@ -17,7 +17,7 @@ The guide is in several parts:
   by stage, introducing each operator in turn.
 - [Pipeline operators reference](../reference/README.md)
   -- per-operator syntax and semantics.
-- [Expression and projection reference](../reference/expressions.md)
+- [Expression and projection reference](../reference/README.md)
   -- the sublanguages used inside `restrict`, `project`, and the
   `on` clause of `join`.
 

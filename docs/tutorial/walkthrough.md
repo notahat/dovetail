@@ -142,6 +142,6 @@ set is wider -- the literal source forms, `unqualify`, `type`,
 `drop table` sinks -- and the
 [pipeline operator reference](../reference/README.md)
 systematises each one. The
-[expression and projection reference](../reference/expressions.md)
+[expression and projection reference](../reference/README.md)
 covers the sublanguages used inside `restrict`, `project`, and the
 `on` clause of `join`.

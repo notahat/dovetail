@@ -50,3 +50,16 @@ transaction and the database is unchanged.
 - [insert into](insert-into.md) — append rows to a table
 - [create table](create-table.md) — add a new table, empty or seeded
 - [drop table](drop-table.md) — remove a table and its storage
+
+## Expressions
+
+The expression language is used as a predicate in `restrict` and in
+`join`'s `on` clause; the projection language is used in `project`.
+
+- [Literals](literals.md) — `42`, `"hello"`, `true`, `false`
+- [Column references](column-references.md) — `id`, `users.id`
+- [Comparisons](comparisons.md) — `=`, `<>`, `<`, `<=`, `>`, `>=`
+- [Boolean operators](boolean-operators.md) — `and`, `or`, `not`
+- [Parentheses](parentheses.md) — grouping to override precedence
+- [Precedence and associativity](precedence.md) — how the forms bind
+- [Projections](projections.md) — the column list `project` takes

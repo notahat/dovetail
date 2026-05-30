@@ -6,7 +6,7 @@ A pipeline source. Part of the [query-language reference](README.md).
 
 A bare scalar at the head of a pipeline yields that scalar value.
 The supported forms are the same three the
-[expression reference](expressions.md#literals)
+[expression reference](literals.md)
 describes: signed decimal integers, double-quoted strings (with
 `\"` and `\\` escapes), and the keywords `true` and `false`. The
 only operator that consumes a scalar is `type`, which yields the

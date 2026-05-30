@@ -7,7 +7,7 @@ A pipeline operator. Part of the [query-language reference](README.md).
 Keeps only the named columns from `<input>`, in the order listed.
 Each entry is either a bare name (`name`) or qualified
 (`users.name`); see the
-[projection reference](expressions.md#projections)
+[projection reference](projections.md)
 for the precise rules. Bare names must resolve unambiguously
 against `<input>`'s schema, duplicates in the column list are
 rejected, and each retained column keeps its qualifier from
