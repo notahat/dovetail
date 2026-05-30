@@ -53,18 +53,28 @@ let translate_in environment transaction ~output ~show_logical ~show_physical
   if show_physical then Plan.Physical.format output physical_plan;
   physical_plan
 
+(* Render an evaluated [term] to [output] in the surface's result style. The
+   SQL surface shows a result relation as a psql-style table; the RA surface
+   (and any non-relation term) keeps the canonical {!Term.format} form, which
+   round-trips as RA input. No trailing newline -- the caller adds the cut. *)
+let format_term ~surface output term =
+  match (surface, term) with
+  | `Sql, Term.Relation_value relation -> Sql_table.format output relation
+  | _ -> Term.format output term
+
 (* Translate [logical_plan] inside [transaction], evaluate the resulting
    physical plan, and pretty-print the relation to [output]. Insert plans
    produce a one-row [(insert_count : int64)] relation; query plans produce
-   their result relation; both render the same way through [Term.format]. *)
+   their result relation; rendering is delegated to [format_term], which picks
+   the surface's result style. *)
 let print_result environment transaction ~output ~show_logical ~show_physical
-    logical_plan =
+    ~surface logical_plan =
   let physical_plan =
     translate_in environment transaction ~output ~show_logical ~show_physical
       logical_plan
   in
   Execution.Eval.eval environment transaction physical_plan (fun term ->
-      Format.fprintf output "%a@\n" Term.format term)
+      Format.fprintf output "%a@\n" (format_term ~surface) term)
 
 (* Run a single parsed query against [environment] and pretty-print the
    result to [output]. The plan's required access picks the transaction
@@ -74,18 +84,18 @@ let print_result environment transaction ~output ~show_logical ~show_physical
    one because [with_read_transaction] and [with_write_transaction] carry
    different permission tags -- unifying them would need a rank-2 type
    trick the gain doesn't justify. *)
-let evaluate_and_print environment ~output ~show_logical ~show_physical
+let evaluate_and_print environment ~output ~show_logical ~show_physical ~surface
     logical_plan =
   try
     match Plan.Logical.required_access logical_plan with
     | `Read ->
         Storage.Engine.with_read_transaction environment (fun transaction ->
             print_result environment transaction ~output ~show_logical
-              ~show_physical logical_plan)
+              ~show_physical ~surface logical_plan)
     | `Write ->
         Storage.Engine.with_write_transaction environment (fun transaction ->
             print_result environment transaction ~output ~show_logical
-              ~show_physical logical_plan)
+              ~show_physical ~surface logical_plan)
   with
   | Failure message -> Format.fprintf output "error: %s@." message
   | Typecheck_failed errors ->
@@ -103,7 +113,7 @@ let process_line environment ~output ~show_logical ~show_physical ~surface line
   | Error message -> Format.fprintf output "parse error: %s@." message
   | Ok logical_plan ->
       evaluate_and_print environment ~output ~show_logical ~show_physical
-        logical_plan
+        ~surface logical_plan
 
 let run ?(show_logical = false) ?(show_physical = false) ?(surface = `Ra)
     environment ~read_line ~output =

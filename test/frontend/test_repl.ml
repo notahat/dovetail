@@ -263,6 +263,22 @@ let test_sql_select_star_prints_all_five_rows () =
     [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve" ];
   check_contains "sql select" output "alice@example.com"
 
+(* The SQL surface renders results as a psql-style table rather than the
+   canonical relation literal: bare-name headers, a dashed rule, and a
+   trailing row count, with cell values shown bare (no [email = "..."]
+   binding form). *)
+let test_sql_select_star_renders_psql_table () =
+  let output = run_with_input ~surface:`Sql [ "SELECT * FROM users" ] in
+  check_contains "bare-name header" output "email";
+  check_contains "dashed rule" output "---";
+  check_contains "row-count footer" output "(5 rows)";
+  Alcotest.(check bool)
+    "not the canonical relation literal" false
+    (contains_substring output "relation (");
+  Alcotest.(check bool)
+    "cells are bare, not name = value bindings" false
+    (contains_substring output "email = ")
+
 (* The SQL session prompts with [sql> ] so transcripts show which surface
    is live; the RA session keeps [> ]. *)
 let test_sql_session_uses_the_sql_prompt () =
@@ -344,6 +360,8 @@ let () =
             `Quick test_post_join_renders_canonical_qualified_literal;
           Alcotest.test_case "a SQL SELECT * session prints all five rows"
             `Quick test_sql_select_star_prints_all_five_rows;
+          Alcotest.test_case "a SQL SELECT * session renders a psql-style table"
+            `Quick test_sql_select_star_renders_psql_table;
           Alcotest.test_case "the SQL session uses the sql> prompt" `Quick
             test_sql_session_uses_the_sql_prompt;
           Alcotest.test_case "the RA session keeps the default prompt" `Quick

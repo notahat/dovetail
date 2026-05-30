@@ -121,7 +121,16 @@ let test_sql_select_star_prints_fixture_rows () =
       ~stdin_text:"SELECT * FROM users\n" ()
   in
   expect_stdout_contains stdout_text
-    [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve"; "alice@example.com" ]
+    [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve"; "alice@example.com" ];
+  (* The SQL surface renders a psql-style table: a dashed rule and a
+     trailing row count, not the RA surface's relation-literal form. *)
+  expect_stdout_contains stdout_text [ "---"; "(5 rows)" ];
+  if contains_substring stdout_text "relation (" then
+    Alcotest.failf
+      "expected the SQL surface to render a table, not a relation literal\n\
+       --- stdout ---\n\
+       %s"
+      stdout_text
 
 (* A SQL query against a missing table reaches eval and reports the same
    [error:] the RA surface would; the session does not crash. *)
