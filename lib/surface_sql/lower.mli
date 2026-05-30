@@ -7,10 +7,16 @@
 
     [SELECT *] is the identity over its FROM/WHERE sub-plan -- it lowers with no
     [Project] node, preserving the input's primary key and set/bag tag, exactly
-    as a relational-algebra pipeline that omits its [project] step does. *)
+    as a relational-algebra pipeline that omits its [project] step does. A
+    [WHERE] predicate lowers to a [Restrict] wrapping the [Scan]; the predicate
+    maps onto the shared {!Dovetail_core.Expression.t} (both [<>] and [!=]
+    having already been collapsed to [NotEqual] by the parser). *)
 
 module Plan = Dovetail_plan
 
 val lower : Ast.t -> Plan.Logical.t
 (** [lower ast] lowers a parsed SQL statement to a logical plan.
-    [SELECT * FROM <table>] lowers to [Scan { table }]. *)
+    [SELECT * FROM <table>] lowers to [Scan { table }]; a [WHERE <predicate>]
+    wraps that scan in [Restrict { input = Scan; predicate }]. The predicate's
+    kind discipline -- that it resolves to [Bool] -- is enforced later, by
+    {!Plan.Typecheck}, exactly as for the relational-algebra surface. *)

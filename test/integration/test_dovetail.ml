@@ -142,6 +142,49 @@ let test_sql_select_from_missing_table_reports_error () =
   in
   expect_stdout_contains stdout_text [ "error:" ]
 
+(* Assert every substring in [absent_substrings] is missing from [stdout_text],
+   failing with the captured output when one slips through. *)
+let expect_stdout_omits stdout_text absent_substrings =
+  List.iter
+    (fun absent ->
+      if contains_substring stdout_text absent then
+        Alcotest.failf "expected stdout to omit %S\n--- stdout ---\n%s" absent
+          stdout_text)
+    absent_substrings
+
+(* A bare boolean column as the predicate filters rows: [WHERE active] keeps
+   only the active users (Alice, Carol, Dave) and drops the inactive ones,
+   then renders the three survivors as a psql-style table. *)
+let test_sql_where_bare_bool_filters_rows () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT * FROM users WHERE active\n" ()
+  in
+  expect_stdout_contains stdout_text [ "Alice"; "Carol"; "Dave"; "(3 rows)" ];
+  expect_stdout_omits stdout_text [ "Bob"; "Eve" ]
+
+(* A comparison predicate against a single-quoted string literal filters to the
+   matching row. *)
+let test_sql_where_string_comparison_filters_rows () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT * FROM users WHERE name = 'Alice'\n" ()
+  in
+  expect_stdout_contains stdout_text [ "Alice"; "(1 row)" ];
+  expect_stdout_omits stdout_text [ "Bob"; "Carol" ]
+
+(* A non-boolean predicate (a bare int64 column) is rejected by the same
+   typecheck path the RA surface uses, printing an [error:] rather than rows. *)
+let test_sql_where_non_bool_predicate_reports_error () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT * FROM users WHERE id\n" ()
+  in
+  expect_stdout_contains stdout_text [ "error:" ]
+
 let () =
   Alcotest.run "dovetail"
     [
@@ -166,5 +209,14 @@ let () =
             test_sql_select_star_prints_fixture_rows;
           Alcotest.test_case "[--sql] SELECT * FROM <missing> reports an error"
             `Slow test_sql_select_from_missing_table_reports_error;
+          Alcotest.test_case
+            "[--sql] SELECT * ... WHERE <bare bool> filters rows" `Slow
+            test_sql_where_bare_bool_filters_rows;
+          Alcotest.test_case
+            "[--sql] SELECT * ... WHERE <string comparison> filters rows" `Slow
+            test_sql_where_string_comparison_filters_rows;
+          Alcotest.test_case
+            "[--sql] SELECT * ... WHERE <non-bool> reports a typecheck error"
+            `Slow test_sql_where_non_bool_predicate_reports_error;
         ] );
     ]
