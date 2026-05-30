@@ -6,10 +6,11 @@ open Test_helpers
 (** Run the REPL against a populated environment with [lines] as input,
     capturing all formatter output as a string. [show_logical] and
     [show_physical] default to [false], matching the binary's defaults. *)
-let run_with_input ?(show_logical = false) ?(show_physical = false) lines =
+let run_with_input ?(show_logical = false) ?(show_physical = false)
+    ?(surface = `Ra) lines =
   with_fixture_environment @@ fun environment ->
   with_captured_formatter @@ fun formatter ->
-  Repl.run ~show_logical ~show_physical environment
+  Repl.run ~show_logical ~show_physical ~surface environment
     ~read_line:(read_line_from_list lines)
     ~output:formatter
 
@@ -251,6 +252,46 @@ let test_post_join_renders_canonical_qualified_literal () =
   check_contains "qualified field on the join's right side" output
     "orders.user_id = "
 
+(* The SQL surface runs end-to-end in-process: a [~surface:`Sql] session
+   parses [SELECT * FROM users] with the SQL parser, lowers it to the same
+   logical Scan the RA surface produces, and prints the fixture rows. This
+   is the first place SQL runs through the full pipeline. *)
+let test_sql_select_star_prints_all_five_rows () =
+  let output = run_with_input ~surface:`Sql [ "SELECT * FROM users" ] in
+  List.iter
+    (fun name -> check_contains "sql select" output name)
+    [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve" ];
+  check_contains "sql select" output "alice@example.com"
+
+(* The SQL session prompts with [sql> ] so transcripts show which surface
+   is live; the RA session keeps [> ]. *)
+let test_sql_session_uses_the_sql_prompt () =
+  let output = run_with_input ~surface:`Sql [] in
+  Alcotest.(check string) "sql prompt" "sql> " output
+
+let test_ra_session_keeps_the_default_prompt () =
+  let output = run_with_input ~surface:`Ra [] in
+  Alcotest.(check string) "ra prompt" "> " output
+
+(* A SQL parse failure lands in the same [parse error:] channel the RA
+   surface uses, and the loop continues so the next line still runs. *)
+let test_sql_parse_error_continues_loop () =
+  let output =
+    run_with_input ~surface:`Sql [ "SELECT FROM users"; "SELECT * FROM users" ]
+  in
+  check_contains "sql parse error" output "parse error";
+  check_contains "loop continues after sql parse error" output "Alice"
+
+(* A SQL query against a missing table reaches eval and reports the same
+   [error:] the RA surface would, then the loop continues. *)
+let test_sql_eval_error_continues_loop () =
+  let output =
+    run_with_input ~surface:`Sql
+      [ "SELECT * FROM nonexistent"; "SELECT * FROM users" ]
+  in
+  check_contains "sql eval error" output "error:";
+  check_contains "loop continues after sql eval error" output "Alice"
+
 let () =
   Alcotest.run "repl"
     [
@@ -301,5 +342,15 @@ let () =
           Alcotest.test_case
             "a post-join relation renders as the canonical qualified literal"
             `Quick test_post_join_renders_canonical_qualified_literal;
+          Alcotest.test_case "a SQL SELECT * session prints all five rows"
+            `Quick test_sql_select_star_prints_all_five_rows;
+          Alcotest.test_case "the SQL session uses the sql> prompt" `Quick
+            test_sql_session_uses_the_sql_prompt;
+          Alcotest.test_case "the RA session keeps the default prompt" `Quick
+            test_ra_session_keeps_the_default_prompt;
+          Alcotest.test_case "loop continues after a SQL parse error" `Quick
+            test_sql_parse_error_continues_loop;
+          Alcotest.test_case "loop continues after a SQL eval error" `Quick
+            test_sql_eval_error_continues_loop;
         ] );
     ]

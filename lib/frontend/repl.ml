@@ -3,7 +3,13 @@ module Term = Dovetail_core.Term
 module Storage = Dovetail_storage
 module Plan = Dovetail_plan
 module Surface_ra = Dovetail_surface_ra
+module Surface_sql = Dovetail_surface_sql
 module Execution = Dovetail_execution
+
+(* Which surface language the session speaks. One surface per REPL run,
+   chosen at launch; there is no per-line auto-detection or mode command.
+   [`Ra] is the relational-algebra surface, [`Sql] the SQL one. *)
+type surface = [ `Ra | `Sql ]
 
 (* Raised inside a transaction when [Typecheck] reports one or more
    user-facing errors. The transaction's exception path aborts cleanly and
@@ -11,7 +17,18 @@ module Execution = Dovetail_execution
    exit out of the storage API. *)
 exception Typecheck_failed of Plan.Typecheck.error list
 
-let prompt = "> "
+(* The prompt for each surface, so a transcript shows which language is
+   live. *)
+let prompt_for = function `Ra -> "> " | `Sql -> "sql> "
+
+(* Parse [line] with the chosen surface's parser and lower the resulting
+   AST to the shared logical IR. The two surfaces have distinct ASTs but
+   lower to the same {!Plan.Logical.t}, so the result type unifies here even
+   though the parse/lower pair differs by surface. *)
+let parse_and_lower surface line =
+  match surface with
+  | `Ra -> Result.map Surface_ra.Lower.lower (Surface_ra.Parser.parse line)
+  | `Sql -> Result.map Surface_sql.Lower.lower (Surface_sql.Parser.parse line)
 
 (* Translate [logical_plan] inside [transaction] and, when the matching
    [show_*] flag is true, dump the logical and/or chosen physical plan to
@@ -77,18 +94,20 @@ let evaluate_and_print environment ~output ~show_logical ~show_physical
           Format.fprintf output "error: %s@." (Plan.Typecheck.render error))
         errors
 
-(* Process one input line: parse, lower, evaluate, print. Parse and eval
-   errors land in [output]; nothing is raised. *)
-let process_line environment ~output ~show_logical ~show_physical line =
-  match Surface_ra.Parser.parse line with
+(* Process one input line: parse and lower with [surface]'s pair, then
+   evaluate and print. Parse and eval errors land in [output]; nothing is
+   raised. *)
+let process_line environment ~output ~show_logical ~show_physical ~surface line
+    =
+  match parse_and_lower surface line with
   | Error message -> Format.fprintf output "parse error: %s@." message
-  | Ok plan ->
-      let logical_plan = Surface_ra.Lower.lower plan in
+  | Ok logical_plan ->
       evaluate_and_print environment ~output ~show_logical ~show_physical
         logical_plan
 
-let run ?(show_logical = false) ?(show_physical = false) environment ~read_line
-    ~output =
+let run ?(show_logical = false) ?(show_physical = false) ?(surface = `Ra)
+    environment ~read_line ~output =
+  let prompt = prompt_for surface in
   let rec loop () =
     Format.fprintf output "%s" prompt;
     Format.pp_print_flush output ();
@@ -96,7 +115,8 @@ let run ?(show_logical = false) ?(show_physical = false) environment ~read_line
     | None -> ()
     | Some line ->
         if String.length (String.trim line) > 0 then
-          process_line environment ~output ~show_logical ~show_physical line;
+          process_line environment ~output ~show_logical ~show_physical ~surface
+            line;
         loop ()
   in
   loop ()
