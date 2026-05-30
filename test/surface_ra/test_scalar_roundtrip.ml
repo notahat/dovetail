@@ -1,10 +1,10 @@
 (** Round-trip property tests for scalar values.
 
-    The type-system design (see [docs/type-system.md]) treats round-tripping
-    between the printer and the parser as a first-class property of every rung
-    of the value/type ladder. This file pins the property at the scalar rung:
-    for each [Scalar.value] [s] in a hand-rolled corpus, parsing the output of
-    [Scalar.format s] yields an [Ast.Literal s] back.
+    The type-system design (see [docs/design/type-system.md]) treats
+    round-tripping between the printer and the parser as a first-class property
+    of every rung of the value/type ladder. This file pins the property at the
+    scalar rung: for each [Scalar.value] [s] in a hand-rolled corpus, parsing
+    the output of [Scalar.format s] yields an [Ast.Literal s] back.
 
     The parser surface for a bare scalar today is [Parser.parse_expression] -- a
     literal is a valid standalone atom in the expression sublanguage. When the
@@ -18,7 +18,7 @@
     them verbatim while the parser only accepts the backslash-quote and
     backslash-backslash escape forms. The mismatch is documented in
     [Scalar.format]'s [.mli] and called out as an open question in
-    [docs/type-system.md]. *)
+    [docs/design/type-system.md]. *)
 
 open Dovetail_surface_ra
 module Scalar = Dovetail_core.Scalar
