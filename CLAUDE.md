@@ -11,8 +11,8 @@ still settling — refine this file as cases come up.
   and so on, with the file number matching the slice number. Read the
   relevant slice plan before writing code for it.
 - `lib/` for library code, organised into seven sub-libraries under
-  their own dune libraries: `core`, `storage`, `plan`, `ddl`,
-  `surface_ra`, `execution`, `frontend`. `bin/` for the executable.
+  their own dune libraries: `core`, `storage`, `plan`, `surface_ra`,
+  `surface_sql`, `execution`, `frontend`. `bin/` for the executable.
   `test/` mirrors `lib/` (`test/core/`, `test/storage/`, …), plus
   `test/helpers/` for shared test infrastructure and
   `test/integration/` for end-to-end tests that cross library
@@ -102,12 +102,12 @@ from that paragraph.
   `Prefix: operation: detail` when the operation is worth naming
   (`Translate: insert into "orders": ...`,
   `Eval: insert into "orders": ...`, `Projection.resolve: ...`,
-  `Relation.assemble_tuple: ...`, `DDL: drop table "orders": ...`). The
-  prefix usually matches a module name, since the user-facing concept
-  and the module that implements it usually line up. When they don't —
-  e.g. `Ddl_executor` is implementation detail, but the user typed a
-  `:` DDL statement and is in "DDL land" — the prefix names the
-  user-facing concept (`DDL:`), not the module.
+  `Relation.assemble_tuple: ...`, `Drop table: "orders": no such
+  table`). The prefix usually matches a module name, since the
+  user-facing concept and the module that implements it usually line
+  up. When they don't — e.g. `Eval_drop_table` is implementation
+  detail, but the user typed a `drop table` operator — the prefix
+  names the user-facing concept (`Drop table:`), not the module.
 - Prefer `failwith` for user-reachable failures; reserve
   `invalid_arg` for argument-shape precondition violations that callers
   could and should have prevented (e.g. `assemble_tuple`'s length checks).
@@ -124,9 +124,9 @@ from that paragraph.
 The sub-library layout means lib-internal files reach across library
 boundaries to use modules from sibling sub-libraries. Two styles:
 
-- **Library alias.** `module Ddl = Dovetail_ddl` at the top of the file;
-  references become `Ddl.Statement.t`. The prefix keeps group membership
-  visible at the call site — "this is the DDL vocabulary" — which is
+- **Library alias.** `module Plan = Dovetail_plan` at the top of the file;
+  references become `Plan.Logical.t`. The prefix keeps group membership
+  visible at the call site — "this is the plan vocabulary" — which is
   worth signal when the sibling library names a localised concern.
 - **Per-module alias.** `module Scalar = Dovetail_core.Scalar` for each
   used module; references stay unqualified (`Scalar.value`). Smaller
@@ -138,8 +138,8 @@ boundaries to use modules from sibling sub-libraries. Two styles:
 than signal). `core` types — `Scalar`, `Row`, `Relation`, `Expression`,
 `Relation_literal` — are pervasive enough that a `Core.`
 prefix on every reference would add noise without signal. Localised
-sublibraries (`storage`, `plan`, `ddl`, `surface_ra`, `execution`,
-`frontend`) carry meaningful prefixes, so the library-alias form is
+sublibraries (`storage`, `plan`, `surface_ra`, `surface_sql`,
+`execution`, `frontend`) carry meaningful prefixes, so the library-alias form is
 the default — `Storage.Engine.X`, `Plan.Logical.X`,
 `Execution.Eval.X`, `Frontend.Cli.X`.
 

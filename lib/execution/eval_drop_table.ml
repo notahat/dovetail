@@ -1,10 +1,10 @@
 module Storage = Dovetail_storage
 module Term = Dovetail_core.Term
 
-(* Drop [table_name] from the catalog and storage. Mirrors
-   {!Ddl_executor.drop_table}'s ordering: rejects an unknown table first,
-   then drops the storage subDB before the catalog entry so a partial
-   commit cannot leave orphan rows under a still-present catalog binding.
+(* Drop [table_name] from the catalog and storage: rejects an unknown
+   table first, then drops the storage subDB before the catalog entry so
+   a partial commit cannot leave orphan rows under a still-present
+   catalog binding.
 
    [transaction] is widened to a write transaction via [Obj.magic]: the
    upstream invariant is that {!Plan.Logical.required_access} reports

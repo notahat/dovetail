@@ -64,13 +64,13 @@ val delete :
 (** [delete environment transaction ~table_name] removes the catalog binding for
     [table_name], if any. A no-op when no such binding exists, and a no-op when
     the catalog subDB has not yet been created -- the catalog-aware "no such
-    table" error message lives in the higher layer
-    ({!Ddl_executor.execute_write}) so it can share scope with the storage drop.
-    Must be called inside a read-write transaction. *)
+    table" error message lives in the higher layer ({!Eval_drop_table.evaluate})
+    so it can share scope with the storage drop. Must be called inside a
+    read-write transaction. *)
 
 val table_subdb_name : string -> string
 (** [table_subdb_name table_name] returns the name of the storage subDB that
     holds the rows of [table_name]: the [table:] namespace convention
     ([table:users] for [users], and so on). Single source of truth for the
-    convention -- {!Eval} and {!Ddl_executor.execute_write} both ask here rather
+    convention -- {!Eval} and {!Eval_drop_table.evaluate} both ask here rather
     than constructing the string locally. *)
