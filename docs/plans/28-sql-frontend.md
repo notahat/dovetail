@@ -83,6 +83,19 @@ Out of scope (later slices, noted so the boundaries are explicit):
     `parse error: ...`; lowering/typecheck/eval failures print
     `error: ...` (or their module prefix, e.g. `Scan:`, `Typecheck:`).
     No SQL-specific prefix — the prompt already conveys the surface.
+14. **PostgreSQL-style result output for the SQL surface.** A `--sql`
+    session renders query results as a psql-style aligned text table:
+    bare-name column headers centred over each column, a dashed rule
+    (`---+---`), int64 cells right-aligned and string/bool cells
+    left-aligned, every cell padded with a single space inside `|`
+    separators, and a trailing `(N rows)` / `(1 row)` count. Booleans
+    render as `true`/`false` (our scalar form), not psql's `t`/`f`.
+    Headers show the bare field name (qualifier stripped) — safe while
+    SELECT is single-table, since no two columns can collide on their
+    bare name; qualified-name display returns with joins. The RA surface
+    keeps its canonical relation-literal output, which round-trips as RA
+    input; only the SQL surface gets the table. The renderer lives in
+    `frontend` (a presentation policy of the SQL surface), not `core`.
 
 ## Surface grammar (this slice)
 
@@ -154,9 +167,10 @@ and `!=` map to the same not-equal operator.
 
 Build the thinnest end-to-end path — `SELECT * FROM t` running through
 the binary — before widening the grammar. Steps 1–5 stand up that
-skeleton (library bottom-up, then wired through the REPL, cli, and bin);
-steps 6–9 extend it with `WHERE` and column-list projection, each adding
-its own integration coverage now that the pipeline is live.
+skeleton (library bottom-up, then wired through the REPL, cli, and bin).
+Steps 6–7 give the SQL surface its own PostgreSQL-style result table.
+Steps 8–11 extend the grammar with `WHERE` and column-list projection,
+each adding its own integration coverage now that the pipeline is live.
 
 Within the library, **parse and lower are separate steps**: each feature
 lands its parse-to-AST half (with its parser unit test) before its
@@ -164,9 +178,10 @@ lower-to-`Logical` half (with its lower unit test). Each step ends green,
 stays well under the ~5-file / ~200-line ceiling, and is one layer of one
 feature. TDD throughout: failing test first.
 
-The feature order is `SELECT *` → `WHERE` → column-list, so each lower
-step targets exactly one new logical operator (none → `Restrict` →
-`Project`).
+The feature order is `SELECT *` → result table → `WHERE` → column-list.
+The result-table steps add no logical operator (they are presentation);
+each later lower step targets exactly one new logical operator
+(`Restrict`, then `Project`).
 
 ### Skeleton: `SELECT * FROM t` end-to-end
 
@@ -209,16 +224,37 @@ against a fixture, asserting `SELECT * FROM t` prints the fixture rows
 and a no-such-table query prints an `error:`. After this step SQL is a
 fully wired, demoable surface — every later step extends a live pipeline.
 
+### SQL result rendering (PostgreSQL-style)
+
+**Step 6 — `Sql_table` renderer.**
+New `lib/frontend/sql_table.ml(i)`:
+`format : Format.formatter -> _ Relation.t -> unit` renders a relation as
+a psql-style table — centred bare-name headers, a dashed `---+---` rule,
+int64 cells right-aligned and string/bool cells left-aligned, single-space
+cell padding inside `|` separators, and a trailing `(N rows)` / `(1 row)`
+count. A pure function over a materialised row list. New
+`test/frontend/test_sql_table.ml` covers cell alignment, centred headers,
+bare-name headers (qualifier stripped), the singular/plural row-count
+footer, and the empty-relation `(0 rows)` case. (~3 files.)
+
+**Step 7 — REPL renders SQL results through `Sql_table`.**
+`repl.ml`: the eval callback renders a `Relation_value` via
+`Sql_table.format` when `surface = `Sql`, falling back to `Term.format`
+otherwise (so the RA surface is untouched). Update the in-process SQL
+frontend test and the `--sql` integration test to assert the table shape
+(header line, rule, a data row, the `(N rows)` footer). After this step
+the SQL surface looks like SQL end-to-end. (~3 files.)
+
 ### Extend: `WHERE`, then column-list projection
 
-**Step 6 — parse `WHERE <predicate>`.**
+**Step 8 — parse `WHERE <predicate>`.**
 Extend the parser with the expression sublanguage: comparisons,
 `AND`/`OR`/`NOT`, parens, single-quoted strings, `<>`/`!=`,
 `TRUE`/`FALSE`, bare boolean atom. Extend `ast` with the `expression`
 type and `where` field. Parser unit tests cover precedence and
 associativity, mirroring the RA expression tests. (parser + ast + test.)
 
-**Step 7 — lower `WHERE` → `Restrict`.**
+**Step 9 — lower `WHERE` → `Restrict`.**
 `Some predicate` → `Logical.Restrict` wrapping the lowered expression;
 `lower_expr` maps the SQL expression AST onto `Core.Expression.t` (both
 `<>` and `!=` → not-equal). Lower unit tests, plus an integration case:
@@ -226,12 +262,12 @@ associativity, mirroring the RA expression tests. (parser + ast + test.)
 col) works, and a non-bool atom yields a typecheck `error:`.
 (lower + test.)
 
-**Step 8 — parse column-list select.**
+**Step 10 — parse column-list select.**
 Extend the select-list grammar to `column ("," column)*`; `ast`'s
 `select_list` gains the `Columns` arm. Parser unit tests, including that
 `*` and a column list parse distinctly. (parser + ast + test.)
 
-**Step 9 — lower column-list → `Project`.**
+**Step 11 — lower column-list → `Project`.**
 `Columns cols` → `Logical.Project { input; columns }`; `*` still lowers
 to no `Project`. Lower unit tests for column order and the `*`-vs-columns
 distinction, plus an integration case: `SELECT a, b FROM t` projects in
@@ -244,19 +280,20 @@ Per the project pattern, tests land with the step that introduces the
 behaviour they cover, at the lowest layer that can prove it:
 
 - **Library unit tests (`test/surface_sql/`)** carry the bulk. The
-  parser steps (1, 6, 8) extend `test_parser.ml`; the lower steps
-  (2, 7, 9) extend `test_lower.ml`. The suite needs its own `dune`
+  parser steps (1, 8, 10) extend `test_parser.ml`; the lower steps
+  (2, 9, 11) extend `test_lower.ml`. The suite needs its own `dune`
   (alcotest + the libraries it touches) and, per the test-aliasing
   convention, opens the library under test (`Dovetail_surface_sql`).
 - **Frontend tests (`test/frontend/`)** cover the REPL seam (step 3,
-  an in-process `Repl.run ~surface:\`Sql` session) and the cli flag
-  (step 4).
+  an in-process `Repl.run ~surface:\`Sql` session), the cli flag
+  (step 4), and the `Sql_table` renderer (step 6, `test_sql_table.ml`).
 - **Integration tests (`test/integration/`)** run real `--sql` sessions
   through `bin/main.exe`: the skeleton end-to-end pass lands in step 5
-  (`SELECT *` + no-such-table `error:`), with `WHERE` (step 7) and
-  projection (step 9) adding their own cases as those features land.
-  `test/integration/dune` gains `dovetail.surface_sql`; integration
-  tests alias every library with `module X = Dovetail_X` (no single SUT).
+  (`SELECT *` + no-such-table `error:`), the PostgreSQL-style table shape
+  in step 7, with `WHERE` (step 9) and projection (step 11) adding their
+  own cases as those features land. `test/integration/dune` gains
+  `dovetail.surface_sql`; integration tests alias every library with
+  `module X = Dovetail_X` (no single SUT).
 
 The redundancy between the in-process frontend test and the subprocess
 integration tests is intentional and consistent with the project's
