@@ -21,9 +21,16 @@ let markdown_files_in directory =
   |> List.map (Filename.concat directory)
 
 (** Markdown files that participate in doctest verification: every doc under the
-    user-facing [tutorial/] and [reference/] folders, plus the top-level README.
-    Internals, design notes, and slice plans are excluded -- they carry no
-    runnable REPL sessions. *)
+    user-facing [tutorial/] and [reference/ra/] folders, plus the top-level
+    README. Internals, design notes, and slice plans are excluded -- they carry
+    no runnable REPL sessions.
+
+    The SQL reference under [reference/sql/] is not yet listed: its examples use
+    the [sql> ] prompt and the SQL surface, which {!Doctest} does not understand
+    yet (it keys on [> ] and runs the relational-algebra surface). Its examples
+    are hand-checked against the binary for now. TODO(sql-doctest): teach the
+    harness the SQL surface, then add [reference/sql] here and to the
+    [glob_files] dep in [dune]. *)
 let verified_files =
   markdown_files_in "../../docs/tutorial"
   @ markdown_files_in "../../docs/reference/ra"

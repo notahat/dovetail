@@ -14,10 +14,14 @@ Learn the query language from the ground up.
 
 ## Reference — looking something up
 
-One file per pipeline source, operator, sink, expression form, and
-type, with a worked example for each.
+One file per item, with a worked example for each. Dovetail has two
+query surfaces, each with its own reference:
 
-- [Reference index](reference/ra/README.md)
+- [Relational-algebra reference](reference/ra/README.md) — the
+  pipeline surface (`users | restrict … | project …`): sources,
+  operators, sinks, expression forms, and types.
+- [SQL reference](reference/sql/README.md) — the
+  `SELECT … FROM … WHERE …` surface over a single table.
 
 ## Internals — understanding the implementation
 
