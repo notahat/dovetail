@@ -8,9 +8,9 @@ module Storage = Dovetail_storage
 module Frontend = Dovetail_frontend
 
 let usage program_name =
-  Printf.sprintf "usage: %s [%s] [%s] [%s] [environment-path]" program_name
+  Printf.sprintf "usage: %s [%s] [%s] [%s] [%s] [environment-path]" program_name
     Frontend.Cli.show_logical_flag Frontend.Cli.show_physical_flag
-    Frontend.Cli.demo_data_flag
+    Frontend.Cli.demo_data_flag Frontend.Cli.sql_flag
 
 let parse_argv_or_exit argv =
   let arguments = Array.to_list argv |> List.tl in
@@ -28,13 +28,11 @@ let read_line_from_stdin () =
   | exception End_of_file -> None
 
 let () =
-  (* [sql] is parsed but not yet wired into the surface; that lands when the
-     bin hands a [~surface] to the REPL. *)
   let {
     Frontend.Cli.show_logical;
     show_physical;
     demo_data;
-    sql = _;
+    sql;
     environment_path;
   } =
     parse_argv_or_exit Sys.argv
@@ -44,5 +42,6 @@ let () =
     ~finally:(fun () -> Storage.Engine.close_environment environment)
     (fun () ->
       if demo_data then Frontend.Demo_data.run environment;
-      Frontend.Repl.run ~show_logical ~show_physical environment
+      let surface = if sql then `Sql else `Ra in
+      Frontend.Repl.run ~show_logical ~show_physical ~surface environment
         ~read_line:read_line_from_stdin ~output:Format.std_formatter)

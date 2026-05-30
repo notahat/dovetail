@@ -17,9 +17,12 @@ let binary_path = "../../bin/main.exe"
     binary's read path against known rows. Returns the captured stdout as a
     string. Asserts the binary exited cleanly (code 0); on non-zero, signal, or
     stop, fails the test with stderr included so the failure mode is visible. *)
-let run_binary ~environment_path ~stdin_text =
+let run_binary ?(extra_flags = []) ~environment_path ~stdin_text () =
   let environment_variables = Unix.environment () in
-  let argv = [| binary_path; "--demo-data"; environment_path |] in
+  let argv =
+    Array.of_list
+      ((binary_path :: "--demo-data" :: extra_flags) @ [ environment_path ])
+  in
   let stdout_chan, stdin_chan, stderr_chan =
     Unix.open_process_args_full binary_path argv environment_variables
   in
@@ -43,7 +46,7 @@ let run_binary ~environment_path ~stdin_text =
 
 let test_users_query_prints_fixture_rows () =
   with_temp_dir @@ fun environment_path ->
-  let stdout_text = run_binary ~environment_path ~stdin_text:"users\n" in
+  let stdout_text = run_binary ~environment_path ~stdin_text:"users\n" () in
   List.iter
     (fun name ->
       if not (contains_substring stdout_text name) then
@@ -55,7 +58,7 @@ let test_users_join_orders_prints_matched_pairs () =
   with_temp_dir @@ fun environment_path ->
   let stdout_text =
     run_binary ~environment_path
-      ~stdin_text:"users | join orders on users.id = orders.user_id\n"
+      ~stdin_text:"users | join orders on users.id = orders.user_id\n" ()
   in
   (* Dave (user 4) has no orders, so he must not appear; the other four
      buyers must each show up in the output. *)
@@ -88,7 +91,7 @@ let test_create_table_empty_form_creates_and_reports () =
     "(id: int64, name: string, primary key (id)) | create table widgets\n\
      catalog | tables\n"
   in
-  let stdout_text = run_binary ~environment_path ~stdin_text in
+  let stdout_text = run_binary ~environment_path ~stdin_text () in
   expect_stdout_contains stdout_text [ "widgets"; "created" ]
 
 let test_create_table_seeded_form_creates_and_seeds () =
@@ -98,14 +101,37 @@ let test_create_table_seeded_form_creates_and_seeds () =
      \"alice\") } | create table greeters\n\
      greeters\n"
   in
-  let stdout_text = run_binary ~environment_path ~stdin_text in
+  let stdout_text = run_binary ~environment_path ~stdin_text () in
   expect_stdout_contains stdout_text [ "greeters"; "created"; "alice" ]
 
 let test_drop_table_leaf_drops_and_reports () =
   with_temp_dir @@ fun environment_path ->
   let stdin_text = "drop table orders\ncatalog | tables\n" in
-  let stdout_text = run_binary ~environment_path ~stdin_text in
+  let stdout_text = run_binary ~environment_path ~stdin_text () in
   expect_stdout_contains stdout_text [ "orders"; "dropped" ]
+
+(* The SQL surface, fully wired: launching with [--sql] selects it for the
+   session, so [SELECT * FROM users] runs through parse / lower / translate /
+   eval against the seeded fixture and prints the same rows the RA surface's
+   [users] query does. *)
+let test_sql_select_star_prints_fixture_rows () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT * FROM users\n" ()
+  in
+  expect_stdout_contains stdout_text
+    [ "Alice"; "Bob"; "Carol"; "Dave"; "Eve"; "alice@example.com" ]
+
+(* A SQL query against a missing table reaches eval and reports the same
+   [error:] the RA surface would; the session does not crash. *)
+let test_sql_select_from_missing_table_reports_error () =
+  with_temp_dir @@ fun environment_path ->
+  let stdout_text =
+    run_binary ~extra_flags:[ "--sql" ] ~environment_path
+      ~stdin_text:"SELECT * FROM nonexistent\n" ()
+  in
+  expect_stdout_contains stdout_text [ "error:" ]
 
 let () =
   Alcotest.run "dovetail"
@@ -126,5 +152,10 @@ let () =
             `Slow test_create_table_seeded_form_creates_and_seeds;
           Alcotest.test_case "[drop table <name>] drops the table" `Slow
             test_drop_table_leaf_drops_and_reports;
+          Alcotest.test_case
+            "[--sql] SELECT * FROM users prints fixture rows to stdout" `Slow
+            test_sql_select_star_prints_fixture_rows;
+          Alcotest.test_case "[--sql] SELECT * FROM <missing> reports an error"
+            `Slow test_sql_select_from_missing_table_reports_error;
         ] );
     ]

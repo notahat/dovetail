@@ -10,6 +10,7 @@
   dovetail.storage
   dovetail.plan
   dovetail.surface_ra
+  dovetail.surface_sql
   dovetail.execution
   dovetail.frontend
   test_helpers)
