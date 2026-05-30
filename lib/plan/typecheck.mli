@@ -3,13 +3,18 @@
 
     {!typecheck} walks a {!Logical.t} against a snapshotted {!Catalog.kind} and
     accumulates every error it finds, so one walk reports every problem rather
-    than just the first. Today the pass is a no-op; checks migrate in from
-    {!Translate}, {!Eval}, and {!Surface_ra.Lower} step by step, with one error
-    constructor per check.
+    than just the first. The pass owns the kind-discipline, column-resolution,
+    catalog-existence, and operator-shape checks enumerated by {!error}, with
+    one error constructor per check. Two kinds of check live elsewhere by
+    design: structural checks {!Surface_ra.Lower} can make before a catalog is
+    in hand (relation-literal field names and arity) stay there, and checks that
+    depend on runtime values rather than kinds (primary-key collisions on
+    insert, a seeded table's derived kind) stay in {!Eval}.
 
-    The success arm returns the input {!Logical.t} unchanged. The shape stays
-    the same once a typed Logical IR replaces the untyped one in a later slice —
-    the success arm widens to that type then. *)
+    The success arm returns the input {!Logical.t} unchanged — the pass
+    validates but does not itself produce a typed IR. The shape stays the same
+    once a typed Logical IR replaces the untyped one in a later slice; the
+    success arm widens to that type then. *)
 
 module Catalog = Dovetail_core.Catalog
 module Expression = Dovetail_core.Expression
