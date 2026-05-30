@@ -26,7 +26,7 @@ let markdown_files_in directory =
     runnable REPL sessions. *)
 let verified_files =
   markdown_files_in "../../docs/tutorial"
-  @ markdown_files_in "../../docs/reference"
+  @ markdown_files_in "../../docs/reference/ra"
   @ [ "../../README.md" ]
 
 (** Verify one markdown file end to end: spin up a fresh environment, seed the
