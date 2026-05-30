@@ -11,20 +11,29 @@ module Expression = Dovetail_core.Expression
 module Relation = Dovetail_core.Relation
 
 type t =
-  | FullScan of { table : string }
-      (** [FullScan { table }] reads every row of [table] in primary-key order
-          via a cursor over the table's storage subDB. *)
-  | Filter of { input : t; predicate : Expression.t }
-      (** [Filter { input; predicate }] yields the rows from [input] for which
-          [predicate] holds. Kind and multiplicity tag are passed through from
-          [input] -- filtering preserves whether the input is a set or a bag. *)
-  | Project of { input : t; columns : Projection.t }
-      (** [Project { input; columns }] yields the rows from [input] narrowed to
-          the named [columns], in the order given. The output schema's
-          [primary_key] is always empty -- derived relations don't carry PK
-          information at this point in the project. The multiplicity tag
-          downgrades to [`Bag] because dropping columns can introduce duplicates
-          that weren't present in the input. *)
+  | Catalog_source
+      (** [Catalog_source] yields the database's catalog as a value. {!Eval}
+          enumerates the catalog under the active read transaction and opens a
+          per-table cursor lazily for each entry. Sits at a plan's root only;
+          {!kind_of} is an invariant violation for this arm because the catalog
+          rung's static shape is a {!Dovetail_core.Catalog.kind} rather than a
+          {!Relation.kind}. The [Type_op] evaluator short-circuits a
+          [Catalog_source] input directly. *)
+  | Create_table_empty of { table_name : string; kind : Relation.kind }
+      (** [Create_table_empty { table_name; kind }] creates an empty table named
+          [table_name] with the declared [kind]: registers the kind in the
+          catalog and provisions its storage subDB, in the active write
+          transaction. {!kind_of} reports a one-row [(created : string)] result.
+      *)
+  | Create_table_seeded of { table_name : string; source : t }
+      (** [Create_table_seeded { table_name; source }] creates [table_name] from
+          [source]'s row kind and seeds it with [source]'s rows, all in the
+          active write transaction. The target kind is derived from [source]'s
+          kind at eval time (the evaluator calls {!kind_of} on [source], rejects
+          a qualified source, stamps each field with [Some table_name], and
+          requires a primary key). {!kind_of} on the node reports a one-row
+          [(created : string)] result -- the source kind is not the node's
+          result kind. *)
   | CrossProduct of { left : t; right : t }
       (** [CrossProduct { left; right }] yields every (left, right) row pair,
           executed as a nested loop with the right side materialised once. The
@@ -34,30 +43,17 @@ type t =
           duplicate values that the inputs already had. The dedicated [Join]
           operator with multiple strategies (hash, merge) is a future addition.
       *)
-  | IndexLookup of { table : string; key : int64 }
-      (** [IndexLookup { table; key }] fetches the single row in [table] whose
-          primary key equals [key], by encoding [key] and calling
-          [Storage.Engine.get] on the table's storage subDB. The result is a
-          relation with the table's full schema and either zero or one rows.
-          Always cheaper than a [FullScan] when the predicate fixes the primary
-          key.
-
-          The [key] field is [int64] for now: every primary key in dovetail is a
-          single [int64] column at this point. The field widens to
-          [Scalar.value] when other key kinds arrive. *)
-  | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
-      (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
-          row pair for which [predicate] holds, executed as a nested loop with
-          the right side materialised once and the predicate fused into the
-          inner loop. Kind construction matches [CrossProduct]: [left]'s fields
-          followed by [right]'s, qualifiers preserved, [primary_key] empty. The
-          multiplicity tag is preserved -- the join cannot introduce duplicates
-          that weren't already implicit in the cross.
-
-          Per-pair work is the same as [Filter (CrossProduct ...)]; the node
-          exists so that {!Translate} has a place to emit when it recognises an
-          inner join, and so future strategies (indexed nested-loop, hash join,
-          merge join) have siblings to slot in next to. *)
+  | Drop_table of { table_name : string }
+      (** [Drop_table { table_name }] removes [table_name] from the catalog and
+          deletes its storage subDB, all in the active write transaction.
+          {!kind_of} reports a one-row [(dropped : string)] result. *)
+  | Filter of { input : t; predicate : Expression.t }
+      (** [Filter { input; predicate }] yields the rows from [input] for which
+          [predicate] holds. Kind and multiplicity tag are passed through from
+          [input] -- filtering preserves whether the input is a set or a bag. *)
+  | FullScan of { table : string }
+      (** [FullScan { table }] reads every row of [table] in primary-key order
+          via a cursor over the table's storage subDB. *)
   | IndexedNestedLoopJoin of {
       outer : t;
       inner_table : string;
@@ -84,57 +80,48 @@ type t =
 
           The output [primary_key] is [], matching [NestedLoopJoin] and
           [CrossProduct]. *)
+  | IndexLookup of { table : string; key : int64 }
+      (** [IndexLookup { table; key }] fetches the single row in [table] whose
+          primary key equals [key], by encoding [key] and calling
+          [Storage.Engine.get] on the table's storage subDB. The result is a
+          relation with the table's full schema and either zero or one rows.
+          Always cheaper than a [FullScan] when the predicate fixes the primary
+          key.
+
+          The [key] field is [int64] for now: every primary key in dovetail is a
+          single [int64] column at this point. The field widens to
+          [Scalar.value] when other key kinds arrive. *)
+  | Insert of { table : string; source : t }
+      (** [Insert { table; source }] writes [source]'s rows to [table] and
+          yields a one-row relation reporting the affected-row count. {!Eval}
+          handles it as a regular case, writing rows inside the active write
+          transaction and producing the (insert_count : int64) result. *)
+  | NestedLoopJoin of { left : t; right : t; predicate : Expression.t }
+      (** [NestedLoopJoin { left; right; predicate }] yields every (left, right)
+          row pair for which [predicate] holds, executed as a nested loop with
+          the right side materialised once and the predicate fused into the
+          inner loop. Kind construction matches [CrossProduct]: [left]'s fields
+          followed by [right]'s, qualifiers preserved, [primary_key] empty. The
+          multiplicity tag is preserved -- the join cannot introduce duplicates
+          that weren't already implicit in the cross.
+
+          Per-pair work is the same as [Filter (CrossProduct ...)]; the node
+          exists so that {!Translate} has a place to emit when it recognises an
+          inner join, and so future strategies (indexed nested-loop, hash join,
+          merge join) have siblings to slot in next to. *)
+  | Project of { input : t; columns : Projection.t }
+      (** [Project { input; columns }] yields the rows from [input] narrowed to
+          the named [columns], in the order given. The output schema's
+          [primary_key] is always empty -- derived relations don't carry PK
+          information at this point in the project. The multiplicity tag
+          downgrades to [`Bag] because dropping columns can introduce duplicates
+          that weren't present in the input. *)
   | Relation_literal of { kind : Relation.kind; rows : Scalar.value list list }
       (** [Relation_literal { kind; rows }] yields a relation whose row kind is
           declared up front. Each row in [rows] is a list of values in the order
           of [kind.row_kind]'s fields. The empty form ([rows = []]) is valid
           because the kind is declared directly, not inferred from a first row.
           {!Eval} uses [kind] directly. *)
-  | Insert of { table : string; source : t }
-      (** [Insert { table; source }] writes [source]'s rows to [table] and
-          yields a one-row relation reporting the affected-row count. {!Eval}
-          handles it as a regular case, writing rows inside the active write
-          transaction and producing the (insert_count : int64) result. *)
-  | Unqualify of { input : t }
-      (** [Unqualify { input }] strips the qualifier from every field of
-          [input]'s row kind. {!Eval} runs the input, builds a new kind by
-          setting every field's qualifier to [None], and emits the input's rows
-          unchanged under the new kind. Accepts either a relation
-          ({!Term.Relation_value}) or a row ({!Term.Row_value}) on the input.
-          Raises [Failure] if two fields collide on their bare name after
-          stripping; {!kind_of} raises the same way. *)
-  | Type_op of { input : t }
-      (** [Type_op { input }] yields [input]'s relation kind rather than its
-          rows. {!Eval} reads the static kind via {!kind_of} without opening any
-          cursors. The node sits at the root of a plan only; {!kind_of} raises
-          [Failure] if called on a [Type_op] directly, since the operator's
-          evaluation result is a kind, not a relation. *)
-  | Scalar_literal of Scalar.value
-      (** [Scalar_literal value] yields the literal [value] directly — no
-          storage, no cursors. {!Eval} hands it down the pipe as a
-          {!Term.Scalar_value}. Sits at a plan's root only; {!kind_of} raises
-          [Failure] because the operator's result is a scalar value, not a
-          relation. The [Type_op] evaluator handles a [Scalar_literal] input
-          specially, computing the corresponding {!Scalar.kind} directly. *)
-  | Drop_table of { table_name : string }
-      (** [Drop_table { table_name }] removes [table_name] from the catalog and
-          deletes its storage subDB, all in the active write transaction.
-          {!kind_of} reports a one-row [(dropped : string)] result. *)
-  | Create_table_empty of { table_name : string; kind : Relation.kind }
-      (** [Create_table_empty { table_name; kind }] creates an empty table named
-          [table_name] with the declared [kind]: registers the kind in the
-          catalog and provisions its storage subDB, in the active write
-          transaction. {!kind_of} reports a one-row [(created : string)] result.
-      *)
-  | Create_table_seeded of { table_name : string; source : t }
-      (** [Create_table_seeded { table_name; source }] creates [table_name] from
-          [source]'s row kind and seeds it with [source]'s rows, all in the
-          active write transaction. The target kind is derived from [source]'s
-          kind at eval time (the evaluator calls {!kind_of} on [source], rejects
-          a qualified source, stamps each field with [Some table_name], and
-          requires a primary key). {!kind_of} on the node reports a one-row
-          [(created : string)] result -- the source kind is not the node's
-          result kind. *)
   | Row_literal of { fields : (Row.column_reference * Scalar.value) list }
       (** [Row_literal { fields }] yields the literal row directly — no storage,
           no cursors. Each entry pairs a column reference (qualified
@@ -146,14 +133,13 @@ type t =
           is a row value, not a relation. The [Type_op] evaluator handles a
           [Row_literal] input specially, computing the corresponding {!Row.kind}
           directly. *)
-  | Catalog_source
-      (** [Catalog_source] yields the database's catalog as a value. {!Eval}
-          enumerates the catalog under the active read transaction and opens a
-          per-table cursor lazily for each entry. Sits at a plan's root only;
-          {!kind_of} is an invariant violation for this arm because the catalog
-          rung's static shape is a {!Dovetail_core.Catalog.kind} rather than a
-          {!Relation.kind}. The [Type_op] evaluator short-circuits a
-          [Catalog_source] input directly. *)
+  | Scalar_literal of Scalar.value
+      (** [Scalar_literal value] yields the literal [value] directly — no
+          storage, no cursors. {!Eval} hands it down the pipe as a
+          {!Term.Scalar_value}. Sits at a plan's root only; {!kind_of} raises
+          [Failure] because the operator's result is a scalar value, not a
+          relation. The [Type_op] evaluator handles a [Scalar_literal] input
+          specially, computing the corresponding {!Scalar.kind} directly. *)
   | Tables of { input : t }
       (** [Tables { input }] yields a one-column [(name: string)] relation
           listing every table in the catalog [input] produces. {!Eval}
@@ -161,7 +147,21 @@ type t =
           table in cursor order; anything else raises a user-facing [Failure].
           {!kind_of} reports the static result kind unconditionally, so
           [tables | type] falls out of the default dispatch in
-          [evaluate_type_op]. *)
+          [Eval_type_op.evaluate]. *)
+  | Type_op of { input : t }
+      (** [Type_op { input }] yields [input]'s relation kind rather than its
+          rows. {!Eval} reads the static kind via {!kind_of} without opening any
+          cursors. The node sits at the root of a plan only; {!kind_of} raises
+          [Failure] if called on a [Type_op] directly, since the operator's
+          evaluation result is a kind, not a relation. *)
+  | Unqualify of { input : t }
+      (** [Unqualify { input }] strips the qualifier from every field of
+          [input]'s row kind. {!Eval} runs the input, builds a new kind by
+          setting every field's qualifier to [None], and emits the input's rows
+          unchanged under the new kind. Accepts either a relation
+          ({!Term.Relation_value}) or a row ({!Term.Row_value}) on the input.
+          Raises [Failure] if two fields collide on their bare name after
+          stripping; {!kind_of} raises the same way. *)
 
 val kind_of : catalog:(string -> Relation.kind option) -> t -> Relation.kind
 (** [kind_of ~catalog plan] returns [plan]'s result kind — the {!Relation.kind}
