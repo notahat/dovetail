@@ -1,5 +1,5 @@
 (tests
- (names test_cli test_repl test_demo_data)
+ (names test_cli test_repl test_demo_data test_sql_table)
  (libraries
   alcotest
   dovetail.core
