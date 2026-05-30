@@ -63,3 +63,15 @@ The expression language is used as a predicate in `restrict` and in
 - [Parentheses](parentheses.md) — grouping to override precedence
 - [Precedence and associativity](precedence.md) — how the forms bind
 - [Projections](projections.md) — the column list `project` takes
+
+## Types
+
+The types are what `| type` reports for a value at each rung of the
+ladder -- a scalar, a row, a relation, or a catalog.
+
+- [Int64](int64.md) — signed 64-bit integer
+- [String](string.md) — a sequence of bytes
+- [Bool](bool.md) — `true` or `false`
+- [Row type](row-type.md) — `(name: type, ...)`
+- [Relation type](relation-type.md) — a row type plus refinements
+- [Catalog type](catalog-type.md) — table names to relation types
