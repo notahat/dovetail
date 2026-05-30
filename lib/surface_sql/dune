@@ -1,0 +1,4 @@
+(library
+ (name dovetail_surface_sql)
+ (public_name dovetail.surface_sql)
+ (libraries dovetail.core dovetail.plan angstrom))
