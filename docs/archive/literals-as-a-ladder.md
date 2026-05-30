@@ -7,7 +7,7 @@ the unrelated special cases SQL presents them as.
 
 For the as-built vocabulary — what the rungs are called in the code,
 and how `kind` / `value` / `t` are arranged at each — see
-[`type-ladder.md`](type-ladder.md). This note uses "schema" as the
+[`type-ladder.md`](../design/type-ladder.md). This note uses "schema" as the
 conceptual name for the row-shape rung; the implementation calls it
 `Row.kind`.
 

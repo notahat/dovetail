@@ -6,7 +6,7 @@ single pipe-style language that covers them all.
 
 Pairs with:
 
-- [`literals-as-a-ladder.md`](literals-as-a-ladder.md), which frames
+- [`literals-as-a-ladder.md`](../archive/literals-as-a-ladder.md), which frames
   the ladder conceptually and sketches a speculative
   math-RA-flavoured syntax. This note supersedes that speculative
   sketch — the framing it captures is exactly what's committed to

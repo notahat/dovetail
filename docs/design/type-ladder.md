@@ -2,7 +2,7 @@
 
 The shape that the `lib/core/` modules — `Scalar`, `Row`, `Relation` —
 follow, and the rules for adding to it. Pairs with
-[`literals-as-a-ladder.md`](literals-as-a-ladder.md), which sketches
+[`literals-as-a-ladder.md`](../archive/literals-as-a-ladder.md), which sketches
 the design; this file describes what got built.
 
 ## The rungs
@@ -142,7 +142,7 @@ until the first cross-table constraint arrives.
 ## Literals
 
 The ladder framing came from asking what a *literal* at each rung
-would look like (see [`literals-as-a-ladder.md`](literals-as-a-ladder.md)).
+would look like (see [`literals-as-a-ladder.md`](../archive/literals-as-a-ladder.md)).
 The realized literals so far:
 
 - **Scalar literal** — `42`, `"alice"`, `true`. Appears in expression
@@ -165,7 +165,7 @@ The realized literals so far:
   `Physical.Relation_literal`.
 
 - **Catalog literal** — DDL as text that denotes a catalog value:
-  sketched in [`literals-as-a-ladder.md`](literals-as-a-ladder.md),
+  sketched in [`literals-as-a-ladder.md`](../archive/literals-as-a-ladder.md),
   not built. Today's `create table` / `drop table` are catalog
   *mutations*, not a literal form; a catalog literal would name a
   whole catalog value the way a relation literal names a whole

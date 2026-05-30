@@ -614,5 +614,5 @@ This design lands across two slices:
   `frontend` library stays as one piece for now; splitting
   is cheap to revisit if it grows.
 
-See [`16-full-sub-library-setup.md`](16-full-sub-library-setup.md)
+See [`16-full-sub-library-setup.md`](../plans/16-full-sub-library-setup.md)
 for the slice-16 plan.
