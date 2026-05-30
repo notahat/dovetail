@@ -47,7 +47,10 @@ type expression =
 type select_list =
   | All
       (** The [*] select list: keep every column of the FROM relation, in its
-          natural order. A column-list form lands in a later slice. *)
+          natural order. *)
+  | Columns of column_reference list
+      (** A [a, b, c] select list: keep the named columns, in the order written.
+          Columns are bare-only in the current slice; the list is non-empty. *)
 
 type t =
   | Select of {

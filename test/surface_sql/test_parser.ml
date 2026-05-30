@@ -30,6 +30,18 @@ let select_where table predicate =
 (* Build a bare (unqualified) column reference in expression position. *)
 let column name : Ast.expression = Ast.Column { qualifier = None; name }
 
+(* A bare column reference for a select list. *)
+let column_ref name : Ast.column_reference = { qualifier = None; name }
+
+(* A [SELECT <columns> FROM <table>] expectation with a column-list select. *)
+let select_columns table names =
+  Ast.Select
+    {
+      select_list = Ast.Columns (List.map column_ref names);
+      from = table;
+      where = None;
+    }
+
 (* Build an int64-literal expression. *)
 let int64 number : Ast.expression = Ast.Literal (Scalar.Int64 number)
 
@@ -163,6 +175,39 @@ let test_rejects_where_with_no_predicate () =
 let test_rejects_double_quoted_string_literal () =
   rejects "SELECT * FROM users WHERE name = \"Alice\""
 
+let test_parses_single_column_select () =
+  parses "SELECT id FROM users" (select_columns "users" [ "id" ])
+
+let test_parses_multiple_column_select_preserving_order () =
+  parses "SELECT id, name, email FROM users"
+    (select_columns "users" [ "id"; "name"; "email" ])
+
+let test_tolerates_whitespace_around_select_list_commas () =
+  parses "SELECT id,name , email FROM users"
+    (select_columns "users" [ "id"; "name"; "email" ])
+
+let test_star_and_column_list_parse_distinctly () =
+  parses "SELECT * FROM users" (select_all_from "users");
+  parses "SELECT id FROM users" (select_columns "users" [ "id" ])
+
+let test_parses_column_list_with_where () =
+  parses "SELECT id, name FROM users WHERE active"
+    (Ast.Select
+       {
+         select_list = Ast.Columns [ column_ref "id"; column_ref "name" ];
+         from = "users";
+         where = Some (column "active");
+       })
+
+let test_rejects_trailing_comma_in_select_list () =
+  rejects "SELECT id, FROM users"
+
+let test_rejects_qualified_column_in_select_list () =
+  rejects "SELECT users.id FROM users"
+
+let test_rejects_leading_comma_in_select_list () =
+  rejects "SELECT , id FROM users"
+
 let () =
   Alcotest.run "sql_parser"
     [
@@ -237,5 +282,24 @@ let () =
             test_rejects_where_with_no_predicate;
           Alcotest.test_case "rejects a double-quoted string literal" `Quick
             test_rejects_double_quoted_string_literal;
+        ] );
+      ( "select list",
+        [
+          Alcotest.test_case "parses a single-column select" `Quick
+            test_parses_single_column_select;
+          Alcotest.test_case "parses a multi-column select preserving order"
+            `Quick test_parses_multiple_column_select_preserving_order;
+          Alcotest.test_case "tolerates whitespace around select-list commas"
+            `Quick test_tolerates_whitespace_around_select_list_commas;
+          Alcotest.test_case "* and a column list parse to distinct ASTs" `Quick
+            test_star_and_column_list_parse_distinctly;
+          Alcotest.test_case "parses a column list with a WHERE clause" `Quick
+            test_parses_column_list_with_where;
+          Alcotest.test_case "rejects a trailing comma in the select list"
+            `Quick test_rejects_trailing_comma_in_select_list;
+          Alcotest.test_case "rejects a qualified column in the select list"
+            `Quick test_rejects_qualified_column_in_select_list;
+          Alcotest.test_case "rejects a leading comma in the select list" `Quick
+            test_rejects_leading_comma_in_select_list;
         ] );
     ]

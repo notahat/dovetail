@@ -18,7 +18,7 @@ type expression =
   | Or of expression * expression
   | Not of expression
 
-type select_list = All
+type select_list = All | Columns of column_reference list
 
 type t =
   | Select of {

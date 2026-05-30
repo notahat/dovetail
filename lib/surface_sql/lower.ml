@@ -32,9 +32,17 @@ let rec lower_expression (expression : Ast.expression) : Expression.t =
 
 let lower (ast : Ast.t) : Plan.Logical.t =
   match ast with
-  | Select { select_list = All; from; where } -> (
+  | Select { select_list; from; where } -> (
       let scan : Plan.Logical.t = Scan { table = from } in
-      match where with
-      | None -> scan
-      | Some predicate ->
-          Restrict { input = scan; predicate = lower_expression predicate })
+      let filtered =
+        match where with
+        | None -> scan
+        | Some predicate ->
+            Restrict { input = scan; predicate = lower_expression predicate }
+      in
+      match select_list with
+      | All -> filtered
+      | Columns _ ->
+          (* TODO(sql-project): lower the column list to a Project over the
+             filtered sub-plan. *)
+          failwith "column-list SELECT is not yet supported")

@@ -176,15 +176,24 @@ let where_clause =
     ( whitespace *> keyword "where" *> whitespace *> expression
     >>| fun predicate -> Some predicate )
 
-(* A [SELECT * FROM <table> [WHERE <predicate>]] statement. The [*] select list
-   and the bare table name are the only shapes today; a column list arrives in
-   a later slice. *)
+(* The select list: either [*] (every column) or a non-empty comma-separated
+   list of bare column references, in the order written. The leading [*] is
+   tried first; on a non-[*] input the column list is parsed, requiring at
+   least one column and only consuming a comma when another column follows, so
+   leading and trailing commas are rejected. *)
+let select_list =
+  char '*' *> return Ast.All
+  <|> ( column_reference >>= fun first_column ->
+        many (whitespace *> char ',' *> whitespace *> column_reference)
+        >>| fun more_columns -> Ast.Columns (first_column :: more_columns) )
+
+(* A [SELECT <select-list> FROM <table> [WHERE <predicate>]] statement. The
+   bare table name is the only FROM shape today; joins and qualified names
+   arrive in a later slice. *)
 let select_statement =
-  keyword "select" *> whitespace *> char '*' *> whitespace *> keyword "from"
-  *> whitespace *> identifier
-  >>= fun from ->
-  where_clause >>| fun where ->
-  Ast.Select { select_list = Ast.All; from; where }
+  keyword "select" *> whitespace *> select_list >>= fun select_list ->
+  whitespace *> keyword "from" *> whitespace *> identifier >>= fun from ->
+  where_clause >>| fun where -> Ast.Select { select_list; from; where }
 
 (* The top-level grammar: optional leading whitespace, one statement, an
    optional trailing semicolon, then end of input. [end_of_input] forces full
