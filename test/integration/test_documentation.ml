@@ -9,18 +9,25 @@
 
 open Test_helpers
 
-(** Markdown files that participate in doctest verification. Paths are resolved
-    relative to the test runner's working directory under
-    [_build/default/test/integration/], and the corresponding [(deps)] entries
-    in [test/integration/dune] mirror each file into the build tree. *)
+(** Lists the markdown files directly in [directory], sorted, as paths relative
+    to the test runner's working directory. The doctest folders are mirrored
+    into the build tree by the [glob_files] [(deps)] entries in
+    [test/integration/dune], so reading the directory here picks up exactly the
+    docs dune copied in -- a new reference file needs no edit to this test. *)
+let markdown_files_in directory =
+  Sys.readdir directory |> Array.to_list
+  |> List.filter (fun file_name -> Filename.check_suffix file_name ".md")
+  |> List.sort String.compare
+  |> List.map (Filename.concat directory)
+
+(** Markdown files that participate in doctest verification: every doc under the
+    user-facing [tutorial/] and [reference/] folders, plus the top-level README.
+    Internals, design notes, and slice plans are excluded -- they carry no
+    runnable REPL sessions. *)
 let verified_files =
-  [
-    "../../docs/tutorial/README.md";
-    "../../docs/tutorial/walkthrough.md";
-    "../../docs/query-language-pipeline-operators.md";
-    "../../docs/query-language-expressions.md";
-    "../../README.md";
-  ]
+  markdown_files_in "../../docs/tutorial"
+  @ markdown_files_in "../../docs/reference"
+  @ [ "../../README.md" ]
 
 (** Verify one markdown file end to end: spin up a fresh environment, seed the
     demo tables, hand both off to {!Doctest.verify_file}, fail with a

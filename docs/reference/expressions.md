@@ -1,15 +1,15 @@
 # Query language: expression and projection reference
 
-Part of the [query-language guide](query-language.md). Two
+Part of the [query-language guide](../tutorial/README.md). Two
 sublanguages appear inside the pipeline operators: the expression
 language used as a predicate in `restrict` and in `join`'s `on`
 clause, and the projection language used in `project`. This file
 covers both.
 
 For the pipeline operators themselves, see the
-[operator reference](query-language-pipeline-operators.md); for a
+[operator reference](pipeline-operators.md); for a
 narrative introduction, see the
-[tutorial](query-language-tutorial.md).
+[tutorial](../tutorial/walkthrough.md).
 
 ## Literals
 

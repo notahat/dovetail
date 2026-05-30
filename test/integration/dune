@@ -15,8 +15,6 @@
   test_helpers)
  (deps
   ../../bin/main.exe
-  ../../docs/tutorial/README.md
-  ../../docs/tutorial/walkthrough.md
-  ../../docs/query-language-pipeline-operators.md
-  ../../docs/query-language-expressions.md
+  (glob_files ../../docs/tutorial/*.md)
+  (glob_files ../../docs/reference/*.md)
   ../../README.md))

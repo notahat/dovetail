@@ -140,8 +140,8 @@ That's the canonical join-and-project shape. The full operator
 set is wider -- the literal source forms, `unqualify`, `type`,
 `tables`, `catalog`, the `insert into`, `create table`, and
 `drop table` sinks -- and the
-[pipeline operator reference](../query-language-pipeline-operators.md)
+[pipeline operator reference](../reference/pipeline-operators.md)
 systematises each one. The
-[expression and projection reference](../query-language-expressions.md)
+[expression and projection reference](../reference/expressions.md)
 covers the sublanguages used inside `restrict`, `project`, and the
 `on` clause of `join`.

@@ -1,12 +1,12 @@
 # Query language: pipeline operators reference
 
-Part of the [query-language guide](query-language.md). One
+Part of the [query-language guide](../tutorial/README.md). One
 subsection per pipeline form: syntax, semantics, and a single
 worked example against the example tables. For a narrative
-introduction, see the [tutorial](query-language-tutorial.md); for
+introduction, see the [tutorial](../tutorial/walkthrough.md); for
 the expression and projection sublanguages that appear inside
 `restrict`, `project`, and the `on` clause of `join`, see the
-[expression and projection reference](query-language-expressions.md).
+[expression and projection reference](expressions.md).
 
 Every pipeline starts at a **source**, threads through zero or
 more **operators**, and may end at a **sink** that writes to the
@@ -49,7 +49,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 
 A bare scalar at the head of a pipeline yields that scalar value.
 The supported forms are the same three the
-[expression reference](query-language-expressions.md#literals)
+[expression reference](expressions.md#literals)
 describes: signed decimal integers, double-quoted strings (with
 `\"` and `\\` escapes), and the keywords `true` and `false`. The
 only operator that consumes a scalar is `type`, which yields the
@@ -151,7 +151,7 @@ its value.
 
 Keeps rows of `<input>` for which `<predicate>` evaluates to true.
 The predicate is any expression that resolves to a Bool; see the
-[expression reference](query-language-expressions.md) for the full
+[expression reference](expressions.md) for the full
 grammar. The short version: literals, column references,
 comparisons (`=`, `<>`, `<`, `<=`, `>`, `>=`), and the boolean
 operators `and`, `or`, `not`. Output schema and column qualifiers
@@ -171,7 +171,7 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
 Keeps only the named columns from `<input>`, in the order listed.
 Each entry is either a bare name (`name`) or qualified
 (`users.name`); see the
-[projection reference](query-language-expressions.md#projections)
+[projection reference](expressions.md#projections)
 for the precise rules. Bare names must resolve unambiguously
 against `<input>`'s schema, duplicates in the column list are
 rejected, and each retained column keeps its qualifier from
