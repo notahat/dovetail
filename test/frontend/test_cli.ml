@@ -6,10 +6,10 @@ let options_testable =
   Alcotest.testable
     (Fmt.of_to_string (fun (options : Cli.options) ->
          Printf.sprintf
-           "{ show_logical = %b; show_physical = %b; demo_data = %b; \
+           "{ show_logical = %b; show_physical = %b; demo_data = %b; sql = %b; \
             environment_path = %S }"
            options.show_logical options.show_physical options.demo_data
-           options.environment_path))
+           options.sql options.environment_path))
     ( = )
 
 let check_parse_ok ~label expected arguments =
@@ -29,6 +29,7 @@ let test_empty_arguments_yield_defaults () =
       show_logical = false;
       show_physical = false;
       demo_data = false;
+      sql = false;
       environment_path = Cli.default_environment_path;
     }
     []
@@ -39,6 +40,7 @@ let test_flag_alone_sets_show_physical_and_leaves_path_default () =
       show_logical = false;
       show_physical = true;
       demo_data = false;
+      sql = false;
       environment_path = Cli.default_environment_path;
     }
     [ "--show-physical" ]
@@ -49,6 +51,7 @@ let test_path_alone_sets_environment_path () =
       show_logical = false;
       show_physical = false;
       demo_data = false;
+      sql = false;
       environment_path = "/tmp/example";
     }
     [ "/tmp/example" ]
@@ -59,6 +62,7 @@ let test_flag_then_path_sets_both () =
       show_logical = false;
       show_physical = true;
       demo_data = false;
+      sql = false;
       environment_path = "/tmp/example";
     }
     [ "--show-physical"; "/tmp/example" ]
@@ -69,6 +73,7 @@ let test_path_then_flag_sets_both () =
       show_logical = false;
       show_physical = true;
       demo_data = false;
+      sql = false;
       environment_path = "/tmp/example";
     }
     [ "/tmp/example"; "--show-physical" ]
@@ -87,6 +92,7 @@ let test_demo_data_alone_sets_the_flag () =
       show_logical = false;
       show_physical = false;
       demo_data = true;
+      sql = false;
       environment_path = Cli.default_environment_path;
     }
     [ "--demo-data" ]
@@ -97,6 +103,7 @@ let test_demo_data_combines_with_show_physical_and_path () =
       show_logical = false;
       show_physical = true;
       demo_data = true;
+      sql = false;
       environment_path = "/tmp/example";
     }
     [ "--demo-data"; "--show-physical"; "/tmp/example" ]
@@ -111,6 +118,7 @@ let test_show_logical_alone_sets_the_flag () =
       show_logical = true;
       show_physical = false;
       demo_data = false;
+      sql = false;
       environment_path = Cli.default_environment_path;
     }
     [ "--show-logical" ]
@@ -121,6 +129,7 @@ let test_show_logical_combines_with_path () =
       show_logical = true;
       show_physical = false;
       demo_data = false;
+      sql = false;
       environment_path = "/tmp/example";
     }
     [ "--show-logical"; "/tmp/example" ]
@@ -136,9 +145,36 @@ let test_show_logical_and_show_physical_compose () =
       show_logical = true;
       show_physical = true;
       demo_data = true;
+      sql = false;
       environment_path = "/tmp/example";
     }
     [ "--show-logical"; "--show-physical"; "--demo-data"; "/tmp/example" ]
+
+let test_sql_alone_sets_the_flag () =
+  check_parse_ok ~label:"sql only"
+    {
+      show_logical = false;
+      show_physical = false;
+      demo_data = false;
+      sql = true;
+      environment_path = Cli.default_environment_path;
+    }
+    [ "--sql" ]
+
+let test_sql_combines_with_other_flags_and_path () =
+  check_parse_ok ~label:"sql with show-logical, demo-data, and path"
+    {
+      show_logical = true;
+      show_physical = false;
+      demo_data = true;
+      sql = true;
+      environment_path = "/tmp/example";
+    }
+    [ "--sql"; "--show-logical"; "--demo-data"; "/tmp/example" ]
+
+let test_duplicate_sql_is_rejected () =
+  check_parse_error ~label:"duplicate sql" "duplicate --sql flag"
+    [ "--sql"; "--sql" ]
 
 let () =
   Alcotest.run "cli"
@@ -176,5 +212,11 @@ let () =
             "--show-logical composes with --show-physical, --demo-data, and a \
              path"
             `Quick test_show_logical_and_show_physical_compose;
+          Alcotest.test_case "--sql alone sets the flag" `Quick
+            test_sql_alone_sets_the_flag;
+          Alcotest.test_case "--sql composes with other flags and a path" `Quick
+            test_sql_combines_with_other_flags_and_path;
+          Alcotest.test_case "a repeated --sql is rejected" `Quick
+            test_duplicate_sql_is_rejected;
         ] );
     ]

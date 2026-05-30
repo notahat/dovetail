@@ -9,6 +9,7 @@ type options = {
   show_logical : bool;
   show_physical : bool;
   demo_data : bool;
+  sql : bool;
   environment_path : string;
 }
 (** Parsed argument set. [environment_path] is the directory the LMDB
@@ -17,7 +18,9 @@ type options = {
     [--show-logical] appears in the argument list; [show_physical] mirrors that
     for [--show-physical]. [demo_data] becomes [true] only when [--demo-data]
     appears in the argument list; the binary uses it to decide whether to seed
-    the example tables on boot. *)
+    the example tables on boot. [sql] becomes [true] only when [--sql] appears;
+    the binary uses it to select the SQL surface for the session (default is the
+    relational-algebra surface). *)
 
 val default_environment_path : string
 (** Path used when no positional argument is supplied -- a sibling directory of
@@ -34,6 +37,10 @@ val show_physical_flag : string
 val demo_data_flag : string
 (** The literal flag string [--demo-data], exposed so the binary's usage line
     can render it without restating the spelling. *)
+
+val sql_flag : string
+(** The literal flag string [--sql], exposed so the binary's usage line can
+    render it without restating the spelling. *)
 
 val parse : string list -> (options, string) result
 (** [parse arguments] walks [arguments] -- the argv list with the program name

@@ -28,8 +28,15 @@ let read_line_from_stdin () =
   | exception End_of_file -> None
 
 let () =
-  let { Frontend.Cli.show_logical; show_physical; demo_data; environment_path }
-      =
+  (* [sql] is parsed but not yet wired into the surface; that lands when the
+     bin hands a [~surface] to the REPL. *)
+  let {
+    Frontend.Cli.show_logical;
+    show_physical;
+    demo_data;
+    sql = _;
+    environment_path;
+  } =
     parse_argv_or_exit Sys.argv
   in
   let environment = Storage.Engine.open_environment environment_path in
