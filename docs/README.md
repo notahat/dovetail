@@ -30,6 +30,9 @@ For coders reading the source.
 - [Architecture](internals/architecture.md) — how the pieces fit
   together: the query pipeline, the storage stack, the sub-library
   layout.
+- [Executor](internals/executor.md) — why evaluation is in
+  continuation-passing style, how the per-operator modules compose,
+  and the join materialisation tradeoff.
 - [Ubiquitous language](internals/ubiquitous-language.md) — shared
   vocabulary, defined once.
 

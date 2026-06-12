@@ -71,9 +71,8 @@ returns. The relation's lifetime is structurally bounded by
 the call to `eval`.
 
 See [`lib/execution/eval.mli`](../../lib/execution/eval.mli) for the
-entry-point signature and slice 6
-([`docs/plans/06-streaming-cps-executor.md`](../plans/06-streaming-cps-executor.md))
-for the rationale behind the conversion to CPS.
+entry-point signature and [`docs/internals/executor.md`](executor.md)
+for the rationale behind the CPS shape.
 
 ## IR — Intermediate representation
 

@@ -1,5 +1,9 @@
 # Slice 6: Streaming CPS executor
 
+**The durable design rationale here is promoted to
+[`docs/internals/executor.md`](../internals/executor.md), which tracks
+the code as it evolves; this plan is frozen history.**
+
 Not a query-language slice. End-state: `Eval` becomes a streaming
 continuation-passing executor, where the storage cursor's lifetime
 extends through the consumer's iteration of the result. User-visible
