@@ -1,15 +1,26 @@
 # IR types
 
+**Status: mixed — every section below carries its own status line.**
+The document interleaves as-built description with proposal. The two
+big proposals, neither built: the `Typed_logical` GADT (no such
+module exists — `Typecheck` validates a `Logical.t` and returns it
+unchanged) and the function-call surface AST (the shipped AST has a
+dedicated constructor per operator and no `Call` node). The
+`Logical.t`, `Physical.t`, and `Term.t` sections describe the code
+as it is, with the divergences noted in place.
+
 The OCaml types that represent a query at each stage of the pipeline,
 from the surface AST through the logical and physical IRs to the
 runtime payloads `Eval` produces.
 
-This document describes the **as-designed** shape. Today's code
-diverges in places — most notably, the surface AST reaches into
-`core` and `plan` for several types, rather than defining its own.
-Those divergences are called out as they come up.
-
 ## Guiding principle: two vocabularies
+
+**Status: as-built from `Logical` onward; proposal at the surface.**
+`Logical` and `Physical` share their composition vocabulary exactly
+as described. The surface-AST half describes the proposed AST in the
+next section, not the shipped one — though the shipped AST does keep
+its own expression and type-expression forms, reaching outside
+`surface_ra` only for `Scalar`.
 
 Each IR layer is built from two vocabularies:
 
@@ -49,6 +60,16 @@ surface form and the resolved form are different things — and not
 when they don't, as between two IRs over the same algebra.
 
 ## Surface AST (`lib/surface_ra/`)
+
+**Status: proposal — not built.** The shipped AST
+([`ast.mli`](../../lib/surface_ra/ast.mli)) takes the opposite shape
+on the key choice: every operator is a dedicated constructor
+(`Restrict`, `Project`, `Join`, …), there is no generic `Call` node
+and no operator registry, and expressions live in a separate
+`expression` type rather than inside `t`. This whole section — atoms,
+supporting records, the twelve-constructor `t`, and the
+registry-driven Lower — describes a possible future reshaping, not
+the code.
 
 The AST is the structure the parser produces and `Lower` consumes.
 Two design choices shape it:
@@ -214,6 +235,12 @@ that Lower produces.
 
 ## Logical IR (`lib/plan/logical.mli`)
 
+**Status: split — see the per-subsection lines.** The operator
+vocabulary and the untyped `Logical.t` are as-built. `Typed_logical`
+is a proposal: no such module exists. The `Typecheck` pass shipped
+in the error-accumulating shape described here, but its success arm
+returns the input `Logical.t` unchanged.
+
 The logical IR is the algebraic representation of a query — what
 the query *means* relative to the catalog and the kind ladder,
 without committing to *how* it executes. There are two views of
@@ -285,6 +312,11 @@ typecheck pass's job.
 
 ### Typed form: `Typed_logical.t`
 
+**Status: proposal — not built.** There is no `Typed_logical`
+module anywhere in `lib/`. Today `Typecheck.typecheck` returns the
+input `Logical.t` unchanged on success; the GADT below is the shape
+its success arm would widen to if the typed form lands.
+
 The same operators, indexed by the rung of the result:
 
 ```ocaml
@@ -351,6 +383,15 @@ five-tag rung covers the rung-discipline wins without forcing the
 type-level-function question.
 
 ### The Typecheck pass
+
+**Status: largely built.** The pass exists
+([`typecheck.mli`](../../lib/plan/typecheck.mli)) and is
+error-accumulating with structured errors as described; the
+consolidation this section calls for has happened. Two divergences
+from the sketch below: the success arm returns the validated
+`Logical.t`, not a `Typed_logical.t`, and two of the listed checks
+still fire at eval time — unqualify bare-name collisions, and the
+create-table name-collision check.
 
 ```ocaml
 val typecheck :
@@ -426,6 +467,13 @@ a schema file).
 
 ### Language-server fit
 
+**Status: proposal — no language server exists.** The pipeline
+diagram's `Typecheck → Typed_logical` step today produces a
+validated `Logical.t`. Of the two plumbing items at the end of this
+section, structured errors have since landed (`Typecheck.error`
+carries the offending names and kinds, though not positions); source
+positions remain unbuilt.
+
 A future language server is the second consumer of this pipeline,
 and the typed/untyped split is what makes it tractable.
 
@@ -487,6 +535,14 @@ isn't. Neither case requires the `surface_ra` or `plan`
 libraries to depend on `storage`.
 
 ## Physical IR (`lib/plan/physical.mli`)
+
+**Status: as-built, with two arm shapes out of date.** In the
+shipped [`physical.mli`](../../lib/plan/physical.mli), `IndexLookup`
+carries `key : int64` rather than an `Expression.t`, and
+`IndexedNestedLoopJoin` is
+`{ outer; inner_table; outer_key_column; inner_position }` rather
+than the left/right/index shape shown below. The "typed front door"
+at the end of the section is a proposal — see its note.
 
 The physical IR is the execution-strategy representation of a query
 — what the query *does*, operator by operator, against the storage
@@ -588,6 +644,11 @@ arms:
 val translate : Typed_logical.t -> Physical.t
 ```
 
+**Proposal.** With no `Typed_logical`, the shipped signature is
+`translate : catalog:(string -> Relation.kind option) -> Logical.t
+-> Physical.t`; the guarantees below hold by virtue of `Typecheck`
+having validated the same `Logical.t` beforehand, not by type.
+
 Whatever guarantees Typed_logical established stay in force as
 Translate runs; once the result is a `Physical.t`, those
 guarantees are invariants Translate is responsible for
@@ -615,6 +676,11 @@ Physical's standpoint is a compiler-bug signal, not a user-error
 signal.
 
 ## Runtime payloads (`lib/core/term.mli`)
+
+**Status: as-built.** Matches
+[`term.mli`](../../lib/core/term.mli) arm for arm, catalog arms
+included. The references to "the Typed_logical GADT" point at the
+unbuilt proposal above.
 
 `Term.t` is the unified payload that flows through Eval's
 continuations and falls out the end of a pipeline. Everything an
@@ -688,6 +754,12 @@ against its arms. Nothing in `surface_ra` mentions it — Term is the
 runtime side of the wall, not the surface side.
 
 ## Open questions and follow-ups
+
+**Status: forward-looking by design.** Two items presuppose unbuilt
+proposals: `Type_op`'s rung handling assumes `Typed_logical`, and
+the registry question assumes the `Call`-based AST. The
+source-positions item remains open; its structured-error half has
+since landed as `Typecheck.error`.
 
 Things this design defers rather than answers. Worth revisiting as
 the relevant rungs come into focus, but not worth pinning down
