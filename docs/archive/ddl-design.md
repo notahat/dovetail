@@ -1,5 +1,13 @@
 # DDL in the RA query language
 
+**Status: superseded.** The standalone DDL grammar designed here —
+the statement sigil, the `Ddl` module, `describe` — was not what
+shipped. DDL landed as ordinary pipeline operators instead
+(`create table`, `drop table`, `tables`, with the `type` operator
+covering `describe`'s role);
+[type-system.md](../design/type-system.md) describes the shipped
+surface. Kept as a record of the design discussion.
+
 This document captures the design of data-definition operators
 (`create table`, `drop table`, `describe`, `list tables`) in the surface
 RA query language. All four are designed together so the surface is

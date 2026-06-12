@@ -35,9 +35,14 @@ For coders reading the source.
 
 ## Design and plans — setting direction
 
-The maintainer's working notes. Some are speculative, some superseded;
-this corner is still being untangled.
+The maintainer's design notes and build plans. Everything under
+`internals/` above describes the code as it is; docs here may not.
+Each design and archive doc opens with a **Status** banner —
+as-built, proposal, superseded, or historical record — saying how
+far to trust it.
 
-- [Design notes](design/) — the type system, IR types, the ladder
-  framing, and the DML/DDL surface designs.
-- [Slice plans](plans/) — numbered, one per slice of the build.
+- [Design notes](design/) — the type system, the type ladder, and
+  the IR types.
+- [Slice plans](plans/) — numbered, one per slice of the build;
+  frozen history once a slice closes.
+- [Archive](archive/) — closed design discussions and reviews.

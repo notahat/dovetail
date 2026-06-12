@@ -1,5 +1,9 @@
 # Code review — post-slice-11
 
+**Status: historical record.** A closed code review; every item
+shipped or was deliberately deferred, as the Status section below
+records.
+
 A pass over the whole codebase after eleven slices of growth. Not focused
 on the insert work specifically; the goal is to surface places where the
 shape of the codebase has drifted, where slice-1 scaffolding is overdue

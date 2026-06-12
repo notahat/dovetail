@@ -1,5 +1,9 @@
 # Library and module structure
 
+**Status: historical record.** This design landed across slices 13
+and 16, and the sub-library layout under `lib/` matches what it
+describes. Kept as the rationale for the structure.
+
 This document captures the design for breaking `lib/` (and the
 mirroring `test/`) into multiple dune sub-libraries with enforced
 dependency boundaries. The aim is to make Dovetail's internal

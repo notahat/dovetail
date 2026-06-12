@@ -1,5 +1,12 @@
 # Type system
 
+**Status: largely as-built.** The scalar, row, and relation syntax,
+the `type` operator, the qualifier rules, and the sinks shipped as
+described. The catalog rung is read-side only (`catalog`,
+`catalog | type`, `catalog | tables`); catalog literals, foreign-key
+refinements, and `alter table` remain proposals, and "What this
+leaves open" lists the rest.
+
 Reference for Dovetail's surface syntax across the ladder of values and
 types its core organises — Scalar, Row, Relation, Catalog — and the
 single pipe-style language that covers them all.
@@ -216,7 +223,7 @@ What flows into what:
 | Source                | Pipe stage                       | Output                                           |
 |-----------------------|----------------------------------|--------------------------------------------------|
 | any                   | `type`                           | the type of the input                            |
-| relation              | `filter (...)`                   | relation (streaming)                             |
+| relation              | `restrict (...)`                 | relation (streaming)                             |
 | relation              | `project (...)`                  | relation (streaming)                             |
 | relation              | `cross …`                        | relation                                         |
 | relation              | `join … on …`                    | relation                                         |
@@ -274,7 +281,7 @@ type, or relation type appears.
 
 ### How operators handle qualifiers
 
-- **`filter`, `project`** preserve whatever qualifiers are on the
+- **`restrict`, `project`** preserve whatever qualifiers are on the
   input. Expressions inside them accept bare field names when the
   reference is unambiguous, and require a qualified name
   (`users.id`) when two input fields share a name. The qualifier

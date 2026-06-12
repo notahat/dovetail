@@ -1,5 +1,13 @@
 # Literals as a ladder
 
+**Status: proposal, partly realised.** The ladder framing motivated
+the `kind` / `value` / `t` framework that shipped —
+[type-ladder.md](../design/type-ladder.md) documents the as-built
+shape, and [type-system.md](../design/type-system.md) the surface
+syntax that superseded the sketch here. The round-trippable-literals
+programme beyond that (catalog literals, migration by diff) remains
+speculative.
+
 A design note, not a plan. It captures a framing for thinking about
 schemas, relations, catalogs, and DDL as facets of one idea —
 round-trippable literals at every level of granularity — rather than as

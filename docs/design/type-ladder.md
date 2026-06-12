@@ -1,5 +1,9 @@
 # Type ladder
 
+**Status: as-built.** Describes the code as it is. The one
+forward-looking part — the `Catalog` rung's target shape — is marked
+where it appears.
+
 The shape that the `lib/core/` modules — `Scalar`, `Row`, `Relation` —
 follow, and the rules for adding to it. Pairs with
 [`literals-as-a-ladder.md`](../archive/literals-as-a-ladder.md), which sketches
@@ -9,12 +13,12 @@ the design; this file describes what got built.
 
 Four rungs, each composing the one below:
 
-| Rung       | Shape          | Carrier     |
-| ---------- | -------------- | ----------- |
-| `Scalar`   | a single typed value          | `kind` + `value` |
-| `Row`      | an ordered list of values     | `kind` + `value` |
-| `Relation` | a stream of rows, plus refinements on the contents | `kind` + `value` + `t` |
-| `Catalog`  | a named collection of relations, plus cross-table refinements | `kind` + `value` + `t` (not yet built as a value) |
+| Rung       | Shape          | Carrier     | Status |
+| ---------- | -------------- | ----------- | ------ |
+| `Scalar`   | a single typed value          | `kind` + `value` | built |
+| `Row`      | an ordered list of values     | `kind` + `value` | built |
+| `Relation` | a stream of rows, plus refinements on the contents | `kind` + `value` + `t` | built |
+| `Catalog`  | a named collection of relations, plus cross-table refinements | `kind` + `value` + `t` | kind side only; see below |
 
 At each rung the vocabulary is the same:
 

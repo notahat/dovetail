@@ -1,5 +1,10 @@
 # DML in the RA query language
 
+**Status: partly built, the rest proposal.** `insert` shipped as the
+`insert into` pipeline sink. `update` and `delete` remain unbuilt;
+the designs here — including the upstream-identity validator — are
+the starting point when they land.
+
 This document captures the design of data-modification operators
 (insert, update, delete) in the surface RA query language. All three
 are designed together so the surface is coherent, and so insert's
