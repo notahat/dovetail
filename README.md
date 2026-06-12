@@ -47,7 +47,10 @@ docker run -it --rm dovetail          # relational-algebra REPL
 docker run -it --rm dovetail --sql    # SQL REPL
 ```
 
-The `-it` flags are required — the REPL is interactive. The LMDB data
+The `-it` flags are required — the REPL is interactive. The image's
+entrypoint runs `dovetail --demo-data /data`, so anything after the
+image name is appended (that's how `--sql` reaches the binary), and
+re-seeding an already-seeded directory is a no-op. The LMDB data
 directory lives in the container's `/data` volume and is discarded
 with `--rm`; mount a named volume to keep it between runs:
 
@@ -66,9 +69,10 @@ against.
 ### Relational algebra (default)
 
 The default surface is pipeline-shaped: name a relation, then chain
-operators (`restrict`, `project`, `cross`, `join`, `unqualify`, `type`,
-`insert into`, `tables`) with `|`. The canonical multi-operator query
-joins two tables and projects:
+operators (`restrict`, `project`, `join`, and friends) with `|`; the
+[relational-algebra reference](docs/reference/ra/README.md) lists the
+full set of sources, operators, and sinks. The canonical
+multi-operator query joins two tables and projects:
 
 ```
 > users | join orders on users.id = orders.user_id | project name, description, amount
@@ -109,6 +113,12 @@ the expression and projection sublanguages -- and the
 
 ### Next up
 
+A documentation overhaul
+([plan 29](docs/plans/29-documentation-overhaul.md)): status banners
+separating as-built docs from proposals, promotion of design
+rationale out of frozen plan files into `docs/internals/`, doctest
+coverage for the SQL reference, a query-lifecycle walkthrough, new
+tutorial chapters, and an odoc build.
 
 ### Beyond
 
