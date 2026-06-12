@@ -105,6 +105,32 @@ focus: lowering doesn't worry about strategy, translation
 doesn't worry about syntax, evaluation doesn't worry about
 algebra.
 
+## Lower
+
+The pass that converts a surface AST into the logical IR. Each
+surface has its own (`Surface_ra.Lower`, `Surface_sql.Lower`), and
+both target the same `Logical.t` — that shared target is what lets
+two query languages drive one engine.
+
+Lowering is purely syntactic-to-semantic: it maps surface forms onto
+algebra constructors and desugars conveniences (`join … on` becomes
+a restriction over a cross product), but it never consults the
+catalog. Whether a table exists or a column resolves is `Typecheck`'s
+job, one step later.
+
+## Physical plan
+
+The concrete execution strategy for a query: which cursors to open,
+which join algorithm to run, point lookup versus full scan, and
+where writes happen. The output of `Translate` and the input of
+`Eval`. Where the logical IR says *what* a query computes, the
+physical plan says *how* — the same distinction drawn under **IR**
+above.
+
+Lives in [`lib/plan/physical.mli`](../../lib/plan/physical.mli).
+The `--show-physical` flag on the binary prints the chosen plan for
+a query.
+
 ## Relation
 
 A collection of rows that all share the same shape, plus any
@@ -154,3 +180,55 @@ it is) and a payload (the bits for that type).
 The bottom rung of the type ladder; see
 [`docs/design/type-ladder.md`](../design/type-ladder.md) and
 [`lib/core/scalar.mli`](../../lib/core/scalar.mli).
+
+## Translate
+
+The pass that converts the logical IR into a physical plan, picking
+an execution strategy for each operator. Most operators map
+one-for-one; the interesting work is the rewrite rules that
+recognise patterns worth executing as something better than the
+literal translation — an equality on a primary key becomes an
+`IndexLookup`, a restriction over a cross product becomes a
+`NestedLoopJoin` (folded further into `IndexedNestedLoopJoin` when
+the join is on a primary key).
+
+Translate consults the catalog for table kinds — that's how it
+recognises a primary-key pattern — but it does not validate;
+`Typecheck` has already run by the time Translate sees the plan.
+Lives in [`lib/plan/translate.mli`](../../lib/plan/translate.mli).
+
+## Typecheck
+
+The validation pass between `Lower` and `Translate`. It walks the
+logical plan against a snapshot of the catalog's kinds and checks
+everything that can be known before any rows move: every column
+reference resolves, comparison operands agree on kind, predicates
+are boolean, insert sources match their target's columns, referenced
+tables exist.
+
+Two properties matter to its callers. It accumulates errors — one
+walk reports every problem, not just the first — and on success it
+returns the plan unchanged; the pass validates but does not (yet)
+produce a separate typed IR. The catalog snapshot is taken inside
+the same transaction later used for execution, so the kinds it
+validated against can't shift before evaluation. Lives in
+[`lib/plan/typecheck.mli`](../../lib/plan/typecheck.mli).
+
+## One operator, three names
+
+The same operation deliberately changes name as it crosses layers:
+the surface speaks the user's language, the logical IR speaks
+relational algebra, and the physical plan names the execution
+strategy. The mapping for the operators that rename:
+
+| Surface           | Logical IR                       | Physical plan                              |
+| ----------------- | -------------------------------- | ------------------------------------------ |
+| bare table name   | `Scan`                           | `FullScan`, or `IndexLookup` when a restriction pins the primary key |
+| `restrict`        | `Restrict`                       | `Filter`                                   |
+| `join … on`       | `Restrict` over a `CrossProduct` | `NestedLoopJoin`, or `IndexedNestedLoopJoin` when joining on a primary key |
+
+A renaming marks a real change of meaning: `Restrict` is the
+algebra's σ, a statement about *what* rows survive; `Filter` is the
+executor's strategy of passing matching rows through. Operators that
+keep one name across layers (`Project`, `CrossProduct`, `Insert`, …)
+do so because the strategy *is* the literal translation.

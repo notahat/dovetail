@@ -4,8 +4,9 @@
 
 The query pipeline runs top-to-bottom from text to rows and back to text.
 Two surface languages — relational algebra (RA) and SQL — each parse their
-own AST, then lower to the same `Logical.t`; from there a single spine runs
-to output. The storage stack sits below, used by `Eval` and the catalog.
+own AST, then lower to the same `Logical.t`; from there a single spine —
+typecheck, translate, evaluate — runs to output. The storage stack sits
+below, used by `Eval` and the catalog.
 
 ```
   Query pipeline                                  Storage stack
@@ -24,6 +25,9 @@ to output. The storage stack sits below, used by `Eval` and the catalog.
                         ▼
                     Logical.t      — relational algebra; what the query
                         │            computes
+                        │  Typecheck   — validates against a catalog
+                        │                snapshot; plan passes through
+                        │                unchanged
                         │  Translate
                         ▼
                     Physical.t     — physical operators; how to compute it
@@ -58,6 +62,7 @@ Each layer in the diagram, in pipeline order:
 | `Ast`       | Abstract syntax tree for a surface language; the RA and SQL surfaces each have their own.       |
 | `Lower`     | Converts a surface AST into a relational algebra expression tree. Both surfaces target `Logical.t`. |
 | `Logical`   | Relational algebra describing *what* the query computes, with no execution detail.            |
+| `Typecheck` | Validates the logical plan against a catalog snapshot — column resolution, kind agreement, table existence — accumulating every error in one walk. On success the plan passes through unchanged. |
 | `Translate` | Converts the relational algebra expression tree into a physical execution plan.               |
 | `Physical`  | The concrete execution plan: cursors, filters, projections, joins, point lookups, and writes. |
 | `Eval`      | Executes the physical plan and returns a `Term`.                                              |
@@ -72,7 +77,7 @@ library.
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `core`        | Shared data types — `Scalar`, `Row`, `Relation`, `Term`, `Expression`, `Catalog` — the type ladder everything else builds on. |
 | `storage`     | LMDB-backed persistence: the storage engine, key and row encoding, and the table catalog.                                     |
-| `plan`        | Query-plan IRs and the optimiser: `Logical`, `Physical`, `Translate`, `Projection`.                                           |
+| `plan`        | Query-plan IRs, validation, and the optimiser: `Logical`, `Typecheck`, `Physical`, `Translate`, `Projection`.                 |
 | `surface_ra`  | The RA surface language: parser, AST, and lowering to relational algebra.                                                     |
 | `surface_sql` | The SQL surface language: parser, AST, and lowering to relational algebra.                                                    |
 | `execution`   | The streaming evaluator that runs a physical plan against storage.                                                            |
