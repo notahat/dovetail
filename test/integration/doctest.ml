@@ -1,15 +1,17 @@
 (** Doctest extractor and verifier for markdown files containing REPL sessions.
 
     A fenced code block (triple-backtick) is treated as a REPL session if and
-    only if its first non-blank line starts with [> ]. Inside a session, every
-    line starting with [> ] is a query; the lines that follow (up to the next
-    [> ] or the end of the block) are the expected rendered output of that
+    only if its first non-blank line starts with a REPL prompt — [> ] for the
+    relational-algebra surface, [sql> ] for the SQL surface. The prompt names
+    the surface the whole session runs on. Inside a session, every line starting
+    with the session's prompt is a query; the lines that follow (up to the next
+    prompt or the end of the block) are the expected rendered output of that
     query.
 
-    Fenced blocks that don't start with [> ] -- shell snippets, OCaml code,
+    Fenced blocks that don't start with a prompt -- shell snippets, OCaml code,
     ASCII diagrams -- pass through untouched. The convention is unambiguous
-    against Dovetail query syntax: no real query line ever begins with [> ], so
-    a leading prompt reliably marks a REPL session.
+    against Dovetail query syntax: no real query line ever begins with a prompt,
+    so a leading prompt reliably marks a REPL session.
 
     Verification runs the extracted queries through {!Repl.run} against a
     caller-supplied environment, splits the captured output back into one
@@ -27,7 +29,12 @@
 module Frontend = Dovetail_frontend
 
 type query = { source : string; expected_output : string }
-type session = { block_starts_at_line : int; queries : query list }
+
+type session = {
+  block_starts_at_line : int;
+  surface : [ `Ra | `Sql ];
+  queries : query list;
+}
 
 type error = {
   block_starts_at_line : int;
@@ -38,7 +45,10 @@ type error = {
 (* === Markdown parsing === *)
 
 let fence_marker = "```"
-let prompt_marker = "> "
+
+(** The prompt that opens each query line of a session, per surface. Matches
+    what {!Frontend.Repl} prints, so a pasted transcript doctests verbatim. *)
+let prompt_marker_for = function `Ra -> "> " | `Sql -> "sql> "
 
 (** [starts_with prefix string] is [true] when [string] begins with [prefix]. *)
 let starts_with prefix string =
@@ -51,11 +61,16 @@ let starts_with prefix string =
 let is_fence line = starts_with fence_marker line
 
 (** The convention: a block is a session iff its first non-blank line opens with
-    the REPL prompt. *)
-let first_non_blank_starts_with_prompt lines =
+    a REPL prompt, and the prompt names the surface the session runs on. Returns
+    [None] for non-session blocks. The SQL prompt is checked first out of
+    caution, though neither prompt is a prefix of the other. *)
+let surface_of_block lines =
   match List.find_opt (fun line -> String.trim line <> "") lines with
-  | None -> false
-  | Some line -> starts_with prompt_marker line
+  | None -> None
+  | Some line ->
+      if starts_with (prompt_marker_for `Sql) line then Some `Sql
+      else if starts_with (prompt_marker_for `Ra) line then Some `Ra
+      else None
 
 type pending_query = { source : string; output_lines_reversed : string list }
 (** A query whose expected-output lines are still being accumulated. The lines
@@ -74,10 +89,10 @@ let finish_pending_query pending queries =
       { source; expected_output } :: queries
 
 (** Walk a session's body lines, collecting [(source, expected_output)] pairs.
-    Lines before the first prompt are dropped; once a prompt is seen, subsequent
-    lines accumulate as that query's expected output until the next prompt or
-    end of block. *)
-let parse_session_lines lines =
+    Lines before the first [prompt_marker] are dropped; once a prompt is seen,
+    subsequent lines accumulate as that query's expected output until the next
+    prompt or end of block. *)
+let parse_session_lines ~prompt_marker lines =
   let prompt_length = String.length prompt_marker in
   let process_line (pending, queries) line =
     if starts_with prompt_marker line then
@@ -110,13 +125,17 @@ type extractor_state =
   | Inside_block of { block_starts_at_line : int; lines_reversed : string list }
 
 (** Close out the current block: if its body opens with a prompt, parse it as a
-    session and prepend; either way, return to [Outside]. *)
+    session on the prompt's surface and prepend; either way, return to
+    [Outside]. *)
 let close_block ~block_starts_at_line ~lines_reversed sessions =
   let body = List.rev lines_reversed in
-  if first_non_blank_starts_with_prompt body then
-    let queries = parse_session_lines body in
-    { block_starts_at_line; queries } :: sessions
-  else sessions
+  match surface_of_block body with
+  | None -> sessions
+  | Some surface ->
+      let queries =
+        parse_session_lines ~prompt_marker:(prompt_marker_for surface) body
+      in
+      { block_starts_at_line; surface; queries } :: sessions
 
 (** Walk [markdown] line by line, alternating in/out of fenced blocks. On each
     block close, if its body opens with a prompt, parse it as a session.
@@ -148,12 +167,13 @@ let extract_sessions markdown =
 
 (* === Verification === *)
 
-(** Feed every query's source line into {!Repl.run} against [environment],
-    capturing all formatter output into a single string. *)
-let capture_repl_output environment queries =
-  let lines = List.map (fun (query : query) -> query.source) queries in
+(** Feed every query of [session] into {!Repl.run} on the session's surface
+    against [environment], capturing all formatter output into a single string.
+*)
+let capture_repl_output environment session =
+  let lines = List.map (fun (query : query) -> query.source) session.queries in
   Test_helpers.with_captured_formatter @@ fun formatter ->
-  Frontend.Repl.run environment
+  Frontend.Repl.run ~surface:session.surface environment
     ~read_line:(Test_helpers.read_line_from_list lines)
     ~output:formatter
 
@@ -201,9 +221,10 @@ let split_on_substring ~separator body =
 
     The first prompt has no preceding newline; every later prompt does. The
     final prompt comes from the EOF read and has nothing after it. So stripping
-    the leading prompt and splitting on ["\n> "] yields N+1 chunks, the last of
-    which is empty -- and that trailing empty is dropped. *)
-let split_outputs captured =
+    the leading [prompt_marker] and splitting on [{"\n" ^ prompt_marker}] yields
+    N+1 chunks, the last of which is empty -- and that trailing empty is
+    dropped. *)
+let split_outputs ~prompt_marker captured =
   let prompt_length = String.length prompt_marker in
   if
     String.length captured < prompt_length
@@ -264,8 +285,9 @@ let outputs_match actual expected =
 
 (** Run one session and return the first mismatch, if any. *)
 let verify_session environment session =
+  let prompt_marker = prompt_marker_for session.surface in
   let actual_outputs =
-    split_outputs (capture_repl_output environment session.queries)
+    split_outputs ~prompt_marker (capture_repl_output environment session)
   in
   let actual_count = List.length actual_outputs in
   let query_count = List.length session.queries in

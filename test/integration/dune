@@ -18,4 +18,5 @@
   ../../bin/main.exe
   (glob_files ../../docs/tutorial/*.md)
   (glob_files ../../docs/reference/ra/*.md)
+  (glob_files ../../docs/reference/sql/*.md)
   ../../README.md))
