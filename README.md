@@ -8,7 +8,7 @@ This is a learning vehicle, not production software.
 
 ## Building and running
 
-OCaml 5.2 in a local opam switch at the repo root.
+You'll need OCaml 5.2 with Dune.
 
 ```sh
 opam exec -- dune build              # compile
@@ -17,6 +17,7 @@ opam exec -- dune build @fmt --auto-promote   # format
 ./dovetail                           # run the REPL (default env: ./dovetail-data)
 ./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
 ./dovetail --demo-data /tmp/play     # ...or seed the example tables on first launch
+./dovetail --sql                     # ...or speak SQL instead of the pipeline language
 ./dovetail --show-logical            # ...or print each query's logical plan
 ./dovetail --show-physical           # ...or print each query's physical plan
 ```
@@ -34,13 +35,40 @@ up, which keeps the artifact fresh).
 See [`CLAUDE.md`](CLAUDE.md) for project-specific naming and tooling
 conventions.
 
-## Query language
+## Trying it out with Docker
 
-Launched with `--demo-data`, the REPL seeds two example tables,
-`users` and `orders`, for queries to read against. Pipeline
-operators (`restrict`, `project`, `cross`, `join`, `unqualify`,
-`type`, `insert into`, `tables`) compose with `|`, and the
-canonical multi-operator query joins them and projects:
+If you'd rather not set up an OCaml toolchain, the included
+[`Dockerfile`](Dockerfile) builds the binary and starts the REPL with
+the demo tables already seeded:
+
+```sh
+docker build -t dovetail .
+docker run -it --rm dovetail          # relational-algebra REPL
+docker run -it --rm dovetail --sql    # SQL REPL
+```
+
+The `-it` flags are required — the REPL is interactive. The LMDB data
+directory lives in the container's `/data` volume and is discarded
+with `--rm`; mount a named volume to keep it between runs:
+
+```sh
+docker run -it -v dovetail-data:/data dovetail
+```
+
+## Query languages
+
+Two surfaces sit over the same logical and physical plans, so they
+share catalog lookup, type checking, evaluation, and error messages.
+The REPL speaks one surface per session, chosen at launch; `--demo-data`
+seeds two example tables, `users` and `orders`, for either to read
+against.
+
+### Relational algebra (default)
+
+The default surface is pipeline-shaped: name a relation, then chain
+operators (`restrict`, `project`, `cross`, `join`, `unqualify`, `type`,
+`insert into`, `tables`) with `|`. The canonical multi-operator query
+joins two tables and projects:
 
 ```
 > users | join orders on users.id = orders.user_id | project name, description, amount
@@ -54,20 +82,33 @@ relation (users.name: string, orders.description: string, orders.amount: int64) 
 }
 ```
 
-See [the query-language guide](docs/tutorial/README.md) for the full
-walkthrough -- tutorial, per-operator reference, and the expression and
-projection sublanguages.
+### SQL (`--sql`)
+
+Launch with `--sql` for a small SQL surface, with a psql-style `sql>`
+prompt and bordered result tables. It understands a single-table
+`SELECT` -- a select list, a `FROM`, and an optional `WHERE` -- which
+lowers to the same scan/restrict/project plan the relational-algebra
+surface builds:
+
+```
+sql> SELECT name, email FROM users WHERE active
+ name  |       email       
+-------+-------------------
+ Alice | alice@example.com 
+ Carol | carol@example.com 
+ Dave  | dave@example.com  
+(3 rows)
+```
+
+See [the query-language guide](docs/tutorial/README.md) for the
+relational-algebra walkthrough -- tutorial, per-operator reference, and
+the expression and projection sublanguages -- and the
+[SQL reference](docs/reference/sql/README.md) for the `SELECT` grammar.
 
 ## Roadmap
 
 ### Next up
 
-The next slice lands as its own plan in `docs/plans/`. Likely
-direction: a minimal SQL frontend — SQL parser, SQL AST, and
-SQL→logical lowering feeding the existing logical and physical IRs.
-Deliberately limited (no NULLs, scope otherwise TBD); the focus is
-on how the architecture splits between two surface languages, not
-on covering SQL.
 
 ### Beyond
 
@@ -101,7 +142,7 @@ is not committed to here.
 - EXPLAIN-style plan introspection.
 - A cost-based query optimiser: statistics collection, a cost model,
   plan search.
-- SQL elaboration beyond the first slice — joins, aggregation,
+- SQL elaboration beyond the initial frontend — joins, aggregation,
   subqueries, the rest of SELECT.
 - An internals walkthrough that follows a query through the layers.
 - A network protocol so the database can run as a separate process.

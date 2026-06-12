@@ -1,0 +1,10 @@
+# Keep the build context small and free of host-specific artifacts.
+# `_build` and `dovetail-data` are macOS/host build and data outputs
+# that must not leak into the Linux image; `.git` is large and unused
+# by the build.
+.git
+.github
+.claude
+_build
+_opam
+dovetail-data
