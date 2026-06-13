@@ -38,6 +38,8 @@ For coders reading the source.
   invariants they protect.
 - [SQL frontend](internals/sql-frontend.md) — how the SQL surface
   parses, lowers to the shared algebra, and renders results.
+- [Storage](internals/storage.md) — the LMDB layering, byte-comparable
+  keys, row and catalog encoding, and transaction/cursor lifetime.
 - [Ubiquitous language](internals/ubiquitous-language.md) — shared
   vocabulary, defined once.
 
