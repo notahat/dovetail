@@ -71,8 +71,8 @@ Apply the split deliberately:
 
 - Code identifiers, doc comments inside `.mli` files, and references
   to specific OCaml identifiers use `kind`.
-- User-facing strings (REPL prompts, errors, `:`-command output until
-  it's retired, anything a user reads) use `type`.
+- User-facing strings (REPL prompts, errors, anything a user reads)
+  use `type`.
 - Design docs in `docs/` use `type` in prose and `kind` only when
   pointing at OCaml identifiers. `type-ladder.md` is the documented
   exception — it describes the as-built code and uses `kind`
@@ -192,6 +192,16 @@ follows lib code's convention straight through — no opens.
 - TDD where the global rules call for it: failing test first for behaviour
   changes; skip when there is no testable behaviour (config, formatting,
   pure renames).
+- Closing a slice includes a promotion pass. Plans are frozen history
+  and don't get updated when the code moves on, so any durable design
+  rationale a plan carries — the *why* behind a design, the
+  alternatives ruled out — must have a home outside `plans/` before
+  the slice is done. Promote it to a living `docs/internals/` doc
+  (which tracks the code as it evolves), leave a one-line banner at
+  the top of the plan pointing there, and add the plan's one-line
+  status row to [`docs/plans/README.md`](docs/plans/README.md). Pure
+  build-and-ship slices with no rationale worth keeping skip the
+  promotion but still get the `plans/README.md` row.
 - Don't make conventions stricter than they need to be. When something
   doesn't fit, surface it for discussion rather than silently working
   around it.

@@ -37,7 +37,7 @@ code side calls it `kind`. The payload half is `value` on both sides.
 
 ## Per-rung detail
 
-### `Scalar` ([`lib/core/scalar.mli`](../lib/core/scalar.mli))
+### `Scalar` ([`lib/core/scalar.mli`](../../lib/core/scalar.mli))
 
 ```
 type kind = Int64 | String | Bool
@@ -54,7 +54,7 @@ There is no `Scalar.t`. A scalar *is* its own carrier — pairing a
 (`Scalar.kind_of` recovers the kind in one step), so the rung stops
 at `kind` and `value`.
 
-### `Row` ([`lib/core/row.mli`](../lib/core/row.mli))
+### `Row` ([`lib/core/row.mli`](../../lib/core/row.mli))
 
 ```
 type field = { name : string; kind : Scalar.kind; qualifier : string option }
@@ -70,7 +70,7 @@ There is no `Row.t` either. A row is consumed in the context of a
 relation, which already pairs the kind with each row's value — pairing
 them per-row would just inflate the working set.
 
-### `Relation` ([`lib/core/relation.mli`](../lib/core/relation.mli))
+### `Relation` ([`lib/core/relation.mli`](../../lib/core/relation.mli))
 
 ```
 type refinement = Primary_key of string list
@@ -90,7 +90,7 @@ whether they can rely on primary-key uniqueness. The phantom `'tag`
 distinguishes set from bag semantics so the type system can reject
 combinations that would silently change them.
 
-### `Catalog` ([`lib/storage/catalog.mli`](../lib/storage/catalog.mli))
+### `Catalog` ([`lib/storage/catalog.mli`](../../lib/storage/catalog.mli))
 
 A catalog is the database one rung up: a named collection of relations
 plus the cross-table refinements (foreign keys, …) that constrain how
