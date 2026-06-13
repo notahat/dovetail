@@ -50,4 +50,4 @@ wholesale retired later, the status says so.
 | [26 — Typecheck extraction](26-typecheck-extraction.md)             | Done. |
 | [27 — Docs audience reorganisation](27-docs-audience-reorganisation.md) | Done. |
 | [28 — SQL frontend](28-sql-frontend.md)                             | Done. |
-| [29 — Documentation overhaul](29-documentation-overhaul.md)         | In progress. |
+| [29 — Documentation overhaul](29-documentation-overhaul.md)         | Done. |

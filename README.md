@@ -117,20 +117,11 @@ the expression and projection sublanguages -- and the
 
 ## Roadmap
 
-### Next up
-
-A documentation overhaul
-([plan 29](docs/plans/29-documentation-overhaul.md)): status banners
-separating as-built docs from proposals, promotion of design
-rationale out of frozen plan files into `docs/internals/`, doctest
-coverage for the SQL reference, a query-lifecycle walkthrough, new
-tutorial chapters, and an odoc build.
-
-### Beyond
-
-Unordered backlog. Some items are foundational, some are operator
-additions, some are tooling and infrastructure; the order they land in
-is not committed to here.
+No slice is currently committed to. The
+[slice plans index](docs/plans/README.md) records what has shipped;
+the items below are an unordered backlog. Some are foundational, some
+are operator additions, some are tooling and infrastructure; the order
+they land in is not committed to here.
 
 - Primary key range lookups.
 - Autoincrement columns.
