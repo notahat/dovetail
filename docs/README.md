@@ -11,6 +11,9 @@ Learn the query language from the ground up.
   tables every example reads against.
 - [Walkthrough](tutorial/walkthrough.md) — one query grown operator by
   operator.
+- [Tables](tutorial/tables.md) — building your own table: create,
+  insert, query, and drop, with the literal forms and the `type` and
+  `catalog` operators.
 
 ## Reference — looking something up
 

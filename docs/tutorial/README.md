@@ -15,6 +15,9 @@ The guide is in several parts:
   tables every example reads against.
 - [Tutorial](walkthrough.md) -- one query grown stage
   by stage, introducing each operator in turn.
+- [Tables](tables.md) -- building a table of your own: create,
+  insert, query, and drop, plus the literal source forms and the
+  `type` and `catalog` operators.
 - [Relational-algebra reference](../reference/ra/README.md)
   -- per-operator syntax and semantics, plus the expression and
   projection sublanguages used inside `restrict`, `project`, and
