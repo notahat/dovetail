@@ -11,6 +11,13 @@ table. The **expression** and **projection** sublanguages appear inside
 operators like `restrict`, `project`, and `join`. The **types** are what
 `| type` reports for a value at each rung.
 
+The pipeline language is **case-sensitive throughout**. Operator and
+source keywords (`restrict`, `project`, `join`, `catalog`, …) must be
+lowercase — `RESTRICT` is a parse error — and table and column names are
+matched exactly, so `USERS` is an unknown table when the table is
+`users`. This differs from the SQL surface, whose keywords are
+case-insensitive while its identifiers stay case-sensitive.
+
 ## Sources
 
 A source produces the initial value at the head of the pipeline. The

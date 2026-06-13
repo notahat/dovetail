@@ -20,6 +20,26 @@ on the reference's source form, so a bare and a qualified
 reference to the same underlying column are not currently treated
 as duplicates of each other.
 
+That last point is a quirk worth seeing. Because `name` and
+`users.name` are different source spellings, listing both passes the
+duplicate check and yields two columns of the same name — a result
+you almost certainly didn't intend:
+
+```
+> users | project name, users.name
+relation (users.name: string, users.name: string) {
+  (users.name = "Alice", users.name = "Alice"),
+  (users.name = "Bob", users.name = "Bob"),
+  (users.name = "Carol", users.name = "Carol"),
+  (users.name = "Dave", users.name = "Dave"),
+  (users.name = "Eve", users.name = "Eve")
+}
+```
+
+Deduplicating by resolved column identity rather than source spelling
+would catch this; it is tracked in the code as
+`TODO(projection-dedup-by-resolution)`.
+
 ```
 > orders | project description, amount, id
 relation (orders.description: string, orders.amount: int64, orders.id: int64) {

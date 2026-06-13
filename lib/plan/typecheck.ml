@@ -455,7 +455,13 @@ let check_predicate_kind ~operator ~row_kind expression : error list =
    for every occurrence beyond the first of a reference whose formatted
    spelling has already been seen. The formatted spelling collapses bare
    and qualified forms together so ["users.id"] and ["users.id"] count as
-   duplicates regardless of which spelling style appeared first. *)
+   duplicates regardless of which spelling style appeared first.
+
+   TODO(projection-dedup-by-resolution): the key is the source spelling,
+   so a bare and a qualified reference to the same resolved column
+   ([name] and [users.name]) slip through as distinct and produce two
+   like-named output columns. Deduplicating by resolved column identity
+   would catch that; it needs the input row kind in hand here. *)
 let check_duplicate_columns ~operator references : error list =
   let rec walk seen errors = function
     | [] -> List.rev errors
