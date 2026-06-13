@@ -14,6 +14,8 @@ Learn the query language from the ground up.
 - [Tables](tutorial/tables.md) — building your own table: create,
   insert, query, and drop, with the literal forms and the `type` and
   `catalog` operators.
+- [SQL](tutorial/sql.md) — the same query on the SQL surface, showing
+  both surfaces drive one engine.
 
 ## Reference — looking something up
 

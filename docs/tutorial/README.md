@@ -18,6 +18,8 @@ The guide is in several parts:
 - [Tables](tables.md) -- building a table of your own: create,
   insert, query, and drop, plus the literal source forms and the
   `type` and `catalog` operators.
+- [SQL](sql.md) -- the same query on the SQL surface, showing both
+  surfaces drive one engine.
 - [Relational-algebra reference](../reference/ra/README.md)
   -- per-operator syntax and semantics, plus the expression and
   projection sublanguages used inside `restrict`, `project`, and
