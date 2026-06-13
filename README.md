@@ -14,6 +14,7 @@ You'll need OCaml 5.2 with Dune.
 opam exec -- dune build              # compile
 opam exec -- dune test               # run all alcotest suites
 opam exec -- dune build @fmt --auto-promote   # format
+opam exec -- dune build @doc         # build the odoc API docs
 ./dovetail                           # run the REPL (default env: ./dovetail-data)
 ./dovetail /tmp/dovetail-play        # ...or pass a custom data directory
 ./dovetail --demo-data /tmp/play     # ...or seed the example tables on first launch
@@ -21,6 +22,11 @@ opam exec -- dune build @fmt --auto-promote   # format
 ./dovetail --show-logical            # ...or print each query's logical plan
 ./dovetail --show-physical           # ...or print each query's physical plan
 ```
+
+`dune build @doc` renders the `.mli` API documentation with odoc;
+the generated HTML lands under `_build/default/_doc/_html/`. It builds
+warning-free, so a markup warning there is a real regression worth
+fixing.
 
 `--show-logical` and `--show-physical` are dev-facing EXPLAIN-style
 debug flags: each prints the relevant plan to stdout before the

@@ -16,4 +16,5 @@
    (>= 3.16))
   lmdb
   angstrom
-  (alcotest :with-test)))
+  (alcotest :with-test)
+  (odoc :with-doc)))
