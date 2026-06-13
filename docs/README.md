@@ -30,6 +30,9 @@ For coders reading the source.
 - [Architecture](internals/architecture.md) — how the pieces fit
   together: the query pipeline, the storage stack, the sub-library
   layout.
+- [Query lifecycle](internals/query-lifecycle.md) — one query traced
+  end to end, from text through AST, logical plan, typecheck, physical
+  plan, and CPS evaluation to the rendered relation.
 - [Executor](internals/executor.md) — why evaluation is in
   continuation-passing style, how the per-operator modules compose,
   and the join materialisation tradeoff.

@@ -68,6 +68,11 @@ Each layer in the diagram, in pipeline order:
 | `Eval`      | Executes the physical plan and returns a `Term`.                                              |
 | `Term`      | The thing returned by a query; either a scalar, row, relation, catalog, or type.              |
 
+For a single query traced through every one of these layers — text,
+AST, logical plan, typecheck, physical plan, evaluation, and rendered
+result, with the value shown at each stage — see
+[query-lifecycle.md](query-lifecycle.md).
+
 ## Sub-libraries
 
 The code under `lib/` is split into seven sub-libraries, each its own dune

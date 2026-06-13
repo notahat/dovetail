@@ -154,7 +154,6 @@ is not committed to here.
   plan search.
 - SQL elaboration beyond the initial frontend — joins, aggregation,
   subqueries, the rest of SELECT.
-- An internals walkthrough that follows a query through the layers.
 - A network protocol so the database can run as a separate process.
 - Network client libraries.
 - An embeddable API for use as a library.
