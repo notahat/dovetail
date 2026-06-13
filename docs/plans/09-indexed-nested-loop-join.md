@@ -1,5 +1,9 @@
 # Slice 9: Indexed nested-loop join over the primary key
 
+**The durable design rationale here is promoted to
+[`docs/internals/optimization.md`](../internals/optimization.md),
+which tracks the code as it evolves; this plan is frozen history.**
+
 The ninth vertical slice. End-state: `users | join orders on
 users.id = orders.user_id` produces an `IndexedNestedLoopJoin`
 that streams one side and probes the other by primary key via

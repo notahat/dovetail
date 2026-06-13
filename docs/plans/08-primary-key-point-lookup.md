@@ -1,5 +1,9 @@
 # Slice 8: Primary-key point lookup
 
+**The durable design rationale here is promoted to
+[`docs/internals/optimization.md`](../internals/optimization.md),
+which tracks the code as it evolves; this plan is frozen history.**
+
 The eighth vertical slice. End-state: `users | restrict id = 5`
 produces an `IndexLookup` physical operator that fetches the
 single matching row by primary key via `Storage.get`, instead of

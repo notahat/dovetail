@@ -33,6 +33,9 @@ For coders reading the source.
 - [Executor](internals/executor.md) — why evaluation is in
   continuation-passing style, how the per-operator modules compose,
   and the join materialisation tradeoff.
+- [Optimization](internals/optimization.md) — the point-lookup and
+  indexed-join rewrite rules, conjunct partitioning, and the
+  invariants they protect.
 - [Ubiquitous language](internals/ubiquitous-language.md) — shared
   vocabulary, defined once.
 
