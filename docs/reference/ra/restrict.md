@@ -17,3 +17,11 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
   (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true)
 }
 ```
+
+A predicate that doesn't resolve to a Bool is a type error, caught
+before the query runs:
+
+```
+> users | restrict name
+error: Restrict: predicate position requires Bool, got String
+```

@@ -18,3 +18,11 @@ relation (insert_count: int64) {
   (insert_count = 1)
 }
 ```
+
+The literal's columns must be a permutation of the target's. A source
+missing target columns is rejected before any rows are written:
+
+```
+> relation (id: int64, name: string) { (id = 1, name = "x") } | insert into users
+error: Insert: into "users": missing column(s): email, active
+```

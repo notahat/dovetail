@@ -23,3 +23,10 @@ relation (users.name: string, users.email: string) {
   (users.name = "Eve", users.email = "eve@example.com")
 }
 ```
+
+A bare name that doesn't resolve to a column of the input is rejected:
+
+```
+> users | project missing
+error: Project: unknown column "missing"
+```

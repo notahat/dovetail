@@ -22,3 +22,13 @@ relation (users.id: int64, users.name: string, users.email: string, users.active
   (users.id = 1, users.name = "Alice", users.email = "alice@example.com", users.active = true, orders.id = 2, orders.user_id = 1, orders.description = "Bagel", orders.amount = 4)
 }
 ```
+
+Comparing two columns of different types is a type error. Because
+`join` desugars to a `cross` followed by a `restrict`, the predicate
+is checked under the restriction, so the error carries the `Restrict:`
+prefix:
+
+```
+> users | join orders on users.id = orders.description
+error: Restrict: type mismatch: column "users.id" is Int64, column "orders.description" is String
+```

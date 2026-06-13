@@ -30,3 +30,11 @@ relation (created: string) {
   (created = "users_copy")
 }
 ```
+
+A declared type with no primary key is rejected — every table must be
+index-organised on one:
+
+```
+> (name: string) | create table bad
+error: Create table: "bad": primary key is empty
+```
