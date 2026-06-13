@@ -1,5 +1,9 @@
 # 28 — SQL frontend: SELECT / FROM / WHERE (single table)
 
+**The durable design rationale here is promoted to
+[`docs/internals/sql-frontend.md`](../internals/sql-frontend.md),
+which tracks the code as it evolves; this plan is frozen history.**
+
 The first SQL slice. Adds a second surface language alongside the
 relational-algebra (RA) pipeline language, fulfilling the foundational
 goal of "two surfaces, one algebraic IR". This slice delivers

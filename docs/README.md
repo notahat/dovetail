@@ -36,6 +36,8 @@ For coders reading the source.
 - [Optimization](internals/optimization.md) — the point-lookup and
   indexed-join rewrite rules, conjunct partitioning, and the
   invariants they protect.
+- [SQL frontend](internals/sql-frontend.md) — how the SQL surface
+  parses, lowers to the shared algebra, and renders results.
 - [Ubiquitous language](internals/ubiquitous-language.md) — shared
   vocabulary, defined once.
 
